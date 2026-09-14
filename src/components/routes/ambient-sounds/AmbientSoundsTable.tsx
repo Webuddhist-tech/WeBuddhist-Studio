@@ -31,8 +31,14 @@ function SortableAmbientSoundRow({
   readonly onEdit: (sound: AmbientSound) => void;
   readonly onDelete: (sound: AmbientSound) => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
-    useSortable({ id: sound.id, disabled: !canReorder });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: sound.id, disabled: !canReorder });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -65,10 +71,17 @@ function SortableAmbientSoundRow({
       </Pecha.TableCell>
       {sound.url ? (
         <Pecha.TableCell>
-          <audio controls preload="none" src={sound.url} className="h-8 max-w-[220px]" />
+          <audio
+            controls
+            preload="none"
+            src={sound.url}
+            className="h-8 max-w-[220px]"
+          />
         </Pecha.TableCell>
       ) : (
-        <Pecha.TableCell className="text-sm text-muted-foreground">—</Pecha.TableCell>
+        <Pecha.TableCell className="text-sm text-muted-foreground">
+          —
+        </Pecha.TableCell>
       )}
       {canManage ? (
         <Pecha.TableCell>

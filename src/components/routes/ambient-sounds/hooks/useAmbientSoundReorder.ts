@@ -3,10 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import { reorderArray } from "@/lib/utils";
-import {
-  updateAmbientSound,
-  type AmbientSound,
-} from "../api/ambientSoundsApi";
+import { updateAmbientSound, type AmbientSound } from "../api/ambientSoundsApi";
 
 const sortByDisplayOrder = (sounds: AmbientSound[]) =>
   [...sounds].sort((a, b) => a.display_order - b.display_order);
@@ -51,7 +48,8 @@ export const useAmbientSoundReorder = (
     },
   });
 
-  const displaySounds = orderedSounds.length > 0 ? orderedSounds : (sounds ?? []);
+  const displaySounds =
+    orderedSounds.length > 0 ? orderedSounds : (sounds ?? []);
   const canReorder = canManage && displaySounds.length > 1;
 
   const handleReorder = (activeId: string, overId: string) => {
