@@ -1,9 +1,32 @@
 import axiosInstance from "@/config/axios-config";
+import type { LanguageCode } from "@/lib/languageCodes";
 
 export interface GroupAccumulatorImage {
   thumbnail: string;
   medium: string;
   original: string;
+}
+
+export interface GroupAccumulatorMetadataDTO {
+  language: LanguageCode;
+  description: string | null;
+}
+
+export type GroupAccumulatorLinkType = "YOUTUBE" | "LINK";
+
+export interface GroupAccumulatorLinkDTO {
+  id: string;
+  url: string;
+  link_type: GroupAccumulatorLinkType;
+  video_id: string | null;
+  title: string | null;
+  display_order: number;
+}
+
+/** Array order becomes `display_order`; `link_type` is derived server-side. */
+export interface GroupAccumulatorLinkInput {
+  url: string;
+  title?: string | null;
 }
 
 export interface GroupAccumulatorDTO {
@@ -16,10 +39,14 @@ export interface GroupAccumulatorDTO {
   target_count: number | null;
   start_date: string | null;
   end_date: string | null;
+  metadata?: GroupAccumulatorMetadataDTO[] | null;
+  links: GroupAccumulatorLinkDTO[];
   member_count?: number;
   created_at: string;
   updated_at: string | null;
 }
+
+export type GroupAccumulatorDetailDTO = GroupAccumulatorDTO;
 
 export interface GroupAccumulatorsResponse {
   accumulators: GroupAccumulatorDTO[];
@@ -35,6 +62,10 @@ export interface CreateGroupAccumulatorRequest {
   target_count?: number | null;
   start_date?: string | null;
   end_date?: string | null;
+  // Both arrays are a full replace, not a delta: omitting leaves existing rows
+  // untouched, `[]` deletes them all. Always send the complete current list.
+  metadata?: GroupAccumulatorMetadataDTO[] | null;
+  links?: GroupAccumulatorLinkInput[] | null;
 }
 
 export type UpdateGroupAccumulatorRequest = CreateGroupAccumulatorRequest;
@@ -42,6 +73,23 @@ export type UpdateGroupAccumulatorRequest = CreateGroupAccumulatorRequest;
 const getAuthHeaders = () => ({
   Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
 });
+
+export const GROUP_ACCUMULATOR_LINK_URL_MAX = 2000;
+export const GROUP_ACCUMULATOR_LINK_TITLE_MAX = 500;
+
+/** Mirrors the server rule behind the 400 `INVALID_URL` response. */
+export function isValidLinkUrl(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > GROUP_ACCUMULATOR_LINK_URL_MAX) return false;
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+  return Boolean(parsed.hostname);
+}
 
 export function resolveGroupAccumulatorImageUrl(
   accumulator: Pick<GroupAccumulatorDTO, "image">,
@@ -90,6 +138,17 @@ export const makeGroupAccumulatorSearchFn =
       total: data.total,
     };
   };
+
+export const fetchGroupAccumulator = async (
+  groupId: string,
+  groupAccumulatorId: string,
+): Promise<GroupAccumulatorDetailDTO> => {
+  const { data } = await axiosInstance.get<GroupAccumulatorDetailDTO>(
+    `/api/v1/cms/groups/${groupId}/accumulators/${groupAccumulatorId}`,
+    { headers: getAuthHeaders() },
+  );
+  return data;
+};
 
 export const createGroupAccumulator = async (
   groupId: string,
