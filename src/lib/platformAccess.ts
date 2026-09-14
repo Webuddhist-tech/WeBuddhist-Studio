@@ -108,6 +108,11 @@ export function canAccessAdminAuthors(role?: PlatformRole | string): boolean {
   return isSuperAdmin(role) || isReviewer(role);
 }
 
+/** Ambient sound catalog CRUD is Super Admin only (shared, sitewide media/S3 writes). */
+export function canManageAmbientSounds(role?: PlatformRole | string): boolean {
+  return isSuperAdmin(role);
+}
+
 /** Whether dashboard group filter should load (staff-wide vs membership list). */
 export function canUseDashboardGroupFilter(
   user?: Pick<UserInfo, "platform_role" | "has_group"> | null,

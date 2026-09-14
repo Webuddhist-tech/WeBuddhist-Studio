@@ -1,0 +1,175 @@
+import { useEffect, useState } from "react";
+import Dropzone from "react-dropzone";
+import { FiUpload } from "react-icons/fi";
+import { toast } from "sonner";
+import { Pecha } from "@/components/ui/shadimport";
+import { Button } from "@/components/ui/atoms/button";
+import type { AmbientSound } from "./api/ambientSoundsApi";
+
+export interface AmbientSoundFormPayload {
+  name: string;
+  displayOrder: number;
+  isDefault: boolean;
+  file: File | null;
+}
+
+interface AmbientSoundFormDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  sound: AmbientSound | null;
+  isSubmitting: boolean;
+  onSubmit: (payload: AmbientSoundFormPayload) => void;
+}
+
+const AmbientSoundFormDialog = ({
+  open,
+  onOpenChange,
+  sound,
+  isSubmitting,
+  onSubmit,
+}: AmbientSoundFormDialogProps) => {
+  const isEdit = !!sound;
+  const [name, setName] = useState("");
+  const [displayOrder, setDisplayOrder] = useState("0");
+  const [isDefault, setIsDefault] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    setName(sound?.name ?? "");
+    setDisplayOrder(sound ? String(sound.display_order) : "0");
+    setIsDefault(sound?.is_default ?? false);
+    setPendingFile(null);
+  }, [open, sound]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      toast.error("Name is required");
+      return;
+    }
+
+    const parsedOrder = Number(displayOrder.trim());
+    if (!Number.isFinite(parsedOrder) || parsedOrder < 0) {
+      toast.error("Order must be a non-negative number");
+      return;
+    }
+
+    if (!isEdit && !pendingFile) {
+      toast.error("An audio file is required");
+      return;
+    }
+
+    onSubmit({
+      name: trimmedName,
+      displayOrder: parsedOrder,
+      isDefault,
+      file: pendingFile,
+    });
+  };
+
+  const idleLabel = isEdit ? "Save changes" : "Add sound";
+  const pendingLabel = isEdit ? "Saving…" : "Adding…";
+  const submitLabel = isSubmitting ? pendingLabel : idleLabel;
+
+  return (
+    <Pecha.Dialog open={open} onOpenChange={onOpenChange}>
+      <Pecha.DialogContent className="max-w-lg">
+        <Pecha.DialogHeader>
+          <Pecha.DialogTitle>
+            {isEdit ? `Edit sound — ${sound.name}` : "Add ambient sound"}
+          </Pecha.DialogTitle>
+        </Pecha.DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-5 pt-2">
+          <div className="space-y-2">
+            <p className="text-sm font-bold">Name</p>
+            <Pecha.Input
+              placeholder="e.g. Sea waves"
+              className="h-12 bg-white dark:bg-[#262626]"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm font-bold">Order</p>
+            <Pecha.Input
+              type="number"
+              min={0}
+              className="h-12 bg-white dark:bg-[#262626]"
+              value={displayOrder}
+              onChange={(e) => setDisplayOrder(e.target.value)}
+            />
+          </div>
+
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <Pecha.Checkbox
+              checked={isDefault}
+              onCheckedChange={(checked) => setIsDefault(checked === true)}
+            />
+            Default sound
+          </label>
+
+          <div className="space-y-2">
+            <p className="text-sm font-bold">Audio file</p>
+            <Dropzone
+              accept={{ "audio/*": [".mp3", ".m4a", ".wav", ".aac", ".ogg"] }}
+              multiple={false}
+              disabled={isSubmitting}
+              onDrop={(files) => setPendingFile(files[0] ?? null)}
+            >
+              {({ getRootProps, getInputProps }) => (
+                <div
+                  {...getRootProps()}
+                  className="cursor-pointer rounded-lg border border-dashed p-6 text-center hover:bg-muted/50"
+                >
+                  <input {...getInputProps()} />
+                  <FiUpload className="mx-auto mb-2 h-5 w-5" />
+                  <p className="text-sm font-medium">
+                    {pendingFile
+                      ? pendingFile.name
+                      : isEdit
+                        ? "Replace audio (optional)"
+                        : "Add an audio file"}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    MP3, M4A, WAV, AAC, or OGG; maximum 50 MB.
+                  </p>
+                </div>
+              )}
+            </Dropzone>
+            {isEdit && !pendingFile ? (
+              <p className="text-xs text-muted-foreground">
+                Leave empty to keep the current audio.
+              </p>
+            ) : null}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="bg-[#A51C21] text-white hover:bg-[#A51C21]/90"
+              disabled={isSubmitting}
+            >
+              {submitLabel}
+            </Button>
+          </div>
+        </form>
+      </Pecha.DialogContent>
+    </Pecha.Dialog>
+  );
+};
+
+export default AmbientSoundFormDialog;

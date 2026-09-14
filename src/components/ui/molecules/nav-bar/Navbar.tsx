@@ -19,6 +19,7 @@ import {
   MdAdminPanelSettings,
   MdOutlineReportProblem,
   MdPublicOff,
+  MdMusicNote,
 } from "react-icons/md";
 import { ROUTES } from "@/routes/paths";
 import { SIDEBAR_EXPANDED } from "@/lib/constant";
@@ -172,6 +173,12 @@ const Navbar = () => {
             label: "Chat Reports",
             path: ROUTES.adminChatReports,
             tooltip: "Chat moderation reports",
+          },
+          {
+            icon: <MdMusicNote className="w-4 h-4" />,
+            label: "Ambient Sounds",
+            path: ROUTES.ambientSounds,
+            tooltip: "Manage ambient sound catalog",
           },
         ]
       : []),
