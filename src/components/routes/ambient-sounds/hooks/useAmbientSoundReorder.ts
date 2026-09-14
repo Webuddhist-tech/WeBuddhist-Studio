@@ -21,36 +21,44 @@ export const useAmbientSoundReorder = (
     }
   }, [sounds]);
 
+  const reconcileWithServer = () => {
+    // Re-fetch rather than trusting any local snapshot: with no bulk
+    // reorder endpoint, a "failed" attempt can still have partially applied
+    // on the server (some of its per-row PUTs may have succeeded before one
+    // failed), so the only source of truth afterward is the server itself.
+    queryClient.invalidateQueries({ queryKey: ["cms-ambient-sounds"] });
+  };
+
   const reorderMutation = useMutation({
     mutationFn: async (next: AmbientSound[]) => {
       // No bulk reorder endpoint exists - persist only the rows whose
-      // position actually changed, one PUT each.
+      // position actually changed. Sequential, not Promise.all: this keeps
+      // a failure's blast radius predictable (everything up to the failed
+      // row is known to have been applied) instead of firing every PUT at
+      // once and losing track of which ones landed.
       const updates = next
         .map((sound, index) => ({ sound, index }))
         .filter(({ sound, index }) => sound.display_order !== index);
 
-      await Promise.all(
-        updates.map(({ sound, index }) =>
-          updateAmbientSound(sound.id, { displayOrder: index }),
-        ),
-      );
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["cms-ambient-sounds"] });
-    },
-    onError: (err) => {
-      if (sounds) {
-        setOrderedSounds(sortByDisplayOrder(sounds));
+      for (const { sound, index } of updates) {
+        await updateAmbientSound(sound.id, { displayOrder: index });
       }
+    },
+    onSuccess: reconcileWithServer,
+    onError: (err) => {
       toast.error("Failed to reorder sounds", {
         description: getApiErrorMessage(err),
       });
+      reconcileWithServer();
     },
   });
 
   const displaySounds =
     orderedSounds.length > 0 ? orderedSounds : (sounds ?? []);
-  const canReorder = canManage && displaySounds.length > 1;
+  // Serialized: block new drags while one reorder is still persisting, so
+  // a second drag can't race the first's in-flight requests.
+  const canReorder =
+    canManage && displaySounds.length > 1 && !reorderMutation.isPending;
 
   const handleReorder = (activeId: string, overId: string) => {
     if (!canReorder || activeId === overId) return;

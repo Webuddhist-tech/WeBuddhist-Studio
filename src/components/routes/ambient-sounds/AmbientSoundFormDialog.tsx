@@ -1,10 +1,28 @@
 import { useEffect, useState } from "react";
-import Dropzone from "react-dropzone";
+import Dropzone, { ErrorCode, type FileRejection } from "react-dropzone";
 import { FiUpload } from "react-icons/fi";
 import { toast } from "sonner";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import type { AmbientSound } from "./api/ambientSoundsApi";
+
+// Matches the backend's MAX_AUDIO_FILE_SIZE (pecha_api/config.py) — enforced
+// here too so an oversized file is rejected locally instead of failing the
+// upload request.
+const MAX_AUDIO_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+
+const describeRejection = (rejection: FileRejection): string => {
+  const isTooLarge = rejection.errors.some(
+    (error) => error.code === ErrorCode.FileTooLarge,
+  );
+  if (isTooLarge) return "File is too large — maximum 50 MB.";
+  const isInvalidType = rejection.errors.some(
+    (error) => error.code === ErrorCode.FileInvalidType,
+  );
+  if (isInvalidType)
+    return "Unsupported file type — use MP3, M4A, WAV, AAC, or OGG.";
+  return rejection.errors[0]?.message ?? "File was rejected.";
+};
 
 export interface AmbientSoundFormPayload {
   name: string;
@@ -119,8 +137,13 @@ const AmbientSoundFormDialog = ({
             <Dropzone
               accept={{ "audio/*": [".mp3", ".m4a", ".wav", ".aac", ".ogg"] }}
               multiple={false}
+              maxSize={MAX_AUDIO_FILE_SIZE_BYTES}
               disabled={isSubmitting}
               onDrop={(files) => setPendingFile(files[0] ?? null)}
+              onDropRejected={(rejections) => {
+                const rejection = rejections[0];
+                if (rejection) toast.error(describeRejection(rejection));
+              }}
             >
               {({ getRootProps, getInputProps }) => (
                 <div
