@@ -62,6 +62,8 @@ type AccumulatorFormState = {
   about_languages: string[];
   about_descriptions: Record<string, string>;
   links: AccumulatorLinkRow[];
+  metadata_loaded: boolean;
+  links_loaded: boolean;
 };
 
 const emptyFormState = (): AccumulatorFormState => ({
@@ -75,6 +77,8 @@ const emptyFormState = (): AccumulatorFormState => ({
   about_languages: [],
   about_descriptions: {},
   links: [],
+  metadata_loaded: true,
+  links_loaded: true,
 });
 
 /** Turns the CMS `metadata` array into the About field's per-language state. */
@@ -110,6 +114,8 @@ function formStateFromAccumulator(
     about_languages: about.languages,
     about_descriptions: about.descriptions,
     links: linkRowsFromDetail(accumulator),
+    metadata_loaded: Array.isArray(accumulator.metadata),
+    links_loaded: Array.isArray(accumulator.links),
   };
 }
 
@@ -273,8 +279,8 @@ const GroupAccumulatorsPanel = ({
       target_count: Number.isFinite(target_count) ? target_count : null,
       start_date: form.start_date,
       end_date: form.end_date,
-      metadata,
-      links,
+      ...(form.metadata_loaded ? { metadata } : {}),
+      ...(form.links_loaded ? { links } : {}),
     };
   };
 
@@ -286,7 +292,11 @@ const GroupAccumulatorsPanel = ({
       if (form.links.some(isLinkRowFilled)) {
         // Keep the dialog open so the author can see how each link resolved.
         setEditing(created);
-        setForm((prev) => ({ ...prev, links: linkRowsFromDetail(created) }));
+        setForm((prev) => ({
+          ...prev,
+          links: linkRowsFromDetail(created),
+          links_loaded: Array.isArray(created.links),
+        }));
         return;
       }
       closeDialog();
@@ -301,7 +311,11 @@ const GroupAccumulatorsPanel = ({
       toast.success("Accumulator updated");
       invalidate();
       if (form.links.some(isLinkRowFilled)) {
-        setForm((prev) => ({ ...prev, links: linkRowsFromDetail(updated) }));
+        setForm((prev) => ({
+          ...prev,
+          links: linkRowsFromDetail(updated),
+          links_loaded: Array.isArray(updated.links),
+        }));
         return;
       }
       closeDialog();
@@ -367,6 +381,22 @@ const GroupAccumulatorsPanel = ({
     } finally {
       setImageUploading(false);
     }
+  };
+
+  /** Drop the error on a row once it validates, without flagging rows the
+   *  author is still typing into. */
+  const clearFixedLinkErrors = (rows: AccumulatorLinkRow[]) => {
+    setLinkErrors((prev) => {
+      if (Object.keys(prev).length === 0) return prev;
+      const stillInvalid = validateLinkRows(rows);
+      const next: Record<string, string> = {};
+      Object.keys(prev).forEach((rowId) => {
+        if (stillInvalid[rowId]) next[rowId] = stillInvalid[rowId];
+      });
+      return Object.keys(next).length === Object.keys(prev).length
+        ? prev
+        : next;
+    });
   };
 
   const handleSubmit = (event: React.FormEvent) => {
@@ -760,7 +790,10 @@ const GroupAccumulatorsPanel = ({
                 <AccumulatorLinksField
                   rows={form.links}
                   errors={linkErrors}
-                  onChange={(links) => setForm((prev) => ({ ...prev, links }))}
+                  onChange={(links) => {
+                    setForm((prev) => ({ ...prev, links }));
+                    clearFixedLinkErrors(links);
+                  }}
                 />
               </div>
             </div>
