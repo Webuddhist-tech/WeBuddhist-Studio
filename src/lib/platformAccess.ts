@@ -113,6 +113,11 @@ export function canManageAmbientSounds(role?: PlatformRole | string): boolean {
   return isSuperAdmin(role);
 }
 
+/** Whether the user may publish timer audio presets to every app user. */
+export function canManageTimerAudios(role?: PlatformRole | string): boolean {
+  return isSuperAdmin(role);
+}
+
 /** Whether dashboard group filter should load (staff-wide vs membership list). */
 export function canUseDashboardGroupFilter(
   user?: Pick<UserInfo, "platform_role" | "has_group"> | null,

@@ -180,6 +180,12 @@ const Navbar = () => {
             path: ROUTES.ambientSounds,
             tooltip: "Manage ambient sound catalog",
           },
+          {
+            icon: <MdMusicNote className="w-4 h-4" />,
+            label: "Timer Audios",
+            path: ROUTES.timerAudios,
+            tooltip: "Manage timer audio presets",
+          },
         ]
       : []),
   ];
