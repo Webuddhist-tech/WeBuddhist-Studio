@@ -57,6 +57,7 @@ import ChinaRestrictionsPage from "./components/routes/china-restrictions/ChinaR
 import ChatReportsPage from "./components/routes/chat-reports/ChatReportsPage.tsx";
 import AccumulatorPresetsPage from "./components/routes/accumulator-presets/AccumulatorPresetsPage.tsx";
 import TextAudioPage from "./components/routes/text-audio/TextAudioPage.tsx";
+import AmbientSoundsPage from "./components/routes/ambient-sounds/AmbientSoundsPage.tsx";
 import { UserbackProvider } from "./config/userback-context.tsx";
 import { Navigate } from "react-router-dom";
 import { ROUTES } from "./routes/paths.ts";
@@ -249,6 +250,14 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <TextAudioPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: ROUTES.ambientSounds,
+        element: (
+          <ProtectedRoute>
+            <AmbientSoundsPage />
           </ProtectedRoute>
         ),
       },

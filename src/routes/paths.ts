@@ -51,6 +51,7 @@ export const ROUTES = {
   adminChatReports: "/admin/chat-reports",
   accumulatorPresets: "/accumulator-presets",
   textAudio: "/text-audio",
+  ambientSounds: "/ambient-sounds",
 } as const;
 
 export const AUTH_ROUTE_PATHS: readonly string[] = [
