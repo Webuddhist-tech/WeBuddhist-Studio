@@ -124,7 +124,8 @@ const TimerAudioFormDialog = ({
               onDrop={(files) => setPendingAudio(files[0] ?? null)}
               onDropRejected={(rejections) => {
                 const rejection = rejections[0];
-                if (rejection) toast.error(describeRejection(rejection, "audio"));
+                if (rejection)
+                  toast.error(describeRejection(rejection, "audio"));
               }}
             >
               {({ getRootProps, getInputProps }) => (
@@ -169,7 +170,8 @@ const TimerAudioFormDialog = ({
               onDrop={(files) => setPendingImage(files[0] ?? null)}
               onDropRejected={(rejections) => {
                 const rejection = rejections[0];
-                if (rejection) toast.error(describeRejection(rejection, "image"));
+                if (rejection)
+                  toast.error(describeRejection(rejection, "image"));
               }}
             >
               {({ getRootProps, getInputProps }) => (
