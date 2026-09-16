@@ -40,14 +40,17 @@ const getAuthHeaders = () => ({
 
 const CMS_BASE = "/api/v1/timers/audios/cms";
 
-export const fetchTimerAudioPresets =
-  async (): Promise<TimerAudiosResponse> => {
-    const { data } = await axiosInstance.get<TimerAudiosResponse>(CMS_BASE, {
-      headers: getAuthHeaders(),
-      params: { skip: 0, limit: 100 },
-    });
-    return data;
-  };
+export const fetchTimerAudioPresets = async (
+  page: number,
+  limit: number,
+): Promise<TimerAudiosResponse> => {
+  const skip = (page - 1) * limit;
+  const { data } = await axiosInstance.get<TimerAudiosResponse>(CMS_BASE, {
+    headers: getAuthHeaders(),
+    params: { skip, limit },
+  });
+  return data;
+};
 
 export const createTimerAudioPreset = async (
   payload: CreateTimerAudioPresetPayload,

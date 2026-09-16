@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { IoMdAdd } from "react-icons/io";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import AuthButton from "@/components/ui/molecules/auth-button/AuthButton";
+import { Pagination } from "@/components/ui/molecules/pagination/Pagination";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import { useUserInfo } from "@/hooks/useUserInfo";
 import { canManageTimerAudios } from "@/lib/platformAccess";
@@ -20,9 +21,12 @@ import TimerAudioFormDialog, {
   type TimerAudioFormPayload,
 } from "./TimerAudioFormDialog";
 
+const PAGE_SIZE = 10;
+
 const TimerAudiosPage = () => {
   const { data: userInfo } = useUserInfo();
   const canManage = canManageTimerAudios(userInfo?.platform_role);
+  const [currentPage, setCurrentPage] = useState(1);
   const [formOpen, setFormOpen] = useState(false);
   const [editingAudio, setEditingAudio] = useState<TimerAudio | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<TimerAudio | null>(null);
@@ -34,8 +38,8 @@ const TimerAudiosPage = () => {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["cms-timer-audios"],
-    queryFn: fetchTimerAudioPresets,
+    queryKey: ["cms-timer-audios", currentPage],
+    queryFn: () => fetchTimerAudioPresets(currentPage, PAGE_SIZE),
     // The backend requires Super Admin to read this catalogue, not just to
     // write it, so asking without the role would only produce a 403.
     enabled: canManage,
@@ -44,6 +48,16 @@ const TimerAudiosPage = () => {
   });
 
   const audios = audiosData?.audios ?? [];
+  const totalPages = Math.max(
+    1,
+    Math.ceil((audiosData?.total ?? 0) / PAGE_SIZE),
+  );
+
+  useEffect(() => {
+    if (audiosData && currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [audiosData, currentPage, totalPages]);
 
   const invalidateAudios = () => {
     queryClient.invalidateQueries({ queryKey: ["cms-timer-audios"] });
@@ -81,6 +95,9 @@ const TimerAudiosPage = () => {
     onSuccess: () => {
       toast.success("Preset deleted successfully");
       setDeleteTarget(null);
+      if (audios.length === 1 && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      }
       invalidateAudios();
     },
     onError: (err) => toast.error(getApiErrorMessage(err)),
@@ -116,6 +133,16 @@ const TimerAudiosPage = () => {
   };
 
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
+
+  const handleDeleteOpenChange = (open: boolean) => {
+    if (!open && !deleteMutation.isPending) setDeleteTarget(null);
+  };
+
+  const handleConfirmDelete = (e: MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    if (!deleteTarget) return;
+    deleteMutation.mutate(deleteTarget.id);
+  };
 
   return (
     <div className="flex flex-col border h-[calc(100vh-40px)] overflow-auto bg-[#F5F5F5] dark:bg-[#181818] my-4 rounded-l-2xl font-dynamic">
@@ -171,15 +198,26 @@ const TimerAudiosPage = () => {
             ) : null}
           </div>
         ) : (
-          <div className="w-full flex-1 overflow-auto">
-            <TimerAudiosTable
-              audios={audios}
-              isLoading={isLoading}
-              canManage={canManage}
-              onEdit={handleOpenEdit}
-              onDelete={setDeleteTarget}
-            />
-          </div>
+          <>
+            <div className="w-full flex-1 overflow-auto">
+              <TimerAudiosTable
+                audios={audios}
+                isLoading={isLoading}
+                canManage={canManage}
+                onEdit={handleOpenEdit}
+                onDelete={setDeleteTarget}
+              />
+            </div>
+            {totalPages > 1 ? (
+              <div className="py-4">
+                <Pagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                />
+              </div>
+            ) : null}
+          </>
         )}
       </div>
 
@@ -198,9 +236,7 @@ const TimerAudiosPage = () => {
 
       <Pecha.AlertDialog
         open={!!deleteTarget}
-        onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null);
-        }}
+        onOpenChange={handleDeleteOpenChange}
       >
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
@@ -212,12 +248,12 @@ const TimerAudiosPage = () => {
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <Pecha.AlertDialogFooter>
-            <Pecha.AlertDialogCancel>Cancel</Pecha.AlertDialogCancel>
+            <Pecha.AlertDialogCancel disabled={deleteMutation.isPending}>
+              Cancel
+            </Pecha.AlertDialogCancel>
             <Pecha.AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
-              onClick={() => {
-                if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
-              }}
+              onClick={handleConfirmDelete}
               disabled={deleteMutation.isPending}
             >
               {deleteMutation.isPending ? "Deleting…" : "Delete"}
