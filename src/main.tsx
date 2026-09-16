@@ -58,6 +58,7 @@ import ChatReportsPage from "./components/routes/chat-reports/ChatReportsPage.ts
 import AccumulatorPresetsPage from "./components/routes/accumulator-presets/AccumulatorPresetsPage.tsx";
 import TextAudioPage from "./components/routes/text-audio/TextAudioPage.tsx";
 import AmbientSoundsPage from "./components/routes/ambient-sounds/AmbientSoundsPage.tsx";
+import TimerAudiosPage from "./components/routes/timer-audios/TimerAudiosPage.tsx";
 import { UserbackProvider } from "./config/userback-context.tsx";
 import { Navigate } from "react-router-dom";
 import { ROUTES } from "./routes/paths.ts";
@@ -258,6 +259,14 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <AmbientSoundsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: ROUTES.timerAudios,
+        element: (
+          <ProtectedRoute>
+            <TimerAudiosPage />
           </ProtectedRoute>
         ),
       },
