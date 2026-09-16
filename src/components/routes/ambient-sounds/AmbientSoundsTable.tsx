@@ -11,6 +11,7 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
+import { useState } from "react";
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
 import { IoMdCreate, IoMdTrash } from "react-icons/io";
@@ -46,6 +47,13 @@ function SortableAmbientSoundRow({
     opacity: isDragging ? 0.5 : 1,
   };
 
+  // Covers are presigned URLs with a one-hour life, so a tab left open long
+  // enough will start 403ing. Remember which URL failed rather than a bare
+  // boolean: a refetch mints a fresh URL, which won't match and so gets its
+  // own attempt instead of being stuck behind one earlier failure.
+  const [failedCoverUrl, setFailedCoverUrl] = useState<string | null>(null);
+  const showCover = !!sound.image_url && sound.image_url !== failedCoverUrl;
+
   return (
     <Pecha.TableRow ref={setNodeRef} style={style} {...attributes}>
       {canManage ? (
@@ -62,11 +70,12 @@ function SortableAmbientSoundRow({
         </Pecha.TableCell>
       ) : null}
       <Pecha.TableCell>
-        {sound.image_url ? (
+        {showCover ? (
           <img
-            src={sound.image_url}
+            src={sound.image_url ?? undefined}
             alt=""
             className="h-10 w-10 rounded object-cover"
+            onError={() => setFailedCoverUrl(sound.image_url)}
           />
         ) : (
           <div
