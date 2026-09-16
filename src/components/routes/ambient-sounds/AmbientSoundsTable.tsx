@@ -61,6 +61,20 @@ function SortableAmbientSoundRow({
           </button>
         </Pecha.TableCell>
       ) : null}
+      <Pecha.TableCell>
+        {sound.image_url ? (
+          <img
+            src={sound.image_url}
+            alt=""
+            className="h-10 w-10 rounded object-cover"
+          />
+        ) : (
+          <div
+            className="h-10 w-10 rounded bg-muted"
+            aria-label={`${sound.name} has no cover image`}
+          />
+        )}
+      </Pecha.TableCell>
       <Pecha.TableCell className="font-medium">{sound.name}</Pecha.TableCell>
       <Pecha.TableCell>
         {sound.is_default ? (
@@ -159,6 +173,7 @@ const AmbientSoundsTable = ({
           <Pecha.TableHeader>
             <Pecha.TableRow>
               {canManage ? <Pecha.TableHead className="w-10" /> : null}
+              <Pecha.TableHead className="w-16">Cover</Pecha.TableHead>
               <Pecha.TableHead>Name</Pecha.TableHead>
               <Pecha.TableHead>Default</Pecha.TableHead>
               <Pecha.TableHead>Preview</Pecha.TableHead>

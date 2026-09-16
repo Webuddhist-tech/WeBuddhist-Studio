@@ -106,6 +106,7 @@ const AmbientSoundsPage = () => {
           displayOrder: payload.displayOrder,
           isDefault: payload.isDefault,
           file: payload.file ?? undefined,
+          imageFile: payload.imageFile ?? undefined,
         },
       });
     } else {
@@ -114,6 +115,7 @@ const AmbientSoundsPage = () => {
         displayOrder: payload.displayOrder,
         isDefault: payload.isDefault,
         file: payload.file as File,
+        imageFile: payload.imageFile ?? undefined,
       });
     }
   };

@@ -35,7 +35,7 @@ import AuthAvatar from "@/components/ui/molecules/auth-avatar/AuthAvatar";
 import { useUserInfo } from "@/hooks/useUserInfo";
 import {
   canAccessAdminAuthors,
-  canManageTimerAudios,
+  canManageAmbientSounds,
   isStaffRole,
 } from "@/lib/platformAccess";
 
@@ -149,7 +149,7 @@ const Navbar = () => {
   const [expanded, setExpanded] = useState(readStoredExpanded);
   const showAdminAuthors = canAccessAdminAuthors(userInfo?.platform_role);
   /** Reviewers reach the admin section, but this catalogue is Super Admin only. */
-  const showTimerAudios = canManageTimerAudios(userInfo?.platform_role);
+  const showAmbientSounds = canManageAmbientSounds(userInfo?.platform_role);
   /** Plain CREATOR accounts only manage their author groups — no other CMS pages. */
   const isGroupsOnly =
     !isUserInfoLoading && !isStaffRole(userInfo?.platform_role);
@@ -180,19 +180,13 @@ const Navbar = () => {
             path: ROUTES.adminChatReports,
             tooltip: "Chat moderation reports",
           },
-          {
-            icon: <MdMusicNote className="w-4 h-4" />,
-            label: "Ambient Sounds",
-            path: ROUTES.ambientSounds,
-            tooltip: "Manage ambient sound catalog",
-          },
-          ...(showTimerAudios
+          ...(showAmbientSounds
             ? [
                 {
                   icon: <MdMusicNote className="w-4 h-4" />,
-                  label: "Timer Audios",
-                  path: ROUTES.timerAudios,
-                  tooltip: "Manage timer audio presets",
+                  label: "Ambient Sounds",
+                  path: ROUTES.ambientSounds,
+                  tooltip: "Manage ambient sound catalog",
                 },
               ]
             : []),

@@ -89,6 +89,27 @@ describe("Navbar", () => {
     expect(
       screen.getByRole("link", { name: /author administration/i }),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /manage ambient sound catalog/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the ambient sound catalogue out of a REVIEWER's nav", () => {
+    // Reviewers reach the admin section, but the catalogue writes shared,
+    // sitewide media, so it stays Super Admin only.
+    vi.mocked(useUserInfo).mockReturnValue({
+      data: { id: "1", platform_role: "REVIEWER" },
+      isLoading: false,
+    } as ReturnType<typeof useUserInfo>);
+
+    renderNavbar();
+
+    expect(
+      screen.getByRole("link", { name: /author administration/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /manage ambient sound catalog/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows the full nav for a REVIEWER account", () => {

@@ -10,17 +10,30 @@ import type { AmbientSound } from "./api/ambientSoundsApi";
 // here too so an oversized file is rejected locally instead of failing the
 // upload request.
 const MAX_AUDIO_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+// The cover is re-encoded to WebP server side, but the raw upload still has to
+// clear the backend's MAX_FILE_SIZE_MB before it gets there.
+const MAX_IMAGE_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 
-const describeRejection = (rejection: FileRejection): string => {
+const describeRejection = (
+  rejection: FileRejection,
+  kind: "audio" | "image",
+): string => {
   const isTooLarge = rejection.errors.some(
     (error) => error.code === ErrorCode.FileTooLarge,
   );
-  if (isTooLarge) return "File is too large — maximum 50 MB.";
+  if (isTooLarge) {
+    return kind === "audio"
+      ? "File is too large — maximum 50 MB."
+      : "Image is too large — maximum 5 MB.";
+  }
   const isInvalidType = rejection.errors.some(
     (error) => error.code === ErrorCode.FileInvalidType,
   );
-  if (isInvalidType)
-    return "Unsupported file type — use MP3, M4A, WAV, AAC, or OGG.";
+  if (isInvalidType) {
+    return kind === "audio"
+      ? "Unsupported file type — use MP3, M4A, WAV, AAC, or OGG."
+      : "Unsupported image type — use PNG, JPG, or WEBP.";
+  }
   return rejection.errors[0]?.message ?? "File was rejected.";
 };
 
@@ -29,6 +42,7 @@ export interface AmbientSoundFormPayload {
   displayOrder: number;
   isDefault: boolean;
   file: File | null;
+  imageFile: File | null;
 }
 
 interface AmbientSoundFormDialogProps {
@@ -51,6 +65,7 @@ const AmbientSoundFormDialog = ({
   const [displayOrder, setDisplayOrder] = useState("0");
   const [isDefault, setIsDefault] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingImage, setPendingImage] = useState<File | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -59,6 +74,7 @@ const AmbientSoundFormDialog = ({
     setDisplayOrder(sound ? String(sound.display_order) : "0");
     setIsDefault(sound?.is_default ?? false);
     setPendingFile(null);
+    setPendingImage(null);
   }, [open, sound]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -86,6 +102,7 @@ const AmbientSoundFormDialog = ({
       displayOrder: parsedOrder,
       isDefault,
       file: pendingFile,
+      imageFile: pendingImage,
     });
   };
 
@@ -142,7 +159,7 @@ const AmbientSoundFormDialog = ({
               onDrop={(files) => setPendingFile(files[0] ?? null)}
               onDropRejected={(rejections) => {
                 const rejection = rejections[0];
-                if (rejection) toast.error(describeRejection(rejection));
+                if (rejection) toast.error(describeRejection(rejection, "audio"));
               }}
             >
               {({ getRootProps, getInputProps }) => (
@@ -168,6 +185,51 @@ const AmbientSoundFormDialog = ({
             {isEdit && !pendingFile ? (
               <p className="text-xs text-muted-foreground">
                 Leave empty to keep the current audio.
+              </p>
+            ) : null}
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm font-bold">
+              Cover image{" "}
+              <span className="font-normal text-muted-foreground">
+                (optional)
+              </span>
+            </p>
+            <Dropzone
+              accept={{ "image/*": [".png", ".jpg", ".jpeg", ".webp"] }}
+              multiple={false}
+              maxSize={MAX_IMAGE_FILE_SIZE_BYTES}
+              disabled={isSubmitting}
+              onDrop={(files) => setPendingImage(files[0] ?? null)}
+              onDropRejected={(rejections) => {
+                const rejection = rejections[0];
+                if (rejection) toast.error(describeRejection(rejection, "image"));
+              }}
+            >
+              {({ getRootProps, getInputProps }) => (
+                <div
+                  {...getRootProps()}
+                  className="cursor-pointer rounded-lg border border-dashed p-6 text-center hover:bg-muted/50"
+                >
+                  <input {...getInputProps()} />
+                  <FiUpload className="mx-auto mb-2 h-5 w-5" />
+                  <p className="text-sm font-medium">
+                    {pendingImage
+                      ? pendingImage.name
+                      : sound?.image_url
+                        ? "Replace image (optional)"
+                        : "Add a cover image"}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    PNG, JPG, or WEBP; maximum 5 MB.
+                  </p>
+                </div>
+              )}
+            </Dropzone>
+            {isEdit && !pendingImage && sound?.image_url ? (
+              <p className="text-xs text-muted-foreground">
+                Leave empty to keep the current image.
               </p>
             ) : null}
           </div>
