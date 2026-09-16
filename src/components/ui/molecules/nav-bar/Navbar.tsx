@@ -33,7 +33,11 @@ import {
 } from "../../atoms/tooltip";
 import AuthAvatar from "@/components/ui/molecules/auth-avatar/AuthAvatar";
 import { useUserInfo } from "@/hooks/useUserInfo";
-import { canAccessAdminAuthors, isStaffRole } from "@/lib/platformAccess";
+import {
+  canAccessAdminAuthors,
+  canManageTimerAudios,
+  isStaffRole,
+} from "@/lib/platformAccess";
 
 const navItems = [
   {
@@ -144,6 +148,8 @@ const Navbar = () => {
   const { data: userInfo, isLoading: isUserInfoLoading } = useUserInfo();
   const [expanded, setExpanded] = useState(readStoredExpanded);
   const showAdminAuthors = canAccessAdminAuthors(userInfo?.platform_role);
+  /** Reviewers reach the admin section, but this catalogue is Super Admin only. */
+  const showTimerAudios = canManageTimerAudios(userInfo?.platform_role);
   /** Plain CREATOR accounts only manage their author groups — no other CMS pages. */
   const isGroupsOnly =
     !isUserInfoLoading && !isStaffRole(userInfo?.platform_role);
@@ -180,12 +186,16 @@ const Navbar = () => {
             path: ROUTES.ambientSounds,
             tooltip: "Manage ambient sound catalog",
           },
-          {
-            icon: <MdMusicNote className="w-4 h-4" />,
-            label: "Timer Audios",
-            path: ROUTES.timerAudios,
-            tooltip: "Manage timer audio presets",
-          },
+          ...(showTimerAudios
+            ? [
+                {
+                  icon: <MdMusicNote className="w-4 h-4" />,
+                  label: "Timer Audios",
+                  path: ROUTES.timerAudios,
+                  tooltip: "Manage timer audio presets",
+                },
+              ]
+            : []),
         ]
       : []),
   ];

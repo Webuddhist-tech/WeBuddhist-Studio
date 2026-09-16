@@ -36,6 +36,9 @@ const TimerAudiosPage = () => {
   } = useQuery({
     queryKey: ["cms-timer-audios"],
     queryFn: fetchTimerAudioPresets,
+    // The backend requires Super Admin to read this catalogue, not just to
+    // write it, so asking without the role would only produce a 403.
+    enabled: canManage,
     refetchOnWindowFocus: false,
     retry: false,
   });
@@ -142,7 +145,13 @@ const TimerAudiosPage = () => {
       </div>
 
       <div className="px-4 pt-4 h-full flex flex-col items-center justify-between flex-1 min-h-0">
-        {error ? (
+        {!canManage ? (
+          <div className="flex flex-col h-full items-center justify-center">
+            <p className="text-base text-muted-foreground">
+              Timer audio presets are managed by Super Admins.
+            </p>
+          </div>
+        ) : error ? (
           <p className="text-sm text-red-500 py-8">
             Failed to load timer audio presets. {getApiErrorMessage(error)}
           </p>
