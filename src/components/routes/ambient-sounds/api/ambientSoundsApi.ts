@@ -4,6 +4,7 @@ export interface AmbientSound {
   id: string;
   name: string;
   url: string | null;
+  image_url: string | null;
   is_default: boolean;
   display_order: number;
 }
@@ -17,6 +18,7 @@ export interface CreateAmbientSoundPayload {
   displayOrder: number;
   isDefault: boolean;
   file: File;
+  imageFile?: File | null;
 }
 
 export interface UpdateAmbientSoundPayload {
@@ -24,6 +26,7 @@ export interface UpdateAmbientSoundPayload {
   displayOrder?: number;
   isDefault?: boolean;
   file?: File;
+  imageFile?: File | null;
 }
 
 const getAuthHeaders = () => ({
@@ -45,6 +48,7 @@ export const createAmbientSound = async (
   body.append("display_order", String(payload.displayOrder));
   body.append("is_default", String(payload.isDefault));
   body.append("file", payload.file);
+  if (payload.imageFile) body.append("image_file", payload.imageFile);
 
   const { data } = await axiosInstance.post<AmbientSound>(
     "/api/v1/ambient-sounds/cms",
@@ -67,6 +71,7 @@ export const updateAmbientSound = async (
     body.append("is_default", String(payload.isDefault));
   }
   if (payload.file) body.append("file", payload.file);
+  if (payload.imageFile) body.append("image_file", payload.imageFile);
 
   const { data } = await axiosInstance.put<AmbientSound>(
     `/api/v1/ambient-sounds/cms/${id}`,

@@ -53,7 +53,6 @@ export const ROUTES = {
   accumulatorPresets: "/accumulator-presets",
   textAudio: "/text-audio",
   ambientSounds: "/ambient-sounds",
-  timerAudios: "/timer-audios",
 } as const;
 
 export const AUTH_ROUTE_PATHS: readonly string[] = [

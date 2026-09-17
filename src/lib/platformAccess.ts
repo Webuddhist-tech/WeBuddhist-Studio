@@ -108,13 +108,10 @@ export function canAccessAdminAuthors(role?: PlatformRole | string): boolean {
   return isSuperAdmin(role) || isReviewer(role);
 }
 
-/** Ambient sound catalog CRUD is Super Admin only (shared, sitewide media/S3 writes). */
+/** The ambient sound catalogue is the one background-sound catalogue: curated
+ * in Studio, chosen per timer in the app. CRUD is Super Admin only (shared,
+ * sitewide media/S3 writes). */
 export function canManageAmbientSounds(role?: PlatformRole | string): boolean {
-  return isSuperAdmin(role);
-}
-
-/** Whether the user may publish timer audio presets to every app user. */
-export function canManageTimerAudios(role?: PlatformRole | string): boolean {
   return isSuperAdmin(role);
 }
 
