@@ -31,9 +31,7 @@ const imageFile = () => fileOfSize("cover.png", "image/png", 1024);
 
 /** Dropzones render a hidden file input each, audio first then cover. */
 const fileInputs = () =>
-  Array.from(
-    document.querySelectorAll<HTMLInputElement>('input[type="file"]'),
-  );
+  Array.from(document.querySelectorAll<HTMLInputElement>('input[type="file"]'));
 
 const dropOnCover = async (file: File) => {
   const [, coverInput] = fileInputs();
@@ -41,10 +39,7 @@ const dropOnCover = async (file: File) => {
   await waitFor(() => expect(coverInput).toBeTruthy());
 };
 
-const renderDialog = (
-  sound: AmbientSound | null,
-  onSubmit = vi.fn(),
-) => {
+const renderDialog = (sound: AmbientSound | null, onSubmit = vi.fn()) => {
   render(
     <AmbientSoundFormDialog
       open
@@ -87,7 +82,9 @@ describe("AmbientSoundFormDialog — cover image", () => {
   it("sends a null cover when editing without replacing it", async () => {
     const onSubmit = renderDialog(existingSound);
 
-    await userEvent.click(screen.getByRole("button", { name: /save changes/i }));
+    await userEvent.click(
+      screen.getByRole("button", { name: /save changes/i }),
+    );
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     // Null, not a File: the API layer then omits image_file entirely so the
@@ -132,7 +129,9 @@ describe("AmbientSoundFormDialog — audio rejection stays audio-specific", () =
 
     const [audioInput] = fileInputs();
     fireEvent.change(audioInput, {
-      target: { files: [fileOfSize("huge.mp3", "audio/mpeg", 60 * 1024 * 1024)] },
+      target: {
+        files: [fileOfSize("huge.mp3", "audio/mpeg", 60 * 1024 * 1024)],
+      },
     });
 
     await waitFor(() =>

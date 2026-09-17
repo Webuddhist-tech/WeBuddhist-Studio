@@ -63,7 +63,11 @@ describe("AmbientSoundsTable — cover image", () => {
   it("keeps one row's cover failure from affecting another row", () => {
     renderTable([
       sound(),
-      sound({ id: "sound-2", name: "Sea waves", image_url: "https://s3.example/sea.webp?sig=1" }),
+      sound({
+        id: "sound-2",
+        name: "Sea waves",
+        image_url: "https://s3.example/sea.webp?sig=1",
+      }),
     ]);
 
     const [rainImg] = Array.from(document.querySelectorAll("img"));
