@@ -111,9 +111,9 @@ describe("fetchGroupBans", () => {
 
     await fetchGroupBans(GROUP_ID, { activeOnly: false });
 
-    expect(
-      vi.mocked(axiosInstance.get).mock.calls[0][1],
-    ).toMatchObject({ params: { active_only: false } });
+    expect(vi.mocked(axiosInstance.get).mock.calls[0][1]).toMatchObject({
+      params: { active_only: false },
+    });
   });
 });
 

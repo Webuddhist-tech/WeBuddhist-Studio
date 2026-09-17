@@ -97,7 +97,9 @@ const GroupCommunitySection = ({ groupId }: GroupCommunitySectionProps) => {
 
   const activeQuery = tab === "joined" ? joinedQuery : bansQuery;
   const total =
-    tab === "joined" ? (joinedQuery.data?.total ?? 0) : (bansQuery.data?.total ?? 0);
+    tab === "joined"
+      ? (joinedQuery.data?.total ?? 0)
+      : (bansQuery.data?.total ?? 0);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   // Removing the last row on a trailing page shrinks the list past the current
@@ -133,7 +135,9 @@ const GroupCommunitySection = ({ groupId }: GroupCommunitySectionProps) => {
       }),
     onSuccess: (ban, { userName }) => {
       setRemoveTarget(null);
-      toast.success(`${userName} removed — blocked ${banEndsIn(ban.expires_at)}`);
+      toast.success(
+        `${userName} removed — blocked ${banEndsIn(ban.expires_at)}`,
+      );
       invalidate();
     },
     onError: (err) => toast.error(getApiErrorMessage(err)),
