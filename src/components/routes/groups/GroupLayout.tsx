@@ -24,6 +24,7 @@ import {
   canDeleteGroup,
   canManageGroupInvites,
   canManageJoinRequests,
+  canModerateGroupUsers,
   getEffectiveGroupRole,
 } from "./lib/groupPermissions";
 import {
@@ -144,6 +145,7 @@ const GroupLayout = () => {
   const showTransfersNav = !readOnlyPlatform;
   const showJoinRequestsNav =
     !readOnlyPlatform && canManageJoinRequests(myRole);
+  const showCommunityNav = !readOnlyPlatform && canModerateGroupUsers(myRole);
   const pendingCount = pendingJoinRequests?.total ?? 0;
   const showDelete = !readOnlyPlatform && canDelete;
   const canPublishGroup = !readOnlyPlatform && canChangeGroupStatus(myRole);
@@ -238,6 +240,14 @@ const GroupLayout = () => {
             >
               Members
             </NavLink>
+            {showCommunityNav ? (
+              <NavLink
+                to={ROUTES.groupCommunity(group.id)}
+                className={navLinkClass}
+              >
+                Community
+              </NavLink>
+            ) : null}
             {showJoinRequestsNav ? (
               <NavLink
                 to={ROUTES.groupJoinRequests(group.id)}

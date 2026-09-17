@@ -27,6 +27,7 @@ export const ROUTES = {
   groupTransfers: (groupId: string) => `/groups/${groupId}/transfers`,
   groupMembers: (groupId: string) => `/groups/${groupId}/members`,
   groupJoinRequests: (groupId: string) => `/groups/${groupId}/join-requests`,
+  groupCommunity: (groupId: string) => `/groups/${groupId}/community`,
   groupEvents: (groupId: string) => `/groups/${groupId}/events`,
   groupEventNew: (groupId: string) => `/groups/${groupId}/events/new`,
   groupEvent: (groupId: string, eventId: string) =>
