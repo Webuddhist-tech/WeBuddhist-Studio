@@ -275,6 +275,9 @@ const GroupLayout = () => {
             <NavLink to={ROUTES.groupChants(group.id)} className={navLinkClass}>
               Chants
             </NavLink>
+            <NavLink to={ROUTES.groupAssets(group.id)} className={navLinkClass}>
+              Assets
+            </NavLink>
           </nav>
         }
       >

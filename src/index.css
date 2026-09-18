@@ -103,6 +103,10 @@
 }
 
 :root {
+  /* Tells the browser to render native widgets (audio players, scrollbars,
+     form controls) with light chrome. Without it they stay light in dark
+     mode, which is why an <audio> element looks washed out there. */
+  color-scheme: light;
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -139,6 +143,9 @@
 }
 
 .dark {
+  /* Flips native widgets to dark chrome: the <audio> player, scrollbars and
+     form controls all repaint themselves from this one line. */
+  color-scheme: dark;
   --background: #161616;
   --foreground: hsl(0 0% 93%);
   --card: oklch(0.205 0 0);
@@ -262,4 +269,33 @@ div::-webkit-scrollbar {
 * {
   scrollbar-width: none;
   -ms-overflow-style: none;
+}
+
+/*
+ * Opt back in to a visible scrollbar. The rules above hide scrollbars app-wide,
+ * which leaves horizontally scrollable regions (wide tables) with no hint that
+ * there is more content off-screen. Add `show-scrollbar` to such a container.
+ */
+.show-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.show-scrollbar::-webkit-scrollbar {
+  display: block;
+  width: 8px;
+  height: 8px;
+}
+
+.show-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.show-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 9999px;
+}
+
+.show-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted-foreground);
 }

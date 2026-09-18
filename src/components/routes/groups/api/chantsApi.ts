@@ -1,6 +1,7 @@
 import axiosInstance from "@/config/axios-config";
 import { uploadImageToS3 } from "@/components/routes/task/api/taskApi";
 import { capitalizeFirstLetter } from "@/lib/textUtils";
+import type { GroupAssetDTO } from "./groupAssetsApi";
 
 export interface ChantCollectionItemDTO {
   id: string;
@@ -9,6 +10,8 @@ export interface ChantCollectionItemDTO {
   language?: string;
   type?: string;
   display_order: number;
+  /** Ordered by display_order; empty when nothing is linked. */
+  audio?: GroupAssetDTO[];
 }
 
 export interface ChantCollectionDTO {
@@ -146,6 +149,24 @@ export const reorderChantItems = async (
   const { data } = await axiosInstance.put<ChantCollectionDetailDTO>(
     `${BASE_URL}/${groupId}/recitation-collections/${collectionId}/items/reorder`,
     { item_ids: itemIds },
+  );
+  return data;
+};
+
+/**
+ * Replaces an item's ordered audio: the array is the new state, so this links,
+ * unlinks and reorders atomically by array position. `[]` clears the row, and
+ * unlinking never deletes the file. Returns the full updated collection.
+ */
+export const setChantItemAudio = async (
+  groupId: string,
+  collectionId: string,
+  itemId: string,
+  assetIds: string[],
+): Promise<ChantCollectionDetailDTO> => {
+  const { data } = await axiosInstance.put<ChantCollectionDetailDTO>(
+    `${BASE_URL}/${groupId}/recitation-collections/${collectionId}/items/${itemId}/audio`,
+    { asset_ids: assetIds },
   );
   return data;
 };

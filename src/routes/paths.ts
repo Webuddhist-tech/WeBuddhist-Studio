@@ -40,6 +40,7 @@ export const ROUTES = {
     `/groups/${groupId}/chants/${collectionId}`,
   groupChantEdit: (groupId: string, collectionId: string) =>
     `/groups/${groupId}/chants/${collectionId}/edit`,
+  groupAssets: (groupId: string) => `/groups/${groupId}/assets`,
   groupPosts: (groupId: string) => `/groups/${groupId}/posts`,
   groupPostNew: (groupId: string) => `/groups/${groupId}/posts/new`,
   groupPostEdit: (groupId: string, postId: string) =>
