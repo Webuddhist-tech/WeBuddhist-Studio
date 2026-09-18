@@ -88,14 +88,7 @@ describe("getAssetDeleteConflict", () => {
 
 describe("validateAudioFile", () => {
   it("accepts every supported extension, case-insensitively", () => {
-    for (const name of [
-      "a.mp3",
-      "b.m4a",
-      "c.wav",
-      "d.aac",
-      "e.ogg",
-      "F.MP3",
-    ]) {
+    for (const name of ["a.mp3", "b.m4a", "c.wav", "d.aac", "e.ogg", "F.MP3"]) {
       expect(isSupportedAudioFile(makeFile(name))).toBe(true);
       expect(validateAudioFile(makeFile(name))).toBeNull();
     }
