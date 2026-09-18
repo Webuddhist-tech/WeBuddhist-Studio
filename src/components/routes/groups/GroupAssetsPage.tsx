@@ -151,6 +151,15 @@ const GroupAssetsPage = () => {
   };
 
   const totalPages = Math.max(1, Math.ceil(total / GROUP_ASSETS_PAGE_SIZE));
+
+  // Deleting the last asset on the final page leaves `page` past the end, so
+  // the next fetch reads an empty offset and pagination disappears with it.
+  useEffect(() => {
+    if (!isLoading && page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [isLoading, page, totalPages]);
+
   const columnCount = canWrite ? 4 : 3;
   const isConflict = Boolean(pendingDelete?.conflictMessage);
 
