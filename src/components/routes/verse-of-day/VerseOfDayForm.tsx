@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Pecha } from "@/components/ui/shadimport";
 import { Textarea } from "@/components/ui/atoms/textarea";
+import { Input } from "@/components/ui/atoms/input";
 import { Button } from "@/components/ui/atoms/button";
 import { Calendar } from "@/components/ui/atoms/calendar";
 import { useLanguages } from "@/hooks/useLanguages";
@@ -54,6 +55,7 @@ const VerseOfDayForm = ({
   const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
   const [isImageUploading, setIsImageUploading] = useState(false);
   const [groupId, setGroupId] = useState("");
+  const [source, setSource] = useState("");
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [showCalendar, setShowCalendar] = useState(false);
 
@@ -73,6 +75,7 @@ const VerseOfDayForm = ({
       setImagePreview(initialData.image_url || null);
       // Use group_id directly from the response
       setGroupId(initialData.group_id || "");
+      setSource(initialData.source || "");
       setDate(parse(initialData.date, "yyyy-MM-dd", new Date()));
     } else {
       setActiveLanguage("EN");
@@ -80,6 +83,7 @@ const VerseOfDayForm = ({
       setImageKey(null);
       setImagePreview(null);
       setGroupId("");
+      setSource("");
       setDate(new Date());
     }
   }, [mode, initialData, languageCodes.join(",")]);
@@ -171,6 +175,7 @@ const VerseOfDayForm = ({
     const trimmedVerses = Object.fromEntries(
       Object.entries(verses).map(([key, value]) => [key, value.trim()]),
     );
+    const trimmedSource = source.trim() || null;
 
     // For create, send all required fields
     // For update, only send fields that have changed
@@ -201,6 +206,11 @@ const VerseOfDayForm = ({
         updatePayload.group_id = trimmedGroupId;
       }
 
+      const previousSource = initialData.source?.trim() || null;
+      if (trimmedSource !== previousSource) {
+        updatePayload.source = trimmedSource;
+      }
+
       updateMutation.mutate({ id: initialData.id, payload: updatePayload });
     } else {
       const createPayload: any = {
@@ -208,6 +218,7 @@ const VerseOfDayForm = ({
         image_urls: imageKey ? [imageKey] : [],
         group_id: groupId.trim() || null,
         date: format(date, "yyyy-MM-dd"),
+        source: trimmedSource,
       };
       createMutation.mutate(createPayload);
     }
@@ -248,6 +259,18 @@ const VerseOfDayForm = ({
           onChange={(e) => handleVerseChange(e.target.value)}
           placeholder={`Enter verse content in ${getLanguageLabel(activeLanguage)}`}
           className="min-h-[120px] resize-none"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <label htmlFor="verse-source" className="text-sm font-bold">
+          Source / Reference
+        </label>
+        <Input
+          id="verse-source"
+          value={source}
+          onChange={(e) => setSource(e.target.value)}
+          placeholder="Dhp 1.5"
         />
       </div>
 

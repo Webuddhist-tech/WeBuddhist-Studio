@@ -9,6 +9,7 @@ export interface VerseOfDayPayload {
   image_urls: string[];
   verse_id: string;
   ref_id: string;
+  source?: string | null;
   ref_type: string;
   group_id: string;
   date: string;
@@ -28,6 +29,7 @@ export interface VerseOfDayItem {
   verse: string | null;
   image_url: string | null;
   ref_id: string;
+  source?: string | null;
   ref_type: string;
   date: string;
   group_id: string | null;
@@ -45,6 +47,7 @@ export interface VerseOfDayResponse {
   image_urls: string[];
   verse_id: string;
   ref_id: string;
+  source?: string | null;
   ref_type: string;
   group_id: string;
   date: string;
