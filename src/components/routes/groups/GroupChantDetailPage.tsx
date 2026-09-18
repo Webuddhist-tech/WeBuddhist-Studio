@@ -40,6 +40,8 @@ import {
 } from "./api/chantsApi";
 import FkMultiSearchSelector from "./components/FkMultiSearchSelector";
 import type { FkOption } from "./components/FkMultiSearchSelector";
+import ChantItemAudioCell from "./components/chants/ChantItemAudioCell";
+import ChantItemAudioDialog from "./components/chants/ChantItemAudioDialog";
 import { useChantItemReorder } from "./hooks/useChantItemReorder";
 
 function SortableChantItemRow({
@@ -48,12 +50,14 @@ function SortableChantItemRow({
   canWrite,
   canReorder,
   onRemove,
+  onManageAudio,
 }: {
   readonly item: ChantCollectionItemDTO;
   readonly index: number;
   readonly canWrite: boolean;
   readonly canReorder: boolean;
   readonly onRemove: (item: ChantCollectionItemDTO) => void;
+  readonly onManageAudio: (item: ChantCollectionItemDTO) => void;
 }) {
   const {
     attributes,
@@ -88,9 +92,21 @@ function SortableChantItemRow({
       <Pecha.TableCell className="text-muted-foreground">
         {index + 1}
       </Pecha.TableCell>
-      <Pecha.TableCell className="font-medium">{item.title}</Pecha.TableCell>
+      <Pecha.TableCell className="max-w-xs font-medium">
+        <p className="truncate" title={item.title}>
+          {item.title}
+        </p>
+      </Pecha.TableCell>
       <Pecha.TableCell>{item.language ?? "—"}</Pecha.TableCell>
       <Pecha.TableCell>{item.type ?? "—"}</Pecha.TableCell>
+      <Pecha.TableCell className="w-56 max-w-56">
+        <ChantItemAudioCell
+          audio={item.audio ?? []}
+          itemTitle={item.title}
+          canWrite={canWrite}
+          onManage={() => onManageAudio(item)}
+        />
+      </Pecha.TableCell>
       {canWrite ? (
         <Pecha.TableCell className="text-right">
           <Pecha.Button
@@ -123,6 +139,7 @@ const GroupChantDetailPage = () => {
 
   const [pendingDeleteItem, setPendingDeleteItem] =
     useState<ChantCollectionItemDTO | null>(null);
+  const [audioItemId, setAudioItemId] = useState<string | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedRecitations, setSelectedRecitations] = useState<FkOption[]>(
     [],
@@ -227,6 +244,11 @@ const GroupChantDetailPage = () => {
     setIsEditMode(false);
     setSelectedRecitations([]);
   };
+
+  // Resolved from the live list rather than held in state, so the dialog
+  // re-renders from the cache the PUT seeded instead of a stale snapshot.
+  const audioItem =
+    displayItems.find((item) => item.id === audioItemId) ?? null;
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
@@ -369,7 +391,7 @@ const GroupChantDetailPage = () => {
               onDragEnd={handleDragEnd}
               modifiers={[restrictToVerticalAxis]}
             >
-              <Pecha.Table>
+              <Pecha.Table containerClassName="show-scrollbar">
                 <Pecha.TableHeader>
                   <Pecha.TableRow>
                     {canWrite ? <Pecha.TableHead className="w-10" /> : null}
@@ -377,6 +399,7 @@ const GroupChantDetailPage = () => {
                     <Pecha.TableHead>Title</Pecha.TableHead>
                     <Pecha.TableHead>Language</Pecha.TableHead>
                     <Pecha.TableHead>Type</Pecha.TableHead>
+                    <Pecha.TableHead className="w-56">Audio</Pecha.TableHead>
                     {canWrite ? (
                       <Pecha.TableHead className="text-right">
                         Actions
@@ -397,6 +420,7 @@ const GroupChantDetailPage = () => {
                         canWrite={canWrite}
                         canReorder={canReorder}
                         onRemove={setPendingDeleteItem}
+                        onManageAudio={(target) => setAudioItemId(target.id)}
                       />
                     ))}
                   </Pecha.TableBody>
@@ -406,6 +430,18 @@ const GroupChantDetailPage = () => {
           </div>
         )}
       </div>
+
+      {canWrite && audioItem && groupId && collectionId ? (
+        <ChantItemAudioDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setAudioItemId(null);
+          }}
+          groupId={groupId}
+          collectionId={collectionId}
+          item={audioItem}
+        />
+      ) : null}
 
       <Pecha.AlertDialog
         open={Boolean(pendingDeleteItem)}

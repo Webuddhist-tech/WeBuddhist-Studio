@@ -50,6 +50,7 @@ import GroupEventDetailPage from "./components/routes/groups/GroupEventDetailPag
 import GroupChantsPage from "./components/routes/groups/GroupChantsPage.tsx";
 import GroupChantFormPage from "./components/routes/groups/GroupChantFormPage.tsx";
 import GroupChantDetailPage from "./components/routes/groups/GroupChantDetailPage.tsx";
+import GroupAssetsPage from "./components/routes/groups/GroupAssetsPage.tsx";
 import GroupPostsPage from "./components/routes/groups/GroupPostsPage.tsx";
 import GroupPostFormPage from "./components/routes/groups/GroupPostFormPage.tsx";
 import GroupFormPage from "./components/routes/groups/GroupFormPage.tsx";
@@ -307,6 +308,7 @@ const router = createBrowserRouter([
             path: "chants/:collectionId/edit",
             element: <GroupChantFormPage />,
           },
+          { path: "assets", element: <GroupAssetsPage /> },
         ],
       },
       {
