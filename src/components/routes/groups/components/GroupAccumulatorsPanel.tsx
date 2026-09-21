@@ -11,7 +11,6 @@ import { uploadImageToS3 } from "@/components/routes/task/api/taskApi";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import { canChangeContentStatus } from "@/lib/contentPermissions";
 import { isReviewer, shouldShowCmsActionsColumn } from "@/lib/platformAccess";
-import { normalizeLanguageCode } from "@/lib/languageCodes";
 import { fromBackendMidnightISO, toBackendMidnightISO } from "@/lib/utils";
 import { capitalizeFirstLetter } from "@/lib/textUtils";
 import { useUserInfo } from "@/hooks/useUserInfo";
@@ -26,9 +25,12 @@ import {
   type GroupAccumulatorDetailDTO,
   type GroupAccumulatorDTO,
   type GroupAccumulatorLinkInput,
-  type GroupAccumulatorMetadataDTO,
 } from "../api/groupAccumulatorsApi";
-import AccumulatorAboutField from "./AccumulatorAboutField";
+import AccumulatorTranslationsField from "./AccumulatorTranslationsField";
+import {
+  metadataFromTranslationState,
+  translationStateFromAccumulator,
+} from "./accumulatorTranslations";
 import AccumulatorLinksField from "./AccumulatorLinksField";
 import {
   isLinkRowFilled,
@@ -52,56 +54,40 @@ type GroupAccumulatorsPanelProps = {
 };
 
 type AccumulatorFormState = {
-  title: string;
   target_count: string;
   start_date: string | null;
   end_date: string | null;
   image_key: string | null;
   image_preview: string | null;
   preset: FkOption | null;
-  about_languages: string[];
-  about_descriptions: Record<string, string>;
+  languages: string[];
+  titles: Record<string, string>;
+  descriptions: Record<string, string>;
   links: AccumulatorLinkRow[];
   metadata_loaded: boolean;
   links_loaded: boolean;
 };
 
 const emptyFormState = (): AccumulatorFormState => ({
-  title: "",
   target_count: "",
   start_date: null,
   end_date: null,
   image_key: null,
   image_preview: null,
   preset: null,
-  about_languages: [],
-  about_descriptions: {},
+  languages: [],
+  titles: {},
+  descriptions: {},
   links: [],
   metadata_loaded: true,
   links_loaded: true,
 });
 
-/** Turns the CMS `metadata` array into the About field's per-language state. */
-function aboutStateFromMetadata(
-  metadata: GroupAccumulatorMetadataDTO[] | null | undefined,
-) {
-  const languages: string[] = [];
-  const descriptions: Record<string, string> = {};
-  (metadata ?? []).forEach((entry) => {
-    const lang = normalizeLanguageCode(String(entry.language ?? ""));
-    if (!lang || languages.includes(lang)) return;
-    languages.push(lang);
-    descriptions[lang] = entry.description ?? "";
-  });
-  return { languages, descriptions };
-}
-
 function formStateFromAccumulator(
   accumulator: GroupAccumulatorDTO,
 ): AccumulatorFormState {
-  const about = aboutStateFromMetadata(accumulator.metadata);
+  const translations = translationStateFromAccumulator(accumulator);
   return {
-    title: accumulator.title ?? "",
     target_count:
       accumulator.target_count != null ? String(accumulator.target_count) : "",
     start_date: accumulator.start_date,
@@ -111,8 +97,9 @@ function formStateFromAccumulator(
     preset: accumulator.preset_accumulator_id
       ? { id: accumulator.preset_accumulator_id, title: "Linked preset" }
       : null,
-    about_languages: about.languages,
-    about_descriptions: about.descriptions,
+    languages: translations.languages,
+    titles: translations.titles,
+    descriptions: translations.descriptions,
     links: linkRowsFromDetail(accumulator),
     metadata_loaded: Array.isArray(accumulator.metadata),
     links_loaded: Array.isArray(accumulator.links),
@@ -258,12 +245,7 @@ const GroupAccumulatorsPanel = ({
 
     // Both arrays are a full replace server-side, so always send the complete
     // current list — a partial list deletes whatever is left out.
-    const metadata: GroupAccumulatorMetadataDTO[] = form.about_languages
-      .map((lang) => ({
-        language: lang,
-        description: (form.about_descriptions[lang] ?? "").trim(),
-      }))
-      .filter((entry) => entry.description.length > 0);
+    const metadata = metadataFromTranslationState(form);
 
     const links: GroupAccumulatorLinkInput[] = form.links
       .filter(isLinkRowFilled)
@@ -274,7 +256,8 @@ const GroupAccumulatorsPanel = ({
 
     return {
       accumulator_id: form.preset?.id ?? null,
-      title: form.title.trim() || null,
+      // No `title`: the server keeps the row's default title in step with the
+      // metadata titles below (English, or the first language that has one).
       image_key: form.image_key,
       target_count: Number.isFinite(target_count) ? target_count : null,
       start_date: form.start_date,
@@ -539,25 +522,23 @@ const GroupAccumulatorsPanel = ({
             className="flex min-h-0 flex-1 flex-col"
           >
             <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-6 py-5">
-              <div className="grid gap-4 sm:grid-cols-[2fr_1fr]">
-                <div className="space-y-2">
-                  <label
-                    className="text-sm font-bold"
-                    htmlFor="accumulator-title"
-                  >
-                    Title
-                  </label>
-                  <Pecha.Input
-                    id="accumulator-title"
-                    value={form.title}
-                    onChange={(e) =>
-                      setForm((prev) => ({ ...prev, title: e.target.value }))
-                    }
-                    placeholder="e.g. 100 Million Mani Retreat"
-                    className="h-11 bg-white dark:bg-[#262626]"
-                  />
-                </div>
+              <div className="pb-1">
+                <AccumulatorTranslationsField
+                  activeLanguages={form.languages}
+                  titles={form.titles}
+                  descriptions={form.descriptions}
+                  onChange={({ activeLanguages, titles, descriptions }) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      languages: activeLanguages,
+                      titles,
+                      descriptions,
+                    }))
+                  }
+                />
+              </div>
 
+              <div className="grid gap-4 sm:grid-cols-2 border-t pt-5">
                 <div className="space-y-2">
                   <label
                     className="text-sm font-bold"
@@ -771,20 +752,6 @@ const GroupAccumulatorsPanel = ({
                 onUploadClick={() => setImageDialogOpen(true)}
                 imageClassName="w-full max-w-xs h-32 rounded object-cover border"
               />
-
-              <div className="border-t pt-5">
-                <AccumulatorAboutField
-                  activeLanguages={form.about_languages}
-                  descriptions={form.about_descriptions}
-                  onChange={(about_languages, about_descriptions) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      about_languages,
-                      about_descriptions,
-                    }))
-                  }
-                />
-              </div>
 
               <div className="border-t pt-5">
                 <AccumulatorLinksField

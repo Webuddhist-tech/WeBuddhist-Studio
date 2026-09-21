@@ -9,6 +9,9 @@ export interface GroupAccumulatorImage {
 
 export interface GroupAccumulatorMetadataDTO {
   language: LanguageCode;
+  /** Per-language title. The EN entry (or the first translated one) also
+   * becomes the accumulator's default `title`. */
+  title?: string | null;
   description: string | null;
 }
 
@@ -33,6 +36,7 @@ export interface GroupAccumulatorDTO {
   id: string;
   preset_accumulator_id: string | null;
   group_id: string;
+  /** Default title; per-language titles live in `metadata`. */
   title: string | null;
   image: GroupAccumulatorImage | null;
   image_key: string | null;
