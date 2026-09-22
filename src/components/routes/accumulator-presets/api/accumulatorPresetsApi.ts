@@ -1,6 +1,7 @@
 import axiosInstance from "@/config/axios-config";
 import type { LanguageCode } from "@/schema/SeriesSchema";
 import { capitalizeFirstLetter } from "@/lib/textUtils";
+import type { ImageUrlModel } from "./mantrasApi";
 
 export interface AccumulatorMetadataDTO {
   language: string;
@@ -16,6 +17,7 @@ export interface PresetMantraDTO {
   audio_url?: string | null;
   mala_image_id?: string | null;
   mala_image_url?: string | null;
+  deity_image?: ImageUrlModel | null;
 }
 
 export interface AccumulatorPreset {
