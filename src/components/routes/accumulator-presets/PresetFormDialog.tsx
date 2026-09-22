@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { IoMdAdd, IoMdClose } from "react-icons/io";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Pecha } from "@/components/ui/shadimport";
 import { Textarea } from "@/components/ui/atoms/textarea";
@@ -21,6 +21,7 @@ import {
 import {
   createMantra,
   fetchMantras,
+  type MantraResponse,
   searchMantrasForPicker,
   updateMantra,
   uploadMantraDeityImage,
@@ -132,6 +133,8 @@ const PresetFormDialog = ({
     setDeityImageOverride("unset");
   }, [mantraOption?.id]);
 
+  const queryClient = useQueryClient();
+
   const { data: mantraLookupData } = useQuery({
     queryKey: ["mantra-deity-image-lookup"],
     queryFn: () => fetchMantras(),
@@ -149,6 +152,26 @@ const PresetFormDialog = ({
         linkedMantra?.deity_image?.original ??
         null);
 
+  // Keeps the lookup cache in sync with a just-completed mutation so that
+  // switching to another mantra and back reflects the change immediately,
+  // instead of showing the pre-mutation state until the list is refetched.
+  const patchDeityImageInCache = (
+    mantraId: string,
+    deityImage: MantraResponse["mantras"][number]["deity_image"],
+  ) => {
+    queryClient.setQueryData<MantraResponse>(
+      ["mantra-deity-image-lookup"],
+      (prev) =>
+        prev
+          ? {
+              mantras: prev.mantras.map((m) =>
+                m.id === mantraId ? { ...m, deity_image: deityImage } : m,
+              ),
+            }
+          : prev,
+    );
+  };
+
   const handleDeityImageUpload = async (file: File) => {
     if (!mantraOption?.id) return;
     setIsDeityImageUploading(true);
@@ -157,8 +180,11 @@ const PresetFormDialog = ({
         file,
         mantraOption.id,
       );
-      await updateMantra(mantraOption.id, { deity_image_key: key });
+      const updated = await updateMantra(mantraOption.id, {
+        deity_image_key: key,
+      });
       setDeityImageOverride({ url: image.original });
+      patchDeityImageInCache(mantraOption.id, updated.deity_image ?? null);
       setIsDeityImageDialogOpen(false);
       toast.success("Deity image uploaded");
     } catch (err) {
@@ -174,6 +200,7 @@ const PresetFormDialog = ({
     try {
       await updateMantra(mantraOption.id, { deity_image_key: null });
       setDeityImageOverride({ url: null });
+      patchDeityImageInCache(mantraOption.id, null);
       toast.success("Deity image removed");
     } catch (err) {
       toast.error(getApiErrorMessage(err));
