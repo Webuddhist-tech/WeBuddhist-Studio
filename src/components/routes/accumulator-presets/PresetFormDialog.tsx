@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { IoMdAdd, IoMdClose } from "react-icons/io";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Pecha } from "@/components/ui/shadimport";
 import { Textarea } from "@/components/ui/atoms/textarea";
@@ -11,13 +11,20 @@ import { getApiErrorMessage } from "@/lib/apiErrors";
 import type { LanguageCode } from "@/schema/SeriesSchema";
 import type { FkOption } from "@/components/routes/groups/components/FkMultiSearchSelector";
 import EventLinkPicker from "@/components/routes/groups/components/events/EventLinkPicker";
+import ImageContentData from "@/components/ui/molecules/modals/image-upload/ImageContentData";
 import {
   type AccumulatorPreset,
   type AccumulatorPresetPayload,
   type UpdateAccumulatorPresetPayload,
   presetDisplayName,
 } from "./api/accumulatorPresetsApi";
-import { createMantra, searchMantrasForPicker } from "./api/mantrasApi";
+import {
+  createMantra,
+  fetchMantras,
+  searchMantrasForPicker,
+  updateMantra,
+  uploadMantraDeityImage,
+} from "./api/mantrasApi";
 import { searchTextsForPicker } from "./api/textPickerApi";
 
 interface PresetFormDialogProps {
@@ -61,6 +68,12 @@ const PresetFormDialog = ({
   const [newMantraTitle, setNewMantraTitle] = useState("");
   const [newMantraText, setNewMantraText] = useState("");
   const [newMantraPronunciation, setNewMantraPronunciation] = useState("");
+  const [deityImageOverride, setDeityImageOverride] = useState<
+    "unset" | { url: string | null }
+  >("unset");
+  const [isDeityImageDialogOpen, setIsDeityImageDialogOpen] = useState(false);
+  const [isDeityImageUploading, setIsDeityImageUploading] = useState(false);
+  const [isRemovingDeityImage, setIsRemovingDeityImage] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -111,7 +124,63 @@ const PresetFormDialog = ({
     setNewMantraTitle("");
     setNewMantraText("");
     setNewMantraPronunciation("");
+    setDeityImageOverride("unset");
+    setIsDeityImageDialogOpen(false);
   }, [open, preset]);
+
+  useEffect(() => {
+    setDeityImageOverride("unset");
+  }, [mantraOption?.id]);
+
+  const { data: mantraLookupData } = useQuery({
+    queryKey: ["mantra-deity-image-lookup"],
+    queryFn: () => fetchMantras(),
+    enabled: open && !!mantraOption?.id,
+  });
+
+  const linkedMantra = mantraLookupData?.mantras.find(
+    (m) => m.id === mantraOption?.id,
+  );
+
+  const displayedDeityImageUrl =
+    deityImageOverride !== "unset"
+      ? deityImageOverride.url
+      : (linkedMantra?.deity_image?.medium ??
+        linkedMantra?.deity_image?.original ??
+        null);
+
+  const handleDeityImageUpload = async (file: File) => {
+    if (!mantraOption?.id) return;
+    setIsDeityImageUploading(true);
+    try {
+      const { image, key } = await uploadMantraDeityImage(
+        file,
+        mantraOption.id,
+      );
+      await updateMantra(mantraOption.id, { deity_image_key: key });
+      setDeityImageOverride({ url: image.original });
+      setIsDeityImageDialogOpen(false);
+      toast.success("Deity image uploaded");
+    } catch (err) {
+      toast.error(getApiErrorMessage(err));
+    } finally {
+      setIsDeityImageUploading(false);
+    }
+  };
+
+  const handleRemoveDeityImage = async () => {
+    if (!mantraOption?.id) return;
+    setIsRemovingDeityImage(true);
+    try {
+      await updateMantra(mantraOption.id, { deity_image_key: null });
+      setDeityImageOverride({ url: null });
+      toast.success("Deity image removed");
+    } catch (err) {
+      toast.error(getApiErrorMessage(err));
+    } finally {
+      setIsRemovingDeityImage(false);
+    }
+  };
 
   const createMantraMutation = useMutation({
     mutationFn: createMantra,
@@ -396,6 +465,58 @@ const PresetFormDialog = ({
               </div>
             )}
           </div>
+
+          {mantraOption?.id ? (
+            <div className="space-y-2">
+              <p className="text-sm font-bold">Deity image (optional)</p>
+              <div className="flex items-start gap-4">
+                {!displayedDeityImageUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setIsDeityImageDialogOpen(true)}
+                    className="flex h-24 w-32 items-center justify-center rounded-lg border border-dashed border-gray-300 transition-colors hover:border-gray-400"
+                    aria-label="Upload deity image"
+                    disabled={isSubmitting}
+                  >
+                    <IoMdAdd className="h-8 w-8 text-gray-400" />
+                  </button>
+                )}
+                {displayedDeityImageUrl && (
+                  <div className="relative">
+                    <img
+                      src={displayedDeityImageUrl}
+                      alt="Deity preview"
+                      className="h-24 w-32 rounded-lg border object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRemoveDeityImage}
+                      disabled={isSubmitting || isRemovingDeityImage}
+                      className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white"
+                      aria-label="Remove deity image"
+                    >
+                      <IoMdClose className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <Pecha.Dialog
+                open={isDeityImageDialogOpen}
+                onOpenChange={setIsDeityImageDialogOpen}
+              >
+                <Pecha.DialogContent showCloseButton>
+                  <Pecha.DialogHeader>
+                    <Pecha.DialogTitle>Upload & Crop Deity Image</Pecha.DialogTitle>
+                  </Pecha.DialogHeader>
+                  <ImageContentData
+                    onUpload={handleDeityImageUpload}
+                    isLoading={isDeityImageUploading}
+                  />
+                </Pecha.DialogContent>
+              </Pecha.Dialog>
+            </div>
+          ) : null}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button
