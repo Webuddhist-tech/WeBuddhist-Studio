@@ -6,22 +6,28 @@ import { useLanguages } from "@/hooks/useLanguages";
 import { cn } from "@/lib/utils";
 import type { LanguageCode } from "@/lib/languageCodes";
 
-type AccumulatorAboutFieldProps = {
-  /** Languages shown as tabs, in display order. */
-  readonly activeLanguages: LanguageCode[];
+export type AccumulatorTranslations = {
+  activeLanguages: LanguageCode[];
+  /** Title per language code. */
+  titles: Record<string, string>;
   /** About text (markdown) per language code. */
-  readonly descriptions: Record<string, string>;
-  readonly onChange: (
-    activeLanguages: LanguageCode[],
-    descriptions: Record<string, string>,
-  ) => void;
+  descriptions: Record<string, string>;
 };
 
-const AccumulatorAboutField = ({
+type AccumulatorTranslationsFieldProps = {
+  /** Languages shown as tabs, in display order. */
+  readonly activeLanguages: LanguageCode[];
+  readonly titles: Record<string, string>;
+  readonly descriptions: Record<string, string>;
+  readonly onChange: (next: AccumulatorTranslations) => void;
+};
+
+const AccumulatorTranslationsField = ({
   activeLanguages,
+  titles,
   descriptions,
   onChange,
-}: AccumulatorAboutFieldProps) => {
+}: AccumulatorTranslationsFieldProps) => {
   const { languageOptions, getLanguageLabel } = useLanguages();
   const [selected, setSelected] = useState<LanguageCode | null>(
     activeLanguages[0] ?? null,
@@ -43,25 +49,43 @@ const AccumulatorAboutField = ({
   );
 
   const addLanguage = (langCode: LanguageCode) => {
-    onChange([...activeLanguages, langCode], {
-      ...descriptions,
-      [langCode]: descriptions[langCode] ?? "",
+    onChange({
+      activeLanguages: [...activeLanguages, langCode],
+      titles: { ...titles, [langCode]: titles[langCode] ?? "" },
+      descriptions: {
+        ...descriptions,
+        [langCode]: descriptions[langCode] ?? "",
+      },
     });
     setSelected(langCode);
   };
 
   const removeLanguage = (langCode: LanguageCode) => {
-    onChange(
-      activeLanguages.filter((lang) => lang !== langCode),
-      { ...descriptions, [langCode]: "" },
-    );
+    onChange({
+      activeLanguages: activeLanguages.filter((lang) => lang !== langCode),
+      titles: { ...titles, [langCode]: "" },
+      descriptions: { ...descriptions, [langCode]: "" },
+    });
+  };
+
+  const updateTitle = (langCode: LanguageCode, value: string) => {
+    onChange({
+      activeLanguages,
+      titles: { ...titles, [langCode]: value },
+      descriptions,
+    });
   };
 
   const updateDescription = (langCode: LanguageCode, value: string) => {
-    onChange(activeLanguages, { ...descriptions, [langCode]: value });
+    onChange({
+      activeLanguages,
+      titles,
+      descriptions: { ...descriptions, [langCode]: value },
+    });
   };
 
   const hasText = (lang: LanguageCode) =>
+    (titles[lang] ?? "").trim().length > 0 ||
     (descriptions[lang] ?? "").trim().length > 0;
 
   const missingEnglish = !activeLanguages.includes("EN") || !hasText("EN");
@@ -71,8 +95,10 @@ const AccumulatorAboutField = ({
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-sm font-bold">About</p>
-          <p className="text-xs text-muted-foreground">Markdown supported</p>
+          <p className="text-sm font-bold">Title &amp; About</p>
+          <p className="text-xs text-muted-foreground">
+            One per language. Markdown supported in About.
+          </p>
         </div>
         {availableLanguages.length > 0 ? (
           <Pecha.Select
@@ -99,7 +125,7 @@ const AccumulatorAboutField = ({
       {activeLanguages.length === 0 ? (
         <div className="rounded-md border border-dashed p-6 text-center">
           <p className="text-sm text-muted-foreground">
-            No About text yet. Add a language to write one.
+            No title or About text yet. Add a language to write one.
           </p>
         </div>
       ) : (
@@ -141,15 +167,35 @@ const AccumulatorAboutField = ({
           </div>
 
           {selected ? (
-            <MarkdownEditor
-              value={descriptions[selected] ?? ""}
-              onChange={(value) => updateDescription(selected, value)}
-              placeholder={`About this accumulation in ${getLanguageLabel(
-                selected,
-              )}…`}
-              className="bg-white dark:bg-[#181818]"
-              textareaClassName="bg-white dark:bg-[#181818]"
-            />
+            <div className="space-y-3">
+              <div className="space-y-2">
+                <label
+                  className="text-sm font-bold"
+                  htmlFor={`accumulator-title-${selected}`}
+                >
+                  Title
+                </label>
+                <Pecha.Input
+                  id={`accumulator-title-${selected}`}
+                  value={titles[selected] ?? ""}
+                  onChange={(e) => updateTitle(selected, e.target.value)}
+                  placeholder={`Title in ${getLanguageLabel(selected)}…`}
+                  className="h-11 bg-white dark:bg-[#262626]"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-bold">About</label>
+                <MarkdownEditor
+                  value={descriptions[selected] ?? ""}
+                  onChange={(value) => updateDescription(selected, value)}
+                  placeholder={`About this accumulation in ${getLanguageLabel(
+                    selected,
+                  )}…`}
+                  className="bg-white dark:bg-[#181818]"
+                  textareaClassName="bg-white dark:bg-[#181818]"
+                />
+              </div>
+            </div>
           ) : null}
         </>
       )}
@@ -164,4 +210,4 @@ const AccumulatorAboutField = ({
   );
 };
 
-export default AccumulatorAboutField;
+export default AccumulatorTranslationsField;
