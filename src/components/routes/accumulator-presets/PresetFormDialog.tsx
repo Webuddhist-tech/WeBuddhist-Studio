@@ -507,7 +507,9 @@ const PresetFormDialog = ({
               >
                 <Pecha.DialogContent showCloseButton>
                   <Pecha.DialogHeader>
-                    <Pecha.DialogTitle>Upload & Crop Deity Image</Pecha.DialogTitle>
+                    <Pecha.DialogTitle>
+                      Upload & Crop Deity Image
+                    </Pecha.DialogTitle>
                   </Pecha.DialogHeader>
                   <ImageContentData
                     onUpload={handleDeityImageUpload}
