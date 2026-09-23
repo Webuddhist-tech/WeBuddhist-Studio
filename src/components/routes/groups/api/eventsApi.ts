@@ -591,7 +591,11 @@ async function resolveLinkOption(
       const fetched = res.skip + res.items.length;
       if (fetched >= res.total || res.items.length === 0) break;
     }
-  } catch {}
+  } catch {
+    // Deliberately swallowed: this only resolves a label for an id the caller
+    // already holds, so a failed lookup falls through to the fallback option
+    // below rather than taking down the form that renders it.
+  }
   return {
     id,
     title: fallbackLabel,

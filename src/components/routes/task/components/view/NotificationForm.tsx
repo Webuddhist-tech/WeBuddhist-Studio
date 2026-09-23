@@ -149,7 +149,7 @@ export const NotificationForm = ({
       setCustomImagePreview(image.original);
       setImageType("CUSTOM");
       toast.success("Image uploaded successfully!");
-    } catch (error) {
+    } catch {
       toast.error("Failed to upload image");
     } finally {
       setUploadingImage(false);
