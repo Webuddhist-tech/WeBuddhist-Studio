@@ -13,6 +13,8 @@ type EventSendNotificationDialogProps = {
   eventName: string;
   notificationsEnabled: boolean;
   disabled?: boolean;
+  /** Why sending is unavailable, shown on the disabled button. */
+  disabledReason?: string;
 };
 
 const TITLE_MAX = 120;
@@ -48,6 +50,7 @@ const EventSendNotificationDialog = ({
   eventName,
   notificationsEnabled,
   disabled = false,
+  disabledReason,
 }: EventSendNotificationDialogProps) => {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -83,6 +86,14 @@ const EventSendNotificationDialog = ({
     body.trim().length > 0 &&
     !sendMutation.isPending;
 
+  // The caller's reason wins: it describes a state the organizer can act on
+  // (save first), while "notifications are off" describes the saved event.
+  const blockedReason = disabled
+    ? disabledReason
+    : notificationsEnabled
+      ? undefined
+      : "Notifications are turned off for this event";
+
   return (
     <>
       <Pecha.Button
@@ -90,11 +101,7 @@ const EventSendNotificationDialog = ({
         variant="outline"
         disabled={disabled || !notificationsEnabled}
         onClick={() => setOpen(true)}
-        title={
-          notificationsEnabled
-            ? undefined
-            : "Notifications are turned off for this event"
-        }
+        title={blockedReason}
       >
         Send a notification
       </Pecha.Button>

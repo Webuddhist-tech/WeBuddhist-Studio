@@ -226,8 +226,10 @@ const GroupEventFormPage = () => {
     return isNew ? "Create event" : "Save changes";
   };
 
+  const hasUnsavedChanges = form.formState.isDirty;
+
   const saveDisabled =
-    readOnly || mutation.isPending || (!isNew && !form.formState.isDirty);
+    readOnly || mutation.isPending || (!isNew && !hasUnsavedChanges);
 
   return (
     <div className="space-y-6">
@@ -236,12 +238,22 @@ const GroupEventFormPage = () => {
           {isNew ? "New event" : "Edit event"}
         </h1>
         {/* Only once the event exists: there is nobody to notify about an
-            event that has not been created yet. */}
+            event that has not been created yet.
+
+            Blocked while the form is dirty, because a send is answered from
+            the saved event, not from what is on screen. The notifications
+            switch is the case that matters: unchecked but not yet saved, the
+            page would show notifications as off while the send still went
+            out on the server's older, enabled value - notifying people
+            against the organizer's visible choice. Nothing here can
+            reconcile the two, so the send waits for the save. */}
         {!isNew && !readOnly && eventData ? (
           <EventSendNotificationDialog
             eventId={eventData.id}
             eventName={eventName(eventData)}
             notificationsEnabled={eventData.notifications_enabled ?? true}
+            disabled={hasUnsavedChanges}
+            disabledReason="Save your changes before sending a notification"
           />
         ) : null}
       </div>

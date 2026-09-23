@@ -213,7 +213,13 @@ const GroupJoinRequestsSection = ({
           <p className="text-sm leading-snug">
             <span className="font-semibold">{request.user_name}</span>
             {request.email ? (
-              <span className="text-muted-foreground"> {request.email}</span>
+              // break-words because an address is one unbroken token with no
+              // space to wrap at: without it a long one runs past this row
+              // and into the accept/decline controls on a narrow screen.
+              <span className="break-words text-muted-foreground">
+                {" "}
+                {request.email}
+              </span>
             ) : null}
             <span className="text-muted-foreground">
               {" "}
