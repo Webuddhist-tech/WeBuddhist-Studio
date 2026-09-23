@@ -19,6 +19,7 @@ import {
   resolveLinkedGroupAccumulator,
   resolveLinkedChantCollection,
   resolveLinkedContent,
+  eventName,
   updateCmsEvent,
   type EventDTO,
   type ImageUrlModel,
@@ -32,6 +33,8 @@ import EventYoutubeSection from "./components/events/EventYoutubeSection";
 import EventImageField from "./components/events/EventImageField";
 import EventFormatField from "./components/events/EventFormatField";
 import EventChatField from "./components/events/EventChatField";
+import EventNotificationsField from "./components/events/EventNotificationsField";
+import EventSendNotificationDialog from "./components/events/EventSendNotificationDialog";
 import LocationPicker from "./components/locations/LocationPicker";
 import type { EventLocation } from "./api/locationsApi";
 import type { EventFormData } from "@/schema/EventSchema";
@@ -232,6 +235,15 @@ const GroupEventFormPage = () => {
         <h1 className="text-xl font-bold">
           {isNew ? "New event" : "Edit event"}
         </h1>
+        {/* Only once the event exists: there is nobody to notify about an
+            event that has not been created yet. */}
+        {!isNew && !readOnly && eventData ? (
+          <EventSendNotificationDialog
+            eventId={eventData.id}
+            eventName={eventName(eventData)}
+            notificationsEnabled={eventData.notifications_enabled ?? true}
+          />
+        ) : null}
       </div>
 
       {readOnly ? (
@@ -283,6 +295,8 @@ const GroupEventFormPage = () => {
             <EventFormatField form={form} readOnly={readOnly} />
 
             <EventChatField form={form} readOnly={readOnly} />
+
+            <EventNotificationsField form={form} readOnly={readOnly} />
           </div>
 
           <EventLinksSection
