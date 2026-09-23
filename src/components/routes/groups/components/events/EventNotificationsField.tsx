@@ -38,9 +38,9 @@ const EventNotificationsField = ({
               Send notifications for this event
             </Pecha.FormLabel>
             <p className="text-xs text-muted-foreground">
-              Covers the notice when the event is published, the reminder
-              before it starts, and anything you send by hand. Turn it off to
-              keep the event silent.
+              Covers the notice when the event is published, the reminder before
+              it starts, and anything you send by hand. Turn it off to keep the
+              event silent.
             </p>
           </div>
           <Pecha.FormMessage />
