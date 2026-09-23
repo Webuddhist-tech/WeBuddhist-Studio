@@ -212,6 +212,9 @@ const GroupJoinRequestsSection = ({
         <div className="min-w-0 flex-1 space-y-1.5">
           <p className="text-sm leading-snug">
             <span className="font-semibold">{request.user_name}</span>
+            {request.email ? (
+              <span className="text-muted-foreground"> {request.email}</span>
+            ) : null}
             <span className="text-muted-foreground">
               {" "}
               asked to join this group
