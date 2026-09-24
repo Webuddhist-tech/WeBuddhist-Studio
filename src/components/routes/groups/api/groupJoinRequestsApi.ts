@@ -6,6 +6,7 @@ export interface GroupJoinRequestDTO {
   id: string;
   user_id: string;
   user_name: string;
+  email?: string | null;
   user_avatar_url?: string | null;
   message?: string | null;
   status: GroupJoinRequestStatus;

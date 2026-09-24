@@ -99,6 +99,7 @@ export interface EventDTO {
   location?: EventLocation;
   event_format: EventFormat;
   chat_enabled?: boolean;
+  notifications_enabled?: boolean;
   chat_room_id?: string | null;
   start_date: string;
   end_date: string;
@@ -164,6 +165,7 @@ export interface CreateEventRequest {
   location_id?: string;
   event_format?: EventFormat;
   chat_enabled?: boolean;
+  notifications_enabled?: boolean;
   recurrence?: RecurrenceInput;
 }
 
@@ -184,6 +186,7 @@ export interface UpdateEventRequest {
   location_id?: string | null;
   event_format?: EventFormat;
   chat_enabled?: boolean;
+  notifications_enabled?: boolean;
   recurrence?: RecurrenceInput | null;
 }
 
@@ -236,6 +239,39 @@ export const updateCmsEvent = async (
 ): Promise<EventDTO> => {
   const { data } = await axiosInstance.put<EventDTO>(
     `/api/v1/cms/events/${eventId}`,
+    body,
+  );
+  return data;
+};
+
+export type EventNotificationAudience = "participants" | "group";
+
+export interface SendEventNotificationRequest {
+  title: string;
+  body: string;
+  audience: EventNotificationAudience;
+}
+
+export interface SendEventNotificationResponse {
+  event_id: string;
+  announcement_id: string;
+  audience: EventNotificationAudience;
+  sqs_message_id: string;
+}
+
+/**
+ * Send a one-off notification about an event.
+ *
+ * Resolves once the backend has queued it, not once devices have it: a 202
+ * means accepted for delivery. A 409 means the event's notifications switch
+ * is off.
+ */
+export const sendCmsEventNotification = async (
+  eventId: string,
+  body: SendEventNotificationRequest,
+): Promise<SendEventNotificationResponse> => {
+  const { data } = await axiosInstance.post<SendEventNotificationResponse>(
+    `/api/v1/cms/events/${eventId}/notifications`,
     body,
   );
   return data;
@@ -366,6 +402,7 @@ export function mapEventToFormData(event: EventDTO): EventFormData {
     location_id: event.location_id?.trim() ?? "",
     event_format: event.event_format,
     chat_enabled: event.chat_enabled ?? true,
+    notifications_enabled: event.notifications_enabled ?? true,
   };
 }
 
@@ -496,6 +533,7 @@ export function buildCreateEventBody(
     ...(locationId ? { location_id: locationId } : {}),
     event_format: data.event_format,
     chat_enabled: data.chat_enabled,
+    notifications_enabled: data.notifications_enabled,
   };
 
   if (data.is_recurring && data.recurrence) {
@@ -553,7 +591,11 @@ async function resolveLinkOption(
       const fetched = res.skip + res.items.length;
       if (fetched >= res.total || res.items.length === 0) break;
     }
-  } catch {}
+  } catch {
+    // Deliberately swallowed: this only resolves a label for an id the caller
+    // already holds, so a failed lookup falls through to the fallback option
+    // below rather than taking down the form that renders it.
+  }
   return {
     id,
     title: fallbackLabel,
@@ -697,6 +739,9 @@ export function buildUpdateEventBody(
     body.event_format = data.event_format;
   }
 
+  if (data.notifications_enabled !== original.notifications_enabled) {
+    body.notifications_enabled = data.notifications_enabled;
+  }
   if (data.chat_enabled !== original.chat_enabled) {
     body.chat_enabled = data.chat_enabled;
   }

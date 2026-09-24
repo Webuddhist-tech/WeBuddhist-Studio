@@ -229,6 +229,7 @@ const baseEventSchema = z.object({
   location_id: z.string().trim(),
   event_format: z.enum(eventFormatValues),
   chat_enabled: z.boolean(),
+  notifications_enabled: z.boolean(),
 });
 
 const commonValidation = (
@@ -365,4 +366,5 @@ export const defaultEventFormValues = (): EventFormData => ({
   location_id: "",
   event_format: "offline",
   chat_enabled: true,
+  notifications_enabled: true,
 });
