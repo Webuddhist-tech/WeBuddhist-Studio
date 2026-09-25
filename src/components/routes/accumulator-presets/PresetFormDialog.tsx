@@ -27,6 +27,7 @@ import {
   uploadMantraDeityImage,
 } from "./api/mantrasApi";
 import { searchTextsForPicker } from "./api/textPickerApi";
+import { useTextTitle } from "./useTextTitle";
 
 interface PresetFormDialogProps {
   open: boolean;
@@ -132,6 +133,21 @@ const PresetFormDialog = ({
   useEffect(() => {
     setDeityImageOverride("unset");
   }, [mantraOption?.id]);
+
+  // The API returns only the edition id for a linked text, so the picker
+  // starts out labelled with the id and gets the real title once it resolves.
+  const resolvedTextTitle = useTextTitle(
+    textOption && textOption.title === textOption.id ? textOption.id : null,
+  );
+
+  useEffect(() => {
+    if (!resolvedTextTitle) return;
+    setTextOption((prev) =>
+      prev && prev.title === prev.id
+        ? { ...prev, title: resolvedTextTitle }
+        : prev,
+    );
+  }, [resolvedTextTitle]);
 
   const queryClient = useQueryClient();
 

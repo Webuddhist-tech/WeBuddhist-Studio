@@ -5,6 +5,18 @@ import {
   presetDisplayName,
 } from "./api/accumulatorPresetsApi";
 import { capitalizeFirstLetter } from "@/lib/textUtils";
+import { useTextTitle } from "./useTextTitle";
+
+/** Shows the linked text's name; falls back to the raw edition id while the
+ * title is loading or when it cannot be resolved. */
+const LinkedTextCell = ({ textId }: { textId: string | null }) => {
+  const title = useTextTitle(textId);
+  return (
+    <Pecha.TableCell className="max-w-[180px] truncate text-sm text-muted-foreground">
+      {title || textId || "—"}
+    </Pecha.TableCell>
+  );
+};
 
 interface AccumulatorPresetsTableProps {
   presets: AccumulatorPreset[];
@@ -36,7 +48,7 @@ const AccumulatorPresetsTable = ({
           <Pecha.TableRow>
             <Pecha.TableHead>Name</Pecha.TableHead>
             <Pecha.TableHead>Mantra</Pecha.TableHead>
-            <Pecha.TableHead>Text ID</Pecha.TableHead>
+            <Pecha.TableHead>Text</Pecha.TableHead>
             <Pecha.TableHead className="w-28">Target</Pecha.TableHead>
             {showActionsColumn ? (
               <Pecha.TableHead className="w-28 text-right">
@@ -74,9 +86,7 @@ const AccumulatorPresetsTable = ({
                     "—",
                 )}
               </Pecha.TableCell>
-              <Pecha.TableCell className="max-w-[180px] truncate font-mono text-xs text-muted-foreground">
-                {preset.text_id || "—"}
-              </Pecha.TableCell>
+              <LinkedTextCell textId={preset.text_id} />
               <Pecha.TableCell>
                 {preset.target_count != null
                   ? preset.target_count.toLocaleString()

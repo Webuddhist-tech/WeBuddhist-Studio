@@ -1,4 +1,4 @@
-import { searchTitles } from "@/components/api/searchApi";
+import { fetchTextLanguages, searchTitles } from "@/components/api/searchApi";
 import type { FkOption } from "@/components/routes/groups/components/FkMultiSearchSelector";
 
 type TitleSearchItem = {
@@ -58,4 +58,18 @@ export async function searchTextsForPicker(params: {
       : skip + items.length + (items.length === limit ? 1 : 0);
 
   return { items, skip, limit, total };
+}
+
+/** Resolve an OpenPecha edition id to its text title.
+ *
+ * Preset `text_id`s are edition ids, so the CMS only ever gets the id back
+ * from the API. `/texts/{edition_id}/languages` takes an edition id and
+ * carries the text's title, which is the cheapest name lookup available. */
+export async function fetchTextTitleByEditionId(
+  editionId: string,
+): Promise<string | null> {
+  const data = (await fetchTextLanguages(editionId)) as {
+    title?: string | null;
+  };
+  return data?.title?.trim() || null;
 }
