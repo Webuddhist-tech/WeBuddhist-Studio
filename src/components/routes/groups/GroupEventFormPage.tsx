@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -9,6 +9,11 @@ import type { GroupOutletContext } from "./GroupLayout";
 import { useEventForm } from "./hooks/useEventForm";
 import { useEventImage } from "./hooks/useEventImage";
 import { canWriteEvents } from "./lib/eventPermissions";
+import {
+  EVENT_TABS,
+  tabsWithErrors,
+  type EventTabId,
+} from "./lib/eventFormTabs";
 import {
   buildCreateEventBody,
   buildUpdateEventBody,
@@ -89,7 +94,7 @@ const GroupEventFormPage = () => {
     setTimezone,
     setIsRecurring,
     setRecurrence,
-  } = useEventForm();
+  } = useEventForm(isNew);
 
   const image = useEventImage({ setImageUrl });
   const { setImagePreview, setSelectedImage } = image;
@@ -190,10 +195,26 @@ const GroupEventFormPage = () => {
     onError: (err) => toast.error(getApiErrorMessage(err)),
   });
 
-  const onSubmit = form.handleSubmit((data) => {
-    if (readOnly) return;
-    mutation.mutate(data);
-  });
+  const [activeTab, setActiveTab] = useState<EventTabId>("about");
+
+  const errorTabs = useMemo(
+    () => new Set(tabsWithErrors(form.formState.errors)),
+    [form.formState.errors],
+  );
+
+  const onSubmit = form.handleSubmit(
+    (data) => {
+      if (readOnly) return;
+      mutation.mutate(data);
+    },
+    // Saving from any tab validates the whole event, so the field that failed
+    // is often on a panel that is not showing. Without this the submit just
+    // stops and the button looks broken - jump to the offending tab instead.
+    (errors) => {
+      const [firstInvalid] = tabsWithErrors(errors);
+      if (firstInvalid) setActiveTab(firstInvalid);
+    },
+  );
 
   if (!isNew && eventQuery.isLoading) {
     return (
@@ -266,96 +287,167 @@ const GroupEventFormPage = () => {
       ) : null}
 
       <Pecha.Form {...form}>
-        <form onSubmit={onSubmit} className="space-y-8">
-          <EventDateSection
-            form={form}
-            isOneDay={isOneDay}
-            readOnly={readOnly}
-            isNew={isNew}
-            onStartChange={setStartDate}
-            onEndChange={setEndDate}
-            onStartTimeChange={setStartTime}
-            onEndTimeChange={setEndTime}
-            onTimezoneChange={setTimezone}
-            onOneDayChange={setOneDay}
-            onIsRecurringChange={setIsRecurring}
-            onRecurrenceChange={setRecurrence}
-          />
+        <form onSubmit={onSubmit}>
+          {/* Every panel stays mounted and is hidden with CSS instead of being
+              unmounted by Radix. The sections own effects that resync dates,
+              recurrence and pickers on mount, so tearing them down on each tab
+              change would re-run that work against a half-edited form. */}
+          <Pecha.Tabs
+            value={activeTab}
+            onValueChange={(value) => setActiveTab(value as EventTabId)}
+          >
+            <Pecha.TabsList>
+              {EVENT_TABS.map(({ id, label }) => (
+                <Pecha.TabsTrigger key={id} value={id}>
+                  {label}
+                  {errorTabs.has(id) ? (
+                    <span
+                      aria-label="has errors"
+                      className="size-1.5 rounded-full bg-destructive"
+                    />
+                  ) : null}
+                </Pecha.TabsTrigger>
+              ))}
+            </Pecha.TabsList>
 
-          <EventMetadataRows
-            form={form}
-            fields={metadataRows.fields}
-            usedLanguages={usedLanguages}
-            canAddLanguage={availableLanguages.length > 0}
-            readOnly={readOnly}
-            onAdd={addMetadataRow}
-            onRemove={removeMetadataRow}
-          />
+            <Pecha.TabsContent
+              value="about"
+              forceMount
+              className="space-y-8 data-[state=inactive]:hidden"
+            >
+              <EventMetadataRows
+                form={form}
+                fields={metadataRows.fields}
+                usedLanguages={usedLanguages}
+                canAddLanguage={availableLanguages.length > 0}
+                readOnly={readOnly}
+                onAdd={addMetadataRow}
+                onRemove={removeMetadataRow}
+              />
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <LocationPicker
-              groupId={groupId ?? ""}
-              value={locationValue}
-              readOnly={readOnly}
-              canCreate={canWrite}
-              onChange={(location) => {
-                setLocationValue(location);
-                setLocationId(location?.id ?? "");
-              }}
-            />
+              <EventImageField
+                imagePreview={image.imagePreview}
+                selectedImage={image.selectedImage}
+                isDialogOpen={image.isImageDialogOpen}
+                isUploading={image.isImageUploading}
+                readOnly={readOnly}
+                onOpenDialog={image.openImageDialog}
+                onDialogOpenChange={image.setImageDialogOpen}
+                onUpload={image.uploadImage}
+                onRemove={image.removeImage}
+              />
+            </Pecha.TabsContent>
 
-            <EventFormatField form={form} readOnly={readOnly} />
+            <Pecha.TabsContent
+              value="schedule"
+              forceMount
+              className="space-y-8 data-[state=inactive]:hidden"
+            >
+              <EventDateSection
+                form={form}
+                isOneDay={isOneDay}
+                readOnly={readOnly}
+                isNew={isNew}
+                onStartChange={setStartDate}
+                onEndChange={setEndDate}
+                onStartTimeChange={setStartTime}
+                onEndTimeChange={setEndTime}
+                onTimezoneChange={setTimezone}
+                onOneDayChange={setOneDay}
+                onIsRecurringChange={setIsRecurring}
+                onRecurrenceChange={setRecurrence}
+              />
+            </Pecha.TabsContent>
 
-            <EventChatField form={form} readOnly={readOnly} />
+            <Pecha.TabsContent
+              value="venue"
+              forceMount
+              className="data-[state=inactive]:hidden"
+            >
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <LocationPicker
+                  groupId={groupId ?? ""}
+                  value={locationValue}
+                  readOnly={readOnly}
+                  canCreate={canWrite}
+                  onChange={(location) => {
+                    setLocationValue(location);
+                    setLocationId(location?.id ?? "");
+                  }}
+                />
 
-            <EventNotificationsField form={form} readOnly={readOnly} />
-          </div>
+                <EventFormatField form={form} readOnly={readOnly} />
+              </div>
+            </Pecha.TabsContent>
 
-          <EventLinksSection
-            form={form}
-            groupId={groupId ?? ""}
-            readOnly={readOnly}
-            contentValue={contentValue}
-            accumulatorValue={accumulatorValue}
-            groupAccumulatorValue={groupAccumulatorValue}
-            chantValue={chantValue}
-            onContentChange={setContentValue}
-            onAccumulatorChange={setAccumulatorValue}
-            onGroupAccumulatorChange={setGroupAccumulatorValue}
-            onChantChange={setChantValue}
-          />
+            <Pecha.TabsContent
+              value="youtube"
+              forceMount
+              className="data-[state=inactive]:hidden"
+            >
+              <EventYoutubeSection
+                form={form}
+                fields={youtubeRows.fields}
+                readOnly={readOnly}
+                onAdd={addYoutubeRow}
+                onRemove={removeYoutubeRow}
+                onMove={moveYoutubeRow}
+              />
+            </Pecha.TabsContent>
 
-          <EventYoutubeSection
-            form={form}
-            fields={youtubeRows.fields}
-            readOnly={readOnly}
-            onAdd={addYoutubeRow}
-            onRemove={removeYoutubeRow}
-            onMove={moveYoutubeRow}
-          />
+            <Pecha.TabsContent
+              value="links"
+              forceMount
+              className="space-y-8 data-[state=inactive]:hidden"
+            >
+              <EventUrlLinksSection
+                form={form}
+                fields={linkRows.fields}
+                readOnly={readOnly}
+                onAdd={addLinkRow}
+                onRemove={removeLinkRow}
+                onMove={moveLinkRow}
+              />
 
-          <EventUrlLinksSection
-            form={form}
-            fields={linkRows.fields}
-            readOnly={readOnly}
-            onAdd={addLinkRow}
-            onRemove={removeLinkRow}
-            onMove={moveLinkRow}
-          />
+              <EventLinksSection
+                form={form}
+                groupId={groupId ?? ""}
+                readOnly={readOnly}
+                contentValue={contentValue}
+                accumulatorValue={accumulatorValue}
+                groupAccumulatorValue={groupAccumulatorValue}
+                chantValue={chantValue}
+                onContentChange={setContentValue}
+                onAccumulatorChange={setAccumulatorValue}
+                onGroupAccumulatorChange={setGroupAccumulatorValue}
+                onChantChange={setChantValue}
+              />
+            </Pecha.TabsContent>
 
-          <EventImageField
-            imagePreview={image.imagePreview}
-            selectedImage={image.selectedImage}
-            isDialogOpen={image.isImageDialogOpen}
-            isUploading={image.isImageUploading}
-            readOnly={readOnly}
-            onOpenDialog={image.openImageDialog}
-            onDialogOpenChange={image.setImageDialogOpen}
-            onUpload={image.uploadImage}
-            onRemove={image.removeImage}
-          />
+            <Pecha.TabsContent
+              value="settings"
+              forceMount
+              className="data-[state=inactive]:hidden"
+            >
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <EventChatField form={form} readOnly={readOnly} />
 
-          <div className="flex justify-end gap-3 border-t border-dashed border-border pt-6">
+                <EventNotificationsField form={form} readOnly={readOnly} />
+              </div>
+            </Pecha.TabsContent>
+          </Pecha.Tabs>
+
+          {/* Sticky so the save stays reachable from every tab without
+              scrolling the panel to its end. The scroll container is
+              `GroupPageShell`, so the bar matches that shell's background
+              rather than `bg-background` - otherwise it reads as a pale strip
+              laid over the page. */}
+          <div className="sticky bottom-0 z-10 mt-8 flex items-center justify-end gap-3 border-t border-border bg-[#F3F3F3] py-4 dark:bg-[#181818]">
+            {errorTabs.size > 0 ? (
+              <p className="mr-auto text-xs text-destructive">
+                Some fields need attention — see the marked tabs.
+              </p>
+            ) : null}
             <Pecha.Button
               type="button"
               variant="outline"
