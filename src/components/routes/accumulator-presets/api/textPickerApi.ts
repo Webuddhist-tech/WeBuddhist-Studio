@@ -1,4 +1,5 @@
 import { fetchTextLanguages, searchTitles } from "@/components/api/searchApi";
+import type { TextLanguagesResponse } from "@/components/api/searchApi";
 import type { FkOption } from "@/components/routes/groups/components/FkMultiSearchSelector";
 
 type TitleSearchItem = {
@@ -68,8 +69,9 @@ export async function searchTextsForPicker(params: {
 export async function fetchTextTitleByEditionId(
   editionId: string,
 ): Promise<string | null> {
-  const data = (await fetchTextLanguages(editionId)) as {
-    title?: string | null;
-  };
+  const data = (await fetchTextLanguages(editionId)) as
+    | Partial<TextLanguagesResponse>
+    | null
+    | undefined;
   return data?.title?.trim() || null;
 }
