@@ -97,8 +97,26 @@ export const searchSegments = async ({
   return data;
 };
 
-export const fetchTextLanguages = async (textId: string) => {
-  const { data } = await axiosInstance.get(`/api/v1/texts/${textId}/languages`);
+export type AvailableLanguage = {
+  language: string;
+  language_code: string;
+  version_count: number;
+};
+
+/** Response of `/texts/{edition_id}/languages`: the text's title plus the
+ * languages it has versions in. */
+export type TextLanguagesResponse = {
+  text_id: string;
+  title: string;
+  available_languages: AvailableLanguage[];
+};
+
+export const fetchTextLanguages = async (
+  textId: string,
+): Promise<TextLanguagesResponse> => {
+  const { data } = await axiosInstance.get<TextLanguagesResponse>(
+    `/api/v1/texts/${textId}/languages`,
+  );
   return data;
 };
 
