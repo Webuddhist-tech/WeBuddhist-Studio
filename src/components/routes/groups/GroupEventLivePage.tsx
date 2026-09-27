@@ -32,6 +32,29 @@ const STATE_LABEL: Record<RecitationConnectionState, string> = {
 /** Recitation languages are lowercase on the wire ("bo"), Studio codes are not. */
 const toWireLanguage = (code: string) => code.trim().toLowerCase();
 
+const TOOLBAR_CONTROL_SELECTOR = [
+  "button",
+  "a",
+  "[role='button']",
+  "[role='combobox']",
+  "[role='option']",
+  "[role='menuitem']",
+  "[role='listbox']",
+].join(", ");
+
+/** Shortcuts drive the liturgy. They stay off fields and toolbar controls so
+ * Space can still activate "Load text" or a round button. Line rows are
+ * buttons too; those keep the shortcuts. */
+const allowsLiveShortcut = (target: EventTarget | null) => {
+  if (!(target instanceof HTMLElement)) return false;
+  const tag = target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return false;
+  if (target.isContentEditable) return false;
+  if (target.closest("[data-row]")) return true;
+  if (target.closest(TOOLBAR_CONTROL_SELECTOR)) return false;
+  return true;
+};
+
 const GroupEventLivePage = () => {
   const { groupId, eventId } = useParams<{
     groupId: string;
@@ -57,6 +80,13 @@ const GroupEventLivePage = () => {
   const listRef = useRef<HTMLDivElement | null>(null);
   /** Which language the lines on screen were loaded in. */
   const loadedLanguageRef = useRef<string | null>(null);
+  /** Latest language, read when a response arrives so a late one can be dropped. */
+  const languageRef = useRef(language);
+  languageRef.current = language;
+  /** Bumped on every load so an older response cannot replace a newer one. */
+  const loadRequestRef = useRef(0);
+  /** Text the operator asked for, including a load that has not landed yet. */
+  const requestedTextIdRef = useRef<string | null>(null);
 
   const {
     state,
@@ -106,42 +136,58 @@ const GroupEventLivePage = () => {
   const eventPath =
     groupId && eventId ? ROUTES.groupEvent(groupId, eventId) : ROUTES.groups;
 
-  const loadText = useCallback(
-    async (requestedTextId: string) => {
-      const trimmed = requestedTextId.trim();
-      if (!trimmed) {
-        setLoadError("Choose a liturgy, or enter a text id.");
-        return;
-      }
-      setIsLoadingText(true);
-      setLoadError(null);
-      try {
-        const details = await fetchRecitationDetails(
-          trimmed,
-          toWireLanguage(language),
-        );
-        setSegments(toOperatorSegments(details, toWireLanguage(language)));
-        setLoadedTextId(trimmed);
-        loadedLanguageRef.current = language;
-        setCurrentIndex(-1);
-      } catch (error) {
-        setSegments([]);
-        setLoadedTextId(null);
-        setLoadError(getApiErrorMessage(error, "Could not load this text."));
-      } finally {
+  const loadText = useCallback(async (requestedTextId: string) => {
+    const trimmed = requestedTextId.trim();
+    if (!trimmed) {
+      setLoadError("Choose a liturgy, or enter a text id.");
+      return;
+    }
+    const request = ++loadRequestRef.current;
+    const requestedLanguage = languageRef.current;
+    requestedTextIdRef.current = trimmed;
+    setIsLoadingText(true);
+    setLoadError(null);
+    try {
+      const details = await fetchRecitationDetails(
+        trimmed,
+        toWireLanguage(requestedLanguage),
+      );
+      // A liturgy or language chosen since this request started owns the screen.
+      if (loadRequestRef.current !== request) return;
+      if (languageRef.current !== requestedLanguage) return;
+      setSegments(
+        toOperatorSegments(details, toWireLanguage(requestedLanguage)),
+      );
+      setLoadedTextId(trimmed);
+      loadedLanguageRef.current = requestedLanguage;
+      setCurrentIndex(-1);
+    } catch (error) {
+      if (loadRequestRef.current !== request) return;
+      if (languageRef.current !== requestedLanguage) return;
+      setSegments([]);
+      setLoadedTextId(null);
+      loadedLanguageRef.current = null;
+      requestedTextIdRef.current = null;
+      setLoadError(getApiErrorMessage(error, "Could not load this text."));
+    } finally {
+      if (
+        loadRequestRef.current === request &&
+        languageRef.current === requestedLanguage
+      ) {
         setIsLoadingText(false);
       }
-    },
-    [language],
-  );
+    }
+  }, []);
 
   // Segment ids are per language, so the lines on screen have to be reloaded
   // when the operator switches language - otherwise they would be publishing
-  // ids from the text they are no longer reading.
+  // ids from the text they are no longer reading. A load still in flight counts:
+  // its text id is not in state yet, and the old response must not land instead.
   useEffect(() => {
-    if (!loadedTextId) return;
+    const textToReload = requestedTextIdRef.current;
+    if (!textToReload) return;
     if (loadedLanguageRef.current === language) return;
-    void loadText(loadedTextId);
+    void loadText(textToReload);
   }, [language, loadedTextId, loadText]);
 
   const scrollRowIntoView = (index: number) => {
@@ -168,13 +214,11 @@ const GroupEventLivePage = () => {
   );
 
   // space / ↓ advance, ↑ goes back — the operator drives without leaving the
-  // liturgy, so the shortcuts stay off while a field has focus.
+  // liturgy. Fields and toolbar controls keep their own keys: Space on
+  // "Load text" or a round button must activate that control, not the next line.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      const tag = target?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-      if (target?.isContentEditable) return;
+      if (!allowsLiveShortcut(event.target)) return;
       if (event.code === "Space" || event.code === "ArrowDown") {
         event.preventDefault();
         publish(currentIndex + 1);

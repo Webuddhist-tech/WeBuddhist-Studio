@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { fetchTextDetails } from "@/components/api/searchApi";
 import SelectedSourceDetail from "./SourceDetail";
@@ -141,6 +141,38 @@ describe("SelectedSourceDetail select all", () => {
         segment_numbers: [1, 2, 3],
       }),
     );
+  });
+
+  it("does not add a select-all that was cleared while the request was in flight", async () => {
+    const onAdd = vi.fn();
+    let resolveDetails: (value: unknown) => void = () => {};
+    vi.mocked(fetchTextDetails).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveDetails = resolve;
+        }),
+    );
+
+    renderDetail({ segments: [segment(1)], totalSegments: 3, onAdd });
+    fireEvent.click(selectAllCheckbox());
+
+    const addButton = screen.getByRole("button");
+    await waitFor(() => expect(addButton).not.toBeDisabled());
+    fireEvent.click(addButton);
+    await waitFor(() => expect(fetchTextDetails).toHaveBeenCalled());
+
+    fireEvent.click(selectAllCheckbox());
+    expect(rangeInput().value).toBe("");
+
+    await act(async () => {
+      resolveDetails({
+        content: {
+          sections: [{ segments: [segment(1), segment(2), segment(3)] }],
+        },
+      });
+    });
+
+    expect(onAdd).not.toHaveBeenCalled();
   });
 
   it("trims the preview list for a large whole-text selection", () => {

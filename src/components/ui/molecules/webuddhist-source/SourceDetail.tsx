@@ -130,6 +130,10 @@ const SelectedSourceDetail = ({
   // to the end. The preview only jumps to the start of that range; Add loads
   // the selected window itself.
   const handleSelectAll = (checked: boolean) => {
+    // Same as editing the range: a fetch already in flight was for the previous
+    // selection, and must not Add after Select All is cleared or replaced.
+    addRequestRef.current += 1;
+    setIsResolvingSelection(false);
     setSelectAll(checked);
     if (checked && selectionMax > 0) {
       setRangeInput(`1-${selectionMax}`);
