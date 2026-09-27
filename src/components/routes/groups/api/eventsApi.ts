@@ -400,7 +400,7 @@ export function mapEventToFormData(event: EventDTO): EventFormData {
     group_recitation_collection_id:
       event.group_recitation_collection_id?.trim() ?? "",
     location_id: event.location_id?.trim() ?? "",
-    event_format: event.event_format,
+    event_format: event.event_format ?? "hybrid",
     chat_enabled: event.chat_enabled ?? true,
     notifications_enabled: event.notifications_enabled ?? true,
   };

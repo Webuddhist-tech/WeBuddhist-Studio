@@ -3,13 +3,24 @@ import axiosInstance from "@/config/axios-config";
 export interface EventLocation {
   id: string;
   group_id: string;
+  /** On public/event reads this is already the name for the requested
+   * language, with English as the fallback. */
   name: string;
   latitude?: number;
   longitude?: number;
 }
 
+/** One language's name for a location. `name` on the location itself stays the
+ * canonical name and the fallback. */
+export interface LocationTranslation {
+  id?: string;
+  name: string;
+  language: string;
+}
+
 export interface LocationDetail extends EventLocation {
   event_count: number;
+  translations?: LocationTranslation[];
 }
 
 export interface LocationsResponse {
@@ -23,6 +34,15 @@ export interface CreateLocationRequest {
   name: string;
   latitude?: number;
   longitude?: number;
+  translations?: LocationTranslation[];
+}
+
+export interface UpdateLocationRequest {
+  name?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  /** Omitted leaves the stored names alone; a list replaces them wholesale. */
+  translations?: LocationTranslation[];
 }
 
 export interface LocationListParams {
@@ -54,12 +74,34 @@ export const fetchLocations = async (
   return data;
 };
 
+export const fetchLocation = async (
+  groupId: string,
+  locationId: string,
+): Promise<LocationDetail> => {
+  const { data } = await axiosInstance.get<LocationDetail>(
+    `${locationsUrl(groupId)}/${locationId}`,
+  );
+  return data;
+};
+
 export const createLocation = async (
   groupId: string,
   body: CreateLocationRequest,
 ): Promise<LocationDetail> => {
   const { data } = await axiosInstance.post<LocationDetail>(
     locationsUrl(groupId),
+    body,
+  );
+  return data;
+};
+
+export const updateLocation = async (
+  groupId: string,
+  locationId: string,
+  body: UpdateLocationRequest,
+): Promise<LocationDetail> => {
+  const { data } = await axiosInstance.patch<LocationDetail>(
+    `${locationsUrl(groupId)}/${locationId}`,
     body,
   );
   return data;

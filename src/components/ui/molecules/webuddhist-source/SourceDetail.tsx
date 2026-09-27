@@ -3,6 +3,11 @@ import { Pecha } from "@/components/ui/shadimport";
 import { useDebounce } from "use-debounce";
 import { parseRangeBounds, parseSelection } from "@/lib/utils";
 
+/** A whole-text selection can run to thousands of segments; past this many the
+ * preview list is trimmed so the sheet stays responsive. The payload built on
+ * Add still covers every selected segment. */
+const MAX_RENDERED_SEGMENTS = 200;
+
 export interface SourceData {
   content: string;
   pecha_segment_id: string;
@@ -124,19 +129,23 @@ const SelectedSourceDetail = ({
     });
   }, [scrollToSegmentNumber, loadedSegmentNumbers]);
 
+  // The count comes from the library API rather than from the pages loaded so
+  // far, so the whole text is selectable without typing a range or scrolling
+  // to the end. Filling the range triggers a single fetch of that window.
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked);
-    if (checked && segments.length > 0) {
-      const numbers = segments.map(
-        (s: any, i: number) => s.segment_number ?? i + 1,
-      );
-      const first = Math.min(...numbers);
-      const last = Math.max(...numbers);
-      setRangeInput(`${first}-${last}`);
+    if (checked && selectionMax > 0) {
+      setRangeInput(`1-${selectionMax}`);
     } else {
       setRangeInput("");
     }
   };
+
+  const visibleSegments =
+    selectAll && segments.length > MAX_RENDERED_SEGMENTS
+      ? segments.slice(0, MAX_RENDERED_SEGMENTS)
+      : segments;
+  const hiddenSegmentCount = segments.length - visibleSegments.length;
 
   const handleAdd = () => {
     if (!selectedIndices || !selectedSource) return;
@@ -173,7 +182,13 @@ const SelectedSourceDetail = ({
         <span className="text-sm text-muted-foreground">
           Select Range (e.g. 1-{selectionMax || "N"})
         </span>
-        <label className="flex items-center gap-1.5 cursor-pointer">
+        <label
+          className={`flex items-center gap-1.5 ${
+            selectionMax === 0
+              ? "cursor-not-allowed opacity-60"
+              : "cursor-pointer"
+          }`}
+        >
           <span
             className={`text-sm select-none${selectAll ? "" : " text-muted-foreground"}`}
           >
@@ -181,6 +196,7 @@ const SelectedSourceDetail = ({
           </span>
           <Pecha.Checkbox
             checked={selectAll}
+            disabled={selectionMax === 0}
             onCheckedChange={(checked: boolean) => handleSelectAll(!!checked)}
             className="data-[state=checked]:bg-transparent dark:data-[state=checked]:bg-transparent data-[state=checked]:text-primary"
           />
@@ -243,7 +259,7 @@ const SelectedSourceDetail = ({
               Loading earlier segments...
             </p>
           )}
-          {segments.map((segment: any, segIndex: number) => {
+          {visibleSegments.map((segment: any, segIndex: number) => {
             const segmentNumber = segment.segment_number ?? segIndex + 1;
             const isSelected = selectedIndices?.has(segmentNumber);
             return (
@@ -265,6 +281,12 @@ const SelectedSourceDetail = ({
               </div>
             );
           })}
+          {hiddenSegmentCount > 0 && (
+            <p className="text-center text-sm text-gray-500">
+              … and {hiddenSegmentCount} more selected segment
+              {hiddenSegmentCount === 1 ? "" : "s"} not shown
+            </p>
+          )}
           {bottomRef && (
             <div
               ref={bottomRef}

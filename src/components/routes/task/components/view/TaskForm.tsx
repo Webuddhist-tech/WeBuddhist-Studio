@@ -381,6 +381,15 @@ const TaskForm = ({
   };
 
   const onSubmit = async (data: TaskFormData) => {
+    // A task hangs off a day. Without one there is nothing to save against, so
+    // say so instead of letting the request go out with an undefined day.
+    if (!isEditMode && !currentDayData?.id) {
+      toast.error("Create a day first", {
+        description: "Add a day to this plan before adding a task.",
+      });
+      return;
+    }
+
     const timestampError = validateSubTaskTimestamps(
       subTasks,
       currentDayData?.audio_duration_ms,
@@ -392,7 +401,7 @@ const TaskForm = ({
 
     const taskData: any = {
       plan_id: planId!,
-      day_id: currentDayData!.id,
+      day_id: currentDayData?.id,
       title: data.title,
       estimated_time: 30,
     };
@@ -496,7 +505,8 @@ const TaskForm = ({
                     !isEditable ||
                     createTaskMutation.isPending ||
                     updateTaskMutation.isPending ||
-                    subTasks.length === 0
+                    subTasks.length === 0 ||
+                    (!isEditMode && !currentDayData?.id)
                   }
                 >
                   {createTaskMutation.isPending || updateTaskMutation.isPending

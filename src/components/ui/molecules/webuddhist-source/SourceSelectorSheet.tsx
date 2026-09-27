@@ -13,6 +13,7 @@ import {
   searchSources,
   searchTitles,
   fetchTextDetails,
+  fetchTextSegmentCount,
 } from "@/components/api/searchApi";
 import {
   flattenSegments,
@@ -208,6 +209,16 @@ export const SourceSelectorSheet = ({
     fetchPreviousPage,
   ]);
 
+  // The text's real length, asked for on its own so "Select All" can cover the
+  // whole text before any of it has been paged in.
+  const { data: segmentCount } = useQuery({
+    queryKey: ["textSegmentCount", selectedSource?.id],
+    queryFn: () => fetchTextSegmentCount(selectedSource.id),
+    enabled: !!selectedSource?.id && searchOnlyTitles,
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const detailSegments = useMemo(() => {
     if (!detailsData?.pages) return [];
     const allSegments = detailsData.pages.flatMap((page: any) =>
@@ -220,7 +231,8 @@ export const SourceSelectorSheet = ({
     );
   }, [detailsData?.pages]);
 
-  const totalSegments = detailsData?.pages?.[0]?.total_segments ?? 0;
+  const totalSegments =
+    segmentCount ?? detailsData?.pages?.[0]?.total_segments ?? 0;
 
   const handleRangeNavigate = useCallback((start: number, end: number) => {
     setBlockPreviousUntilLeave(true);

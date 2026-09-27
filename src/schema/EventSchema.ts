@@ -364,7 +364,7 @@ export const defaultEventFormValues = (): EventFormData => ({
   group_accumulator_id: "",
   group_recitation_collection_id: "",
   location_id: "",
-  event_format: "offline",
+  event_format: "hybrid",
   chat_enabled: true,
   notifications_enabled: true,
 });

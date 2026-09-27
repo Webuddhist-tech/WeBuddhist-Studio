@@ -72,6 +72,16 @@ export const fetchTextDetails = async ({
   return data;
 };
 
+/** Total number of segments in a text, asked of the library API with the
+ * smallest possible window. Lets the source picker select a whole text without
+ * paging through it first. */
+export const fetchTextSegmentCount = async (
+  textId: string,
+): Promise<number> => {
+  const data = await fetchTextDetails({ textId, size: 1 });
+  return data?.total_segments ?? 0;
+};
+
 type SearchSegments = {
   content: string;
 };

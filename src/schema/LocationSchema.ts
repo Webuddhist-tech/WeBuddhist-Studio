@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+const localizedNameSchema = z.object({
+  language: z.string().min(1, "Language is required"),
+  name: z
+    .string()
+    .trim()
+    .min(1, "Name is required")
+    .max(255, "Name must be at most 255 characters"),
+});
+
 export const locationSchema = z
   .object({
     name: z
@@ -9,8 +18,23 @@ export const locationSchema = z
       .max(255, "Name must be at most 255 characters"),
     latitude: z.string().trim(),
     longitude: z.string().trim(),
+    /** Per-language names. `name` above stays the canonical one, shown when a
+     * reader's language has no entry here. */
+    translations: z.array(localizedNameSchema),
   })
   .superRefine((data, ctx) => {
+    const seen = new Set<string>();
+    data.translations.forEach((entry, index) => {
+      if (seen.has(entry.language)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "This language already has a name",
+          path: ["translations", index, "language"],
+        });
+      }
+      seen.add(entry.language);
+    });
+
     const hasLat = data.latitude !== "";
     const hasLng = data.longitude !== "";
 
@@ -63,6 +87,7 @@ export const defaultLocationFormValues = (): LocationFormData => ({
   name: "",
   latitude: "",
   longitude: "",
+  translations: [],
 });
 
 export function parseCoordinates(data: LocationFormData): {
