@@ -7,6 +7,7 @@ import {
   LuBookOpen,
   LuCircleDot,
   LuLibrary,
+  LuRadio,
   LuScrollText,
 } from "react-icons/lu";
 import { Pecha } from "@/components/ui/shadimport";
@@ -240,15 +241,28 @@ const GroupEventDetailPage = () => {
           ← Events
         </button>
         {canWrite ? (
-          <Pecha.Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              navigate(ROUTES.groupEventEdit(groupId ?? "", data.id))
-            }
-          >
-            Edit
-          </Pecha.Button>
+          <div className="flex items-center gap-2">
+            <Pecha.Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() =>
+                navigate(ROUTES.groupEventLive(groupId ?? "", data.id))
+              }
+            >
+              <LuRadio className="h-4 w-4" />
+              Live control
+            </Pecha.Button>
+            <Pecha.Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                navigate(ROUTES.groupEventEdit(groupId ?? "", data.id))
+              }
+            >
+              Edit
+            </Pecha.Button>
+          </div>
         ) : null}
       </div>
 

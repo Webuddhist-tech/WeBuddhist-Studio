@@ -1,6 +1,15 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fetchTextDetails } from "@/components/api/searchApi";
 import SelectedSourceDetail from "./SourceDetail";
+
+vi.mock("@/components/api/searchApi", () => ({
+  fetchTextDetails: vi.fn(),
+}));
+
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn() },
+}));
 
 const segment = (n: number) => ({
   segment_id: `seg-${n}`,
@@ -26,6 +35,10 @@ const rangeInput = () =>
 const selectAllCheckbox = () => screen.getByRole("checkbox");
 
 describe("SelectedSourceDetail select all", () => {
+  beforeEach(() => {
+    vi.mocked(fetchTextDetails).mockReset();
+  });
+
   it("fills the range from the text's total segment count, not the loaded pages", () => {
     // Only the first page is loaded, but the text is 1000 segments long.
     renderDetail({ segments: [segment(1), segment(2)], totalSegments: 1000 });
@@ -71,13 +84,14 @@ describe("SelectedSourceDetail select all", () => {
 
     fireEvent.click(selectAllCheckbox());
 
-    // The button reads "Loading…" until the selected range has landed.
+    // The button reads "Loading…" until the range input has settled.
     const addButton = screen.getByRole("button");
     await waitFor(() => expect(addButton).not.toBeDisabled());
     expect(addButton).toHaveTextContent("Add");
 
     fireEvent.click(addButton);
 
+    expect(fetchTextDetails).not.toHaveBeenCalled();
     expect(onAdd).toHaveBeenCalledWith({
       content: "Segment 1\nSegment 2\nSegment 3",
       pecha_segment_id: "pecha-1",
@@ -85,6 +99,48 @@ describe("SelectedSourceDetail select all", () => {
       segment_ids: ["seg-1", "seg-2", "seg-3"],
       segment_numbers: [1, 2, 3],
     });
+  });
+
+  it("adds a long selection in one request without the preview pages", async () => {
+    const onAdd = vi.fn();
+    vi.mocked(fetchTextDetails).mockResolvedValue({
+      content: {
+        sections: [
+          {
+            segments: [segment(1), segment(2), segment(3)],
+          },
+        ],
+      },
+    });
+
+    // Only the first preview row is loaded; the text is longer than that page.
+    renderDetail({ segments: [segment(1)], totalSegments: 3, onAdd });
+
+    fireEvent.click(selectAllCheckbox());
+
+    const addButton = screen.getByRole("button");
+    await waitFor(() => expect(addButton).not.toBeDisabled());
+    expect(addButton).toHaveTextContent("Add");
+
+    fireEvent.click(addButton);
+
+    await waitFor(() =>
+      expect(fetchTextDetails).toHaveBeenCalledWith({
+        textId: "text-1",
+        start: 1,
+        end: 3,
+        size: 3,
+      }),
+    );
+    await waitFor(() =>
+      expect(onAdd).toHaveBeenCalledWith({
+        content: "Segment 1\nSegment 2\nSegment 3",
+        pecha_segment_id: "pecha-1",
+        text_id: "text-1",
+        segment_ids: ["seg-1", "seg-2", "seg-3"],
+        segment_numbers: [1, 2, 3],
+      }),
+    );
   });
 
   it("trims the preview list for a large whole-text selection", () => {

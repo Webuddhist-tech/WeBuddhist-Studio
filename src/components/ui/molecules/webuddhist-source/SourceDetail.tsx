@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { Pecha } from "@/components/ui/shadimport";
 import { useDebounce } from "use-debounce";
-import { parseRangeBounds, parseSelection } from "@/lib/utils";
+import { fetchTextDetails } from "@/components/api/searchApi";
+import { flattenSegments, parseRangeBounds, parseSelection } from "@/lib/utils";
 
 /** A whole-text selection can run to thousands of segments; past this many the
- * preview list is trimmed so the sheet stays responsive. The payload built on
- * Add still covers every selected segment. */
+ * preview list is trimmed so the sheet stays responsive. Add does not wait for
+ * those rows — it loads the selected window in one request. */
 const MAX_RENDERED_SEGMENTS = 200;
 
 export interface SourceData {
@@ -24,7 +26,6 @@ const SelectedSourceDetail = ({
   topRef,
   isFetchingNextPage,
   isFetchingPreviousPage,
-  isRangeLoading,
   totalSegments = 0,
   onRangeNavigate,
   scrollToSegmentNumber,
@@ -36,17 +37,17 @@ const SelectedSourceDetail = ({
   topRef?: (node?: Element | null) => void;
   isFetchingNextPage?: boolean;
   isFetchingPreviousPage?: boolean;
-  /** True while a range jump request is in flight. */
-  isRangeLoading?: boolean;
   totalSegments?: number;
   onRangeNavigate?: (start: number, end: number) => void;
   scrollToSegmentNumber?: number | null;
 }) => {
   const [rangeInput, setRangeInput] = useState("");
   const [selectAll, setSelectAll] = useState(false);
+  const [isResolvingSelection, setIsResolvingSelection] = useState(false);
   const [debouncedRangeInput] = useDebounce(rangeInput, 400);
   const lastNavigatedRange = useRef<string | null>(null);
   const scrolledToRef = useRef<number | null>(null);
+  const addRequestRef = useRef(0);
 
   const selectionMax = totalSegments || segments.length;
 
@@ -67,19 +68,14 @@ const SelectedSourceDetail = ({
     Boolean(parseRangeBounds(rangeInput)) &&
     rangeInput.trim() !== debouncedRangeInput.trim();
 
-  const selectionFullyLoaded =
-    selectedIndices != null &&
-    [...selectedIndices].every((n) => loadedSegmentNumbers.has(n));
-
   const isAddDisabled =
-    !selectedIndices ||
-    !selectionFullyLoaded ||
-    rangePending ||
-    Boolean(isRangeLoading);
+    !selectedIndices || rangePending || isResolvingSelection;
 
   useEffect(() => {
+    addRequestRef.current += 1;
     lastNavigatedRange.current = null;
     scrolledToRef.current = null;
+    setIsResolvingSelection(false);
     setRangeInput("");
     setSelectAll(false);
   }, [selectedSource?.id]);
@@ -131,7 +127,8 @@ const SelectedSourceDetail = ({
 
   // The count comes from the library API rather than from the pages loaded so
   // far, so the whole text is selectable without typing a range or scrolling
-  // to the end. Filling the range triggers a single fetch of that window.
+  // to the end. The preview only jumps to the start of that range; Add loads
+  // the selected window itself.
   const handleSelectAll = (checked: boolean) => {
     setSelectAll(checked);
     if (checked && selectionMax > 0) {
@@ -147,28 +144,75 @@ const SelectedSourceDetail = ({
       : segments;
   const hiddenSegmentCount = segments.length - visibleSegments.length;
 
-  const handleAdd = () => {
-    if (!selectedIndices || !selectedSource) return;
+  const segmentsForNumbers = (pool: any[], numbers: number[]) => {
+    const byNumber = new Map<number, any>();
+    pool.forEach((seg: any, index: number) => {
+      byNumber.set(seg.segment_number ?? index + 1, seg);
+    });
+    return numbers
+      .map((number) => byNumber.get(number))
+      .filter((seg) => seg != null);
+  };
+
+  const handleRangeInputChange = (value: string) => {
+    addRequestRef.current += 1;
+    setIsResolvingSelection(false);
+    setRangeInput(value);
+    setSelectAll(false);
+  };
+
+  const handleAdd = async () => {
+    if (!selectedIndices || !selectedSource || isResolvingSelection) return;
+    const request = addRequestRef.current + 1;
+    addRequestRef.current = request;
     const sortedIndices = Array.from(selectedIndices).sort((a, b) => a - b);
-    const selected = sortedIndices
-      .map((n) =>
-        segments.find(
-          (seg: any, i: number) => (seg.segment_number ?? i + 1) === n,
-        ),
-      )
-      .filter(Boolean);
-    if (selected.length === 0) return;
+    let selected = segmentsForNumbers(segments, sortedIndices);
+
+    // The preview pages 20 segments at a time. A long range is loaded here, in
+    // one details request, instead of by scrolling that preview to the end.
+    if (selected.length !== sortedIndices.length) {
+      const bounds = parseRangeBounds(rangeInput);
+      if (!bounds) return;
+      const start = bounds.start;
+      const end = Math.min(bounds.end, selectionMax);
+      setIsResolvingSelection(true);
+      try {
+        const page = await fetchTextDetails({
+          textId: selectedSource.id,
+          start,
+          end,
+          size: end - start + 1,
+        });
+        if (addRequestRef.current !== request) return;
+        selected = segmentsForNumbers(
+          flattenSegments(page?.content?.sections ?? []),
+          sortedIndices,
+        );
+      } catch {
+        if (addRequestRef.current !== request) return;
+        toast.error("Couldn't load the selected segments. Try again.");
+        return;
+      } finally {
+        if (addRequestRef.current === request) {
+          setIsResolvingSelection(false);
+        }
+      }
+    }
+
+    if (addRequestRef.current !== request) return;
+    if (selected.length !== sortedIndices.length) {
+      toast.error("Couldn't load the selected segments. Try again.");
+      return;
+    }
 
     const content = selected.map((seg: any) => seg.content).join("\n");
     const segmentIds = selected.map((seg: any) => seg.segment_id);
     const pechaSegmentId = selected[0]?.pecha_segment_id || "";
 
-    const textId = selectedSource.id;
-
     onAdd({
       content,
       pecha_segment_id: pechaSegmentId,
-      text_id: textId,
+      text_id: selectedSource.id,
       segment_ids: segmentIds,
       segment_numbers: selected.map(
         (seg: any, i: number) => seg.segment_number ?? i + 1,
@@ -207,24 +251,18 @@ const SelectedSourceDetail = ({
         <Pecha.Input
           placeholder="1-10"
           value={rangeInput}
-          onChange={(e) => {
-            setRangeInput(e.target.value);
-            setSelectAll(false);
-          }}
+          onChange={(e) => handleRangeInputChange(e.target.value)}
           className={`flex-1 h-10 ${rangeInput.trim() !== "" && !rangeInput.trim().endsWith("-") && !selectedIndices ? "ring-1 ring-red-500 dark:ring-red-400" : ""}`}
         />
         <Pecha.Button
           type="button"
           variant="destructive"
           disabled={isAddDisabled}
+          aria-busy={isResolvingSelection}
           onClick={handleAdd}
           className="h-10 px-6 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isRangeLoading ||
-          rangePending ||
-          (selectedIndices && !selectionFullyLoaded)
-            ? "Loading…"
-            : "Add"}
+          {isResolvingSelection || rangePending ? "Loading…" : "Add"}
         </Pecha.Button>
       </div>
 

@@ -107,7 +107,12 @@ const PresetFormDialog = ({
       preset?.target_count != null ? String(preset.target_count) : "",
     );
     setTextOption(
-      preset?.text_id ? { id: preset.text_id, title: preset.text_id } : null,
+      preset?.text_id
+        ? {
+            id: preset.text_id,
+            title: preset.text_title?.trim() || preset.text_id,
+          }
+        : null,
     );
     setMantraOption(
       preset?.mantra
@@ -134,8 +139,8 @@ const PresetFormDialog = ({
     setDeityImageOverride("unset");
   }, [mantraOption?.id]);
 
-  // The API returns only the edition id for a linked text, so the picker
-  // starts out labelled with the id and gets the real title once it resolves.
+  // The list response carries the title. This lookup only runs when that
+  // title was missing and the picker is still labelled with the edition id.
   const resolvedTextTitle = useTextTitle(
     textOption && textOption.title === textOption.id ? textOption.id : null,
   );

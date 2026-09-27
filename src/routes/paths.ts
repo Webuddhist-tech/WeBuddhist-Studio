@@ -34,6 +34,8 @@ export const ROUTES = {
     `/groups/${groupId}/events/${eventId}`,
   groupEventEdit: (groupId: string, eventId: string) =>
     `/groups/${groupId}/events/${eventId}/edit`,
+  groupEventLive: (groupId: string, eventId: string) =>
+    `/groups/${groupId}/events/${eventId}/live`,
   groupChants: (groupId: string) => `/groups/${groupId}/chants`,
   groupChantNew: (groupId: string) => `/groups/${groupId}/chants/new`,
   groupChant: (groupId: string, collectionId: string) =>

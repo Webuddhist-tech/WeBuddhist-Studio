@@ -27,6 +27,8 @@ export interface AccumulatorPreset {
   target_count: number | null;
   current_count: number;
   text_id: string | null;
+  /** Resolved with the list, so the table does not look up each text itself. */
+  text_title?: string | null;
   mantra: PresetMantraDTO | null;
   mala_image_id: string | null;
   mala_image_url: string | null;
