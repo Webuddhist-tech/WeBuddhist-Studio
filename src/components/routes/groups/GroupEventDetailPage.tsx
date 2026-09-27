@@ -246,8 +246,14 @@ const GroupEventDetailPage = () => {
               variant="outline"
               size="sm"
               className="gap-1.5"
+              // Its own tab: the control needs no session, and the operator
+              // keeps Studio open beside it.
               onClick={() =>
-                navigate(ROUTES.groupEventLive(groupId ?? "", data.id))
+                window.open(
+                  ROUTES.liveControl(data.id),
+                  "_blank",
+                  "noopener,noreferrer",
+                )
               }
             >
               <LuRadio className="h-4 w-4" />
