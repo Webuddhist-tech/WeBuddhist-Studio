@@ -17,6 +17,7 @@ import {
 } from "./api/recitationLiveApi";
 import {
   useRecitationSocket,
+  type LivePosition,
   type RecitationConnectionState,
 } from "./hooks/useRecitationSocket";
 
@@ -87,6 +88,8 @@ const GroupEventLivePage = () => {
   const loadRequestRef = useRef(0);
   /** Text the operator asked for, including a load that has not landed yet. */
   const requestedTextIdRef = useRef<string | null>(null);
+  /** The room's last known position, read when a load lands. */
+  const livePositionRef = useRef<LivePosition | null>(null);
 
   const {
     state,
@@ -99,6 +102,7 @@ const GroupEventLivePage = () => {
     sendPosition,
     endSession,
   } = useRecitationSocket(eventId);
+  livePositionRef.current = livePosition;
 
   const { data: event } = useQuery({
     queryKey: ["cms-event", eventId],
@@ -155,12 +159,25 @@ const GroupEventLivePage = () => {
       // A liturgy or language chosen since this request started owns the screen.
       if (loadRequestRef.current !== request) return;
       if (languageRef.current !== requestedLanguage) return;
-      setSegments(
-        toOperatorSegments(details, toWireLanguage(requestedLanguage)),
+      const loaded = toOperatorSegments(
+        details,
+        toWireLanguage(requestedLanguage),
       );
+      setSegments(loaded);
       setLoadedTextId(trimmed);
       loadedLanguageRef.current = requestedLanguage;
-      setCurrentIndex(-1);
+      // A session already under way is somewhere in this liturgy: start from
+      // the room's line and round, so the next press advances the recitation
+      // instead of sending it back to line one.
+      const live = livePositionRef.current;
+      const joined = live?.textId === trimmed;
+      if (joined && live?.roundNumber != null && live.roundNumber >= 1) {
+        setRound(live.roundNumber);
+      }
+      const liveIndex = joined && live?.index != null ? live.index : -1;
+      setCurrentIndex(
+        liveIndex >= 0 && liveIndex < loaded.length ? liveIndex : -1,
+      );
     } catch (error) {
       if (loadRequestRef.current !== request) return;
       if (languageRef.current !== requestedLanguage) return;

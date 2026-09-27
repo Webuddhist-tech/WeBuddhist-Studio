@@ -10,11 +10,21 @@ const {
   fetchCmsEvent,
   fetchChantCollection,
   sendPosition,
+  socketState,
 } = vi.hoisted(() => ({
   fetchRecitationDetails: vi.fn(),
   fetchCmsEvent: vi.fn(),
   fetchChantCollection: vi.fn(),
   sendPosition: vi.fn(() => true),
+  socketState: {
+    livePosition: null as {
+      textId?: string;
+      segmentId: string;
+      index?: number | null;
+      roundNumber?: number | null;
+      at: string;
+    } | null,
+  },
 }));
 
 vi.mock("./api/recitationLiveApi", async () => {
@@ -43,7 +53,7 @@ vi.mock("./hooks/useRecitationSocket", () => ({
     state: "connected",
     isOperator: true,
     notice: null,
-    livePosition: null,
+    livePosition: socketState.livePosition,
     isOpen: true,
     connect: vi.fn(),
     disconnect: vi.fn(),
@@ -120,6 +130,56 @@ describe("GroupEventLivePage", () => {
     Element.prototype.setPointerCapture = () => {};
     Element.prototype.releasePointerCapture = () => {};
     fetchCmsEvent.mockResolvedValue({ metadata: [] });
+    socketState.livePosition = null;
+  });
+
+  it("starts from the room's line and round when joining a session in progress", async () => {
+    const user = userEvent.setup();
+    socketState.livePosition = {
+      textId: "text-a",
+      segmentId: "line-2",
+      index: 1,
+      roundNumber: 3,
+      at: "now",
+    };
+    fetchRecitationDetails.mockResolvedValue({
+      text_id: "text-a",
+      title: "text-a",
+      segments: [
+        { recitation: { bo: { id: "line-1", content: "Line one" } } },
+        { recitation: { bo: { id: "line-2", content: "Line two" } } },
+        { recitation: { bo: { id: "line-3", content: "Line three" } } },
+      ],
+    });
+
+    renderPage();
+    // The room's liturgy is adopted, so only Load text is left to press.
+    await waitFor(() =>
+      expect(screen.getByLabelText("Text id")).toHaveValue("text-a"),
+    );
+    await user.click(screen.getByRole("button", { name: "Load text" }));
+    expect(await screen.findByText("Line two")).toBeInTheDocument();
+    expect(screen.getByLabelText("Round")).toHaveValue(3);
+    sendPosition.mockClear();
+
+    await act(async () => {
+      document.body.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          code: "Space",
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+    });
+
+    // Advances from the live line, at the live round — not back to line one.
+    expect(sendPosition).toHaveBeenCalledWith(
+      expect.objectContaining({
+        segment_id: "line-3",
+        index: 2,
+        round_number: 3,
+      }),
+    );
   });
 
   it("keeps the newer liturgy when an earlier text request finishes last", async () => {

@@ -148,10 +148,17 @@ const SelectedSourceDetail = ({
       : segments;
   const hiddenSegmentCount = segments.length - visibleSegments.length;
 
-  const segmentsForNumbers = (pool: any[], numbers: number[]) => {
+  /** `firstNumber` is the absolute number of the pool's first row, used only
+   * when the API leaves `segment_number` off: a window fetched for 500-520
+   * is numbered from 500, not from 1. */
+  const segmentsForNumbers = (
+    pool: any[],
+    numbers: number[],
+    firstNumber = 1,
+  ) => {
     const byNumber = new Map<number, any>();
     pool.forEach((seg: any, index: number) => {
-      byNumber.set(seg.segment_number ?? index + 1, seg);
+      byNumber.set(seg.segment_number ?? firstNumber + index, seg);
     });
     return numbers
       .map((number) => byNumber.get(number))
@@ -191,6 +198,7 @@ const SelectedSourceDetail = ({
         selected = segmentsForNumbers(
           flattenSegments(page?.content?.sections ?? []),
           sortedIndices,
+          start,
         );
       } catch {
         if (addRequestRef.current !== request) return;
@@ -218,9 +226,9 @@ const SelectedSourceDetail = ({
       pecha_segment_id: pechaSegmentId,
       text_id: selectedSource.id,
       segment_ids: segmentIds,
-      segment_numbers: selected.map(
-        (seg: any, i: number) => seg.segment_number ?? i + 1,
-      ),
+      // Each row was looked up by number, and the lengths matched above, so
+      // the selection's own numbers are the absolute ones.
+      segment_numbers: sortedIndices,
     });
   };
 

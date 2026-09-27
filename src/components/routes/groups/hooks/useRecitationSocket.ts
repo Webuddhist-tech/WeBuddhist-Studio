@@ -133,6 +133,9 @@ export function useRecitationSocket(
     closingRef.current = false;
 
     endedRef.current = false;
+    // The role belongs to the connection that was confirmed it, not to the
+    // operator: until this socket's own session_info lands, assume no rights.
+    setIsOperator(false);
     setNotice(null);
     setState("connecting");
 

@@ -209,6 +209,35 @@ describe("useRecitationSocket", () => {
     expect(FakeSocket.instances).toHaveLength(2);
   });
 
+  it("drops operator rights until the new connection confirms them", () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useRecitationSocket("event-1"));
+    connectAsOperator(result);
+
+    act(() => lastSocket().close());
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    act(() => lastSocket().open());
+
+    // session_info for this socket has not arrived yet.
+    expect(result.current.isOperator).toBe(false);
+
+    let sent: boolean | undefined;
+    act(() => {
+      sent = result.current.sendPosition({
+        text_id: "t1",
+        segment_id: "s1",
+        index: 0,
+      });
+    });
+    expect(sent).toBe(false);
+    expect(lastSocket().sent).toEqual([]);
+
+    act(() => lastSocket().emit({ type: "session_info", is_operator: true }));
+    expect(result.current.isOperator).toBe(true);
+  });
+
   it("does not reconnect after the operator disconnects", () => {
     vi.useFakeTimers();
     const { result } = renderHook(() => useRecitationSocket("event-1"));

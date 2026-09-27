@@ -143,6 +143,48 @@ describe("SelectedSourceDetail select all", () => {
     );
   });
 
+  it("numbers an unnumbered window from the range it was fetched for", async () => {
+    const onAdd = vi.fn();
+    // Some details responses carry no segment_number; the rows are still the
+    // window that was asked for, so they start at 500 rather than at 1.
+    const unnumbered = (n: number) => ({
+      segment_id: `seg-${n}`,
+      pecha_segment_id: `pecha-${n}`,
+      content: `Segment ${n}`,
+    });
+    vi.mocked(fetchTextDetails).mockResolvedValue({
+      content: {
+        sections: [{ segments: [unnumbered(500), unnumbered(501)] }],
+      },
+    });
+
+    renderDetail({ segments: [segment(1)], totalSegments: 1000, onAdd });
+
+    fireEvent.change(rangeInput(), { target: { value: "500-501" } });
+    const addButton = screen.getByRole("button");
+    await waitFor(() => expect(addButton).not.toBeDisabled());
+
+    fireEvent.click(addButton);
+
+    await waitFor(() =>
+      expect(fetchTextDetails).toHaveBeenCalledWith({
+        textId: "text-1",
+        start: 500,
+        end: 501,
+        size: 2,
+      }),
+    );
+    await waitFor(() =>
+      expect(onAdd).toHaveBeenCalledWith({
+        content: "Segment 500\nSegment 501",
+        pecha_segment_id: "pecha-500",
+        text_id: "text-1",
+        segment_ids: ["seg-500", "seg-501"],
+        segment_numbers: [500, 501],
+      }),
+    );
+  });
+
   it("does not add a select-all that was cleared while the request was in flight", async () => {
     const onAdd = vi.fn();
     let resolveDetails: (value: unknown) => void = () => {};
