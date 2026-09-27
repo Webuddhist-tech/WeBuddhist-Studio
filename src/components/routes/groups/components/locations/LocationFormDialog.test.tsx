@@ -73,9 +73,9 @@ describe("LocationFormDialog localized names", () => {
     ).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: /add language/i }));
-    expect(screen.getAllByPlaceholderText("Name in this language")).toHaveLength(
-      1,
-    );
+    expect(
+      screen.getAllByPlaceholderText("Name in this language"),
+    ).toHaveLength(1);
 
     fireEvent.click(
       screen.getByRole("button", { name: "Remove localized name" }),

@@ -300,7 +300,10 @@ const GroupEventLivePage = () => {
         <div className="flex flex-wrap items-end gap-2 border-b bg-muted/30 px-4 py-3">
           {collectionItems.length > 0 ? (
             <div className="min-w-[240px] flex-1 space-y-1">
-              <label className="text-xs text-muted-foreground" htmlFor="liturgy">
+              <label
+                className="text-xs text-muted-foreground"
+                htmlFor="liturgy"
+              >
                 Liturgy
               </label>
               <Pecha.Select
@@ -383,10 +386,7 @@ const GroupEventLivePage = () => {
           </p>
         ) : null}
 
-        <div
-          ref={listRef}
-          className="h-[min(60vh,32rem)] overflow-y-auto"
-        >
+        <div ref={listRef} className="h-[min(60vh,32rem)] overflow-y-auto">
           {segments.length === 0 ? (
             <p className="px-4 py-12 text-center text-sm text-muted-foreground">
               Load a liturgy, then click a line (or press space / ↓) to advance

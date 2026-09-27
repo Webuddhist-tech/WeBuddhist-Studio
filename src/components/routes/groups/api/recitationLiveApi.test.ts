@@ -87,7 +87,11 @@ describe("buildRecitationSocketUrl", () => {
   });
 
   it("uses ws for a plain http api base", () => {
-    const url = buildRecitationSocketUrl("event-1", "t", "http://localhost:8000");
+    const url = buildRecitationSocketUrl(
+      "event-1",
+      "t",
+      "http://localhost:8000",
+    );
 
     expect(url).toBe(
       "ws://localhost:8000/api/v1/events/event-1/recitation/live?token=t",

@@ -198,7 +198,10 @@ export function useRecitationSocket(
 
   const sendPosition = useCallback(
     (frame: Omit<SetPositionFrame, "type">): boolean => {
-      if (!socketRef.current || socketRef.current.readyState !== WebSocket.OPEN) {
+      if (
+        !socketRef.current ||
+        socketRef.current.readyState !== WebSocket.OPEN
+      ) {
         setNotice("Not connected.");
         return false;
       }

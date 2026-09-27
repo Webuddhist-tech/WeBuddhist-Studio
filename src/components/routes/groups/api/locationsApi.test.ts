@@ -38,14 +38,18 @@ describe("formatCoordinates", () => {
   });
 });
 
-
 describe("location requests", () => {
   beforeEach(() => {
     vi.mocked(axiosInstance.get).mockReset();
     vi.mocked(axiosInstance.post).mockReset();
     vi.mocked(axiosInstance.patch).mockReset();
     vi.mocked(axiosInstance.get).mockResolvedValue({
-      data: { id: "loc-1", group_id: "g1", name: "Bodh Gaya", translations: [] },
+      data: {
+        id: "loc-1",
+        group_id: "g1",
+        name: "Bodh Gaya",
+        translations: [],
+      },
     });
     vi.mocked(axiosInstance.post).mockResolvedValue({ data: { id: "loc-1" } });
     vi.mocked(axiosInstance.patch).mockResolvedValue({ data: { id: "loc-1" } });
