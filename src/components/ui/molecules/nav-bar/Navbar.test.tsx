@@ -1,8 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { BrowserRouter } from "react-router-dom";
+import { BrowserRouter, MemoryRouter, useNavigate } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SIDEBAR_OPEN_SECTIONS } from "@/lib/constant";
+import { SIDEBAR_EXPANDED, SIDEBAR_OPEN_SECTIONS } from "@/lib/constant";
 import Navbar from "./Navbar";
 
 vi.mock("@/hooks/useUserInfo", () => ({
@@ -28,9 +28,21 @@ const openAllSections = () =>
     JSON.stringify(["content", "configuration", "administration"]),
   );
 
+/** Lets a test move between routes the way an in-app link would. */
+const GoTo = ({ to }: { to: string }) => {
+  const navigate = useNavigate();
+  return (
+    <button type="button" onClick={() => navigate(to)}>
+      go elsewhere
+    </button>
+  );
+};
+
 describe("Navbar", () => {
   beforeEach(() => {
     localStorage.clear();
+    // jsdom's default, restored for the tests that narrow it.
+    window.innerWidth = 1024;
   });
 
   it("shows only the Groups link for a CREATOR account", () => {
@@ -155,6 +167,34 @@ describe("Navbar", () => {
     ).toBeInTheDocument();
   });
 
+  it("starts on the icon rail when the viewport is too narrow to spare 224px", () => {
+    vi.mocked(useUserInfo).mockReturnValue({
+      data: { id: "1", platform_role: "SUPER_ADMIN" },
+      isLoading: false,
+    } as ReturnType<typeof useUserInfo>);
+    window.innerWidth = 375;
+
+    renderNavbar();
+
+    expect(
+      screen.getByRole("button", { name: /expand sidebar/i }),
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
+  });
+
+  it("honours a saved expanded preference even on a narrow viewport", () => {
+    vi.mocked(useUserInfo).mockReturnValue({
+      data: { id: "1", platform_role: "SUPER_ADMIN" },
+      isLoading: false,
+    } as ReturnType<typeof useUserInfo>);
+    window.innerWidth = 375;
+    localStorage.setItem(SIDEBAR_EXPANDED, "true");
+
+    renderNavbar();
+
+    expect(screen.getByText("Dashboard")).toBeInTheDocument();
+  });
+
   it("starts expanded and shows the labels", () => {
     vi.mocked(useUserInfo).mockReturnValue({
       data: { id: "1", platform_role: "SUPER_ADMIN" },
@@ -272,6 +312,36 @@ describe("Navbar", () => {
     expect(
       screen.queryByRole("button", { name: /^content$/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it("reopens the active section when moving between two of its pages", async () => {
+    // /tags and /traditions share the Configuration id, so reopening cannot
+    // rely on that id changing.
+    vi.mocked(useUserInfo).mockReturnValue({
+      data: { id: "1", platform_role: "SUPER_ADMIN" },
+      isLoading: false,
+    } as ReturnType<typeof useUserInfo>);
+
+    render(
+      <MemoryRouter initialEntries={["/tags"]}>
+        <Navbar />
+        <GoTo to="/traditions" />
+      </MemoryRouter>,
+    );
+
+    // The section holding the current page opens itself.
+    expect(screen.getByText("Tags")).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /^configuration$/i }),
+    );
+    expect(screen.queryByText("Tags")).not.toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /go elsewhere/i }),
+    );
+
+    expect(screen.getByText("Traditions")).toBeInTheDocument();
   });
 
   it("keeps every link reachable while collapsed to icons", async () => {

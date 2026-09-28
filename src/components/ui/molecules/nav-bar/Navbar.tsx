@@ -185,14 +185,25 @@ const isActivePath = (itemPath: string, currentPath: string) => {
   return SECTION_PATHS.includes(itemPath) && currentPath.startsWith(itemPath);
 };
 
-/** Expanded is the default: the grouped sections only read as groups with labels. */
+/** Tailwind's `md`. Narrower than this, a 224px sidebar crowds out the page. */
+const WIDE_VIEWPORT_MIN_WIDTH = 768;
+
+/** The sidebar sits beside the page, so only a wide viewport can spare the width. */
+const fitsExpandedSidebar = () =>
+  typeof window === "undefined" || window.innerWidth >= WIDE_VIEWPORT_MIN_WIDTH;
+
+/**
+ * Expanded by default, because the sections only read as groups once labelled —
+ * but never on a narrow viewport, where that would leave the page a sliver.
+ */
 const readStoredExpanded = () => {
   try {
     const stored = localStorage.getItem(SIDEBAR_EXPANDED);
-    return stored === null ? true : stored === "true";
+    if (stored !== null) return stored === "true";
   } catch {
-    return true;
+    // An unreadable store just means there is no preference to honour yet.
   }
+  return fitsExpandedSidebar();
 };
 
 const readStoredOpenSections = (): string[] => {
@@ -254,7 +265,11 @@ const Navbar = () => {
     section.items.some((item) => isActivePath(item.path, location.pathname)),
   )?.id;
 
-  /** The section you are working in opens itself, so the current page is never hidden. */
+  /**
+   * The section you are working in opens itself, so the current page is never
+   * hidden. Keyed on the path as well as the section, because moving between two
+   * pages of one section leaves the id unchanged and still has to reopen it.
+   */
   useEffect(() => {
     if (!activeSectionId) return;
     setOpenSections((previous) =>
@@ -262,7 +277,7 @@ const Navbar = () => {
         ? previous
         : [...previous, activeSectionId],
     );
-  }, [activeSectionId]);
+  }, [activeSectionId, location.pathname]);
 
   const toggleSection = (id: string) => {
     setOpenSections((previous) => {
@@ -326,13 +341,15 @@ const Navbar = () => {
       <nav
         aria-label="Main"
         data-expanded={expanded}
-        className={`font-dynamic flex flex-col justify-between border-r border-gray-200 dark:border-[#313132] p-2 transition-[width] duration-300 ${
+        className={`font-dynamic flex shrink-0 flex-col justify-between overflow-hidden border-r border-gray-200 dark:border-[#313132] p-2 transition-[width] duration-300 ${
           expanded ? "w-56" : "w-16"
         }`}
       >
-        <div className="flex flex-col space-y-8">
+        {/* The links scroll on their own so a tall nav never pushes the controls
+            below the fold on a short viewport. */}
+        <div className="flex min-h-0 flex-1 flex-col space-y-8">
           <div
-            className={`mt-4 flex items-center ${
+            className={`mt-4 flex shrink-0 items-center ${
               expanded ? "justify-between gap-2" : "flex-col gap-3"
             }`}
           >
@@ -367,7 +384,7 @@ const Navbar = () => {
           </div>
 
           <div
-            className={`flex w-full flex-col ${
+            className={`flex min-h-0 w-full flex-1 flex-col overflow-y-auto ${
               expanded ? "space-y-2" : "items-center space-y-4"
             }`}
           >
@@ -407,7 +424,7 @@ const Navbar = () => {
         </div>
 
         <div
-          className={`flex flex-col space-y-2 pb-2 ${
+          className={`flex shrink-0 flex-col space-y-2 pt-2 pb-2 ${
             expanded ? "" : "items-center"
           }`}
         >
