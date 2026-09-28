@@ -81,7 +81,10 @@ export const RETURN_JUMPS: ReturnJump[] = [
   },
 ];
 
-const byAfterSegment = new Map<string, { label: string; targetSegmentId: string }>();
+const byAfterSegment = new Map<
+  string,
+  { label: string; targetSegmentId: string }
+>();
 for (const jump of RETURN_JUMPS) {
   for (const language of ["bo", "en", "zh"] as const) {
     byAfterSegment.set(jump.after[language], {

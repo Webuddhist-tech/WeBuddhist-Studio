@@ -94,6 +94,16 @@ const renderPage = () => {
   );
 };
 
+/** The titles panel, by the state it carries rather than by the classes the
+ * stylesheet turns into the fold: jsdom loads no stylesheet, so a phone's
+ * folding itself is only ever seen on a phone. */
+const titlesPanel = () => screen.getByRole("complementary");
+const setupPanel = () => {
+  const panel = titlesPanel().querySelector("[data-setup]");
+  if (!panel) throw new Error("no setup panel in the titles");
+  return panel;
+};
+
 const pressKey = async (code: string) => {
   await act(async () => {
     document.body.dispatchEvent(
@@ -886,6 +896,30 @@ describe("LiveControlPage", () => {
       expect(screen.getByText(/line 1\/3/)).toBeInTheDocument();
     });
 
+    it("scrolls the outline to the live section when the peek is opened", async () => {
+      const user = userEvent.setup();
+      const scrollIntoView = vi.mocked(Element.prototype.scrollIntoView);
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      fetchEditionSections.mockResolvedValue(outline);
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+      // Cruised to the second section with the titles folded away, where nothing
+      // in the panel had a box to scroll.
+      await user.click(screen.getByRole("button", { name: /root line 3/ }));
+      await waitFor(() =>
+        expect(screen.getByRole("button", { name: "Praises" })).toHaveAttribute(
+          "data-section-active",
+          "true",
+        ),
+      );
+      scrollIntoView.mockClear();
+
+      await user.click(screen.getByRole("button", { name: "Titles" }));
+
+      expect(scrollIntoView).toHaveBeenCalled();
+    });
+
     it("draws no section list for an edition with no outline", async () => {
       renderPage();
 
@@ -945,8 +979,11 @@ describe("LiveControlPage", () => {
       renderPage();
 
       expect(await screen.findByText("root line 1")).toBeInTheDocument();
+      // Cruise gives a phone's height to the text, so the titles start folded.
+      expect(titlesPanel()).toHaveAttribute("data-titles", "folded");
 
       await user.click(screen.getByRole("button", { name: "Titles" }));
+      expect(titlesPanel()).toHaveAttribute("data-titles", "unfolded");
       expect(
         screen.getByRole("button", { name: "Hide titles" }),
       ).toBeInTheDocument();
@@ -956,9 +993,35 @@ describe("LiveControlPage", () => {
       );
 
       await user.click(screen.getByRole("button", { name: "Hide titles" }));
+      expect(titlesPanel()).toHaveAttribute("data-titles", "folded");
       expect(
         screen.getByRole("button", { name: "Titles" }),
       ).toBeInTheDocument();
+    });
+
+    it("unfolds the titles for find mode and folds them again for cruise", async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Find" }));
+      expect(titlesPanel()).toHaveAttribute("data-titles", "unfolded");
+
+      await user.click(screen.getByRole("button", { name: "Cruise" }));
+      expect(titlesPanel()).toHaveAttribute("data-titles", "folded");
+    });
+
+    it("folds the titles away again after a jump taken from the peek", async () => {
+      const user = userEvent.setup();
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      renderPage();
+
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Titles" }));
+      await user.click(screen.getByRole("button", { name: "Refuge" }));
+
+      expect(titlesPanel()).toHaveAttribute("data-titles", "folded");
     });
 
     it("folds setup away and keeps the editions ticked from there", async () => {
@@ -967,7 +1030,10 @@ describe("LiveControlPage", () => {
 
       expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
+      expect(setupPanel()).toHaveAttribute("data-setup", "folded");
+
       await user.click(screen.getByRole("button", { name: "Setup" }));
+      expect(setupPanel()).toHaveAttribute("data-setup", "unfolded");
       expect(
         screen.getByRole("button", { name: "Hide setup" }),
       ).toBeInTheDocument();
@@ -975,6 +1041,7 @@ describe("LiveControlPage", () => {
       // Folded or open, the editions are in the page: the fold is height on a
       // phone, never a second way to reach them.
       await user.click(screen.getByRole("button", { name: "Hide setup" }));
+      expect(setupPanel()).toHaveAttribute("data-setup", "folded");
       await user.click(
         screen.getByRole("checkbox", { name: "Follow Praise (en)" }),
       );

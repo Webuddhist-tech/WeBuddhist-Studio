@@ -97,6 +97,10 @@ const LiveControlPage = () => {
   /** Adding a text and ticking editions is setup, not driving: on a phone it
    * stays folded so the titles get the height. */
   const [setupOpen, setSetupOpen] = useState(false);
+  const cruise = mode === "cruise";
+  /** Whether a phone has the titles unfolded. A wide screen shows them either
+   * way, so this is the fold, not what is on screen. */
+  const titlesUnfolded = !cruise || navOpen;
 
   const listRef = useRef<HTMLDivElement | null>(null);
   const sectionListRef = useRef<HTMLDivElement | null>(null);
@@ -261,13 +265,15 @@ const LiveControlPage = () => {
   }, [sections, currentIndex]);
 
   // Keep the live section in view, as the line list does: a long outline scrolls
-  // past the operator's place otherwise.
+  // past the operator's place otherwise. An element in a folded panel has no box
+  // to scroll, so every move made while cruise had the titles away was a no-op:
+  // unfolding runs this again, or the peek opens where the outline was left.
   useEffect(() => {
     if (!activeSectionId) return;
     sectionListRef.current
       ?.querySelector('[data-section-active="true"]')
       ?.scrollIntoView({ block: "nearest" });
-  }, [activeSectionId]);
+  }, [activeSectionId, titlesUnfolded]);
 
   /** Teleprompter scroll: keep the live line in a band near the upper third,
    * with lookahead below, and only when it has drifted out of that band - so
@@ -448,9 +454,6 @@ const LiveControlPage = () => {
       ? `${loaded.length} lines — does not line up`
       : `${loaded.length} lines`;
   };
-  const cruise = mode === "cruise";
-  /** Titles are always up on a wide screen; on a phone cruise folds them away. */
-  const titlesVisible = !cruise || navOpen;
   /** One type scale per mode, for the lines and the return jumps between them:
    * cruise is read from a cushion, find is read leaning over the book. */
   const lineClass = cruise
@@ -467,8 +470,9 @@ const LiveControlPage = () => {
        * a phone held upright puts them above it, on a strip of the height. */}
       <div className="flex min-h-0 flex-1 flex-row max-lg:portrait:flex-col">
         <aside
+          data-titles={titlesUnfolded ? "unfolded" : "folded"}
           className={`w-[320px] shrink-0 flex-col overflow-y-auto border-r border-[#2c2c2e] px-3 py-4 max-lg:w-[212px] max-lg:px-2 max-lg:py-2 max-lg:portrait:max-h-[42vh] max-lg:portrait:w-full max-lg:portrait:border-r-0 max-lg:portrait:border-b ${
-            titlesVisible ? "flex" : "hidden lg:flex"
+            titlesUnfolded ? "flex" : "hidden lg:flex"
           }`}
         >
           <div className="mb-2 flex items-center gap-3 border-b border-[#2c2c2e] px-2 pt-1 pb-4 max-lg:hidden">
@@ -561,7 +565,10 @@ const LiveControlPage = () => {
 
           {/* Setup stays in the page at every width: on a phone it is folded
            * rather than gone, so the titles above it get the height. */}
-          <div className={setupOpen ? "block" : "hidden lg:block"}>
+          <div
+            data-setup={setupOpen ? "unfolded" : "folded"}
+            className={setupOpen ? "block" : "hidden lg:block"}
+          >
             <h2 className="mx-2 mt-5 mb-2 text-[13px] tracking-[0.1em] text-[#8e8e93] uppercase max-lg:mx-1 max-lg:mt-2">
               Add a text
             </h2>
