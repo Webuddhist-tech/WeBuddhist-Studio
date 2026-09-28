@@ -27,6 +27,13 @@ export interface RecitationDetails {
 export interface OperatorSegment {
   id: string;
   content: string;
+  /**
+   * Which row of the recitation this came from. Editions are aligned row for
+   * row, not position for position: a row an edition carries no recitation for
+   * is dropped from its lines, so the rows are the only thing two editions can
+   * be matched on.
+   */
+  row: number;
 }
 
 /** One liturgy of the event's order, as the left-hand list shows it. */
@@ -83,7 +90,9 @@ export const fetchRecitationDetails = async (
 /**
  * Flattens the rows into the lines the operator clicks through, preferring the
  * chosen language and falling back to whichever recitation the row carries.
- * Rows with no segment id are dropped: there would be nothing to publish.
+ * Rows with no segment id are dropped: there would be nothing to publish. Each
+ * line keeps the row it came from, so an edition that dropped a row can still
+ * be matched line for line against one that did not.
  */
 export function toOperatorSegments(
   details: Pick<RecitationDetails, "segments">,
@@ -91,10 +100,14 @@ export function toOperatorSegments(
 ): OperatorSegment[] {
   const normalized = language.trim().toLowerCase();
   return (details.segments ?? [])
-    .map((row) => {
+    .map((row, index) => {
       const bucket = row.recitation ?? {};
       const segment = bucket[normalized] ?? Object.values(bucket)[0];
-      return { id: segment?.id ?? "", content: segment?.content ?? "" };
+      return {
+        id: segment?.id ?? "",
+        content: segment?.content ?? "",
+        row: index,
+      };
     })
     .filter((segment) => Boolean(segment.id));
 }

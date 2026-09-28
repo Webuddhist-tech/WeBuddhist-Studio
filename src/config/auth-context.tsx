@@ -57,6 +57,10 @@ export const PlanAuthProvider = ({
   /** One in-flight refresh per tab: a burst of 401s or a wake-up that races
    *  the timer must not fan out into several exchanges. */
   const inFlightRefresh = useRef<Promise<boolean> | null>(null);
+  /** Bumped by every sign-out. A refresh that was already on the wire when the
+   *  author signed out - here or in another tab - must not put the session back
+   *  when it answers, so its result is checked against the epoch it started in. */
+  const sessionEpoch = useRef(0);
 
   const clearRefreshTimer = useCallback(() => {
     if (refreshTimer.current) {
@@ -81,6 +85,9 @@ export const PlanAuthProvider = ({
    *  through Auth0. Used when another tab signed out, or when the refresh
    *  token is spent - there is no live Auth0 session left to end. */
   const endSession = useCallback(() => {
+    sessionEpoch.current += 1;
+    // Nothing may reuse the exchange this sign-out just invalidated.
+    inFlightRefresh.current = null;
     clearRefreshTimer();
     clearTokens();
     clearPendingAuth0Token();
@@ -103,11 +110,16 @@ export const PlanAuthProvider = ({
       return false;
     }
 
+    const epoch = sessionEpoch.current;
     const attempt = (async () => {
       try {
         const { data } = await axiosInstance.post(REFRESH_TOKEN_ENDPOINT, {
           token: refreshToken,
         });
+        // The session was ended while this was on the wire. Storing the token
+        // now would sign the author back in behind their back - and in a tab
+        // whose refresh token another tab has already taken away.
+        if (sessionEpoch.current !== epoch) return false;
         setAccessToken(data.access_token);
         setIsLoggedIn(true);
         setTokenVersion((version) => version + 1);
@@ -115,10 +127,14 @@ export const PlanAuthProvider = ({
       } catch {
         // The refresh token is expired or rejected - a month is up, or it was
         // revoked. Nothing to salvage, so clear and let the guard redirect.
-        endSession();
+        // Unless sign-out got there first, in which case there is nothing left
+        // to clear.
+        if (sessionEpoch.current === epoch) endSession();
         return false;
       } finally {
-        inFlightRefresh.current = null;
+        // A sign-out has already dropped it, and may have left a newer exchange
+        // in its place; only the epoch this one belongs to may clear it.
+        if (sessionEpoch.current === epoch) inFlightRefresh.current = null;
       }
     })();
 
@@ -226,14 +242,15 @@ export const PlanAuthProvider = ({
           setTokenVersion((version) => version + 1);
         }
       } else {
-        clearRefreshTimer();
-        setIsLoggedIn(false);
+        // Through endSession, so a refresh this tab has in flight is discarded
+        // rather than reversing the sign-out the other tab just made.
+        endSession();
       }
     };
 
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
-  }, [clearRefreshTimer]);
+  }, [endSession]);
 
   const contextValue = useMemo(
     () => ({ isLoggedIn, login, logout, isAuthLoading }),

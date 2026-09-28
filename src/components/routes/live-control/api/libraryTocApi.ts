@@ -120,26 +120,42 @@ const scanSegmentSpans = async (
 
 /**
  * The library anchors a section by the character span it covers, while the
- * operator moves by segment id. Bridge the two with the first segment that
- * starts inside the span.
+ * operator moves by segment id. Bridge the two with the first segment the
+ * section begins in.
+ *
+ * Segment and section boundaries need not agree: a section can begin partway
+ * through a segment that started before it - a verse whose segment carries the
+ * tail of the line above. That segment is where the section is recited from, so
+ * it is the anchor; taking only segments that start inside the span would send
+ * the operator to the next one and push the room past the section's own start.
  *
  * An empty span is not a defect: the library uses one to mark a position rather
  * than a range, which is how it writes a heading with no text of its own - a
  * part title standing above its subsections. Nothing starts strictly inside
- * such a span, so anchor it to the first segment at or after the position.
+ * such a span, so anchor it to the segment holding the position, or the first
+ * one after it.
  */
 const firstSegmentInSpan = (
   spans: LibrarySegmentSpan[],
   span: { start: number; end: number } | null | undefined,
 ): string | undefined => {
   if (!span) return undefined;
-  const isAnchor = (start: number) =>
-    span.start === span.end
+  const isAnchor = (start: number, end: number) => {
+    // The segment the section starts inside, however early that segment began.
+    if (start <= span.start && end > span.start) return true;
+    // Otherwise the first segment beginning at or after the span's start, kept
+    // within the span itself when the span is a range.
+    return span.start === span.end
       ? start >= span.start
       : start >= span.start && start < span.end;
+  };
   return spans.find((candidate) => {
-    const start = candidate.lines?.[0]?.start;
-    return start !== undefined && isAnchor(start);
+    const lines = candidate.lines ?? [];
+    if (lines.length === 0) return false;
+    // A segment can be several lines; it covers all of them.
+    const start = Math.min(...lines.map((line) => line.start));
+    const end = Math.max(...lines.map((line) => line.end));
+    return isAnchor(start, end);
   })?.id;
 };
 

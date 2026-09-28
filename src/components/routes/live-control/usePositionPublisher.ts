@@ -3,6 +3,7 @@ import {
   endRecitationSession,
   publishPosition,
   type PositionToPublish,
+  type PublishResult,
 } from "./api/liveControlApi";
 
 /**
@@ -37,13 +38,18 @@ export interface UsePositionPublisherResult {
  * once the room has taken it - so a throttled or failed publish is retried on
  * the next move instead of being silently dropped.
  *
- * Each edition is a separate library text with its own segment ids, and the
- * event holds one position, so a move is published once per edition: readers of
- * each language then find their own line. Those posts go out together rather
- * than in a chain, because every language should land on the new line at the
- * same moment - a chain would walk the room through them one gap at a time.
+ * Each edition is a separate library text with its own segment ids, so a move is
+ * published once per edition: readers of each language then find their own line.
+ * The event holds a single position, though, so the last post the room accepts
+ * is the one it keeps and the one anybody joining later resumes on. The edition
+ * on screen is therefore published last, after the followed ones have landed -
+ * the room settles on the line the operator is actually reading, never on a
+ * translation that merely happened to answer last.
+ *
  * Sent positions are remembered per text, so an edition the room refused is
- * retried while the others are not published twice.
+ * retried on the next move of that same line while the others are not published
+ * twice. A move to a different line supersedes it: the operator has moved on,
+ * and the room is better off on the line being read than on the one it missed.
  */
 export function usePositionPublisher(
   eventId: string | undefined,
@@ -56,6 +62,8 @@ export function usePositionPublisher(
   /** The newest move awaiting a publish; latest always wins. */
   const targetRef = useRef<PositionToPublish[] | null>(null);
   const pumpingRef = useRef(false);
+  /** The run of the pump now in flight, so ending a session can wait for it. */
+  const pumpRef = useRef<Promise<void> | null>(null);
   /** Per text, the last position the room accepted, so it is not sent twice. */
   const sentKeysRef = useRef<Record<string, string>>({});
   const tokenRef = useRef(token);
@@ -95,21 +103,39 @@ export function usePositionPublisher(
         if (pending.length === 0) continue;
 
         if (mountedRef.current) setState("publishing");
-        // All editions of this move at once, so every language turns the page
-        // together instead of trailing the one before it.
-        const results = await Promise.all(
-          pending.map((cue) => publishPosition(eventId, currentToken, cue)),
-        );
+        // The edition on screen leads, and `cues` carries it first. Everything
+        // else goes out together - one gap for the whole move, not one per
+        // language - and the leading edition follows, so it is the position the
+        // event is left holding.
+        const driverTextId = cues[0].textId;
+        const followers = pending.filter((cue) => cue.textId !== driverTextId);
+        const leaders = pending.filter((cue) => cue.textId === driverTextId);
+
+        const sent: { cue: PositionToPublish; result: PublishResult }[] = [];
+        if (followers.length > 0) {
+          const followerResults = await Promise.all(
+            followers.map((cue) => publishPosition(eventId, currentToken, cue)),
+          );
+          followers.forEach((cue, index) =>
+            sent.push({ cue, result: followerResults[index] }),
+          );
+        }
+        for (const cue of leaders) {
+          sent.push({
+            cue,
+            result: await publishPosition(eventId, currentToken, cue),
+          });
+        }
         if (!mountedRef.current) return;
 
         let published = 0;
         let failure: string | null = null;
-        results.forEach((result, index) => {
+        sent.forEach(({ cue, result }) => {
           if (result.ok) {
-            sentKeysRef.current[pending[index].textId] = keyOf(pending[index]);
+            sentKeysRef.current[cue.textId] = keyOf(cue);
             published += 1;
           } else {
-            // Not marked sent, so the next move publishes it again.
+            // Not marked sent, so moving to this line again publishes it again.
             failure = result.message;
           }
         });
@@ -135,6 +161,7 @@ export function usePositionPublisher(
       }
     } finally {
       pumpingRef.current = false;
+      pumpRef.current = null;
     }
   }, [eventId]);
 
@@ -146,7 +173,9 @@ export function usePositionPublisher(
         return;
       }
       targetRef.current = cues;
-      void pump();
+      // A pump already running will take this target on its next turn; starting
+      // a second one would only find the first holding the lock.
+      if (!pumpingRef.current) pumpRef.current = pump();
     },
     [pump],
   );
@@ -155,6 +184,15 @@ export function usePositionPublisher(
     if (!eventId || !tokenRef.current) {
       setNotice("Paste the emit token before driving the room.");
       return;
+    }
+    // Drop whatever is queued and let the move already on the wire finish
+    // first. A position accepted after the end request would leave the room
+    // following a session the operator has closed, and its "publishing" would
+    // replace the notice saying the recitation is over.
+    targetRef.current = null;
+    if (pumpRef.current) {
+      await pumpRef.current;
+      if (!mountedRef.current) return;
     }
     const result = await endRecitationSession(eventId, tokenRef.current);
     if (!mountedRef.current) return;

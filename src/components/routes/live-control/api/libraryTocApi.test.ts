@@ -81,6 +81,25 @@ describe("fetchEditionSections", () => {
     ]);
   });
 
+  it("anchors a section that begins partway through a segment to that segment", async () => {
+    serve({
+      toc: [
+        {
+          id: "toc-1",
+          // The section starts inside the second segment, not on its edge.
+          sections: [
+            { id: "s1", title: "Praises", span: { start: 15, end: 40 } },
+          ],
+        },
+      ],
+      pages: [{ items: spans(4), has_more: false }],
+    });
+
+    const [section] = await fetchEditionSections("ed-1");
+
+    expect(section.segmentId).toBe("seg-2");
+  });
+
   it("falls back to any title the section carries", async () => {
     serve({
       toc: [

@@ -150,6 +150,60 @@ describe("PlanAuthProvider", () => {
     expect(mockAuth0Logout).not.toHaveBeenCalled();
   });
 
+  it("does not restore the session with a refresh that answers after sign-out", async () => {
+    localStorage.setItem(REFRESH_TOKEN, "refresh");
+    let resolvePost: (value: unknown) => void = () => {};
+    mockPost.mockReturnValue(
+      new Promise((resolve) => {
+        resolvePost = resolve;
+      }),
+    );
+
+    await renderProvider();
+    const user = userEvent.setup();
+    expect(screen.getByText("loading")).toBeInTheDocument();
+
+    // The author signs out while the exchange is still on the wire.
+    await user.click(screen.getByText("loading"));
+    expect(localStorage.getItem(REFRESH_TOKEN)).toBeNull();
+
+    await act(async () => {
+      resolvePost({ data: { access_token: tokenExpiringIn(3600) } });
+    });
+
+    // The late answer must not put the session back, nor leave a token behind.
+    expect(await screen.findByText("logged-out")).toBeInTheDocument();
+    expect(localStorage.getItem(ACCESS_TOKEN)).toBeNull();
+  });
+
+  it("does not restore the session another tab signed out of mid-refresh", async () => {
+    localStorage.setItem(ACCESS_TOKEN, tokenExpiringIn(-60));
+    localStorage.setItem(REFRESH_TOKEN, "refresh");
+    let resolvePost: (value: unknown) => void = () => {};
+    mockPost.mockReturnValue(
+      new Promise((resolve) => {
+        resolvePost = resolve;
+      }),
+    );
+
+    await renderProvider();
+
+    await act(async () => {
+      localStorage.removeItem(ACCESS_TOKEN);
+      localStorage.removeItem(REFRESH_TOKEN);
+      window.dispatchEvent(
+        new StorageEvent("storage", { key: REFRESH_TOKEN, newValue: null }),
+      );
+    });
+
+    await act(async () => {
+      resolvePost({ data: { access_token: tokenExpiringIn(3600) } });
+    });
+
+    expect(await screen.findByText("logged-out")).toBeInTheDocument();
+    expect(localStorage.getItem(ACCESS_TOKEN)).toBeNull();
+  });
+
   it("follows a sign-out performed in another tab", async () => {
     localStorage.setItem(ACCESS_TOKEN, tokenExpiringIn(2 * 24 * 60 * 60));
     localStorage.setItem(REFRESH_TOKEN, "refresh");

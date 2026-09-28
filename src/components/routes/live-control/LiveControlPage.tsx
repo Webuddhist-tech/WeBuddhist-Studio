@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
+import { RECITATION_EMIT_TOKEN } from "@/lib/constant";
 import { useQuery } from "@tanstack/react-query";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import {
@@ -17,8 +18,9 @@ import { fetchEditionSections, type TocEntry } from "./api/libraryTocApi";
 import { usePositionPublisher } from "./usePositionPublisher";
 
 /** The emit token is kept per browser, so it is pasted once per machine. It is
- * never put in the link: the URL is shareable, the token must not be. */
-const TOKEN_STORAGE_KEY = "recitation_emit_token";
+ * never put in the link: the URL is shareable, the token must not be. Signing
+ * out of Studio clears it, along with the session's own tokens. */
+const TOKEN_STORAGE_KEY = RECITATION_EMIT_TOKEN;
 
 /** Recitation languages are lowercase on the wire. */
 const toWireLanguage = (code: string) => code.trim().toLowerCase() || "bo";
@@ -143,12 +145,30 @@ const LiveControlPage = () => {
     }
   }, []);
 
+  /**
+   * Move to another work. The editions of it are a fetch away, so the one on
+   * screen stands down now rather than when they arrive: until then there is
+   * nothing to drive, and Next cannot publish a line of the work the operator
+   * has just left.
+   */
+  const openWork = useCallback(
+    (textId: string) => {
+      if (!textId || textId === sourceTextId) return;
+      setSourceTextId(textId);
+      setDriverTextId("");
+      setFollowed([]);
+      setCurrentIndex(-1);
+      setLoadError(null);
+    },
+    [sourceTextId],
+  );
+
   // The first liturgy of the order is what the puja opens with, so it is on
   // screen before the operator touches anything.
   useEffect(() => {
     if (sourceTextId || order.length === 0) return;
-    setSourceTextId(order[0].textId);
-  }, [order, sourceTextId]);
+    openWork(order[0].textId);
+  }, [order, sourceTextId, openWork]);
 
   // A new work brings its own editions: the work itself leads, and anything
   // followed belonged to the work before it.
@@ -248,32 +268,60 @@ const LiveControlPage = () => {
   };
 
   /**
-   * One move, as every edition being followed sees it. Editions are aligned row
-   * for row - the same alignment the recitation API itself publishes - so line N
-   * of the leading edition is line N of each of the others. An edition that is
-   * shorter simply has nothing to send for that line.
+   * Each edition's lines by the recitation row they came from, so a move can be
+   * matched row for row. Position in the array will not do: a row an edition has
+   * no recitation for is not among its lines at all, and from there on its
+   * positions run one short of the edition being read - one move would then
+   * publish a different logical line to each.
+   */
+  const linesByRow = useMemo(() => {
+    const byText: Record<
+      string,
+      Map<number, { id: string; index: number }>
+    > = {};
+    Object.entries(lines).forEach(([textId, segments]) => {
+      const rows = new Map<number, { id: string; index: number }>();
+      segments.forEach((segment, index) => {
+        if (!rows.has(segment.row))
+          rows.set(segment.row, { id: segment.id, index });
+      });
+      byText[textId] = rows;
+    });
+    return byText;
+  }, [lines]);
+
+  /**
+   * One move, as every edition being followed sees it - the same recitation row,
+   * each with its own segment id and its own line number within that edition. An
+   * edition that does not carry the row has nothing to send for this move.
    */
   const cuesForLine = useCallback(
     (index: number): PositionToPublish[] => {
-      const cues: PositionToPublish[] = [];
-      const add = (textId: string) => {
-        const segment = lines[textId]?.[index];
-        if (segment) {
+      const driving = lines[driverTextId]?.[index];
+      if (!driving) return [];
+      const cues: PositionToPublish[] = [
+        {
+          textId: driverTextId,
+          segmentId: driving.id,
+          index,
+          roundNumber: round,
+        },
+      ];
+      followed.forEach((textId) => {
+        if (textId === driverTextId) return;
+        const match = linesByRow[textId]?.get(driving.row);
+        if (match) {
           cues.push({
             textId,
-            segmentId: segment.id,
-            index,
+            segmentId: match.id,
+            index: match.index,
             roundNumber: round,
           });
         }
-      };
-      add(driverTextId);
-      followed.forEach((textId) => {
-        if (textId !== driverTextId) add(textId);
       });
       return cues;
     },
-    [lines, followed, driverTextId, round],
+    [lines, linesByRow, followed, driverTextId, round],
   );
 
   const jump = useCallback(
@@ -332,7 +380,7 @@ const LiveControlPage = () => {
   const addTextId = () => {
     const trimmed = textIdDraft.trim();
     if (!trimmed) return;
-    setSourceTextId(trimmed);
+    openWork(trimmed);
     setTextIdDraft("");
   };
 
@@ -402,7 +450,7 @@ const LiveControlPage = () => {
               <button
                 key={item.textId}
                 type="button"
-                onClick={() => setSourceTextId(item.textId)}
+                onClick={() => openWork(item.textId)}
                 className={`mb-0.5 block w-full cursor-pointer rounded-[7px] px-3 py-2.5 text-left text-[15px] leading-relaxed ${
                   item.textId === sourceTextId
                     ? "bg-[#e5231c] text-white"
@@ -612,7 +660,8 @@ const LiveControlPage = () => {
         <div ref={listRef} className="flex-1 overflow-y-auto pr-2">
           {driverLines.length === 0 ? (
             <p className="py-12 text-center text-sm text-[#8e8e93]">
-              {isPreparingDriver
+              {isPreparingDriver ||
+              (sourceTextId && !driverTextId && !loadError)
                 ? "Loading…"
                 : "Pick a liturgy or add a text id, then tap a line (or press Space) to move the room."}
             </p>

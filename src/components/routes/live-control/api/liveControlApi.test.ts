@@ -60,9 +60,9 @@ describe("toOperatorSegments", () => {
 
   it("takes the chosen language's segment id and content", () => {
     expect(toOperatorSegments(details, "en")).toEqual([
-      { id: "seg-en-1", content: "Line 1" },
+      { id: "seg-en-1", content: "Line 1", row: 0 },
       // Falls back to the only recitation the row carries.
-      { id: "seg-bo-2", content: "བོད་ ༢" },
+      { id: "seg-bo-2", content: "བོད་ ༢", row: 1 },
     ]);
   });
 
@@ -72,6 +72,20 @@ describe("toOperatorSegments", () => {
 
   it("returns nothing for a text with no segments", () => {
     expect(toOperatorSegments({ segments: [] }, "bo")).toEqual([]);
+  });
+
+  it("keeps the row a line came from, past one that was dropped", () => {
+    // The third row carries no recitation, so the fourth is the third line.
+    const withGap: { segments: RecitationSegmentRow[] } = {
+      segments: [
+        ...details.segments,
+        { recitation: { bo: { id: "seg-bo-4", content: "བོད་ ༤" } } },
+      ],
+    };
+
+    expect(toOperatorSegments(withGap, "bo").map((line) => line.row)).toEqual([
+      0, 1, 3,
+    ]);
   });
 });
 

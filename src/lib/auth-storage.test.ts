@@ -1,5 +1,9 @@
-import { describe, expect, it, beforeEach } from "vitest";
-import { ACCESS_TOKEN, REFRESH_TOKEN } from "@/lib/constant";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
+import {
+  ACCESS_TOKEN,
+  RECITATION_EMIT_TOKEN,
+  REFRESH_TOKEN,
+} from "@/lib/constant";
 import {
   clearTokens,
   getAccessToken,
@@ -20,6 +24,12 @@ describe("auth-storage", () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
+    // Also empties the in-memory fallback, which outlives localStorage.clear().
+    clearTokens();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("keeps both tokens in localStorage so every tab shares the session", () => {
@@ -41,6 +51,40 @@ describe("auth-storage", () => {
 
     expect(getAccessToken()).toBeNull();
     expect(getRefreshToken()).toBeNull();
+  });
+
+  it("clears the recitation emit secret with them", () => {
+    // One value drives every event's recitation, so a sign-out on a shared
+    // browser must not leave it for whoever opens a control page next.
+    localStorage.setItem(RECITATION_EMIT_TOKEN, "emit-secret");
+    clearTokens();
+
+    expect(localStorage.getItem(RECITATION_EMIT_TOKEN)).toBeNull();
+  });
+
+  it("keeps a token this tab could not store, so the session still works", () => {
+    // Safari private mode, or site data turned off: setItem throws.
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("storage blocked");
+    });
+
+    setAccessToken("access");
+    setRefreshToken("refresh");
+
+    expect(getAccessToken()).toBe("access");
+    expect(getAuthHeaders()).toEqual({ Authorization: "Bearer access" });
+    expect(getRefreshToken()).toBe("refresh");
+  });
+
+  it("forgets a token held in memory when the session is cleared", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("storage blocked");
+    });
+    setAccessToken("access");
+
+    clearTokens();
+
+    expect(getAccessToken()).toBeNull();
   });
 
   it("builds a bearer header from the stored token", () => {

@@ -236,22 +236,29 @@ describe("LiveControlPage", () => {
     });
   });
 
-  it("sends every edition of one move at once, not in a chain", async () => {
+  it("sends the followed editions together, then the one on screen last", async () => {
     const user = userEvent.setup();
     localStorage.setItem("recitation_emit_token", "tok-123");
-    // Each post hangs until all three are in flight. A chain would still be
-    // waiting on the first, so the third call could never be made.
+    // The event holds one position, so the last post accepted is what the room
+    // keeps: it has to be the edition being read, not a translation that
+    // happened to answer last. The two followed ones still go out together -
+    // both are in flight before either is released.
+    const order: string[] = [];
     let inFlight = 0;
-    let releaseAll: () => void = () => {};
-    const allInFlight = new Promise<void>((resolve) => {
-      releaseAll = resolve;
+    let releaseFollowers: () => void = () => {};
+    const bothInFlight = new Promise<void>((resolve) => {
+      releaseFollowers = resolve;
     });
-    publishPosition.mockImplementation(async () => {
-      inFlight += 1;
-      if (inFlight === 3) releaseAll();
-      await allInFlight;
-      return { ok: true };
-    });
+    publishPosition.mockImplementation(
+      async (_eventId: string, _token: string, cue: { textId: string }) => {
+        order.push(cue.textId);
+        if (cue.textId === "root") return { ok: true };
+        inFlight += 1;
+        if (inFlight === 2) releaseFollowers();
+        await bothInFlight;
+        return { ok: true };
+      },
+    );
 
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
@@ -268,12 +275,15 @@ describe("LiveControlPage", () => {
       expect(fetchRecitationDetails).toHaveBeenCalledWith("root-zh", "zh"),
     );
     publishPosition.mockClear();
+    order.length = 0;
     inFlight = 0;
 
     await pressKey("Space");
 
     await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(3));
-    expect(inFlight).toBe(3);
+    expect(inFlight).toBe(2);
+    expect(order.slice(0, 2).sort()).toEqual(["root-en", "root-zh"]);
+    expect(order[2]).toBe("root");
   });
 
   it("stops moving an edition once it is unticked", async () => {
@@ -351,6 +361,141 @@ describe("LiveControlPage", () => {
       "tok-123",
       expect.objectContaining({ textId: "other", segmentId: "other-s1" }),
     );
+  });
+
+  it("moves a followed edition by recitation row, not by line number", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("recitation_emit_token", "tok-123");
+    // This edition carries no recitation for the first row, so that row is not
+    // one of its lines and every line after it sits one position earlier than
+    // the same line of the text being read.
+    fetchRecitationDetails.mockImplementation(
+      async (textId: string, language: string) =>
+        textId === "root-en"
+          ? {
+              text_id: "root-en",
+              title: "root-en",
+              segments: [
+                {
+                  translations: {
+                    en: { id: "root-en-t1", content: "only a gloss" },
+                  },
+                },
+                {
+                  recitation: {
+                    en: { id: "root-en-s2", content: "root-en line 2" },
+                  },
+                },
+                {
+                  recitation: {
+                    en: { id: "root-en-s3", content: "root-en line 3" },
+                  },
+                },
+              ],
+            }
+          : linesFor(textId, language, 3),
+    );
+
+    renderPage();
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("checkbox", { name: "Follow Praise (en)" }),
+    );
+    await waitFor(() =>
+      expect(fetchRecitationDetails).toHaveBeenCalledWith("root-en", "en"),
+    );
+    publishPosition.mockClear();
+
+    await pressKey("Space");
+    await pressKey("Space");
+
+    // Second line of the text being read is the second row, which this edition
+    // holds as its first line - not its second.
+    await waitFor(() =>
+      expect(publishPosition).toHaveBeenCalledWith("e1", "tok-123", {
+        textId: "root-en",
+        segmentId: "root-en-s2",
+        index: 0,
+        roundNumber: 1,
+      }),
+    );
+    expect(publishPosition).not.toHaveBeenCalledWith(
+      "e1",
+      "tok-123",
+      expect.objectContaining({ segmentId: "root-en-s3" }),
+    );
+  });
+
+  it("publishes nothing for the liturgy just left while the next one loads", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("recitation_emit_token", "tok-123");
+    // The second liturgy's editions never arrive, which is any moment before
+    // they do: there is nothing to drive, so Next must not move the room.
+    fetchTextEditions.mockImplementation(async (textId: string) => {
+      if (textId === "root") {
+        return {
+          text: { textId: "root", title: "Praise (bo)", language: "bo" },
+          editions: [],
+        };
+      }
+      return new Promise(() => {});
+    });
+
+    renderPage();
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
+    await pressKey("Space");
+    await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByText("Refuge"));
+    await pressKey("Space");
+    await pressKey("ArrowRight");
+
+    expect(publishPosition).toHaveBeenCalledTimes(1);
+    expect(publishPosition).not.toHaveBeenCalledWith(
+      "e1",
+      "tok-123",
+      expect.objectContaining({ segmentId: "root-s2" }),
+    );
+  });
+
+  it("drops a queued move when the session is ended", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("recitation_emit_token", "tok-123");
+    const events: string[] = [];
+    let releaseFirst: () => void = () => {};
+    const firstHeld = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let calls = 0;
+    publishPosition.mockImplementation(
+      async (_eventId: string, _token: string, cue: { segmentId: string }) => {
+        calls += 1;
+        events.push(`publish ${cue.segmentId}`);
+        if (calls === 1) await firstHeld;
+        return { ok: true };
+      },
+    );
+    endRecitationSession.mockImplementation(async () => {
+      events.push("end");
+      return { ok: true };
+    });
+
+    renderPage();
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+    await pressKey("Space"); // on the wire, held
+    await pressKey("Space"); // queued behind it
+    await user.click(screen.getByText("End session"));
+    await act(async () => {
+      releaseFirst();
+    });
+
+    await waitFor(() => expect(endRecitationSession).toHaveBeenCalled());
+    // The queued line never goes out, and nothing is published after the end.
+    expect(events).toEqual(["publish root-s1", "end"]);
+    expect(
+      screen.getByText("This recitation session has ended."),
+    ).toBeInTheDocument();
   });
 
   it("says when a translation does not line up with what is being read", async () => {

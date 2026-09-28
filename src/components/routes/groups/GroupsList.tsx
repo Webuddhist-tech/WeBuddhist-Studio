@@ -78,10 +78,12 @@ const GroupsList = ({ groups, isLoading }: GroupsListProps) => {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 border-t border-dashed border-gray-200 dark:border-input pt-3">
-              <Stat label="Members" value={group.member_count ?? "—"} />
-              <Stat label="Followers" value={group.follower_count} />
-              <Stat label="Joiners" value={group.joiner_count ?? "—"} />
+            <div className="border-t border-dashed border-gray-200 dark:border-input pt-3">
+              {group.group_type === "COMMUNITY" ? (
+                <Stat label="Joiners" value={group.joiner_count ?? "—"} />
+              ) : (
+                <Stat label="Followers" value={group.follower_count} />
+              )}
             </div>
           </button>
         );
