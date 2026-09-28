@@ -1,5 +1,6 @@
 import axiosInstance from "@/config/axios-config";
 
+import { getAuthHeaders } from "@/lib/auth-storage";
 export interface VerseContent {
   [lang: string]: string;
 }
@@ -54,10 +55,6 @@ export interface VerseOfDayResponse {
   created_at: string;
   updated_at: string;
 }
-
-const getAuthHeaders = () => ({
-  Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
-});
 
 export type SortOrder = "asc" | "desc";
 

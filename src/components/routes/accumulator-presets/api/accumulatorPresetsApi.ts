@@ -3,6 +3,7 @@ import type { LanguageCode } from "@/schema/SeriesSchema";
 import { capitalizeFirstLetter } from "@/lib/textUtils";
 import type { ImageUrlModel } from "./mantrasApi";
 
+import { getAuthHeaders } from "@/lib/auth-storage";
 export interface AccumulatorMetadataDTO {
   language: string;
   name: string;
@@ -27,6 +28,8 @@ export interface AccumulatorPreset {
   target_count: number | null;
   current_count: number;
   text_id: string | null;
+  /** Resolved with the list, so the table does not look up each text itself. */
+  text_title?: string | null;
   mantra: PresetMantraDTO | null;
   mala_image_id: string | null;
   mala_image_url: string | null;
@@ -63,10 +66,6 @@ export interface UpdateAccumulatorPresetPayload {
   mala_image_id?: string | null;
   metadata?: AccumulatorMetadataInput[];
 }
-
-const getAuthHeaders = () => ({
-  Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
-});
 
 export const fetchAccumulatorPresets = async (
   page: number,

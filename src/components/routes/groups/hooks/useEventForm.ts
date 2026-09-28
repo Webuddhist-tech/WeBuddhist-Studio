@@ -42,7 +42,10 @@ export type UseEventFormReturn = {
   setRecurrence: (recurrence: RecurrenceFormData | null) => void;
 };
 
-export const useEventForm = (isNew: boolean = true): UseEventFormReturn => {
+/** `isNew` is required on purpose: it picks the resolver, and defaulting it
+ *  silently gave edit mode the create schema - rejecting a past start date on
+ *  an event that has already happened. Let the compiler ask the caller. */
+export const useEventForm = (isNew: boolean): UseEventFormReturn => {
   const { languageOptions } = useLanguages();
   const form = useForm<EventFormData>({
     resolver: zodResolver(isNew ? eventSchema : eventEditSchema),

@@ -1,5 +1,6 @@
 import axiosInstance from "@/config/axios-config";
 
+import { getAuthHeaders } from "@/lib/auth-storage";
 export type NotificationCategory =
   | "group_invite"
   | "content_transfer_incoming"
@@ -92,10 +93,6 @@ export interface FetchNotificationsParams {
   skip?: number;
   limit?: number;
 }
-
-const getAuthHeaders = () => ({
-  Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
-});
 
 export const fetchNotifications = async (
   params: FetchNotificationsParams = {},

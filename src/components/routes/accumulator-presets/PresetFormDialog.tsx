@@ -27,6 +27,7 @@ import {
   uploadMantraDeityImage,
 } from "./api/mantrasApi";
 import { searchTextsForPicker } from "./api/textPickerApi";
+import { useTextTitle } from "./useTextTitle";
 
 interface PresetFormDialogProps {
   open: boolean;
@@ -106,7 +107,12 @@ const PresetFormDialog = ({
       preset?.target_count != null ? String(preset.target_count) : "",
     );
     setTextOption(
-      preset?.text_id ? { id: preset.text_id, title: preset.text_id } : null,
+      preset?.text_id
+        ? {
+            id: preset.text_id,
+            title: preset.text_title?.trim() || preset.text_id,
+          }
+        : null,
     );
     setMantraOption(
       preset?.mantra
@@ -132,6 +138,21 @@ const PresetFormDialog = ({
   useEffect(() => {
     setDeityImageOverride("unset");
   }, [mantraOption?.id]);
+
+  // The list response carries the title. This lookup only runs when that
+  // title was missing and the picker is still labelled with the edition id.
+  const resolvedTextTitle = useTextTitle(
+    textOption && textOption.title === textOption.id ? textOption.id : null,
+  );
+
+  useEffect(() => {
+    if (!resolvedTextTitle) return;
+    setTextOption((prev) =>
+      prev && prev.title === prev.id
+        ? { ...prev, title: resolvedTextTitle }
+        : prev,
+    );
+  }, [resolvedTextTitle]);
 
   const queryClient = useQueryClient();
 

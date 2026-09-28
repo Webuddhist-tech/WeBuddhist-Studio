@@ -104,15 +104,7 @@ global.ResizeObserver = class ResizeObserver {
   disconnect() {}
 };
 
-Object.defineProperty(window, "sessionStorage", {
-  value: {
-    getItem: vi.fn((key) => {
-      if (key === "accessToken") return "mock-token";
-      return null;
-    }),
-  },
-  writable: true,
-});
+localStorage.setItem("accessToken", "mock-token");
 
 const renderWithProviders = (
   component: React.ReactElement,
@@ -405,5 +397,36 @@ describe("PlanDetailsPanel Component", () => {
     await waitFor(() => {
       expect(screen.getAllByText("Add Task").length).toBeGreaterThan(0);
     });
+  });
+
+  it("shows the no-days prompt instead of the task form when the plan has no days", async () => {
+    const { default: axiosInstance } = await import("@/config/axios-config");
+    const mockAxios = axiosInstance as any;
+    const emptyPlan = { ...mockPlanData, days: [], status: "DRAFT" };
+    mockAxios.get.mockImplementation((url: string) => {
+      if (String(url).includes("/groups/")) {
+        return Promise.resolve({
+          data: { id: "g1", members: [], metadata: [], slug: "g" },
+        });
+      }
+      return Promise.resolve({ data: { ...emptyPlan, group_id: "g1" } });
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    queryClient.setQueryData(["planDetails", "test-plan-id"], emptyPlan);
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <PlanDetailsPage />
+        </BrowserRouter>
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("This plan has no days yet")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("Add Subtask")).not.toBeInTheDocument();
   });
 });

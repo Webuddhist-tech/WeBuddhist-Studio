@@ -1,6 +1,7 @@
 import axiosInstance from "@/config/axios-config";
 import type { LanguageCode } from "@/schema/SeriesSchema";
 
+import { getAuthHeaders } from "@/lib/auth-storage";
 export interface TraditionMetadataDTO {
   id: string;
   language: string;
@@ -39,10 +40,6 @@ export interface TraditionPayload {
   parent_id?: string | null;
   metadata: TraditionMetadataInput[];
 }
-
-const getAuthHeaders = () => ({
-  Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
-});
 
 export const fetchTraditions = async (
   page: number,

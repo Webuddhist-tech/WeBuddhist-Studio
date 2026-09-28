@@ -330,6 +330,38 @@ describe("TaskForm Component", () => {
     });
   });
 
+  it("blocks submit and explains when the plan has no days", async () => {
+    const { createTask } = await import("../../api/taskApi");
+    const { toast } = await import("sonner");
+    renderWithProviders(<TaskForm selectedDay={1} onCancel={mockOnCancel} />, {
+      '["planDetails","test-plan-id"]': { ...mockPlanData, days: [] },
+    });
+
+    fireEvent.change(screen.getByPlaceholderText("Task Title"), {
+      target: { value: "New Task" },
+    });
+    fireEvent.click(screen.getByText("Add Text"));
+    await waitFor(() => {
+      expect(
+        screen.getByPlaceholderText("Enter your text content"),
+      ).toBeInTheDocument();
+    });
+
+    const submitButton = screen.getByText("Submit");
+    expect(submitButton.closest("button")).toBeDisabled();
+
+    fireEvent.submit(submitButton.closest("form")!);
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        "Create a day first",
+        expect.objectContaining({
+          description: "Add a day to this plan before adding a task.",
+        }),
+      );
+    });
+    expect(createTask).not.toHaveBeenCalled();
+  });
+
   it("populates form with all content types in edit mode", async () => {
     const { fetchTaskDetails } = await import("../../api/taskApi");
     vi.mocked(fetchTaskDetails).mockResolvedValue(mockTaskWithAllTypes);

@@ -35,6 +35,10 @@ WORKDIR /app
 RUN chown nginx:nginx /app && apk add --no-cache gettext
 
 ENV PORT=4173
+# Defaults for the library proxy, so the container still starts where the deploy
+# has not set them yet; an empty proxy_pass would fail nginx's config check.
+ENV VITE_LIBRARY_BASE_URL=https://library.webuddhist.com
+ENV VITE_LIBRARY_APP_NAME=webuddhist
 
 # Copy the React build files into Nginx's public directory
 COPY --from=build-stage /app/dist /usr/share/nginx/html
@@ -45,4 +49,4 @@ COPY nginx/security-headers.conf /etc/nginx/
 
 EXPOSE 4173
 
-CMD ["sh", "-c", "envsubst '${VITE_BACKEND_BASE_URL} ${VITE_YOUTUBE_API_KEY}' < /etc/nginx/conf.d/studio.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
+CMD ["sh", "-c", "envsubst '${VITE_BACKEND_BASE_URL} ${VITE_YOUTUBE_API_KEY} ${VITE_LIBRARY_BASE_URL} ${VITE_LIBRARY_APP_NAME}' < /etc/nginx/conf.d/studio.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]

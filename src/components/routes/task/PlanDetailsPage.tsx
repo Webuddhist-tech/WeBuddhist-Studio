@@ -16,6 +16,8 @@ import MobileView from "./components/MobileView";
 
 import MobilePreviewSplitDivider from "./components/MobilePreviewSplitDivider";
 
+import NoDaysEmptyState from "./components/view/NoDaysEmptyState";
+
 import { fetchPlanDetails } from "./api/planApi";
 import { useUserInfo } from "@/hooks/useUserInfo";
 import { fetchGroup } from "@/components/routes/groups/api/groupsApi";
@@ -167,7 +169,13 @@ const PlanDetailsPage = () => {
     setShowMobilePreview((visible) => !visible);
   }, []);
 
-  const editorContent = selectedTaskId ? (
+  // A plan with no days has nothing a task could be attached to, so the editor
+  // is replaced by a prompt to create one.
+  const hasNoDays = Boolean(planDetails) && !planDetails.days?.length;
+
+  const editorContent = hasNoDays ? (
+    <NoDaysEmptyState planId={planId} isEditable={isEditable} />
+  ) : selectedTaskId ? (
     <TaskView
       taskId={selectedTaskId}
       onEditTask={handleEditTask}

@@ -109,15 +109,7 @@ vi.mock("@/components/ui/molecules/modals/day-delete/DayDeleteDialog", () => ({
   ),
 }));
 
-Object.defineProperty(window, "sessionStorage", {
-  value: {
-    getItem: vi.fn((key) => {
-      if (key === "accessToken") return "test-token";
-      return null;
-    }),
-  },
-  writable: true,
-});
+localStorage.setItem("accessToken", "test-token");
 
 const renderWithProviders = (component: React.ReactElement) => {
   const queryClient = new QueryClient({

@@ -104,6 +104,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/atoms/tooltip";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/atoms/tabs";
 
 export const Pecha = {
   Avatar,
@@ -187,4 +193,8 @@ export const Pecha = {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
 };

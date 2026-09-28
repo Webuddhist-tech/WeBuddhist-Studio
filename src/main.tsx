@@ -47,6 +47,7 @@ import GroupCommunityPage from "./components/routes/groups/GroupCommunityPage.ts
 import GroupEventsPage from "./components/routes/groups/GroupEventsPage.tsx";
 import GroupEventFormPage from "./components/routes/groups/GroupEventFormPage.tsx";
 import GroupEventDetailPage from "./components/routes/groups/GroupEventDetailPage.tsx";
+import LiveControlPage from "./components/routes/live-control/LiveControlPage.tsx";
 import GroupChantsPage from "./components/routes/groups/GroupChantsPage.tsx";
 import GroupChantFormPage from "./components/routes/groups/GroupChantFormPage.tsx";
 import GroupChantDetailPage from "./components/routes/groups/GroupChantDetailPage.tsx";
@@ -83,6 +84,13 @@ const tolgee = Tolgee()
   });
 
 const router = createBrowserRouter([
+  // Outside the app shell on purpose: the operator control is opened in its own
+  // tab, signs nobody in, and carries no navbar - the emit token is what lets it
+  // drive the room.
+  {
+    path: "/live-control/:eventId",
+    element: <LiveControlPage />,
+  },
   {
     path: "/",
     element: <App />,

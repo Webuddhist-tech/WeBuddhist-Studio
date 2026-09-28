@@ -1,5 +1,6 @@
 import axiosInstance from "@/config/axios-config";
 
+import { getAuthHeaders } from "@/lib/auth-storage";
 /**
  * Community users who joined a group from the app, and the moderation actions
  * an owner/admin can take on them.
@@ -63,10 +64,6 @@ export interface PaginationParams {
   skip?: number;
   limit?: number;
 }
-
-const getAuthHeaders = () => ({
-  Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
-});
 
 export const fetchGroupJoinedUsers = async (
   groupId: string,

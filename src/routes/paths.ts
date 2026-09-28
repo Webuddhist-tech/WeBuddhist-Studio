@@ -34,6 +34,8 @@ export const ROUTES = {
     `/groups/${groupId}/events/${eventId}`,
   groupEventEdit: (groupId: string, eventId: string) =>
     `/groups/${groupId}/events/${eventId}/edit`,
+  /** Standalone operator control. Signed out by design, so it takes no group. */
+  liveControl: (eventId: string) => `/live-control/${eventId}`,
   groupChants: (groupId: string) => `/groups/${groupId}/chants`,
   groupChantNew: (groupId: string) => `/groups/${groupId}/chants/new`,
   groupChant: (groupId: string, collectionId: string) =>
