@@ -581,44 +581,6 @@ describe("LiveControlPage", () => {
     });
   });
 
-  it("drops a move made while the session is being ended", async () => {
-    const user = userEvent.setup();
-    localStorage.setItem("recitation_emit_token", "tok-123");
-    const events: string[] = [];
-    let releaseFirst: () => void = () => {};
-    const firstHeld = new Promise<void>((resolve) => {
-      releaseFirst = resolve;
-    });
-    let calls = 0;
-    publishPosition.mockImplementation(
-      async (_eventId: string, _token: string, cue: { segmentId: string }) => {
-        calls += 1;
-        events.push(`publish ${cue.segmentId}`);
-        if (calls === 1) await firstHeld;
-        return { ok: true };
-      },
-    );
-    endRecitationSession.mockImplementation(async () => {
-      events.push("end");
-      return { ok: true };
-    });
-
-    renderPage();
-    expect(await screen.findByText("root line 1")).toBeInTheDocument();
-    await followNone(user);
-
-    await pressKey("Space"); // on the wire, held
-    await user.click(screen.getByText("End session"));
-    // Pressed after End session, while the held move is still being waited on.
-    await pressKey("Space");
-    await act(async () => {
-      releaseFirst();
-    });
-
-    await waitFor(() => expect(endRecitationSession).toHaveBeenCalled());
-    expect(events).toEqual(["publish root-s1", "end"]);
-  });
-
   it("stops moving an edition once it is unticked", async () => {
     const user = userEvent.setup();
     localStorage.setItem("recitation_emit_token", "tok-123");
@@ -780,47 +742,6 @@ describe("LiveControlPage", () => {
     );
   });
 
-  it("drops a queued move when the session is ended", async () => {
-    const user = userEvent.setup();
-    localStorage.setItem("recitation_emit_token", "tok-123");
-    const events: string[] = [];
-    let releaseFirst: () => void = () => {};
-    const firstHeld = new Promise<void>((resolve) => {
-      releaseFirst = resolve;
-    });
-    let calls = 0;
-    publishPosition.mockImplementation(
-      async (_eventId: string, _token: string, cue: { segmentId: string }) => {
-        calls += 1;
-        events.push(`publish ${cue.segmentId}`);
-        if (calls === 1) await firstHeld;
-        return { ok: true };
-      },
-    );
-    endRecitationSession.mockImplementation(async () => {
-      events.push("end");
-      return { ok: true };
-    });
-
-    renderPage();
-    expect(await screen.findByText("root line 1")).toBeInTheDocument();
-    await followNone(user);
-
-    await pressKey("Space"); // on the wire, held
-    await pressKey("Space"); // queued behind it
-    await user.click(screen.getByText("End session"));
-    await act(async () => {
-      releaseFirst();
-    });
-
-    await waitFor(() => expect(endRecitationSession).toHaveBeenCalled());
-    // The queued line never goes out, and nothing is published after the end.
-    expect(events).toEqual(["publish root-s1", "end"]);
-    expect(
-      screen.getByText("This recitation session has ended."),
-    ).toBeInTheDocument();
-  });
-
   it("says when a translation does not line up with what is being read", async () => {
     fetchRecitationDetails.mockImplementation(
       async (textId: string, language: string) =>
@@ -869,6 +790,57 @@ describe("LiveControlPage", () => {
     expect(screen.getByTestId("publish-state")).toHaveTextContent(
       "no emit token",
     );
+  });
+
+  it("closes an error message", async () => {
+    const user = userEvent.setup();
+    fetchLiveControlEvent.mockRejectedValue(
+      new Error("Invalid or no token found"),
+    );
+    renderPage();
+
+    const alert = await screen.findByRole("alert");
+    await user.click(screen.getByRole("button", { name: "Dismiss message" }));
+
+    expect(alert).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("shows a closed message again when a different problem comes up", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("recitation_emit_token", "tok-123");
+    publishPosition.mockResolvedValue({
+      ok: false,
+      message: "That emit token was rejected.",
+    });
+    renderPage();
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+    await pressKey("Space");
+    expect(
+      await screen.findByText(/emit token was rejected/),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Dismiss message" }));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    publishPosition.mockResolvedValue({
+      ok: false,
+      message: "Could not reach the room.",
+    });
+    await pressKey("Space");
+    expect(
+      await screen.findByText(/Could not reach the room/),
+    ).toBeInTheDocument();
+  });
+
+  it("has no round counter or end-session control", async () => {
+    renderPage();
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+    expect(screen.queryByLabelText("Round")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "End session" }),
+    ).not.toBeInTheDocument();
   });
 
   it("advances and steps back on the keyboard", async () => {
@@ -948,38 +920,6 @@ describe("LiveControlPage", () => {
     publishPosition.mockClear();
     await user.click(screen.getByRole("button", { name: /root line 1/ }));
     await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(1));
-  });
-
-  it("publishes the round the operator sets", async () => {
-    const user = userEvent.setup();
-    localStorage.setItem("recitation_emit_token", "tok-123");
-    renderPage();
-    expect(await screen.findByText("root line 1")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Next round" }));
-    await user.click(screen.getByRole("button", { name: "Next →" }));
-
-    await waitFor(() =>
-      expect(publishPosition).toHaveBeenCalledWith(
-        "e1",
-        "tok-123",
-        expect.objectContaining({ roundNumber: 2 }),
-      ),
-    );
-  });
-
-  it("ends the session with the same token", async () => {
-    const user = userEvent.setup();
-    localStorage.setItem("recitation_emit_token", "tok-123");
-    renderPage();
-    expect(await screen.findByText("root line 1")).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "End session" }));
-
-    await waitFor(() =>
-      expect(endRecitationSession).toHaveBeenCalledWith("e1", "tok-123"),
-    );
-    expect(await screen.findByText(/session has ended/i)).toBeInTheDocument();
   });
 
   describe("the outline of the edition on screen", () => {

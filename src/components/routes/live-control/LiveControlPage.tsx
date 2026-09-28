@@ -169,6 +169,10 @@ const opensWithTitles = () => {
   }
 };
 
+/** Every position is sent as the first round: the operator page does not
+ * count rounds. */
+const ROUND_NUMBER = 1;
+
 /** Shortcuts drive the liturgy, so they stay off fields and off the controls:
  * Space on "Next" or the token box must do what that control does. Lines are
  * buttons too; those keep the shortcuts. */
@@ -206,8 +210,10 @@ const LiveControlPage = () => {
   const [lines, setLines] = useState<Record<string, OperatorSegment[]>>({});
   const [preparing, setPreparing] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(-1);
-  const [round, setRound] = useState(1);
   const [loadError, setLoadError] = useState<string | null>(null);
+  /** A message the operator closed. It stays closed until the page shows a
+   * different one, or the problem goes away and comes back. */
+  const [dismissedError, setDismissedError] = useState<string | null>(null);
   /** The liturgy and section titles, shown or put away with one button. */
   const [navOpen, setNavOpen] = useState(() => opensWithTitles());
   /** An upright phone's split between the titles and the lines. */
@@ -229,7 +235,7 @@ const LiveControlPage = () => {
   /** Editions already asked for, so nothing is fetched twice. */
   const requestedRef = useRef<Set<string>>(new Set());
 
-  const { state, notice, lastSent, publish, endSession, clearNotice } =
+  const { state, notice, lastSent, publish, clearNotice } =
     usePositionPublisher(eventId, token);
 
   const { data: event, error: eventError } = useQuery({
@@ -483,7 +489,7 @@ const LiveControlPage = () => {
           textId: driverTextId,
           segmentId: driving.id,
           index,
-          roundNumber: round,
+          roundNumber: ROUND_NUMBER,
         },
       ];
       followed.forEach((textId) => {
@@ -494,13 +500,13 @@ const LiveControlPage = () => {
             textId,
             segmentId: match.id,
             index: match.index,
-            roundNumber: round,
+            roundNumber: ROUND_NUMBER,
           });
         }
       });
       return cues;
     },
-    [lines, linesByRow, followed, driverTextId, round],
+    [lines, linesByRow, followed, driverTextId],
   );
 
   const jump = useCallback(
@@ -640,6 +646,22 @@ const LiveControlPage = () => {
     void prepare(edition);
   };
 
+  /** The one problem the page is showing, if any. */
+  const errorMessage =
+    eventError || editionsError || loadError || notice
+      ? (loadError ??
+        notice ??
+        getApiErrorMessage(
+          eventError ?? editionsError,
+          "Could not load this event.",
+        ))
+      : null;
+  // Once the problem is gone, closing it is forgotten: if it comes back, it
+  // is news again.
+  useEffect(() => {
+    if (!errorMessage) setDismissedError(null);
+  }, [errorMessage]);
+
   const currentLiturgy = order.find((item) => item.textId === sourceTextId);
   const liturgyNumber =
     order.findIndex((item) => item.textId === sourceTextId) + 1;
@@ -716,7 +738,7 @@ const LiveControlPage = () => {
   /** The lines are read at arm's length, from a cushion. The titles start at
    * the same size, and each pane is then sized on its own. */
   const lineClass =
-    "px-1.5 py-1 text-[calc(26px*var(--text-scale))] leading-[1.6] lg:text-[calc(23px*var(--text-scale))] lg:leading-[1.7]";
+    "mb-3 px-1.5 py-1.5 text-[calc(26px*var(--text-scale))] leading-[1.6] lg:text-[calc(23px*var(--text-scale))] lg:leading-[1.7]";
   const titleSize =
     "text-[calc(26px*var(--titles-scale))] leading-[1.6] lg:text-[calc(23px*var(--titles-scale))] lg:leading-[1.7]";
   const sizePicker = (
@@ -1127,127 +1149,100 @@ const LiveControlPage = () => {
             {followedCount > 0
               ? ` · ${followedCount} more edition${followedCount === 1 ? "" : "s"} following`
               : null}
-            {round > 1 ? ` · round ${round}` : null}
           </div>
 
-          {eventError || editionsError || loadError || notice ? (
-            <p className="mb-3 rounded-lg border border-[#3a1f1f] bg-[#2a1515] px-3 py-2 text-sm text-[#e08585] max-lg:mb-2">
-              {loadError ??
-                notice ??
-                getApiErrorMessage(
-                  eventError ?? editionsError,
-                  "Could not load this event.",
-                )}
-            </p>
+          {errorMessage && errorMessage !== dismissedError ? (
+            <div
+              role="alert"
+              className="mb-3 flex items-start gap-2 rounded-lg border border-[#3a1f1f] bg-[#2a1515] py-2 pr-1.5 pl-3 text-sm text-[#e08585] max-lg:mb-2"
+            >
+              <p className="min-w-0 flex-1 py-0.5 [overflow-wrap:anywhere]">
+                {errorMessage}
+              </p>
+              <button
+                type="button"
+                aria-label="Dismiss message"
+                onClick={() => setDismissedError(errorMessage)}
+                className="-my-0.5 shrink-0 cursor-pointer rounded-md px-2 py-0.5 text-lg leading-none hover:bg-[#3a1f1f]"
+              >
+                ×
+              </button>
+            </div>
           ) : null}
 
-          <div
-            ref={listRef}
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-2 max-lg:pr-0"
-          >
-            {driverLines.length === 0 ? (
-              <p className="py-12 text-center text-sm text-[#8e8e93]">
-                {isPreparingDriver ||
-                (sourceTextId && !driverTextId && !loadError)
-                  ? "Loading…"
-                  : "Pick a liturgy or add a text id, then tap a line (or press Space) to move the room."}
-              </p>
-            ) : (
-              driverLines.map((segment, index) => {
-                const returnTo = returnButtonForLine(segment.id, driverLines);
-                return (
-                  <Fragment key={segment.id}>
-                    <button
-                      type="button"
-                      data-line={index}
-                      onClick={() => jump(index)}
-                      className={`block w-full cursor-pointer rounded-[5px] text-left break-words ${lineClass} ${
-                        index === currentIndex
-                          ? // Packed lines need more than a tint to be found at a
-                            // glance, so the live one is outlined as well.
-                            "bg-[rgba(229,35,28,0.30)] text-white outline-1 outline-[#e5231c]"
-                          : "text-[#8e8e93] hover:bg-[#1a1a1c] hover:text-[#f2f2f7]"
-                      }`}
-                    >
-                      {segment.content}
-                    </button>
-                    {returnTo ? (
+          {/* A phone held sideways has height to spare for neither, so the
+           * controls stand in a column to the right of the lines. */}
+          <div className="flex min-h-0 flex-1 flex-col max-lg:landscape:flex-row max-lg:landscape:gap-2">
+            <div
+              ref={listRef}
+              className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-2 max-lg:pr-0"
+            >
+              {driverLines.length === 0 ? (
+                <p className="py-12 text-center text-sm text-[#8e8e93]">
+                  {isPreparingDriver ||
+                  (sourceTextId && !driverTextId && !loadError)
+                    ? "Loading…"
+                    : "Pick a liturgy or add a text id, then tap a line (or press Space) to move the room."}
+                </p>
+              ) : (
+                driverLines.map((segment, index) => {
+                  const returnTo = returnButtonForLine(segment.id, driverLines);
+                  return (
+                    <Fragment key={segment.id}>
                       <button
                         type="button"
-                        onClick={() => jump(returnTo.index)}
-                        className="mt-1 mb-4 ml-1.5 block cursor-pointer rounded-[9px] border border-[#e5231c] bg-[#2c2c2e] px-5 py-2.5 text-base font-semibold text-[#f2f2f7] hover:bg-[#3a3a3c]"
+                        data-line={index}
+                        onClick={() => jump(index)}
+                        className={`block w-full cursor-pointer rounded-[5px] text-left break-words ${lineClass} ${
+                          index === currentIndex
+                            ? // Packed lines need more than a tint to be found at a
+                              // glance, so the live one is outlined as well.
+                              "bg-[rgba(229,35,28,0.30)] text-white outline-1 outline-[#e5231c]"
+                            : "text-[#8e8e93] hover:bg-[#1a1a1c] hover:text-[#f2f2f7]"
+                        }`}
                       >
-                        {returnTo.label}
+                        {segment.content}
                       </button>
-                    ) : null}
-                  </Fragment>
-                );
-              })
-            )}
-          </div>
-
-          <div className="border-t border-[#2c2c2e] pt-3 pb-4 max-lg:pt-2 max-lg:pb-2">
-            {/* The round, the session and the last cue sent. */}
-            <div className="flex flex-wrap items-center gap-3.5 text-[13px] text-[#8e8e93] max-lg:gap-2">
-              <span className="flex items-center gap-1.5">
-                round
-                <button
-                  type="button"
-                  aria-label="Previous round"
-                  onClick={() => setRound((value) => Math.max(1, value - 1))}
-                  className="rounded-md bg-[#2c2c2e] px-3 py-2 font-semibold hover:bg-[#3a3a3c] max-lg:px-2.5 max-lg:py-1"
-                >
-                  −
-                </button>
-                <input
-                  aria-label="Round"
-                  type="number"
-                  min={1}
-                  value={round}
-                  onChange={(e) =>
-                    setRound(Math.max(1, Number(e.target.value) || 1))
-                  }
-                  className="w-14 rounded-md border border-[#2c2c2e] bg-[#1c1c1e] px-2 py-1.5 text-center text-sm text-[#f2f2f7] max-lg:text-base"
-                />
-                <button
-                  type="button"
-                  aria-label="Next round"
-                  onClick={() => setRound((value) => value + 1)}
-                  className="rounded-md bg-[#2c2c2e] px-3 py-2 font-semibold hover:bg-[#3a3a3c] max-lg:px-2.5 max-lg:py-1"
-                >
-                  +
-                </button>
-              </span>
-              <button
-                type="button"
-                onClick={() => void endSession()}
-                className="rounded-[9px] border border-[#e5231c] bg-[#2c2c2e] px-5 py-2.5 text-sm font-semibold hover:bg-[#3a3a3c] max-lg:px-3 max-lg:py-1.5 max-lg:text-[13px]"
-              >
-                End session
-              </button>
-              <span className="ml-auto max-lg:hidden">
-                {lastSent ? `sent ${lastSent}` : "Tap any line · ← / → / Space"}
-              </span>
+                      {returnTo ? (
+                        <button
+                          type="button"
+                          onClick={() => jump(returnTo.index)}
+                          className="mt-1 mb-4 ml-1.5 block cursor-pointer rounded-[9px] border border-[#e5231c] bg-[#2c2c2e] px-5 py-2.5 text-base font-semibold text-[#f2f2f7] hover:bg-[#3a3a3c]"
+                        >
+                          {returnTo.label}
+                        </button>
+                      ) : null}
+                    </Fragment>
+                  );
+                })
+              )}
             </div>
 
-            {/* Next takes the whole width left over and stands tall enough to
-             * take a fresh finger each time; Previous stays narrow beside it so
-             * it is not the one hit by mistake. */}
-            <div className="mt-2 flex items-stretch gap-3 max-lg:gap-2">
-              <button
-                type="button"
-                onClick={() => step(-1)}
-                className="w-[28%] max-w-[200px] touch-manipulation cursor-pointer rounded-[9px] bg-[#2c2c2e] py-5 text-lg font-semibold select-none hover:bg-[#3a3a3c] active:bg-[#48484a] max-lg:text-base"
-              >
-                ← Previous
-              </button>
-              <button
-                type="button"
-                onClick={() => step(1)}
-                className="flex-1 touch-manipulation cursor-pointer rounded-[9px] bg-[#e5231c] py-5 text-2xl font-semibold text-white select-none hover:bg-[#ff3a33] active:bg-[#ff6b66] max-lg:portrait:min-h-[104px] max-lg:landscape:min-h-[64px]"
-              >
-                Next →
-              </button>
+            <div className="border-t border-[#2c2c2e] pt-3 pb-4 max-lg:pt-2 max-lg:pb-2 max-lg:landscape:flex max-lg:landscape:w-[120px] max-lg:landscape:shrink-0 max-lg:landscape:flex-col max-lg:landscape:border-t-0 max-lg:landscape:border-l max-lg:landscape:pt-0 max-lg:landscape:pl-2">
+              <p className="text-[13px] text-[#8e8e93] max-lg:hidden">
+                {lastSent ? `sent ${lastSent}` : "Tap any line · ← / → / Space"}
+              </p>
+
+              {/* Next takes the room left over and stands tall enough to take a
+               * fresh finger each time; Previous stays smaller beside it - or
+               * below it, on a phone held sideways - so it is not the one hit by
+               * mistake. */}
+              <div className="mt-2 flex items-stretch gap-3 max-lg:gap-2 max-lg:landscape:mt-0 max-lg:landscape:min-h-0 max-lg:landscape:flex-1 max-lg:landscape:flex-col-reverse">
+                <button
+                  type="button"
+                  onClick={() => step(-1)}
+                  className="w-[28%] max-w-[200px] touch-manipulation cursor-pointer rounded-[9px] bg-[#2c2c2e] py-4 text-base font-semibold select-none hover:bg-[#3a3a3c] active:bg-[#48484a] max-lg:py-3 max-lg:text-[15px] max-lg:landscape:w-full max-lg:landscape:max-w-none"
+                >
+                  ← Previous
+                </button>
+                <button
+                  type="button"
+                  onClick={() => step(1)}
+                  className="flex-1 touch-manipulation cursor-pointer rounded-[9px] bg-[#e5231c] py-4 text-xl font-semibold text-white select-none hover:bg-[#ff3a33] active:bg-[#ff6b66] max-lg:portrait:min-h-[84px] max-lg:landscape:min-h-0"
+                >
+                  Next →
+                </button>
+              </div>
             </div>
           </div>
         </main>
