@@ -42,7 +42,10 @@ const serve = ({ edition, editions, toc, pages = [] }: Routes) => {
     }
     if (url.endsWith("/table-of-contents")) return { data: toc ?? [] };
     if (url.endsWith("/editions")) return { data: editions ?? [] };
-    if (edition instanceof Error || (edition as { isAxiosError?: boolean })?.isAxiosError)
+    if (
+      edition instanceof Error ||
+      (edition as { isAxiosError?: boolean })?.isAxiosError
+    )
       throw edition;
     return { data: edition ?? { id: "ed-1" } };
   });
@@ -129,7 +132,11 @@ describe("fetchEditionSections", () => {
               title: "Praises",
               span: { start: 0, end: 40 },
               subsections: [
-                { id: "s1a", title: "First Tārā", span: { start: 10, end: 20 } },
+                {
+                  id: "s1a",
+                  title: "First Tārā",
+                  span: { start: 10, end: 20 },
+                },
                 {
                   id: "s1b",
                   title: "Second Tārā",
@@ -157,7 +164,9 @@ describe("fetchEditionSections", () => {
           id: "toc-1",
           // An empty span marks a position, not a range: a part title standing
           // above its subsections.
-          sections: [{ id: "s1", title: "Part Two", span: { start: 20, end: 20 } }],
+          sections: [
+            { id: "s1", title: "Part Two", span: { start: 20, end: 20 } },
+          ],
         },
       ],
       pages: [{ items: spans(4), has_more: false }],
@@ -179,7 +188,11 @@ describe("fetchEditionSections", () => {
               title: "Praises",
               span: null,
               subsections: [
-                { id: "s1a", title: "First Tārā", span: { start: 10, end: 20 } },
+                {
+                  id: "s1a",
+                  title: "First Tārā",
+                  span: { start: 10, end: 20 },
+                },
               ],
             },
           ],
@@ -275,7 +288,9 @@ describe("fetchEditionSections", () => {
       toc: [
         {
           id: "toc-1",
-          sections: [{ id: "s1", title: "Refuge", span: { start: 0, end: 10 } }],
+          sections: [
+            { id: "s1", title: "Refuge", span: { start: 0, end: 10 } },
+          ],
         },
       ],
       pages: [{ items: spans(1), has_more: false }],
