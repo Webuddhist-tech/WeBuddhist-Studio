@@ -830,7 +830,63 @@ describe("LiveControlPage", () => {
       ).toBeDisabled();
     });
 
-    it("draws no section list for an edition with no outline", async () => {
+    it("shows a return button under a praise ending and jumps back to its start", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("recitation_emit_token", "tok-123");
+    fetchRecitationDetails.mockImplementation(
+      async (textId: string, language: string) => {
+        if (textId !== "root") return linesFor(textId, language, 3);
+        return {
+          text_id: "root",
+          title: "root",
+          segments: [
+            {
+              recitation: {
+                bo: { id: "BsajlElFFNFLoHcUjICwB", content: "homage line" },
+              },
+            },
+            {
+              recitation: {
+                bo: { id: "root-middle", content: "middle line" },
+              },
+            },
+            {
+              recitation: {
+                bo: {
+                  id: "kYNR7EmC5apQWrkYl5fiO",
+                  content: "root mantra line",
+                },
+              },
+            },
+          ],
+        };
+      },
+    );
+    renderPage();
+
+    expect(await screen.findByText("root mantra line")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /2nd Praises/ }),
+    ).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "↺ Return to start · 1st Praises to the 21 Tārās",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(publishPosition).toHaveBeenCalledWith("e1", "tok-123", {
+        textId: "root",
+        segmentId: "BsajlElFFNFLoHcUjICwB",
+        index: 0,
+        roundNumber: 1,
+      }),
+    );
+    expect(screen.getByText(/line 1\/3/)).toBeInTheDocument();
+  });
+
+  it("draws no section list for an edition with no outline", async () => {
       renderPage();
 
       expect(await screen.findByText("root line 1")).toBeInTheDocument();

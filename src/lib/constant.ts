@@ -10,6 +10,8 @@ export const LANGUAGE = "language";
 /** The recitation emit secret, kept per browser by the live control page. */
 export const RECITATION_EMIT_TOKEN = "recitation_emit_token";
 export const SIDEBAR_EXPANDED = "sidebarExpanded";
+/** Which collapsible nav sections the sidebar leaves open, as a JSON id array. */
+export const SIDEBAR_OPEN_SECTIONS = "sidebarOpenSections";
 export const DIFFICULTY = [
   { label: "Beginner", value: "BEGINNER" },
   { label: "Intermediate", value: "INTERMEDIATE" },
