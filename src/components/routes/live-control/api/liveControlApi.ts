@@ -1,5 +1,6 @@
 import axios from "axios";
 import axiosInstance from "@/config/axios-config";
+import { fetchTextLanguages, searchTitles } from "@/components/api/searchApi";
 
 /**
  * The live control page runs signed out, so everything here talks to endpoints
@@ -182,9 +183,48 @@ export const fetchTextEditions = async (
     .map(asEdition)
     .filter(
       (edition: TextEdition) =>
-        edition.textId && edition.textId !== text.textId,
+        edition.textId &&
+        edition.textId !== text.textId &&
+        edition.textId !== textId,
     );
-  return { text: { ...text, textId: text.textId || textId }, editions };
+  // The work keeps the edition id it was opened by. The library answers with
+  // its own internal id for the work, but the edition id is what the event's
+  // liturgies, the search and the operator's saved texts all carry, so that is
+  // the id the room is told about.
+  return { text: { ...text, textId }, editions };
+};
+
+/** A text found by name: the edition id to open it by, and what to call it. */
+export interface TextSearchResult {
+  textId: string;
+  title: string;
+}
+
+/** Texts whose title matches, by edition id. */
+export const searchTextsByTitle = async (
+  title: string,
+  limit = 10,
+): Promise<TextSearchResult[]> => {
+  const query = title.trim();
+  if (!query) return [];
+  const data = await searchTitles({ title: query, limit });
+  const rows: { id?: string; title?: string | null }[] = Array.isArray(data)
+    ? data
+    : (data?.texts ?? data?.results ?? data?.sources ?? []);
+  return rows
+    .filter((row) => Boolean(row?.id))
+    .map((row) => ({
+      textId: row.id as string,
+      title: row.title?.trim() || (row.id as string),
+    }));
+};
+
+/** An edition's title, for a text known only by its id. */
+export const fetchEditionTitle = async (
+  editionId: string,
+): Promise<string | null> => {
+  const data = await fetchTextLanguages(editionId);
+  return data?.title?.trim() || null;
 };
 
 /** Bare client: the emit secret authorises these, never a bearer token. */

@@ -13,7 +13,11 @@ const {
   publishPosition,
   endRecitationSession,
   fetchEditionSections,
+  searchTextsByTitle,
+  fetchEditionTitle,
 } = vi.hoisted(() => ({
+  searchTextsByTitle: vi.fn(),
+  fetchEditionTitle: vi.fn(),
   fetchLiveControlEvent: vi.fn(),
   fetchLiturgies: vi.fn(),
   fetchTextEditions: vi.fn(),
@@ -52,6 +56,8 @@ vi.mock("./api/liveControlApi", async () => {
     fetchRecitationDetails,
     publishPosition,
     endRecitationSession,
+    searchTextsByTitle,
+    fetchEditionTitle,
   };
 });
 
@@ -113,6 +119,17 @@ const followNone = async (user: ReturnType<typeof userEvent.setup>) => {
   }
 };
 
+/** Finds a text by name and opens the first match, as an operator would. */
+const openTextByName = async (
+  user: ReturnType<typeof userEvent.setup>,
+  name: string,
+) => {
+  await user.type(await screen.findByLabelText("Search texts"), name);
+  await user.click(
+    await screen.findByRole("option", { name: "Praise to the 21 Taras" }),
+  );
+};
+
 const pressKey = async (code: string) => {
   await act(async () => {
     document.body.dispatchEvent(
@@ -133,6 +150,14 @@ describe("LiveControlPage", () => {
     endRecitationSession.mockResolvedValue({ ok: true });
     fetchEditionSections.mockReset();
     fetchEditionSections.mockResolvedValue([]);
+    searchTextsByTitle.mockReset();
+    searchTextsByTitle.mockResolvedValue([
+      { textId: "root", title: "Praise to the 21 Taras" },
+    ]);
+    fetchEditionTitle.mockReset();
+    fetchEditionTitle.mockImplementation(
+      async (textId: string) => `Title of ${textId}`,
+    );
     localStorage.clear();
     Element.prototype.scrollIntoView = vi.fn();
 
@@ -245,14 +270,111 @@ describe("LiveControlPage", () => {
     });
     renderPage();
 
-    await user.type(await screen.findByLabelText("Text id"), "root");
-    await user.click(screen.getByRole("button", { name: "Add" }));
+    await openTextByName(user, "Praise");
 
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
     expect(fetchTextEditions).toHaveBeenCalledWith("root");
     expect(
       screen.getByRole("checkbox", { name: "Follow Praise (en)" }),
     ).toBeInTheDocument();
+  });
+
+  it("finds a text by name and opens it by its edition id", async () => {
+    const user = userEvent.setup();
+    fetchLiveControlEvent.mockResolvedValue({
+      title: "Tara Puja",
+      collectionId: null,
+    });
+    renderPage();
+
+    await openTextByName(user, "Praise");
+
+    expect(searchTextsByTitle).toHaveBeenCalledWith("Praise");
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
+    expect(fetchTextEditions).toHaveBeenCalledWith("root");
+    // The search closes once a text is picked.
+    expect(screen.getByLabelText("Search texts")).toHaveValue("");
+  });
+
+  it("still opens a pasted edition id as it is", async () => {
+    const user = userEvent.setup();
+    fetchLiveControlEvent.mockResolvedValue({
+      title: "Tara Puja",
+      collectionId: null,
+    });
+    renderPage();
+
+    await user.type(
+      await screen.findByLabelText("Search texts"),
+      "Zt5c0fe1OMJI1Kh8rp2FM{Enter}",
+    );
+
+    await waitFor(() =>
+      expect(fetchTextEditions).toHaveBeenCalledWith("Zt5c0fe1OMJI1Kh8rp2FM"),
+    );
+  });
+
+  it("names the suggested texts instead of showing their ids", async () => {
+    fetchLiveControlEvent.mockResolvedValue({
+      title: "Tara Puja",
+      collectionId: null,
+    });
+    renderPage();
+
+    expect(
+      await screen.findByRole("button", {
+        name: "Open Title of Zt5c0fe1OMJI1Kh8rp2FM",
+      }),
+    ).toHaveTextContent("Title of Zt5c0fe1OMJI1Kh8rp2FM");
+    expect(
+      await screen.findByRole("button", {
+        name: "Open Title of lEmYv8BrRQkOMPY9ymQpS",
+      }),
+    ).toBeInTheDocument();
+  });
+
+  it("remembers a pasted text id in this browser, under its title", async () => {
+    const user = userEvent.setup();
+    fetchLiveControlEvent.mockResolvedValue({
+      title: "Tara Puja",
+      collectionId: null,
+    });
+    renderPage();
+
+    await openTextByName(user, "Praise");
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+    await waitFor(() =>
+      expect(
+        JSON.parse(localStorage.getItem("live-control-recent-texts") ?? "[]"),
+      ).toEqual([{ textId: "root", title: "Praise (bo)" }]),
+    );
+    expect(
+      screen.getByRole("button", { name: "Open Praise (bo)" }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("offers remembered and suggested texts to open with one tap", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem(
+      "live-control-recent-texts",
+      JSON.stringify([{ textId: "root", title: "Praise (bo)" }]),
+    );
+    fetchLiveControlEvent.mockResolvedValue({
+      title: "Tara Puja",
+      collectionId: null,
+    });
+    renderPage();
+
+    expect(
+      await screen.findByRole("button", {
+        name: "Open Title of Zt5c0fe1OMJI1Kh8rp2FM",
+      }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Open Praise (bo)" }));
+
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
+    expect(fetchTextEditions).toHaveBeenCalledWith("root");
   });
 
   it("fetches every edition when the work opens, not when a line is picked", async () => {
@@ -1067,8 +1189,7 @@ describe("LiveControlPage", () => {
         screen.queryByRole("button", { name: /^(Hide )?setup$/i }),
       ).toHaveClass("hidden");
 
-      await user.type(screen.getByLabelText("Text id"), "root");
-      await user.click(screen.getByRole("button", { name: "Add" }));
+      await openTextByName(user, "Praise");
       expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
       // Once a text is on screen, cruise gives the height back to the lines.

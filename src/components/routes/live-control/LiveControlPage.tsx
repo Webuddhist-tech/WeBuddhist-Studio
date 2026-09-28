@@ -8,13 +8,16 @@ import {
 } from "react";
 import { useParams } from "react-router-dom";
 import { RECITATION_EMIT_TOKEN } from "@/lib/constant";
-import { useQuery } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
+import { useDebounce } from "use-debounce";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import {
+  fetchEditionTitle,
   fetchLiturgies,
   fetchLiveControlEvent,
   fetchRecitationDetails,
   fetchTextEditions,
+  searchTextsByTitle,
   toOperatorSegments,
   type Liturgy,
   type OperatorSegment,
@@ -78,6 +81,46 @@ const storeTitleScale = (scale: number) => {
   }
 };
 
+/** Texts pasted by id, newest first, kept per browser so an event with no
+ * liturgies does not need the id pasted again next time. */
+interface RecentText {
+  textId: string;
+  title?: string;
+}
+const RECENT_TEXTS_STORAGE_KEY = "live-control-recent-texts";
+const MAX_RECENT_TEXTS = 6;
+/** Offered until they have been opened in this browser, by edition id. */
+const SUGGESTED_TEXT_IDS = ["Zt5c0fe1OMJI1Kh8rp2FM", "lEmYv8BrRQkOMPY9ymQpS"];
+
+const readRecentTexts = (): RecentText[] => {
+  try {
+    const parsed: unknown = JSON.parse(
+      localStorage.getItem(RECENT_TEXTS_STORAGE_KEY) ?? "[]",
+    );
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (item): item is RecentText =>
+          typeof item?.textId === "string" && item.textId.length > 0,
+      )
+      .map(({ textId, title }) => ({
+        textId,
+        title: typeof title === "string" ? title : undefined,
+      }))
+      .slice(0, MAX_RECENT_TEXTS);
+  } catch {
+    return [];
+  }
+};
+
+const storeRecentTexts = (texts: RecentText[]) => {
+  try {
+    localStorage.setItem(RECENT_TEXTS_STORAGE_KEY, JSON.stringify(texts));
+  } catch {
+    // Blocked site data: the list holds for this session only.
+  }
+};
+
 /** Shortcuts drive the liturgy, so they stay off fields and off the controls:
  * Space on "Next" or the token box must do what that control does. Lines are
  * buttons too; those keep the shortcuts. */
@@ -99,7 +142,10 @@ const LiveControlPage = () => {
   const [showTokenBox, setShowTokenBox] = useState(() => !readStoredToken());
   /** The work the operator is on: a liturgy of the event, or a pasted text id. */
   const [sourceTextId, setSourceTextId] = useState("");
-  const [textIdDraft, setTextIdDraft] = useState("");
+  /** What the operator has typed to find a text: a title, or an edition id. */
+  const [textQuery, setTextQuery] = useState("");
+  const [debouncedTextQuery] = useDebounce(textQuery.trim(), 300);
+  const [recentTexts, setRecentTexts] = useState(() => readRecentTexts());
   /** The edition on screen, which leads the room. */
   const [driverTextId, setDriverTextId] = useState("");
   /** Editions moved by the same key press, in the order they were ticked. */
@@ -172,6 +218,22 @@ const LiveControlPage = () => {
   });
 
   const order: Liturgy[] = useMemo(() => liturgies ?? [], [liturgies]);
+
+  // A remembered text is named once the library says what it is, so the list
+  // reads as titles rather than ids.
+  useEffect(() => {
+    const title = editionData?.text.title;
+    if (!title || !sourceTextId) return;
+    setRecentTexts((current) => {
+      const at = current.findIndex((item) => item.textId === sourceTextId);
+      if (at < 0 || current[at].title === title) return current;
+      const next = current.map((item, index) =>
+        index === at ? { ...item, title } : item,
+      );
+      storeRecentTexts(next);
+      return next;
+    });
+  }, [editionData, sourceTextId]);
 
   /** The work itself first, then every translation of it. */
   const editions: TextEdition[] = useMemo(
@@ -445,15 +507,68 @@ const LiveControlPage = () => {
     setShowTokenBox(true);
   };
 
-  const addTextId = () => {
-    const trimmed = textIdDraft.trim();
-    if (!trimmed) return;
-    openWork(trimmed);
-    setTextIdDraft("");
+  /** Opens a text by edition id and puts it at the top of this browser's list. */
+  const openTextById = (textId: string, title?: string) => {
+    openWork(textId);
+    setTextQuery("");
+    setRecentTexts((current) => {
+      const known = current.find((item) => item.textId === textId);
+      const next = [
+        { textId, title: title ?? known?.title },
+        ...current.filter((item) => item.textId !== textId),
+      ].slice(0, MAX_RECENT_TEXTS);
+      storeRecentTexts(next);
+      return next;
+    });
   };
+
+  /** What the text box offers: this browser's texts, then the suggested ones. */
+  const shortcutIds = [
+    ...recentTexts,
+    ...SUGGESTED_TEXT_IDS.filter(
+      (textId) => !recentTexts.some((item) => item.textId === textId),
+    ).map((textId): RecentText => ({ textId })),
+  ];
+  // A text saved before its title arrived, or a suggestion, is named by the
+  // library rather than shown as an id.
+  const shortcutTitles = useQueries({
+    queries: shortcutIds.map((item) => ({
+      queryKey: ["live-control-edition-title", item.textId],
+      queryFn: () => fetchEditionTitle(item.textId),
+      enabled: !item.title,
+      staleTime: Infinity,
+      retry: false,
+      refetchOnWindowFocus: false,
+    })),
+  });
+  const textShortcuts: RecentText[] = shortcutIds.map((item, index) => ({
+    textId: item.textId,
+    title: item.title ?? shortcutTitles[index]?.data ?? undefined,
+  }));
 
   /** Reading another edition keeps the one it replaces in the room: it was being
    * sent a moment ago, and its readers should not be left behind by the switch. */
+  const { data: textMatches, isFetching: searchingTexts } = useQuery({
+    queryKey: ["live-control-text-search", debouncedTextQuery],
+    queryFn: () => searchTextsByTitle(debouncedTextQuery),
+    enabled: debouncedTextQuery.length >= 2,
+    staleTime: 1000 * 60,
+    refetchOnWindowFocus: false,
+  });
+  /** An id pasted into the search box opens as it is, as it always could. */
+  const looksLikeId = /^[A-Za-z0-9_-]{15,}$/.test(textQuery.trim());
+
+  const openFirstMatch = () => {
+    const query = textQuery.trim();
+    if (!query) return;
+    if (looksLikeId) {
+      openTextById(query);
+      return;
+    }
+    const first = textMatches?.[0];
+    if (first) openTextById(first.textId, first.title);
+  };
+
   const read = (edition: TextEdition) => {
     const previous = driverTextId;
     setDriverTextId(edition.textId);
@@ -658,25 +773,92 @@ const LiveControlPage = () => {
             <h2 className="mx-2 mt-5 mb-2 text-[13px] tracking-[0.1em] text-[#8e8e93] uppercase max-lg:mx-1 max-lg:mt-2">
               Add a text
             </h2>
-            <div className="flex gap-2 px-2 max-lg:px-1">
+            <div className="px-2 max-lg:px-1">
               <input
-                aria-label="Text id"
-                value={textIdDraft}
-                onChange={(e) => setTextIdDraft(e.target.value)}
+                type="search"
+                aria-label="Search texts"
+                value={textQuery}
+                onChange={(e) => setTextQuery(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") addTextId();
+                  if (e.key === "Enter") openFirstMatch();
+                  if (e.key === "Escape") setTextQuery("");
                 }}
-                placeholder="text_id"
-                className="min-w-0 flex-1 rounded-md border border-[#2c2c2e] bg-[#1c1c1e] px-3 py-2 text-sm text-[#f2f2f7] placeholder:text-[#8e8e93] max-lg:text-base"
+                placeholder="Search by name or paste an id"
+                autoComplete="off"
+                className="w-full rounded-md border border-[#2c2c2e] bg-[#1c1c1e] px-3 py-2 text-sm text-[#f2f2f7] placeholder:text-[#8e8e93] max-lg:text-base"
               />
-              <button
-                type="button"
-                onClick={addTextId}
-                className="rounded-md bg-[#2c2c2e] px-3 py-2 text-sm font-semibold hover:bg-[#3a3a3c]"
-              >
-                Add
-              </button>
             </div>
+            {textQuery.trim() ? (
+              <div
+                role="listbox"
+                aria-label="Matching texts"
+                className="mx-2 mt-1 max-h-72 overflow-y-auto overscroll-contain rounded-md border border-[#2c2c2e] bg-[#111113] max-lg:mx-1 max-lg:max-h-56"
+              >
+                {looksLikeId ? (
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={false}
+                    onClick={() => openTextById(textQuery.trim())}
+                    className="block w-full cursor-pointer border-b border-[#2c2c2e] px-3 py-2.5 text-left text-[14px] text-[#f2f2f7] hover:bg-[#1c1c1e]"
+                  >
+                    Open id{" "}
+                    <span className="font-mono">{textQuery.trim()}</span>
+                  </button>
+                ) : null}
+                {(textMatches ?? []).map((match) => (
+                  <button
+                    key={match.textId}
+                    type="button"
+                    role="option"
+                    aria-selected={match.textId === sourceTextId}
+                    title={match.textId}
+                    onClick={() => openTextById(match.textId, match.title)}
+                    className="block w-full cursor-pointer px-3 py-2.5 text-left text-[14px] leading-snug text-[#f2f2f7] hover:bg-[#1c1c1e]"
+                  >
+                    {match.title}
+                  </button>
+                ))}
+                {textQuery.trim().length < 2 ? (
+                  <p className="px-3 py-2.5 text-[13px] text-[#8e8e93]">
+                    Keep typing…
+                  </p>
+                ) : searchingTexts ||
+                  textQuery.trim() !== debouncedTextQuery ? (
+                  <p className="px-3 py-2.5 text-[13px] text-[#8e8e93]">
+                    Searching…
+                  </p>
+                ) : (textMatches ?? []).length === 0 && !looksLikeId ? (
+                  <p className="px-3 py-2.5 text-[13px] text-[#8e8e93]">
+                    No text by that name.
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+            {textShortcuts.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-1.5 px-2 max-lg:px-1">
+                {textShortcuts.map((item) => {
+                  const isOpen = item.textId === sourceTextId;
+                  return (
+                    <button
+                      key={item.textId}
+                      type="button"
+                      title={item.textId}
+                      aria-label={`Open ${item.title ?? item.textId}`}
+                      aria-pressed={isOpen}
+                      onClick={() => openTextById(item.textId)}
+                      className={`max-w-full cursor-pointer truncate rounded-full border px-3 py-1.5 text-[13px] ${
+                        isOpen
+                          ? "border-[#e5231c] bg-[#e5231c]/20 text-white"
+                          : "border-[#2c2c2e] bg-[#1c1c1e] text-[#f2f2f7] hover:bg-[#2c2c2e]"
+                      }`}
+                    >
+                      {item.title ?? item.textId}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
 
             {editions.length > 0 ? (
               <>
