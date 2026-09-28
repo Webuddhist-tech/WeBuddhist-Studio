@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { RECITATION_EMIT_TOKEN } from "@/lib/constant";
 import { useQuery } from "@tanstack/react-query";
@@ -15,6 +15,7 @@ import {
   type TextEdition,
 } from "./api/liveControlApi";
 import { fetchEditionSections, type TocEntry } from "./api/libraryTocApi";
+import { returnButtonForLine } from "./returnJumps";
 import { usePositionPublisher } from "./usePositionPublisher";
 
 /** The emit token is kept per browser, so it is pasted once per machine. It is
@@ -666,21 +667,34 @@ const LiveControlPage = () => {
                 : "Pick a liturgy or add a text id, then tap a line (or press Space) to move the room."}
             </p>
           ) : (
-            driverLines.map((segment, index) => (
-              <button
-                key={segment.id}
-                type="button"
-                data-line={index}
-                onClick={() => jump(index)}
-                className={`block w-full cursor-pointer rounded-[5px] px-1.5 py-1 text-left text-[23px] leading-[1.7] break-words ${
-                  index === currentIndex
-                    ? "bg-[rgba(229,35,28,0.30)] text-white"
-                    : "text-[#8e8e93] hover:bg-[#1a1a1c] hover:text-[#f2f2f7]"
-                }`}
-              >
-                {segment.content}
-              </button>
-            ))
+            driverLines.map((segment, index) => {
+              const returnTo = returnButtonForLine(segment.id, driverLines);
+              return (
+                <Fragment key={segment.id}>
+                  <button
+                    type="button"
+                    data-line={index}
+                    onClick={() => jump(index)}
+                    className={`block w-full cursor-pointer rounded-[5px] px-1.5 py-1 text-left text-[23px] leading-[1.7] break-words ${
+                      index === currentIndex
+                        ? "bg-[rgba(229,35,28,0.30)] text-white"
+                        : "text-[#8e8e93] hover:bg-[#1a1a1c] hover:text-[#f2f2f7]"
+                    }`}
+                  >
+                    {segment.content}
+                  </button>
+                  {returnTo ? (
+                    <button
+                      type="button"
+                      onClick={() => jump(returnTo.index)}
+                      className="mt-1 mb-4 ml-1.5 block cursor-pointer rounded-[9px] border border-[#e5231c] bg-[#2c2c2e] px-5 py-2.5 text-base font-semibold text-[#f2f2f7] hover:bg-[#3a3a3c]"
+                    >
+                      {returnTo.label}
+                    </button>
+                  ) : null}
+                </Fragment>
+              );
+            })
           )}
         </div>
 
