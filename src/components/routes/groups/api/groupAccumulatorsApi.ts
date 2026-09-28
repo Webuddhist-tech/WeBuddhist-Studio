@@ -1,6 +1,7 @@
 import axiosInstance from "@/config/axios-config";
 import type { LanguageCode } from "@/lib/languageCodes";
 
+import { getAuthHeaders } from "@/lib/auth-storage";
 export interface GroupAccumulatorImage {
   thumbnail: string;
   medium: string;
@@ -73,10 +74,6 @@ export interface CreateGroupAccumulatorRequest {
 }
 
 export type UpdateGroupAccumulatorRequest = CreateGroupAccumulatorRequest;
-
-const getAuthHeaders = () => ({
-  Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
-});
 
 export const GROUP_ACCUMULATOR_LINK_URL_MAX = 2000;
 export const GROUP_ACCUMULATOR_LINK_TITLE_MAX = 500;

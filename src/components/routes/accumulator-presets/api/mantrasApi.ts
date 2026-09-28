@@ -2,6 +2,7 @@ import axiosInstance from "@/config/axios-config";
 import type { LanguageCode } from "@/schema/SeriesSchema";
 import type { FkOption } from "@/components/routes/groups/components/FkMultiSearchSelector";
 
+import { getAuthHeaders } from "@/lib/auth-storage";
 export interface MantraMetadataDTO {
   id: string;
   mantra: string;
@@ -53,10 +54,6 @@ export interface MantraImageUploadResponse {
   path: string;
   message: string;
 }
-
-const getAuthHeaders = () => ({
-  Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
-});
 
 export function mantraDisplayLabel(mantra: MantraDTO): string {
   const meta = mantra.metadata?.[0];

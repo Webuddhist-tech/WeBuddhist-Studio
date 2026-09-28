@@ -13,6 +13,7 @@ import { usesStaffWideDashboardGroupList } from "@/lib/platformAccess";
 import type { UserInfo } from "@/hooks/useUserInfo";
 import { capitalizeFirstLetter } from "@/lib/textUtils";
 
+import { getAuthHeaders } from "@/lib/auth-storage";
 export type AuthorGroupMemberRole = "OWNER" | "ADMIN" | "AUTHOR" | "VIEWER";
 
 export type AuthorGroupType = "PAGE" | "COMMUNITY";
@@ -260,10 +261,6 @@ export interface FetchGroupsParams {
 }
 
 export const TRANSFER_GROUPS_PAGE_LIMIT = 100;
-
-const getAuthHeaders = () => ({
-  Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
-});
 
 export function groupTypeLabel(groupType?: AuthorGroupType): string {
   if (!groupType) return "—";

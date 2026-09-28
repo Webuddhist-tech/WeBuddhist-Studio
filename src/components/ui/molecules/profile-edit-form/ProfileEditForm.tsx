@@ -15,6 +15,7 @@ import ImageContentData from "@/components/ui/molecules/modals/image-upload/Imag
 import { uploadImageToS3 } from "@/components/routes/task/api/taskApi";
 import { USER_INFO_QUERY_KEY } from "@/hooks/useUserInfo";
 
+import { getAccessToken } from "@/lib/auth-storage";
 const getUrlError = (account: string, url: string): string | null => {
   if (!account || !url || account === "email") return null;
   const pattern = PLATFORM_PATTERNS[account];
@@ -36,7 +37,7 @@ interface ProfileEditFormProps {
 const updateUserProfile = async (
   profileData: ProfileFormData & { social_profiles?: SocialProfile[] },
 ) => {
-  const accessToken = sessionStorage.getItem("accessToken");
+  const accessToken = getAccessToken();
   const { data } = await axiosInstance.post(
     `/api/v1/authors/info`,
     profileData,

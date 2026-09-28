@@ -5,10 +5,7 @@ import {
   planLanguageToTtsApiLanguage,
 } from "@/lib/ttsConstants";
 
-const getAuthHeaders = () => ({
-  Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
-});
-
+import { getAuthHeaders } from "@/lib/auth-storage";
 interface CreateTaskPayload {
   plan_id: string;
   day_id: string;

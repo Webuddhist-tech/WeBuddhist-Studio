@@ -104,15 +104,7 @@ global.ResizeObserver = class ResizeObserver {
   disconnect() {}
 };
 
-Object.defineProperty(window, "sessionStorage", {
-  value: {
-    getItem: vi.fn((key) => {
-      if (key === "accessToken") return "mock-token";
-      return null;
-    }),
-  },
-  writable: true,
-});
+localStorage.setItem("accessToken", "mock-token");
 
 const renderWithProviders = (
   component: React.ReactElement,

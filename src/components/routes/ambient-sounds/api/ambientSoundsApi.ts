@@ -1,5 +1,6 @@
 import axiosInstance from "@/config/axios-config";
 
+import { getAuthHeaders } from "@/lib/auth-storage";
 export interface AmbientSound {
   id: string;
   name: string;
@@ -28,10 +29,6 @@ export interface UpdateAmbientSoundPayload {
   file?: File;
   imageFile?: File | null;
 }
-
-const getAuthHeaders = () => ({
-  Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
-});
 
 export const fetchAmbientSounds = async (): Promise<AmbientSoundsResponse> => {
   const { data } = await axiosInstance.get<AmbientSoundsResponse>(

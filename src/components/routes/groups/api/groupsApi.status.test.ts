@@ -13,7 +13,7 @@ vi.mock("@/config/axios-config", () => ({
 beforeEach(() => {
   vi.mocked(axiosInstance.get).mockReset();
   vi.mocked(axiosInstance.patch).mockReset();
-  sessionStorage.setItem("accessToken", "token");
+  localStorage.setItem("accessToken", "token");
 });
 
 /** The endpoint returns the same shape as GET /cms/author/groups/{id}. */

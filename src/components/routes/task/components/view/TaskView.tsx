@@ -26,6 +26,7 @@ import { FaPen } from "react-icons/fa";
 import { formatMs } from "@/lib/utils";
 import { AudioSegmentPlayer } from "@/components/ui/molecules/audio-segment-player/AudioSegmentPlayer";
 
+import { getAccessToken } from "@/lib/auth-storage";
 type ContentType =
   | "TEXT"
   | "IMAGE"
@@ -42,7 +43,7 @@ interface TaskViewProps {
 }
 
 const fetchTaskDetails = async (task_id: string) => {
-  const accessToken = sessionStorage.getItem("accessToken");
+  const accessToken = getAccessToken();
   const { data } = await axiosInstance.get(`/api/v1/cms/tasks/${task_id}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });

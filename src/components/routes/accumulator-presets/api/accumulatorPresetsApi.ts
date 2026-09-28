@@ -3,6 +3,7 @@ import type { LanguageCode } from "@/schema/SeriesSchema";
 import { capitalizeFirstLetter } from "@/lib/textUtils";
 import type { ImageUrlModel } from "./mantrasApi";
 
+import { getAuthHeaders } from "@/lib/auth-storage";
 export interface AccumulatorMetadataDTO {
   language: string;
   name: string;
@@ -65,10 +66,6 @@ export interface UpdateAccumulatorPresetPayload {
   mala_image_id?: string | null;
   metadata?: AccumulatorMetadataInput[];
 }
-
-const getAuthHeaders = () => ({
-  Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
-});
 
 export const fetchAccumulatorPresets = async (
   page: number,

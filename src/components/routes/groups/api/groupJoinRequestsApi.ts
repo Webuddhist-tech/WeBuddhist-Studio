@@ -1,5 +1,6 @@
 import axiosInstance from "@/config/axios-config";
 
+import { getAuthHeaders } from "@/lib/auth-storage";
 export type GroupJoinRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export interface GroupJoinRequestDTO {
@@ -30,10 +31,6 @@ export interface FetchGroupJoinRequestsParams {
   skip?: number;
   limit?: number;
 }
-
-const getAuthHeaders = () => ({
-  Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
-});
 
 export const fetchGroupJoinRequests = async (
   groupId: string,

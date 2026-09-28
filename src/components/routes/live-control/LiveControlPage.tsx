@@ -13,6 +13,7 @@ import {
   type PositionToPublish,
   type TextEdition,
 } from "./api/liveControlApi";
+import { fetchEditionSections, type TocEntry } from "./api/libraryTocApi";
 import { usePositionPublisher } from "./usePositionPublisher";
 
 /** The emit token is kept per browser, so it is pasted once per machine. It is
@@ -76,6 +77,7 @@ const LiveControlPage = () => {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const listRef = useRef<HTMLDivElement | null>(null);
+  const sectionListRef = useRef<HTMLDivElement | null>(null);
   /** Editions already asked for, so nothing is fetched twice. */
   const requestedRef = useRef<Set<string>>(new Set());
 
@@ -159,8 +161,73 @@ const LiveControlPage = () => {
     void prepare(editions[0]);
   }, [editions, prepare]);
 
-  const driverLines = lines[driverTextId] ?? [];
+  // One identity per edition's lines, so the outline is not rebuilt on every
+  // render of the page.
+  const driverLines = useMemo(
+    () => lines[driverTextId] ?? [],
+    [lines, driverTextId],
+  );
   const isPreparingDriver = preparing.includes(driverTextId);
+  const driverEdition = editions.find(
+    (edition) => edition.textId === driverTextId,
+  );
+
+  // The outline of the edition on screen, so the operator can go to a section
+  // rather than scrolling for it - the section list of the puja controller. It
+  // belongs to this edition alone: each edition is its own library text with its
+  // own segment ids, so a translation's outline anchors on different segments.
+  const { data: tocSections } = useQuery({
+    queryKey: ["live-control-sections", driverTextId, driverEdition?.language],
+    queryFn: () => fetchEditionSections(driverTextId, driverEdition?.language),
+    enabled: Boolean(driverTextId),
+    refetchOnWindowFocus: false,
+    retry: false,
+    staleTime: 1000 * 60 * 20,
+  });
+
+  /** Where each line sits, so a section's anchor becomes a position to move to. */
+  const indexBySegmentId = useMemo(() => {
+    const positions = new Map<string, number>();
+    driverLines.forEach((segment, index) => {
+      if (!positions.has(segment.id)) positions.set(segment.id, index);
+    });
+    return positions;
+  }, [driverLines]);
+
+  /**
+   * The sections as the sidebar draws them, each with the line it goes to.
+   * A section whose anchor is not among these lines - nothing resolved under the
+   * heading, or the recitation does not carry that segment - keeps its place in
+   * the outline but cannot be moved to.
+   */
+  const sections: (TocEntry & { lineIndex: number })[] = useMemo(
+    () =>
+      (tocSections ?? []).map((section) => ({
+        ...section,
+        lineIndex: section.segmentId
+          ? (indexBySegmentId.get(section.segmentId) ?? -1)
+          : -1,
+      })),
+    [tocSections, indexBySegmentId],
+  );
+
+  /** The section being recited: the last one that starts at or before this line. */
+  const activeSectionId = useMemo(() => {
+    if (currentIndex < 0) return null;
+    const reached = sections.filter(
+      (section) => section.lineIndex >= 0 && section.lineIndex <= currentIndex,
+    );
+    return reached.length > 0 ? reached[reached.length - 1].id : null;
+  }, [sections, currentIndex]);
+
+  // Keep the live section in view, as the line list does: a long outline scrolls
+  // past the operator's place otherwise.
+  useEffect(() => {
+    if (!activeSectionId) return;
+    sectionListRef.current
+      ?.querySelector('[data-section-active="true"]')
+      ?.scrollIntoView({ block: "nearest" });
+  }, [activeSectionId]);
 
   /** Teleprompter scroll: keep the live line in a band near the upper third,
    * with lookahead below, and only when it has drifted out of that band - so
@@ -285,9 +352,6 @@ const LiveControlPage = () => {
     void prepare(edition);
   };
 
-  const driverEdition = editions.find(
-    (edition) => edition.textId === driverTextId,
-  );
   const currentLiturgy = order.find((item) => item.textId === sourceTextId);
   const liturgyNumber =
     order.findIndex((item) => item.textId === sourceTextId) + 1;
@@ -348,6 +412,44 @@ const LiveControlPage = () => {
                 {item.title}
               </button>
             ))}
+          </>
+        ) : null}
+
+        {sections.length > 0 ? (
+          <>
+            <h2 className="mx-2 mt-5 mb-2 text-[13px] tracking-[0.1em] text-[#8e8e93] uppercase">
+              Sections
+            </h2>
+            <div ref={sectionListRef}>
+              {sections.map((section) => {
+                const isActive = section.id === activeSectionId;
+                const reachable = section.lineIndex >= 0;
+                return (
+                  <button
+                    key={section.id}
+                    type="button"
+                    data-section-active={isActive}
+                    disabled={!reachable}
+                    title={reachable ? undefined : "No segment to go to"}
+                    onClick={() => jump(section.lineIndex)}
+                    // Outlines nest deeply - six levels is ordinary - so the
+                    // indent stops after three and the titles keep their width.
+                    style={{
+                      paddingLeft: 12 + Math.min(section.depth, 3) * 12,
+                    }}
+                    className={`mb-0.5 block w-full rounded-[7px] py-2.5 pr-3 text-left text-[15px] leading-relaxed ${
+                      isActive
+                        ? "bg-[#e5231c] text-white"
+                        : reachable
+                          ? "cursor-pointer text-[#8e8e93] hover:bg-[#1a1a1c]"
+                          : "cursor-default text-[#5a5a5f]"
+                    }`}
+                  >
+                    {section.title}
+                  </button>
+                );
+              })}
+            </div>
           </>
         ) : null}
 

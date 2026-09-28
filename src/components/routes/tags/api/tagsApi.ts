@@ -1,6 +1,7 @@
 import axiosInstance from "@/config/axios-config";
 import type { LanguageCode } from "@/schema/SeriesSchema";
 
+import { getAuthHeaders } from "@/lib/auth-storage";
 export interface TagMetadataDTO {
   id: string;
   language: string;
@@ -54,10 +55,6 @@ export interface PlanOption {
   id: string;
   title: string;
 }
-
-const getAuthHeaders = () => ({
-  Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
-});
 
 export const fetchTags = async (
   page: number,

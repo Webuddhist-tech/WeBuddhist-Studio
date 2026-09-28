@@ -12,6 +12,7 @@ const {
   fetchRecitationDetails,
   publishPosition,
   endRecitationSession,
+  fetchEditionSections,
 } = vi.hoisted(() => ({
   fetchLiveControlEvent: vi.fn(),
   fetchLiturgies: vi.fn(),
@@ -23,6 +24,7 @@ const {
   endRecitationSession: vi.fn(
     async (): Promise<{ ok: boolean; message?: string }> => ({ ok: true }),
   ),
+  fetchEditionSections: vi.fn(),
 }));
 
 vi.mock("./api/liveControlApi", async () => {
@@ -39,6 +41,8 @@ vi.mock("./api/liveControlApi", async () => {
     endRecitationSession,
   };
 });
+
+vi.mock("./api/libraryTocApi", () => ({ fetchEditionSections }));
 
 vi.mock("react-router-dom", async () => {
   const actual =
@@ -95,6 +99,8 @@ describe("LiveControlPage", () => {
     publishPosition.mockResolvedValue({ ok: true });
     endRecitationSession.mockClear();
     endRecitationSession.mockResolvedValue({ ok: true });
+    fetchEditionSections.mockReset();
+    fetchEditionSections.mockResolvedValue([]);
     localStorage.clear();
     Element.prototype.scrollIntoView = vi.fn();
 
@@ -510,5 +516,94 @@ describe("LiveControlPage", () => {
       expect(endRecitationSession).toHaveBeenCalledWith("e1", "tok-123"),
     );
     expect(await screen.findByText(/session has ended/i)).toBeInTheDocument();
+  });
+
+  describe("the outline of the edition on screen", () => {
+    /** Two sections of the three-line text: the second starts at line 3. */
+    const outline = [
+      { id: "s1", title: "Going for Refuge", depth: 0, segmentId: "root-s1" },
+      { id: "s2", title: "Praises", depth: 0, segmentId: "root-s3" },
+    ];
+
+    it("lists the sections of the edition being read", async () => {
+      fetchEditionSections.mockResolvedValue(outline);
+      renderPage();
+
+      expect(
+        await screen.findByRole("button", { name: "Praises" }),
+      ).toBeInTheDocument();
+      expect(fetchEditionSections).toHaveBeenCalledWith("root", "bo");
+    });
+
+    it("asks for the outline of a translation when that is read instead", async () => {
+      const user = userEvent.setup();
+      fetchEditionSections.mockResolvedValue(outline);
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: /Praise \(en\)/ }));
+
+      await waitFor(() =>
+        expect(fetchEditionSections).toHaveBeenCalledWith("root-en", "en"),
+      );
+    });
+
+    it("goes to the first segment of a section that is picked", async () => {
+      const user = userEvent.setup();
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      fetchEditionSections.mockResolvedValue(outline);
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+      await user.click(await screen.findByRole("button", { name: "Praises" }));
+
+      await waitFor(() =>
+        expect(publishPosition).toHaveBeenCalledWith("e1", "tok-123", {
+          textId: "root",
+          segmentId: "root-s3",
+          index: 2,
+          roundNumber: 1,
+        }),
+      );
+      expect(screen.getByText(/line 3\/3/)).toBeInTheDocument();
+    });
+
+    it("marks the section the recitation has reached", async () => {
+      const user = userEvent.setup();
+      fetchEditionSections.mockResolvedValue(outline);
+      renderPage();
+      const praises = await screen.findByRole("button", { name: "Praises" });
+      const refuge = screen.getByRole("button", { name: "Going for Refuge" });
+
+      // Nothing is marked before the operator has a position at all.
+      expect(refuge).toHaveAttribute("data-section-active", "false");
+
+      await user.click(screen.getByRole("button", { name: /root line 2/ }));
+      expect(refuge).toHaveAttribute("data-section-active", "true");
+      expect(praises).toHaveAttribute("data-section-active", "false");
+
+      await user.click(screen.getByRole("button", { name: "Next →" }));
+      expect(praises).toHaveAttribute("data-section-active", "true");
+      expect(refuge).toHaveAttribute("data-section-active", "false");
+    });
+
+    it("shows a section with nothing to go to but does not move for it", async () => {
+      fetchEditionSections.mockResolvedValue([
+        // Anchored to a segment this recitation does not carry.
+        { id: "s3", title: "Colophon", depth: 0, segmentId: "root-s9" },
+      ]);
+      renderPage();
+
+      expect(
+        await screen.findByRole("button", { name: "Colophon" }),
+      ).toBeDisabled();
+    });
+
+    it("draws no section list for an edition with no outline", async () => {
+      renderPage();
+
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+      expect(screen.queryByText("Sections")).not.toBeInTheDocument();
+    });
   });
 });

@@ -19,4 +19,16 @@ server {
       proxy_read_timeout 300s;
       proxy_send_timeout 300s;
   }
+
+  # The library (OpenPecha) API, behind our own origin: its host never appears in
+  # a browser request and the X-Application header it requires is added here
+  # rather than shipped in the bundle. Mirrors the /library proxy in vite.config.ts.
+  location /library/ {
+      rewrite ^/library/(.*)$ /$1 break;
+      proxy_pass ${VITE_LIBRARY_BASE_URL};
+      proxy_set_header X-Application ${VITE_LIBRARY_APP_NAME};
+      proxy_ssl_server_name on;
+      proxy_read_timeout 300s;
+      proxy_send_timeout 300s;
+  }
 }
