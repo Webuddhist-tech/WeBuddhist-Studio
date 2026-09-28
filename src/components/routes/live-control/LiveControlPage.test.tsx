@@ -104,6 +104,15 @@ const setupPanel = () => {
   return panel;
 };
 
+/** Unticks every translation, for a test about the edition on screen alone:
+ * a new work follows all of its translations from the start. */
+const followNone = async (user: ReturnType<typeof userEvent.setup>) => {
+  for (const name of ["Follow Praise (en)", "Follow Praise (zh)"]) {
+    const box = await screen.findByRole("checkbox", { name });
+    if ((box as HTMLInputElement).checked) await user.click(box);
+  }
+};
+
 const pressKey = async (code: string) => {
   await act(async () => {
     document.body.dispatchEvent(
@@ -155,21 +164,77 @@ describe("LiveControlPage", () => {
     );
   });
 
-  it("opens the first liturgy and lists its translations to pick from", async () => {
+  it("opens the first liturgy and follows every translation of it", async () => {
     renderPage();
 
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
     expect(fetchRecitationDetails).toHaveBeenCalledWith("root", "bo");
+    // Every edition moves with the room unless the operator unticks it.
     expect(
       screen.getByRole("checkbox", { name: "Follow Praise (en)" }),
-    ).not.toBeChecked();
+    ).toBeChecked();
     expect(
       screen.getByRole("checkbox", { name: "Follow Praise (zh)" }),
-    ).toBeInTheDocument();
+    ).toBeChecked();
     // The edition being read is always published, so its tick is fixed on.
     const driver = screen.getByRole("checkbox", { name: "Follow Praise (bo)" });
     expect(driver).toBeChecked();
     expect(driver).toBeDisabled();
+  });
+
+  it("follows only the Tibetan, English and Chinese editions by default", async () => {
+    fetchTextEditions.mockResolvedValue({
+      text: { textId: "root", title: "Praise (bo)", language: "bo" },
+      editions: [
+        { textId: "root-en", title: "Praise (en)", language: "en" },
+        { textId: "root-fr", title: "Praise (fr)", language: "fr" },
+        { textId: "root-zh", title: "Praise (zh)", language: "zh-hans" },
+      ],
+    });
+    renderPage();
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+    expect(
+      screen.getByRole("checkbox", { name: "Follow Praise (en)" }),
+    ).toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: "Follow Praise (zh)" }),
+    ).toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: "Follow Praise (fr)" }),
+    ).not.toBeChecked();
+    // An edition nobody follows is not fetched until it is ticked.
+    expect(fetchRecitationDetails).not.toHaveBeenCalledWith("root-fr", "fr");
+  });
+
+  it("sizes the titles and remembers the size in this browser", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    expect(
+      await screen.findByRole("button", { name: "Refuge" }),
+    ).toBeInTheDocument();
+    expect(titlesPanel().style.getPropertyValue("--title-scale")).toBe("1");
+
+    await user.click(screen.getByRole("button", { name: "Larger titles" }));
+    expect(titlesPanel().style.getPropertyValue("--title-scale")).toBe("1.15");
+    expect(localStorage.getItem("live-control-title-scale")).toBe("1.15");
+
+    await user.click(screen.getByRole("button", { name: "Smaller titles" }));
+    await user.click(screen.getByRole("button", { name: "Smaller titles" }));
+    expect(localStorage.getItem("live-control-title-scale")).toBe("0.85");
+    // The smallest size goes no further.
+    expect(
+      screen.getByRole("button", { name: "Smaller titles" }),
+    ).toBeDisabled();
+  });
+
+  it("opens with the title size saved in this browser", async () => {
+    localStorage.setItem("live-control-title-scale", "1.5");
+    renderPage();
+    expect(
+      await screen.findByRole("button", { name: "Refuge" }),
+    ).toBeInTheDocument();
+    expect(titlesPanel().style.getPropertyValue("--title-scale")).toBe("1.5");
   });
 
   it("loads a pasted text id and its translations", async () => {
@@ -190,49 +255,34 @@ describe("LiveControlPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("fetches a ticked edition there and then, not when a line is picked", async () => {
+  it("fetches every edition when the work opens, not when a line is picked", async () => {
     const user = userEvent.setup();
     localStorage.setItem("recitation_emit_token", "tok-123");
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
-
-    await user.click(
-      screen.getByRole("checkbox", { name: "Follow Praise (en)" }),
-    );
 
     // Already loaded before any line is chosen.
     await waitFor(() =>
       expect(fetchRecitationDetails).toHaveBeenCalledWith("root-en", "en"),
     );
+    expect(fetchRecitationDetails).toHaveBeenCalledWith("root-zh", "zh");
     expect(
-      await screen.findByText(/1 more edition following/),
+      await screen.findByText(/2 more editions following/),
     ).toBeInTheDocument();
 
     fetchRecitationDetails.mockClear();
     await user.click(screen.getByRole("button", { name: /root line 2/ }));
 
-    await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(3));
     expect(fetchRecitationDetails).not.toHaveBeenCalled();
   });
 
   it("moves every ticked edition with one press", async () => {
-    const user = userEvent.setup();
     localStorage.setItem("recitation_emit_token", "tok-123");
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
-    await user.click(
-      screen.getByRole("checkbox", { name: "Follow Praise (en)" }),
-    );
-    await waitFor(() =>
-      expect(fetchRecitationDetails).toHaveBeenCalledWith("root-en", "en"),
-    );
-    await user.click(
-      screen.getByRole("checkbox", { name: "Follow Praise (zh)" }),
-    );
-    await waitFor(() =>
-      expect(fetchRecitationDetails).toHaveBeenCalledWith("root-zh", "zh"),
-    );
+    await screen.findByText(/2 more editions following/);
     publishPosition.mockClear();
 
     await pressKey("Space");
@@ -260,7 +310,6 @@ describe("LiveControlPage", () => {
   });
 
   it("sends the followed editions together, then the one on screen last", async () => {
-    const user = userEvent.setup();
     localStorage.setItem("recitation_emit_token", "tok-123");
     // The event holds one position, so the last post accepted is what the room
     // keeps: it has to be the edition being read, not a translation that
@@ -285,18 +334,7 @@ describe("LiveControlPage", () => {
 
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
-    await user.click(
-      screen.getByRole("checkbox", { name: "Follow Praise (en)" }),
-    );
-    await waitFor(() =>
-      expect(fetchRecitationDetails).toHaveBeenCalledWith("root-en", "en"),
-    );
-    await user.click(
-      screen.getByRole("checkbox", { name: "Follow Praise (zh)" }),
-    );
-    await waitFor(() =>
-      expect(fetchRecitationDetails).toHaveBeenCalledWith("root-zh", "zh"),
-    );
+    await screen.findByText(/2 more editions following/);
     publishPosition.mockClear();
     order.length = 0;
     inFlight = 0;
@@ -322,6 +360,7 @@ describe("LiveControlPage", () => {
 
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
+    await followNone(user);
     await pressKey("Space");
     await waitFor(() => expect(order).toEqual(["root"]));
 
@@ -369,6 +408,7 @@ describe("LiveControlPage", () => {
 
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
+    await followNone(user);
 
     await pressKey("Space"); // on the wire, held
     await user.click(screen.getByText("End session"));
@@ -388,14 +428,14 @@ describe("LiveControlPage", () => {
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
+    await screen.findByText(/2 more editions following/);
     const english = screen.getByRole("checkbox", {
       name: "Follow Praise (en)",
     });
     await user.click(english);
-    await waitFor(() =>
-      expect(fetchRecitationDetails).toHaveBeenCalledWith("root-en", "en"),
+    await user.click(
+      screen.getByRole("checkbox", { name: "Follow Praise (zh)" }),
     );
-    await user.click(english);
     expect(english).not.toBeChecked();
     publishPosition.mockClear();
 
@@ -435,12 +475,7 @@ describe("LiveControlPage", () => {
     localStorage.setItem("recitation_emit_token", "tok-123");
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
-    await user.click(
-      screen.getByRole("checkbox", { name: "Follow Praise (en)" }),
-    );
-    await waitFor(() =>
-      expect(fetchRecitationDetails).toHaveBeenCalledWith("root-en", "en"),
-    );
+    await screen.findByText(/2 more editions following/);
 
     await user.click(screen.getByRole("button", { name: "Refuge" }));
     expect(await screen.findByText("other line 1")).toBeInTheDocument();
@@ -460,7 +495,6 @@ describe("LiveControlPage", () => {
   });
 
   it("moves a followed edition by recitation row, not by line number", async () => {
-    const user = userEvent.setup();
     localStorage.setItem("recitation_emit_token", "tok-123");
     // This edition carries no recitation for the first row, so that row is not
     // one of its lines and every line after it sits one position earlier than
@@ -494,12 +528,7 @@ describe("LiveControlPage", () => {
 
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
-    await user.click(
-      screen.getByRole("checkbox", { name: "Follow Praise (en)" }),
-    );
-    await waitFor(() =>
-      expect(fetchRecitationDetails).toHaveBeenCalledWith("root-en", "en"),
-    );
+    await screen.findByText(/2 more editions following/);
     publishPosition.mockClear();
 
     await pressKey("Space");
@@ -578,6 +607,7 @@ describe("LiveControlPage", () => {
 
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
+    await followNone(user);
 
     await pressKey("Space"); // on the wire, held
     await pressKey("Space"); // queued behind it
@@ -595,17 +625,12 @@ describe("LiveControlPage", () => {
   });
 
   it("says when a translation does not line up with what is being read", async () => {
-    const user = userEvent.setup();
     fetchRecitationDetails.mockImplementation(
       async (textId: string, language: string) =>
         linesFor(textId, language, textId === "root-en" ? 2 : 3),
     );
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
-
-    await user.click(
-      screen.getByRole("checkbox", { name: "Follow Praise (en)" }),
-    );
 
     expect(await screen.findByText(/does not line up/)).toBeInTheDocument();
   });
@@ -711,6 +736,7 @@ describe("LiveControlPage", () => {
     });
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
+    await followNone(user);
 
     await user.click(screen.getByRole("button", { name: "Next →" }));
     expect(
@@ -1022,6 +1048,32 @@ describe("LiveControlPage", () => {
       await user.click(screen.getByRole("button", { name: "Refuge" }));
 
       expect(titlesPanel()).toHaveAttribute("data-titles", "folded");
+    });
+
+    it("opens the text box on a phone when the event has no liturgies", async () => {
+      fetchLiveControlEvent.mockResolvedValue({
+        title: "Tara Puja",
+        collectionId: null,
+      });
+      const user = userEvent.setup();
+      renderPage();
+
+      // Pasting a text id is the only way in, so it is not left two taps away.
+      await waitFor(() =>
+        expect(titlesPanel()).toHaveAttribute("data-titles", "unfolded"),
+      );
+      expect(setupPanel()).toHaveAttribute("data-setup", "unfolded");
+      expect(
+        screen.queryByRole("button", { name: /^(Hide )?setup$/i }),
+      ).toHaveClass("hidden");
+
+      await user.type(screen.getByLabelText("Text id"), "root");
+      await user.click(screen.getByRole("button", { name: "Add" }));
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+      // Once a text is on screen, cruise gives the height back to the lines.
+      expect(titlesPanel()).toHaveAttribute("data-titles", "folded");
+      expect(setupPanel()).toHaveAttribute("data-setup", "folded");
     });
 
     it("folds setup away and keeps the editions ticked from there", async () => {

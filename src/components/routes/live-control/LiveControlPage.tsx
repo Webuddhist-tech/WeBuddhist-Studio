@@ -50,6 +50,34 @@ const storeToken = (token: string | null) => {
   }
 };
 
+/** The languages the room reads in. A new work follows these of its
+ * translations from the start; any other edition waits to be ticked. */
+const DEFAULT_FOLLOWED_LANGUAGES = ["bo", "en", "zh"];
+const followedByDefault = (edition: TextEdition) =>
+  DEFAULT_FOLLOWED_LANGUAGES.includes(edition.language.split(/[-_]/)[0]);
+
+/** How big the liturgy and section titles are drawn, relative to the default.
+ * Kept per browser, like the token: it suits the screen, not the event. */
+const TITLE_SCALES = [0.85, 1, 1.15, 1.3, 1.5, 1.75];
+const TITLE_SCALE_STORAGE_KEY = "live-control-title-scale";
+
+const readStoredTitleScale = (): number => {
+  try {
+    const stored = Number(localStorage.getItem(TITLE_SCALE_STORAGE_KEY));
+    return TITLE_SCALES.includes(stored) ? stored : 1;
+  } catch {
+    return 1;
+  }
+};
+
+const storeTitleScale = (scale: number) => {
+  try {
+    localStorage.setItem(TITLE_SCALE_STORAGE_KEY, String(scale));
+  } catch {
+    // Blocked site data: the size holds for this session only.
+  }
+};
+
 /** Shortcuts drive the liturgy, so they stay off fields and off the controls:
  * Space on "Next" or the token box must do what that control does. Lines are
  * buttons too; those keep the shortcuts. */
@@ -97,10 +125,8 @@ const LiveControlPage = () => {
   /** Adding a text and ticking editions is setup, not driving: on a phone it
    * stays folded so the titles get the height. */
   const [setupOpen, setSetupOpen] = useState(false);
+  const [titleScale, setTitleScale] = useState(() => readStoredTitleScale());
   const cruise = mode === "cruise";
-  /** Whether a phone has the titles unfolded. A wide screen shows them either
-   * way, so this is the fold, not what is on screen. */
-  const titlesUnfolded = !cruise || navOpen;
 
   const listRef = useRef<HTMLDivElement | null>(null);
   const sectionListRef = useRef<HTMLDivElement | null>(null);
@@ -123,6 +149,18 @@ const LiveControlPage = () => {
     enabled: Boolean(event?.collectionId),
     refetchOnWindowFocus: false,
   });
+
+  /** An event with no liturgies opens on nothing: pasting a text id is the only
+   * way in, so a phone shows that box rather than folding it two taps away. */
+  const needsText =
+    Boolean(event) &&
+    !sourceTextId &&
+    (!event?.collectionId ||
+      (liturgies !== undefined && liturgies.length === 0));
+  /** Whether a phone has the titles unfolded. A wide screen shows them either
+   * way, so this is the fold, not what is on screen. */
+  const titlesUnfolded = !cruise || navOpen || needsText;
+  const setupUnfolded = setupOpen || needsText;
 
   // A text and its translations are separate library texts, each with its own
   // segment ids, so the room has to be told about every one it should follow.
@@ -194,15 +232,19 @@ const LiveControlPage = () => {
     openWork(order[0].textId);
   }, [order, sourceTextId, openWork]);
 
-  // A new work brings its own editions: the work itself leads, and anything
-  // followed belonged to the work before it.
+  // A new work brings its own editions: the work itself leads, and its Tibetan,
+  // English and Chinese translations follow from the start, so readers of those
+  // move with the room without the operator ticking anything. Each is fetched
+  // now, so the first move already has their lines.
   useEffect(() => {
     if (editions.length === 0) return;
-    setDriverTextId(editions[0].textId);
-    setFollowed([]);
+    const [lead, ...translations] = editions;
+    const following = translations.filter(followedByDefault);
+    setDriverTextId(lead.textId);
+    setFollowed(following.map((edition) => edition.textId));
     setCurrentIndex(-1);
     setLoadError(null);
-    void prepare(editions[0]);
+    [lead, ...following].forEach((edition) => void prepare(edition));
   }, [editions, prepare]);
 
   // One identity per edition's lines, so the outline is not rebuilt on every
@@ -410,10 +452,18 @@ const LiveControlPage = () => {
     setTextIdDraft("");
   };
 
+  /** Reading another edition keeps the one it replaces in the room: it was being
+   * sent a moment ago, and its readers should not be left behind by the switch. */
   const read = (edition: TextEdition) => {
+    const previous = driverTextId;
     setDriverTextId(edition.textId);
     setCurrentIndex(-1);
-    setFollowed((current) => current.filter((id) => id !== edition.textId));
+    setFollowed((current) => {
+      const rest = current.filter((id) => id !== edition.textId);
+      return previous && previous !== edition.textId && !rest.includes(previous)
+        ? [...rest, previous]
+        : rest;
+    });
     void prepare(edition);
   };
 
@@ -456,22 +506,32 @@ const LiveControlPage = () => {
   };
   /** One type scale per mode, for the lines and the return jumps between them:
    * cruise is read from a cushion, find is read leaning over the book. */
+  const changeTitleScale = (delta: number) => {
+    const at = TITLE_SCALES.indexOf(titleScale);
+    const next =
+      TITLE_SCALES[Math.min(TITLE_SCALES.length - 1, Math.max(0, at + delta))];
+    setTitleScale(next);
+    storeTitleScale(next);
+  };
   const lineClass = cruise
     ? "px-1.5 py-1 text-[26px] leading-[1.6] lg:text-[23px] lg:leading-[1.7]"
     : "px-1.5 py-0.5 text-[15px] leading-[1.45] lg:text-[17px] lg:leading-[1.55]";
   const modeButton = (active: boolean) =>
-    `cursor-pointer px-3 py-1.5 text-[13px] font-semibold ${
+    `cursor-pointer px-3 py-1.5 text-[13px] font-semibold max-lg:px-2.5 ${
       active ? "bg-[#e5231c] text-white" : "text-[#8e8e93] hover:bg-[#1a1a1c]"
     }`;
 
   return (
-    <div className="flex h-[100dvh] flex-col overflow-hidden bg-black font-sans text-[#f2f2f7]">
+    // A phone must not zoom on a quick second tap of Next, nor reload the page
+    // when the operator drags down past the first line mid-puja.
+    <div className="flex h-[100dvh] touch-manipulation flex-col overflow-hidden bg-black font-sans text-[#f2f2f7]">
       {/* A wide screen and a phone held sideways put the titles beside the text;
        * a phone held upright puts them above it, on a strip of the height. */}
       <div className="flex min-h-0 flex-1 flex-row max-lg:portrait:flex-col">
         <aside
           data-titles={titlesUnfolded ? "unfolded" : "folded"}
-          className={`w-[320px] shrink-0 flex-col overflow-y-auto border-r border-[#2c2c2e] px-3 py-4 max-lg:w-[212px] max-lg:px-2 max-lg:py-2 max-lg:portrait:max-h-[42vh] max-lg:portrait:w-full max-lg:portrait:border-r-0 max-lg:portrait:border-b ${
+          style={{ ["--title-scale" as string]: titleScale }}
+          className={`w-[320px] shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-[#2c2c2e] px-3 py-4 max-lg:w-[212px] max-lg:px-2 max-lg:py-2 max-lg:portrait:max-h-[42vh] max-lg:portrait:w-full max-lg:portrait:border-r-0 max-lg:portrait:border-b ${
             titlesUnfolded ? "flex" : "hidden lg:flex"
           }`}
         >
@@ -483,6 +543,30 @@ const LiveControlPage = () => {
               </span>
             </div>
           </div>
+
+          {order.length > 0 || sections.length > 0 ? (
+            <div className="mx-2 mb-2 flex items-center gap-1.5 text-[12px] tracking-[0.08em] text-[#8e8e93] uppercase max-lg:mx-1 max-lg:mb-1">
+              <span className="mr-auto">Title size</span>
+              <button
+                type="button"
+                aria-label="Smaller titles"
+                onClick={() => changeTitleScale(-1)}
+                disabled={titleScale === TITLE_SCALES[0]}
+                className="h-8 w-9 cursor-pointer rounded-md bg-[#2c2c2e] text-[13px] font-semibold text-[#f2f2f7] normal-case hover:bg-[#3a3a3c] disabled:cursor-default disabled:opacity-40"
+              >
+                A−
+              </button>
+              <button
+                type="button"
+                aria-label="Larger titles"
+                onClick={() => changeTitleScale(1)}
+                disabled={titleScale === TITLE_SCALES[TITLE_SCALES.length - 1]}
+                className="h-8 w-9 cursor-pointer rounded-md bg-[#2c2c2e] text-[16px] font-semibold text-[#f2f2f7] normal-case hover:bg-[#3a3a3c] disabled:cursor-default disabled:opacity-40"
+              >
+                A+
+              </button>
+            </div>
+          ) : null}
 
           {order.length > 0 ? (
             <>
@@ -498,7 +582,7 @@ const LiveControlPage = () => {
                       openWork(item.textId);
                       if (cruise) setNavOpen(false);
                     }}
-                    className={`mb-0.5 block w-full cursor-pointer rounded-[7px] px-3 py-2.5 text-left text-[15px] leading-relaxed max-lg:line-clamp-2 max-lg:px-2 max-lg:py-1 max-lg:text-[13px] max-lg:leading-snug ${
+                    className={`mb-0.5 block w-full cursor-pointer rounded-[7px] px-3 py-2.5 text-left text-[calc(15px*var(--title-scale))] leading-relaxed max-lg:line-clamp-2 max-lg:px-2 max-lg:py-1 max-lg:text-[calc(13px*var(--title-scale))] max-lg:leading-snug ${
                       item.textId === sourceTextId
                         ? "bg-[#e5231c] text-white"
                         : "text-[#8e8e93] hover:bg-[#1a1a1c]"
@@ -539,7 +623,7 @@ const LiveControlPage = () => {
                       style={{
                         paddingLeft: 12 + Math.min(section.depth, 3) * 12,
                       }}
-                      className={`mb-0.5 block w-full rounded-[7px] py-2.5 pr-3 text-left text-[15px] leading-relaxed max-lg:line-clamp-2 max-lg:py-1 max-lg:text-[13px] max-lg:leading-snug ${
+                      className={`mb-0.5 block w-full rounded-[7px] py-2.5 pr-3 text-left text-[calc(15px*var(--title-scale))] leading-relaxed max-lg:line-clamp-2 max-lg:py-1 max-lg:text-[calc(13px*var(--title-scale))] max-lg:leading-snug ${
                         isActive
                           ? "bg-[#e5231c] text-white"
                           : reachable
@@ -558,16 +642,18 @@ const LiveControlPage = () => {
           <button
             type="button"
             onClick={() => setSetupOpen((open) => !open)}
-            className="mx-1 mt-2 cursor-pointer rounded-[7px] bg-[#1c1c1e] px-2 py-1.5 text-left text-[12px] font-semibold tracking-[0.08em] text-[#8e8e93] uppercase lg:hidden"
+            className={`mx-1 mt-2 cursor-pointer rounded-[7px] bg-[#1c1c1e] px-2 py-1.5 text-left text-[12px] font-semibold tracking-[0.08em] text-[#8e8e93] uppercase lg:hidden ${
+              needsText ? "hidden" : ""
+            }`}
           >
-            {setupOpen ? "Hide setup" : "Setup"}
+            {setupUnfolded ? "Hide setup" : "Setup"}
           </button>
 
           {/* Setup stays in the page at every width: on a phone it is folded
            * rather than gone, so the titles above it get the height. */}
           <div
-            data-setup={setupOpen ? "unfolded" : "folded"}
-            className={setupOpen ? "block" : "hidden lg:block"}
+            data-setup={setupUnfolded ? "unfolded" : "folded"}
+            className={setupUnfolded ? "block" : "hidden lg:block"}
           >
             <h2 className="mx-2 mt-5 mb-2 text-[13px] tracking-[0.1em] text-[#8e8e93] uppercase max-lg:mx-1 max-lg:mt-2">
               Add a text
@@ -581,7 +667,7 @@ const LiveControlPage = () => {
                   if (e.key === "Enter") addTextId();
                 }}
                 placeholder="text_id"
-                className="min-w-0 flex-1 rounded-md border border-[#2c2c2e] bg-[#1c1c1e] px-3 py-2 text-sm text-[#f2f2f7] placeholder:text-[#8e8e93]"
+                className="min-w-0 flex-1 rounded-md border border-[#2c2c2e] bg-[#1c1c1e] px-3 py-2 text-sm text-[#f2f2f7] placeholder:text-[#8e8e93] max-lg:text-base"
               />
               <button
                 type="button"
@@ -617,7 +703,7 @@ const LiveControlPage = () => {
                         checked={isDriver || followed.includes(edition.textId)}
                         disabled={isDriver}
                         onChange={() => toggleFollow(edition)}
-                        className="h-4 w-4 shrink-0 accent-[#e5231c]"
+                        className="h-4 w-4 shrink-0 accent-[#e5231c] max-lg:h-5 max-lg:w-5"
                       />
                       <button
                         type="button"
@@ -646,8 +732,8 @@ const LiveControlPage = () => {
         </aside>
 
         <main className="flex min-h-0 min-w-0 flex-1 flex-col px-8 pt-5 max-lg:px-3 max-lg:pt-2">
-          <div className="flex flex-wrap items-center gap-2 text-[13px] tracking-[0.04em] text-[#8e8e93]">
-            <div className="flex overflow-hidden rounded-md border border-[#2c2c2e]">
+          <div className="flex flex-wrap items-center gap-2 text-[13px] tracking-[0.04em] text-[#8e8e93] max-lg:flex-nowrap max-lg:gap-1.5">
+            <div className="flex shrink-0 overflow-hidden rounded-md border border-[#2c2c2e]">
               <button
                 type="button"
                 onClick={() => setMode("cruise")}
@@ -670,8 +756,8 @@ const LiveControlPage = () => {
             <button
               type="button"
               onClick={() => setNavOpen((open) => !open)}
-              className={`cursor-pointer rounded-md bg-[#2c2c2e] px-3 py-1.5 text-[13px] font-semibold hover:bg-[#3a3a3c] ${
-                cruise ? "lg:hidden" : "hidden"
+              className={`shrink-0 cursor-pointer rounded-md bg-[#2c2c2e] px-3 py-1.5 text-[13px] font-semibold hover:bg-[#3a3a3c] max-lg:px-2.5 ${
+                cruise && !needsText ? "lg:hidden" : "hidden"
               }`}
             >
               {navOpen ? "Hide titles" : "Titles"}
@@ -681,7 +767,7 @@ const LiveControlPage = () => {
             </span>
             <span
               data-testid="publish-state"
-              className={`rounded-full px-2.5 py-1 text-[13px] font-semibold ${
+              className={`min-w-0 truncate rounded-full px-2.5 py-1 text-[13px] font-semibold whitespace-nowrap max-lg:px-2 max-lg:text-[12px] ${
                 online
                   ? "bg-[#1f3a24] text-[#7fd598]"
                   : "bg-[#3a1f1f] text-[#e08585]"
@@ -689,12 +775,19 @@ const LiveControlPage = () => {
             >
               {statusLabel}
             </span>
+            {/* A phone has one row for all of this, so the button says less. */}
             <button
               type="button"
+              aria-label={token ? "Change token" : "Add token"}
               onClick={() => (token ? forgetToken() : setShowTokenBox(true))}
-              className="ml-auto rounded-md bg-[#2c2c2e] px-3 py-1.5 text-sm font-semibold hover:bg-[#3a3a3c]"
+              className="ml-auto shrink-0 rounded-md bg-[#2c2c2e] px-3 py-1.5 text-sm font-semibold whitespace-nowrap hover:bg-[#3a3a3c] max-lg:px-2.5 max-lg:text-[13px]"
             >
-              {token ? "Change token" : "Add token"}
+              <span className="max-lg:hidden">
+                {token ? "Change token" : "Add token"}
+              </span>
+              <span className="lg:hidden" aria-hidden="true">
+                Token
+              </span>
             </button>
           </div>
 
@@ -712,7 +805,7 @@ const LiveControlPage = () => {
                   if (e.key === "Enter") saveToken();
                 }}
                 placeholder="paste the recitation emit token"
-                className="min-w-[240px] flex-1 rounded-md border border-[#2c2c2e] bg-black px-3 py-2 text-sm text-[#f2f2f7] placeholder:text-[#8e8e93] max-lg:min-w-0"
+                className="min-w-[240px] flex-1 rounded-md border border-[#2c2c2e] bg-black px-3 py-2 text-sm text-[#f2f2f7] placeholder:text-[#8e8e93] max-lg:min-w-0 max-lg:text-base"
               />
               <button
                 type="button"
@@ -728,7 +821,7 @@ const LiveControlPage = () => {
             </div>
           ) : null}
 
-          <h1 className="mt-3.5 mb-0.5 text-2xl leading-relaxed max-lg:mt-2 max-lg:text-base max-lg:leading-snug">
+          <h1 className="mt-3.5 mb-0.5 text-2xl leading-relaxed [overflow-wrap:anywhere] max-lg:line-clamp-2 max-lg:mt-2 max-lg:text-base max-lg:leading-snug">
             {driverEdition?.title ??
               currentLiturgy?.title ??
               (sourceTextId || "No liturgy loaded")}
@@ -759,7 +852,10 @@ const LiveControlPage = () => {
             </p>
           ) : null}
 
-          <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto pr-2">
+          <div
+            ref={listRef}
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-2 max-lg:pr-0"
+          >
             {driverLines.length === 0 ? (
               <p className="py-12 text-center text-sm text-[#8e8e93]">
                 {isPreparingDriver ||
@@ -831,7 +927,7 @@ const LiveControlPage = () => {
                   onChange={(e) =>
                     setRound(Math.max(1, Number(e.target.value) || 1))
                   }
-                  className="w-14 rounded-md border border-[#2c2c2e] bg-[#1c1c1e] px-2 py-1.5 text-center text-sm text-[#f2f2f7]"
+                  className="w-14 rounded-md border border-[#2c2c2e] bg-[#1c1c1e] px-2 py-1.5 text-center text-sm text-[#f2f2f7] max-lg:text-base"
                 />
                 <button
                   type="button"
@@ -863,7 +959,7 @@ const LiveControlPage = () => {
                 onClick={() => step(-1)}
                 className={`touch-manipulation cursor-pointer rounded-[9px] bg-[#2c2c2e] font-semibold select-none hover:bg-[#3a3a3c] active:bg-[#48484a] ${
                   cruise
-                    ? "w-[28%] max-w-[200px] py-5 text-lg"
+                    ? "w-[28%] max-w-[200px] py-5 text-lg max-lg:text-base"
                     : "px-6 py-3 text-base"
                 }`}
               >
