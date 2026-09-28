@@ -831,66 +831,156 @@ describe("LiveControlPage", () => {
     });
 
     it("shows a return button under a praise ending and jumps back to its start", async () => {
-    const user = userEvent.setup();
-    localStorage.setItem("recitation_emit_token", "tok-123");
-    fetchRecitationDetails.mockImplementation(
-      async (textId: string, language: string) => {
-        if (textId !== "root") return linesFor(textId, language, 3);
-        return {
-          text_id: "root",
-          title: "root",
-          segments: [
-            {
-              recitation: {
-                bo: { id: "BsajlElFFNFLoHcUjICwB", content: "homage line" },
-              },
-            },
-            {
-              recitation: {
-                bo: { id: "root-middle", content: "middle line" },
-              },
-            },
-            {
-              recitation: {
-                bo: {
-                  id: "kYNR7EmC5apQWrkYl5fiO",
-                  content: "root mantra line",
+      const user = userEvent.setup();
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      fetchRecitationDetails.mockImplementation(
+        async (textId: string, language: string) => {
+          if (textId !== "root") return linesFor(textId, language, 3);
+          return {
+            text_id: "root",
+            title: "root",
+            segments: [
+              {
+                recitation: {
+                  bo: { id: "BsajlElFFNFLoHcUjICwB", content: "homage line" },
                 },
               },
-            },
-          ],
-        };
-      },
-    );
-    renderPage();
+              {
+                recitation: {
+                  bo: { id: "root-middle", content: "middle line" },
+                },
+              },
+              {
+                recitation: {
+                  bo: {
+                    id: "kYNR7EmC5apQWrkYl5fiO",
+                    content: "root mantra line",
+                  },
+                },
+              },
+            ],
+          };
+        },
+      );
+      renderPage();
 
-    expect(await screen.findByText("root mantra line")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /2nd Praises/ }),
-    ).not.toBeInTheDocument();
+      expect(await screen.findByText("root mantra line")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /2nd Praises/ }),
+      ).not.toBeInTheDocument();
 
-    await user.click(
-      screen.getByRole("button", {
-        name: "↺ Return to start · 1st Praises to the 21 Tārās",
-      }),
-    );
+      await user.click(
+        screen.getByRole("button", {
+          name: "↺ Return to start · 1st Praises to the 21 Tārās",
+        }),
+      );
 
-    await waitFor(() =>
-      expect(publishPosition).toHaveBeenCalledWith("e1", "tok-123", {
-        textId: "root",
-        segmentId: "BsajlElFFNFLoHcUjICwB",
-        index: 0,
-        roundNumber: 1,
-      }),
-    );
-    expect(screen.getByText(/line 1\/3/)).toBeInTheDocument();
-  });
+      await waitFor(() =>
+        expect(publishPosition).toHaveBeenCalledWith("e1", "tok-123", {
+          textId: "root",
+          segmentId: "BsajlElFFNFLoHcUjICwB",
+          index: 0,
+          roundNumber: 1,
+        }),
+      );
+      expect(screen.getByText(/line 1\/3/)).toBeInTheDocument();
+    });
 
-  it("draws no section list for an edition with no outline", async () => {
+    it("draws no section list for an edition with no outline", async () => {
       renderPage();
 
       expect(await screen.findByText("root line 1")).toBeInTheDocument();
       expect(screen.queryByText("Sections")).not.toBeInTheDocument();
+    });
+  });
+
+  // The page is driven two ways on a phone: cruising, one thumb on a Next big
+  // enough to take a fresh finger, and finding the place, titles and text packed
+  // on the one screen. The layout is the stylesheet's work; what is tested here
+  // is that the modes are switchable and that neither takes the driving away.
+  describe("cruise and find", () => {
+    it("opens in cruise and switches to find", async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Cruise" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+
+      await user.click(screen.getByRole("button", { name: "Find" }));
+
+      expect(screen.getByRole("button", { name: "Find" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      expect(screen.getByRole("button", { name: "Cruise" })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
+    });
+
+    it("still moves the room in find mode", async () => {
+      const user = userEvent.setup();
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      renderPage();
+
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Find" }));
+      await user.click(screen.getByRole("button", { name: "Next →" }));
+
+      await waitFor(() =>
+        expect(publishPosition).toHaveBeenCalledWith("e1", "tok-123", {
+          textId: "root",
+          segmentId: "root-s1",
+          index: 0,
+          roundNumber: 1,
+        }),
+      );
+    });
+
+    it("peeks at the titles without leaving cruise", async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Titles" }));
+      expect(
+        screen.getByRole("button", { name: "Hide titles" }),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Cruise" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+
+      await user.click(screen.getByRole("button", { name: "Hide titles" }));
+      expect(
+        screen.getByRole("button", { name: "Titles" }),
+      ).toBeInTheDocument();
+    });
+
+    it("folds setup away and keeps the editions ticked from there", async () => {
+      const user = userEvent.setup();
+      renderPage();
+
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Setup" }));
+      expect(
+        screen.getByRole("button", { name: "Hide setup" }),
+      ).toBeInTheDocument();
+
+      // Folded or open, the editions are in the page: the fold is height on a
+      // phone, never a second way to reach them.
+      await user.click(screen.getByRole("button", { name: "Hide setup" }));
+      await user.click(
+        screen.getByRole("checkbox", { name: "Follow Praise (en)" }),
+      );
+      expect(
+        await screen.findByText(/1 more edition following/),
+      ).toBeInTheDocument();
     });
   });
 });

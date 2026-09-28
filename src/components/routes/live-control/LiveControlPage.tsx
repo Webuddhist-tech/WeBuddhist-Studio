@@ -1,4 +1,11 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useParams } from "react-router-dom";
 import { RECITATION_EMIT_TOKEN } from "@/lib/constant";
 import { useQuery } from "@tanstack/react-query";
@@ -78,6 +85,18 @@ const LiveControlPage = () => {
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [round, setRound] = useState(1);
   const [loadError, setLoadError] = useState<string | null>(null);
+  /**
+   * The page is used two ways. Cruise: the operator only taps Next, so the
+   * button has to be big enough to take a fresh finger each time, and the lines
+   * are read at arm's length. Find: they have lost the place, so as many titles
+   * and lines as will fit go on the glass at once.
+   */
+  const [mode, setMode] = useState<"cruise" | "find">("cruise");
+  /** Cruise keeps the titles off a phone screen; this peeks at them in place. */
+  const [navOpen, setNavOpen] = useState(false);
+  /** Adding a text and ticking editions is setup, not driving: on a phone it
+   * stays folded so the titles get the height. */
+  const [setupOpen, setSetupOpen] = useState(false);
 
   const listRef = useRef<HTMLDivElement | null>(null);
   const sectionListRef = useRef<HTMLDivElement | null>(null);
@@ -429,331 +448,435 @@ const LiveControlPage = () => {
       ? `${loaded.length} lines — does not line up`
       : `${loaded.length} lines`;
   };
+  const cruise = mode === "cruise";
+  /** Titles are always up on a wide screen; on a phone cruise folds them away. */
+  const titlesVisible = !cruise || navOpen;
+  /** One type scale per mode, for the lines and the return jumps between them:
+   * cruise is read from a cushion, find is read leaning over the book. */
+  const lineClass = cruise
+    ? "px-1.5 py-1 text-[26px] leading-[1.6] lg:text-[23px] lg:leading-[1.7]"
+    : "px-1.5 py-0.5 text-[15px] leading-[1.45] lg:text-[17px] lg:leading-[1.55]";
+  const modeButton = (active: boolean) =>
+    `cursor-pointer px-3 py-1.5 text-[13px] font-semibold ${
+      active ? "bg-[#e5231c] text-white" : "text-[#8e8e93] hover:bg-[#1a1a1c]"
+    }`;
 
   return (
-    <div className="grid h-screen grid-cols-[320px_1fr] bg-black font-sans text-[#f2f2f7]">
-      <aside className="overflow-y-auto border-r border-[#2c2c2e] px-3 py-4">
-        <div className="mb-2 flex items-center gap-3 border-b border-[#2c2c2e] px-2 pt-1 pb-4">
-          <div className="flex min-w-0 flex-col leading-tight">
-            <span className="text-lg font-bold">WeBuddhist</span>
-            <span className="mt-0.5 text-[11px] font-medium tracking-[0.11em] text-[#8e8e93] uppercase">
-              Live control
-            </span>
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-black font-sans text-[#f2f2f7]">
+      {/* A wide screen and a phone held sideways put the titles beside the text;
+       * a phone held upright puts them above it, on a strip of the height. */}
+      <div className="flex min-h-0 flex-1 flex-row max-lg:portrait:flex-col">
+        <aside
+          className={`w-[320px] shrink-0 flex-col overflow-y-auto border-r border-[#2c2c2e] px-3 py-4 max-lg:w-[212px] max-lg:px-2 max-lg:py-2 max-lg:portrait:max-h-[42vh] max-lg:portrait:w-full max-lg:portrait:border-r-0 max-lg:portrait:border-b ${
+            titlesVisible ? "flex" : "hidden lg:flex"
+          }`}
+        >
+          <div className="mb-2 flex items-center gap-3 border-b border-[#2c2c2e] px-2 pt-1 pb-4 max-lg:hidden">
+            <div className="flex min-w-0 flex-col leading-tight">
+              <span className="text-lg font-bold">WeBuddhist</span>
+              <span className="mt-0.5 text-[11px] font-medium tracking-[0.11em] text-[#8e8e93] uppercase">
+                Live control
+              </span>
+            </div>
           </div>
-        </div>
 
-        {order.length > 0 ? (
-          <>
-            <h2 className="mx-2 mt-1 mb-3 text-[13px] tracking-[0.1em] text-[#8e8e93] uppercase">
-              Liturgies
-            </h2>
-            {order.map((item) => (
-              <button
-                key={item.textId}
-                type="button"
-                onClick={() => openWork(item.textId)}
-                className={`mb-0.5 block w-full cursor-pointer rounded-[7px] px-3 py-2.5 text-left text-[15px] leading-relaxed ${
-                  item.textId === sourceTextId
-                    ? "bg-[#e5231c] text-white"
-                    : "text-[#8e8e93] hover:bg-[#1a1a1c]"
-                }`}
-              >
-                {item.title}
-              </button>
-            ))}
-          </>
-        ) : null}
-
-        {sections.length > 0 ? (
-          <>
-            <h2 className="mx-2 mt-5 mb-2 text-[13px] tracking-[0.1em] text-[#8e8e93] uppercase">
-              Sections
-            </h2>
-            <div ref={sectionListRef}>
-              {sections.map((section) => {
-                const isActive = section.id === activeSectionId;
-                const reachable = section.lineIndex >= 0;
-                return (
+          {order.length > 0 ? (
+            <>
+              <h2 className="mx-2 mt-1 mb-3 text-[13px] tracking-[0.1em] text-[#8e8e93] uppercase max-lg:mx-1 max-lg:mb-1">
+                Liturgies
+              </h2>
+              <div className="max-lg:portrait:grid max-lg:portrait:grid-cols-2 max-lg:portrait:gap-x-2">
+                {order.map((item) => (
                   <button
-                    key={section.id}
+                    key={item.textId}
                     type="button"
-                    data-section-active={isActive}
-                    disabled={!reachable}
-                    title={reachable ? undefined : "No segment to go to"}
-                    onClick={() => jump(section.lineIndex)}
-                    // Outlines nest deeply - six levels is ordinary - so the
-                    // indent stops after three and the titles keep their width.
-                    style={{
-                      paddingLeft: 12 + Math.min(section.depth, 3) * 12,
+                    onClick={() => {
+                      openWork(item.textId);
+                      if (cruise) setNavOpen(false);
                     }}
-                    className={`mb-0.5 block w-full rounded-[7px] py-2.5 pr-3 text-left text-[15px] leading-relaxed ${
-                      isActive
+                    className={`mb-0.5 block w-full cursor-pointer rounded-[7px] px-3 py-2.5 text-left text-[15px] leading-relaxed max-lg:line-clamp-2 max-lg:px-2 max-lg:py-1 max-lg:text-[13px] max-lg:leading-snug ${
+                      item.textId === sourceTextId
                         ? "bg-[#e5231c] text-white"
-                        : reachable
-                          ? "cursor-pointer text-[#8e8e93] hover:bg-[#1a1a1c]"
-                          : "cursor-default text-[#5a5a5f]"
+                        : "text-[#8e8e93] hover:bg-[#1a1a1c]"
                     }`}
                   >
-                    {section.title}
+                    {item.title}
                   </button>
-                );
-              })}
-            </div>
-          </>
-        ) : null}
+                ))}
+              </div>
+            </>
+          ) : null}
 
-        <h2 className="mx-2 mt-5 mb-2 text-[13px] tracking-[0.1em] text-[#8e8e93] uppercase">
-          Add a text
-        </h2>
-        <div className="flex gap-2 px-2">
-          <input
-            aria-label="Text id"
-            value={textIdDraft}
-            onChange={(e) => setTextIdDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") addTextId();
-            }}
-            placeholder="text_id"
-            className="min-w-0 flex-1 rounded-md border border-[#2c2c2e] bg-[#1c1c1e] px-3 py-2 text-sm text-[#f2f2f7] placeholder:text-[#8e8e93]"
-          />
-          <button
-            type="button"
-            onClick={addTextId}
-            className="rounded-md bg-[#2c2c2e] px-3 py-2 text-sm font-semibold hover:bg-[#3a3a3c]"
-          >
-            Add
-          </button>
-        </div>
-
-        {editions.length > 0 ? (
-          <>
-            <h2 className="mx-2 mt-5 mb-1 text-[13px] tracking-[0.1em] text-[#8e8e93] uppercase">
-              Editions
-            </h2>
-            <p className="mx-2 mb-2 text-[12px] text-[#8e8e93]">
-              Tick every edition the room should follow. One move sends them
-              all.
-            </p>
-            {editions.map((edition) => {
-              const isDriver = edition.textId === driverTextId;
-              const note = editionNote(edition);
-              return (
-                <div
-                  key={edition.textId}
-                  className={`mb-0.5 flex items-center gap-2 rounded-[7px] px-2 py-2 ${
-                    isDriver ? "bg-[#e5231c]/20" : "hover:bg-[#1a1a1c]"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    aria-label={`Follow ${edition.title}`}
-                    checked={isDriver || followed.includes(edition.textId)}
-                    disabled={isDriver}
-                    onChange={() => toggleFollow(edition)}
-                    className="h-4 w-4 shrink-0 accent-[#e5231c]"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => read(edition)}
-                    className="min-w-0 flex-1 cursor-pointer text-left"
-                  >
-                    <span
-                      className={`block truncate text-[14px] ${
-                        isDriver ? "text-white" : "text-[#f2f2f7]"
+          {sections.length > 0 ? (
+            <>
+              <h2 className="mx-2 mt-5 mb-2 text-[13px] tracking-[0.1em] text-[#8e8e93] uppercase max-lg:mx-1 max-lg:mt-2 max-lg:mb-1">
+                Sections
+              </h2>
+              <div
+                ref={sectionListRef}
+                className="max-lg:portrait:grid max-lg:portrait:grid-cols-2 max-lg:portrait:gap-x-2"
+              >
+                {sections.map((section) => {
+                  const isActive = section.id === activeSectionId;
+                  const reachable = section.lineIndex >= 0;
+                  return (
+                    <button
+                      key={section.id}
+                      type="button"
+                      data-section-active={isActive}
+                      disabled={!reachable}
+                      title={reachable ? undefined : "No segment to go to"}
+                      onClick={() => {
+                        jump(section.lineIndex);
+                        if (cruise) setNavOpen(false);
+                      }}
+                      // Outlines nest deeply - six levels is ordinary - so the
+                      // indent stops after three and the titles keep their width.
+                      style={{
+                        paddingLeft: 12 + Math.min(section.depth, 3) * 12,
+                      }}
+                      className={`mb-0.5 block w-full rounded-[7px] py-2.5 pr-3 text-left text-[15px] leading-relaxed max-lg:line-clamp-2 max-lg:py-1 max-lg:text-[13px] max-lg:leading-snug ${
+                        isActive
+                          ? "bg-[#e5231c] text-white"
+                          : reachable
+                            ? "cursor-pointer text-[#8e8e93] hover:bg-[#1a1a1c]"
+                            : "cursor-default text-[#5a5a5f]"
                       }`}
                     >
-                      {edition.title}
-                    </span>
-                    <span className="block text-[11px] text-[#8e8e93]">
-                      {edition.language || "?"}
-                      {isDriver ? " · reading" : ""}
-                      {note ? ` · ${note}` : ""}
-                    </span>
-                  </button>
-                </div>
-              );
-            })}
-          </>
-        ) : null}
-      </aside>
+                      {section.title}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          ) : null}
 
-      <main className="flex h-screen min-w-0 flex-col px-8 pt-5">
-        <div className="flex flex-wrap items-center gap-2 text-[13px] tracking-[0.04em] text-[#8e8e93]">
-          <span>The WeBuddhist app follows this controller.</span>
-          <span
-            data-testid="publish-state"
-            className={`rounded-full px-2.5 py-1 text-[13px] font-semibold ${
-              online
-                ? "bg-[#1f3a24] text-[#7fd598]"
-                : "bg-[#3a1f1f] text-[#e08585]"
-            }`}
-          >
-            {statusLabel}
-          </span>
           <button
             type="button"
-            onClick={() => (token ? forgetToken() : setShowTokenBox(true))}
-            className="ml-auto rounded-md bg-[#2c2c2e] px-3 py-1.5 text-sm font-semibold hover:bg-[#3a3a3c]"
+            onClick={() => setSetupOpen((open) => !open)}
+            className="mx-1 mt-2 cursor-pointer rounded-[7px] bg-[#1c1c1e] px-2 py-1.5 text-left text-[12px] font-semibold tracking-[0.08em] text-[#8e8e93] uppercase lg:hidden"
           >
-            {token ? "Change token" : "Add token"}
+            {setupOpen ? "Hide setup" : "Setup"}
           </button>
-        </div>
 
-        {showTokenBox ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-[#2c2c2e] bg-[#1c1c1e] p-3">
-            <label className="text-sm text-[#8e8e93]" htmlFor="emit-token">
-              Emit token
-            </label>
-            <input
-              id="emit-token"
-              type="password"
-              value={tokenDraft}
-              onChange={(e) => setTokenDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") saveToken();
-              }}
-              placeholder="paste the recitation emit token"
-              className="min-w-[240px] flex-1 rounded-md border border-[#2c2c2e] bg-black px-3 py-2 text-sm text-[#f2f2f7] placeholder:text-[#8e8e93]"
-            />
+          {/* Setup stays in the page at every width: on a phone it is folded
+           * rather than gone, so the titles above it get the height. */}
+          <div className={setupOpen ? "block" : "hidden lg:block"}>
+            <h2 className="mx-2 mt-5 mb-2 text-[13px] tracking-[0.1em] text-[#8e8e93] uppercase max-lg:mx-1 max-lg:mt-2">
+              Add a text
+            </h2>
+            <div className="flex gap-2 px-2 max-lg:px-1">
+              <input
+                aria-label="Text id"
+                value={textIdDraft}
+                onChange={(e) => setTextIdDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addTextId();
+                }}
+                placeholder="text_id"
+                className="min-w-0 flex-1 rounded-md border border-[#2c2c2e] bg-[#1c1c1e] px-3 py-2 text-sm text-[#f2f2f7] placeholder:text-[#8e8e93]"
+              />
+              <button
+                type="button"
+                onClick={addTextId}
+                className="rounded-md bg-[#2c2c2e] px-3 py-2 text-sm font-semibold hover:bg-[#3a3a3c]"
+              >
+                Add
+              </button>
+            </div>
+
+            {editions.length > 0 ? (
+              <>
+                <h2 className="mx-2 mt-5 mb-1 text-[13px] tracking-[0.1em] text-[#8e8e93] uppercase max-lg:mx-1 max-lg:mt-3">
+                  Editions
+                </h2>
+                <p className="mx-2 mb-2 text-[12px] text-[#8e8e93] max-lg:mx-1">
+                  Tick every edition the room should follow. One move sends them
+                  all.
+                </p>
+                {editions.map((edition) => {
+                  const isDriver = edition.textId === driverTextId;
+                  const note = editionNote(edition);
+                  return (
+                    <div
+                      key={edition.textId}
+                      className={`mb-0.5 flex items-center gap-2 rounded-[7px] px-2 py-2 max-lg:px-1 max-lg:py-1.5 ${
+                        isDriver ? "bg-[#e5231c]/20" : "hover:bg-[#1a1a1c]"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        aria-label={`Follow ${edition.title}`}
+                        checked={isDriver || followed.includes(edition.textId)}
+                        disabled={isDriver}
+                        onChange={() => toggleFollow(edition)}
+                        className="h-4 w-4 shrink-0 accent-[#e5231c]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => read(edition)}
+                        className="min-w-0 flex-1 cursor-pointer text-left"
+                      >
+                        <span
+                          className={`block truncate text-[14px] ${
+                            isDriver ? "text-white" : "text-[#f2f2f7]"
+                          }`}
+                        >
+                          {edition.title}
+                        </span>
+                        <span className="block text-[11px] text-[#8e8e93]">
+                          {edition.language || "?"}
+                          {isDriver ? " · reading" : ""}
+                          {note ? ` · ${note}` : ""}
+                        </span>
+                      </button>
+                    </div>
+                  );
+                })}
+              </>
+            ) : null}
+          </div>
+        </aside>
+
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col px-8 pt-5 max-lg:px-3 max-lg:pt-2">
+          <div className="flex flex-wrap items-center gap-2 text-[13px] tracking-[0.04em] text-[#8e8e93]">
+            <div className="flex overflow-hidden rounded-md border border-[#2c2c2e]">
+              <button
+                type="button"
+                onClick={() => setMode("cruise")}
+                aria-pressed={cruise}
+                title="Big Next button, lines read at arm's length"
+                className={modeButton(cruise)}
+              >
+                Cruise
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode("find")}
+                aria-pressed={!cruise}
+                title="Titles and as many lines as fit, for finding the place"
+                className={modeButton(!cruise)}
+              >
+                Find
+              </button>
+            </div>
             <button
               type="button"
-              onClick={saveToken}
-              className="rounded-md bg-[#e5231c] px-4 py-2 text-sm font-semibold text-white hover:bg-[#ff3a33]"
+              onClick={() => setNavOpen((open) => !open)}
+              className={`cursor-pointer rounded-md bg-[#2c2c2e] px-3 py-1.5 text-[13px] font-semibold hover:bg-[#3a3a3c] ${
+                cruise ? "lg:hidden" : "hidden"
+              }`}
             >
-              Save
+              {navOpen ? "Hide titles" : "Titles"}
             </button>
-            <p className="w-full text-[12px] text-[#8e8e93]">
-              Kept in this browser only, never in the link. This one token can
-              drive any live recitation, so treat it like a password.
-            </p>
+            <span className="max-lg:hidden">
+              The WeBuddhist app follows this controller.
+            </span>
+            <span
+              data-testid="publish-state"
+              className={`rounded-full px-2.5 py-1 text-[13px] font-semibold ${
+                online
+                  ? "bg-[#1f3a24] text-[#7fd598]"
+                  : "bg-[#3a1f1f] text-[#e08585]"
+              }`}
+            >
+              {statusLabel}
+            </span>
+            <button
+              type="button"
+              onClick={() => (token ? forgetToken() : setShowTokenBox(true))}
+              className="ml-auto rounded-md bg-[#2c2c2e] px-3 py-1.5 text-sm font-semibold hover:bg-[#3a3a3c]"
+            >
+              {token ? "Change token" : "Add token"}
+            </button>
           </div>
-        ) : null}
 
-        <h1 className="mt-3.5 mb-0.5 text-2xl leading-relaxed">
-          {driverEdition?.title ??
-            currentLiturgy?.title ??
-            (sourceTextId || "No liturgy loaded")}
-        </h1>
-        <div className="mb-3 text-[13px] text-[#8e8e93]">
-          {order.length > 0 && liturgyNumber > 0
-            ? `Liturgy ${liturgyNumber}/${order.length} · `
-            : null}
-          {driverLines.length > 0
-            ? `line ${currentIndex + 1}/${driverLines.length}`
-            : "nothing loaded yet"}
-          {followedCount > 0
-            ? ` · ${followedCount} more edition${followedCount === 1 ? "" : "s"} following`
-            : null}
-          {round > 1 ? ` · round ${round}` : null}
-        </div>
+          {showTokenBox ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-[#2c2c2e] bg-[#1c1c1e] p-3 max-lg:mt-2">
+              <label className="text-sm text-[#8e8e93]" htmlFor="emit-token">
+                Emit token
+              </label>
+              <input
+                id="emit-token"
+                type="password"
+                value={tokenDraft}
+                onChange={(e) => setTokenDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveToken();
+                }}
+                placeholder="paste the recitation emit token"
+                className="min-w-[240px] flex-1 rounded-md border border-[#2c2c2e] bg-black px-3 py-2 text-sm text-[#f2f2f7] placeholder:text-[#8e8e93] max-lg:min-w-0"
+              />
+              <button
+                type="button"
+                onClick={saveToken}
+                className="rounded-md bg-[#e5231c] px-4 py-2 text-sm font-semibold text-white hover:bg-[#ff3a33]"
+              >
+                Save
+              </button>
+              <p className="w-full text-[12px] text-[#8e8e93]">
+                Kept in this browser only, never in the link. This one token can
+                drive any live recitation, so treat it like a password.
+              </p>
+            </div>
+          ) : null}
 
-        {eventError || editionsError || loadError || notice ? (
-          <p className="mb-3 rounded-lg border border-[#3a1f1f] bg-[#2a1515] px-3 py-2 text-sm text-[#e08585]">
-            {loadError ??
-              notice ??
-              getApiErrorMessage(
-                eventError ?? editionsError,
-                "Could not load this event.",
-              )}
-          </p>
-        ) : null}
+          <h1 className="mt-3.5 mb-0.5 text-2xl leading-relaxed max-lg:mt-2 max-lg:text-base max-lg:leading-snug">
+            {driverEdition?.title ??
+              currentLiturgy?.title ??
+              (sourceTextId || "No liturgy loaded")}
+          </h1>
+          {/* Where the room is, at every width and in both modes: the line that
+           * answers "where are we" without reading the text. */}
+          <div className="mb-3 text-[13px] text-[#8e8e93] max-lg:mb-1 max-lg:text-[12px]">
+            {order.length > 0 && liturgyNumber > 0
+              ? `Liturgy ${liturgyNumber}/${order.length} · `
+              : null}
+            {driverLines.length > 0
+              ? `line ${currentIndex + 1}/${driverLines.length}`
+              : "nothing loaded yet"}
+            {followedCount > 0
+              ? ` · ${followedCount} more edition${followedCount === 1 ? "" : "s"} following`
+              : null}
+            {round > 1 ? ` · round ${round}` : null}
+          </div>
 
-        <div ref={listRef} className="flex-1 overflow-y-auto pr-2">
-          {driverLines.length === 0 ? (
-            <p className="py-12 text-center text-sm text-[#8e8e93]">
-              {isPreparingDriver ||
-              (sourceTextId && !driverTextId && !loadError)
-                ? "Loading…"
-                : "Pick a liturgy or add a text id, then tap a line (or press Space) to move the room."}
+          {eventError || editionsError || loadError || notice ? (
+            <p className="mb-3 rounded-lg border border-[#3a1f1f] bg-[#2a1515] px-3 py-2 text-sm text-[#e08585] max-lg:mb-2">
+              {loadError ??
+                notice ??
+                getApiErrorMessage(
+                  eventError ?? editionsError,
+                  "Could not load this event.",
+                )}
             </p>
-          ) : (
-            driverLines.map((segment, index) => {
-              const returnTo = returnButtonForLine(segment.id, driverLines);
-              return (
-                <Fragment key={segment.id}>
-                  <button
-                    type="button"
-                    data-line={index}
-                    onClick={() => jump(index)}
-                    className={`block w-full cursor-pointer rounded-[5px] px-1.5 py-1 text-left text-[23px] leading-[1.7] break-words ${
-                      index === currentIndex
-                        ? "bg-[rgba(229,35,28,0.30)] text-white"
-                        : "text-[#8e8e93] hover:bg-[#1a1a1c] hover:text-[#f2f2f7]"
-                    }`}
-                  >
-                    {segment.content}
-                  </button>
-                  {returnTo ? (
+          ) : null}
+
+          <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto pr-2">
+            {driverLines.length === 0 ? (
+              <p className="py-12 text-center text-sm text-[#8e8e93]">
+                {isPreparingDriver ||
+                (sourceTextId && !driverTextId && !loadError)
+                  ? "Loading…"
+                  : "Pick a liturgy or add a text id, then tap a line (or press Space) to move the room."}
+              </p>
+            ) : (
+              driverLines.map((segment, index) => {
+                const returnTo = returnButtonForLine(segment.id, driverLines);
+                return (
+                  <Fragment key={segment.id}>
                     <button
                       type="button"
-                      onClick={() => jump(returnTo.index)}
-                      className="mt-1 mb-4 ml-1.5 block cursor-pointer rounded-[9px] border border-[#e5231c] bg-[#2c2c2e] px-5 py-2.5 text-base font-semibold text-[#f2f2f7] hover:bg-[#3a3a3c]"
+                      data-line={index}
+                      onClick={() => jump(index)}
+                      className={`block w-full cursor-pointer rounded-[5px] text-left break-words ${lineClass} ${
+                        index === currentIndex
+                          ? // Packed lines need more than a tint to be found at a
+                            // glance, so the live one is outlined as well.
+                            "bg-[rgba(229,35,28,0.30)] text-white outline-1 outline-[#e5231c]"
+                          : "text-[#8e8e93] hover:bg-[#1a1a1c] hover:text-[#f2f2f7]"
+                      }`}
                     >
-                      {returnTo.label}
+                      {segment.content}
                     </button>
-                  ) : null}
-                </Fragment>
-              );
-            })
-          )}
-        </div>
+                    {returnTo ? (
+                      <button
+                        type="button"
+                        onClick={() => jump(returnTo.index)}
+                        className={`mt-1 mb-4 ml-1.5 block cursor-pointer rounded-[9px] border border-[#e5231c] bg-[#2c2c2e] font-semibold text-[#f2f2f7] hover:bg-[#3a3a3c] ${
+                          cruise
+                            ? "px-5 py-2.5 text-base"
+                            : "mb-2 px-3 py-1.5 text-[13px]"
+                        }`}
+                      >
+                        {returnTo.label}
+                      </button>
+                    ) : null}
+                  </Fragment>
+                );
+              })
+            )}
+          </div>
 
-        <div className="mt-2 flex flex-wrap items-center gap-3.5 border-t border-[#2c2c2e] py-4">
-          <button
-            type="button"
-            onClick={() => step(-1)}
-            className="rounded-[9px] bg-[#2c2c2e] px-6 py-3 text-base font-semibold hover:bg-[#3a3a3c]"
-          >
-            ← Previous
-          </button>
-          <button
-            type="button"
-            onClick={() => step(1)}
-            className="rounded-[9px] bg-[#e5231c] px-6 py-3 text-base font-semibold text-white hover:bg-[#ff3a33]"
-          >
-            Next →
-          </button>
-          <span className="flex items-center gap-1.5 text-[13px] text-[#8e8e93]">
-            round
-            <button
-              type="button"
-              aria-label="Previous round"
-              onClick={() => setRound((value) => Math.max(1, value - 1))}
-              className="rounded-md bg-[#2c2c2e] px-3 py-2 font-semibold hover:bg-[#3a3a3c]"
+          <div className="border-t border-[#2c2c2e] pt-3 pb-4 max-lg:pt-2 max-lg:pb-2">
+            {/* The round, the session and the last cue sent: wanted now and then,
+             * never mid-cruise, so a phone in cruise gives their height to Next. */}
+            <div
+              className={`flex-wrap items-center gap-3.5 text-[13px] text-[#8e8e93] ${
+                cruise ? "hidden lg:flex" : "flex"
+              }`}
             >
-              −
-            </button>
-            <input
-              aria-label="Round"
-              type="number"
-              min={1}
-              value={round}
-              onChange={(e) =>
-                setRound(Math.max(1, Number(e.target.value) || 1))
-              }
-              className="w-14 rounded-md border border-[#2c2c2e] bg-[#1c1c1e] px-2 py-1.5 text-center text-sm text-[#f2f2f7]"
-            />
-            <button
-              type="button"
-              aria-label="Next round"
-              onClick={() => setRound((value) => value + 1)}
-              className="rounded-md bg-[#2c2c2e] px-3 py-2 font-semibold hover:bg-[#3a3a3c]"
-            >
-              +
-            </button>
-          </span>
-          <button
-            type="button"
-            onClick={() => void endSession()}
-            className="rounded-[9px] border border-[#e5231c] bg-[#2c2c2e] px-5 py-3 text-sm font-semibold hover:bg-[#3a3a3c]"
-          >
-            End session
-          </button>
-          <span className="ml-auto text-[13px] text-[#8e8e93]">
-            {lastSent ? `sent ${lastSent}` : "Tap any line · ← / → / Space"}
-          </span>
-        </div>
-      </main>
+              <span className="flex items-center gap-1.5">
+                round
+                <button
+                  type="button"
+                  aria-label="Previous round"
+                  onClick={() => setRound((value) => Math.max(1, value - 1))}
+                  className="rounded-md bg-[#2c2c2e] px-3 py-2 font-semibold hover:bg-[#3a3a3c] max-lg:px-2.5 max-lg:py-1"
+                >
+                  −
+                </button>
+                <input
+                  aria-label="Round"
+                  type="number"
+                  min={1}
+                  value={round}
+                  onChange={(e) =>
+                    setRound(Math.max(1, Number(e.target.value) || 1))
+                  }
+                  className="w-14 rounded-md border border-[#2c2c2e] bg-[#1c1c1e] px-2 py-1.5 text-center text-sm text-[#f2f2f7]"
+                />
+                <button
+                  type="button"
+                  aria-label="Next round"
+                  onClick={() => setRound((value) => value + 1)}
+                  className="rounded-md bg-[#2c2c2e] px-3 py-2 font-semibold hover:bg-[#3a3a3c] max-lg:px-2.5 max-lg:py-1"
+                >
+                  +
+                </button>
+              </span>
+              <button
+                type="button"
+                onClick={() => void endSession()}
+                className="rounded-[9px] border border-[#e5231c] bg-[#2c2c2e] px-5 py-2.5 text-sm font-semibold hover:bg-[#3a3a3c] max-lg:px-3 max-lg:py-1.5 max-lg:text-[13px]"
+              >
+                End session
+              </button>
+              <span className="ml-auto max-lg:hidden">
+                {lastSent ? `sent ${lastSent}` : "Tap any line · ← / → / Space"}
+              </span>
+            </div>
+
+            {/* Next takes the whole width left over and, in cruise, stands tall
+             * enough to take a fresh finger each time; Previous stays narrow
+             * beside it so it is not the one hit by mistake. */}
+            <div className="mt-2 flex items-stretch gap-3 max-lg:gap-2">
+              <button
+                type="button"
+                onClick={() => step(-1)}
+                className={`touch-manipulation cursor-pointer rounded-[9px] bg-[#2c2c2e] font-semibold select-none hover:bg-[#3a3a3c] active:bg-[#48484a] ${
+                  cruise
+                    ? "w-[28%] max-w-[200px] py-5 text-lg"
+                    : "px-6 py-3 text-base"
+                }`}
+              >
+                ← Previous
+              </button>
+              <button
+                type="button"
+                onClick={() => step(1)}
+                className={`touch-manipulation cursor-pointer rounded-[9px] bg-[#e5231c] font-semibold text-white select-none hover:bg-[#ff3a33] active:bg-[#ff6b66] ${
+                  cruise
+                    ? "flex-1 py-5 text-2xl max-lg:portrait:min-h-[124px] max-lg:landscape:min-h-[72px]"
+                    : "px-6 py-3 text-base"
+                }`}
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        </main>
+      </div>
     </div>
   );
 };
