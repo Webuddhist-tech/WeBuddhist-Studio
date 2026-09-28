@@ -371,6 +371,51 @@ describe("LiveControlPage", () => {
     expect(screen.getByLabelText("Search texts")).toHaveValue("");
   });
 
+  it("does not open an earlier search's result on Enter", async () => {
+    const user = userEvent.setup();
+    fetchLiveControlEvent.mockResolvedValue({
+      title: "Tara Puja",
+      collectionId: null,
+    });
+    renderPage();
+
+    const box = await screen.findByLabelText("Search texts");
+    await user.type(box, "Praise");
+    expect(
+      await screen.findByRole("option", { name: "Praise to the 21 Taras" }),
+    ).toBeInTheDocument();
+
+    // Changed and entered before the new search has run.
+    await user.type(box, "x{Enter}");
+
+    expect(fetchTextEditions).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("option", { name: "Praise to the 21 Taras" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("searches a long run-together title rather than opening it as an id", async () => {
+    const user = userEvent.setup();
+    fetchLiveControlEvent.mockResolvedValue({
+      title: "Tara Puja",
+      collectionId: null,
+    });
+    renderPage();
+
+    const box = await screen.findByLabelText("Search texts");
+    await user.type(box, "RefugePrayerTextAbcde");
+    expect(
+      screen.queryByRole("option", { name: /^Open id/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      await screen.findByRole("option", { name: "Praise to the 21 Taras" }),
+    ).toBeInTheDocument();
+    await user.type(box, "{Enter}");
+
+    await waitFor(() => expect(fetchTextEditions).toHaveBeenCalledWith("root"));
+    expect(fetchTextEditions).not.toHaveBeenCalledWith("RefugePrayerTextAbcde");
+  });
+
   it("still opens a pasted edition id as it is", async () => {
     const user = userEvent.setup();
     fetchLiveControlEvent.mockResolvedValue({
@@ -833,6 +878,59 @@ describe("LiveControlPage", () => {
     ).toBeInTheDocument();
   });
 
+  it("sends a followed edition the current line once its lines arrive", async () => {
+    localStorage.setItem("recitation_emit_token", "tok-123");
+    let releaseEnglish: () => void = () => {};
+    const englishHeld = new Promise<void>((resolve) => {
+      releaseEnglish = resolve;
+    });
+    fetchRecitationDetails.mockImplementation(
+      async (textId: string, language: string) => {
+        if (textId === "root-en") await englishHeld;
+        return linesFor(textId, language, 3);
+      },
+    );
+    renderPage();
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+    // Next before the English lines are in: nothing to send it yet.
+    await pressKey("Space");
+    await waitFor(() =>
+      expect(publishPosition).toHaveBeenCalledWith(
+        "e1",
+        "tok-123",
+        expect.objectContaining({ textId: "root", segmentId: "root-s1" }),
+      ),
+    );
+    expect(publishPosition).not.toHaveBeenCalledWith(
+      "e1",
+      "tok-123",
+      expect.objectContaining({ textId: "root-en" }),
+    );
+
+    await act(async () => {
+      releaseEnglish();
+    });
+
+    // Its readers are brought to the line the room is on.
+    await waitFor(() =>
+      expect(publishPosition).toHaveBeenCalledWith("e1", "tok-123", {
+        textId: "root-en",
+        segmentId: "root-en-s1",
+        index: 0,
+        roundNumber: 1,
+      }),
+    );
+    // And the room is left on the edition being read.
+    await waitFor(() =>
+      expect(publishPosition).toHaveBeenLastCalledWith(
+        "e1",
+        "tok-123",
+        expect.objectContaining({ textId: "root" }),
+      ),
+    );
+  });
+
   it("has no round counter or end-session control", async () => {
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
@@ -1184,6 +1282,69 @@ describe("LiveControlPage", () => {
       fireEvent.pointerMove(window, { clientY: 990, pointerId: 1 });
       fireEvent.pointerUp(window, { clientY: 990, pointerId: 1 });
       expect(divider).toHaveAttribute("aria-valuenow", "70");
+    });
+
+    it("follows only the finger that started the drag", async () => {
+      const user = userEvent.setup();
+      class TestPointerEvent extends MouseEvent {
+        pointerId: number;
+        constructor(type: string, init: PointerEventInit = {}) {
+          super(type, init);
+          this.pointerId = init.pointerId ?? 0;
+        }
+      }
+      vi.stubGlobal("PointerEvent", TestPointerEvent);
+      onTestFinished(() => {
+        vi.unstubAllGlobals();
+      });
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Show titles" }));
+
+      const divider = screen.getByRole("separator", { name: "Resize titles" });
+      const area = divider.parentElement as HTMLElement;
+      area.getBoundingClientRect = () => ({ top: 0, height: 1000 }) as DOMRect;
+
+      fireEvent.pointerDown(divider, { clientY: 350, pointerId: 1 });
+      // A second finger lands, moves and lifts: none of it counts.
+      fireEvent.pointerMove(window, { clientY: 650, pointerId: 2 });
+      fireEvent.pointerUp(window, { clientY: 650, pointerId: 2 });
+      expect(divider).toHaveAttribute("aria-valuenow", "35");
+      expect(localStorage.getItem("live-control-titles-share")).toBeNull();
+
+      fireEvent.pointerMove(window, { clientY: 500, pointerId: 1 });
+      fireEvent.pointerUp(window, { clientY: 500, pointerId: 1 });
+      expect(divider).toHaveAttribute("aria-valuenow", "50");
+      expect(localStorage.getItem("live-control-titles-share")).toBe("0.500");
+    });
+
+    it("brings the titles in when the window widens past a phone's", async () => {
+      let onChange: (change: { matches: boolean }) => void = () => {};
+      vi.stubGlobal(
+        "matchMedia",
+        vi.fn(() => ({
+          matches: false,
+          addEventListener: (
+            _type: string,
+            listener: (change: { matches: boolean }) => void,
+          ) => {
+            onChange = listener;
+          },
+          removeEventListener: () => {},
+        })),
+      );
+      onTestFinished(() => {
+        vi.unstubAllGlobals();
+      });
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+      expect(titlesPanel()).toHaveAttribute("data-titles", "folded");
+
+      act(() => onChange({ matches: true }));
+      expect(titlesPanel()).toHaveAttribute("data-titles", "unfolded");
+
+      act(() => onChange({ matches: false }));
+      expect(titlesPanel()).toHaveAttribute("data-titles", "folded");
     });
 
     it("moves the divider from the keyboard without moving the room", async () => {

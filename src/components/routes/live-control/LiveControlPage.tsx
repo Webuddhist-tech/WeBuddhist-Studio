@@ -159,15 +159,19 @@ const storeTitlesShare = (share: number) => {
   }
 };
 
-/** A wide screen opens with the titles beside the text; a phone opens on the
- * text alone and shows the titles when asked. */
-const opensWithTitles = () => {
+/** A wide screen shows the titles beside the text; a phone shows the text
+ * alone and the titles when asked. */
+const WIDE_SCREEN_QUERY = "(min-width: 1024px)";
+
+const wideScreenQuery = (): MediaQueryList | null => {
   try {
-    return window.matchMedia("(min-width: 1024px)").matches;
+    return window.matchMedia(WIDE_SCREEN_QUERY);
   } catch {
-    return false;
+    return null;
   }
 };
+
+const opensWithTitles = () => wideScreenQuery()?.matches ?? false;
 
 /** Every position is sent as the first round: the operator page does not
  * count rounds. */
@@ -216,6 +220,17 @@ const LiveControlPage = () => {
   const [dismissedError, setDismissedError] = useState<string | null>(null);
   /** The liturgy and section titles, shown or put away with one button. */
   const [navOpen, setNavOpen] = useState(() => opensWithTitles());
+  // A window widened into the wide-screen layout gets the titles beside the
+  // text, and one narrowed to a phone's width gives the text the room. Within
+  // either, the operator's own show or hide stands.
+  useEffect(() => {
+    const query = wideScreenQuery();
+    if (!query?.addEventListener) return;
+    const onChange = (change: MediaQueryListEvent) =>
+      setNavOpen(change.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
   /** An upright phone's split between the titles and the lines. */
   const [titlesShare, setTitlesShare] = useState(() => readStoredTitlesShare());
   /** Adding a text and ticking editions is setup, not driving: on a phone it
@@ -519,6 +534,26 @@ const LiveControlPage = () => {
     [driverLines.length, publish, cuesForLine],
   );
 
+  // An edition followed from the start, or ticked mid-liturgy, is fetched in
+  // the background, and a move made before its lines arrive has nothing to
+  // send it. Once they arrive it is sent the line the room is on, so its
+  // readers are not a move behind. Editions already sent this line are not
+  // posted again: the publisher skips what the room has taken.
+  const readyFollowedKey = followed
+    .filter((textId) => Boolean(lines[textId]))
+    .join("|");
+  const latestMoveRef = useRef({ currentIndex, cuesForLine, publish });
+  latestMoveRef.current = { currentIndex, cuesForLine, publish };
+  useEffect(() => {
+    const {
+      currentIndex: at,
+      cuesForLine: cues,
+      publish: send,
+    } = latestMoveRef.current;
+    if (at < 0 || !readyFollowedKey) return;
+    send(cues(at));
+  }, [readyFollowedKey]);
+
   const step = useCallback(
     (delta: number) => {
       const next = currentIndex + delta;
@@ -610,8 +645,25 @@ const LiveControlPage = () => {
     staleTime: 1000 * 60,
     refetchOnWindowFocus: false,
   });
-  /** An id pasted into the search box opens as it is, as it always could. */
-  const looksLikeId = /^[A-Za-z0-9_-]{15,}$/.test(textQuery.trim());
+  /**
+   * An id pasted into the search box opens as it is, as it always could.
+   * Edition ids are 21 characters mixing digits and both cases - a run-together
+   * title such as "RefugePrayerText" is searched for instead.
+   */
+  const looksLikeId = (() => {
+    const query = textQuery.trim();
+    return (
+      /^[A-Za-z0-9_-]{21}$/.test(query) &&
+      /[0-9]/.test(query) &&
+      /[a-z]/.test(query) &&
+      /[A-Z]/.test(query)
+    );
+  })();
+  /** Results belong to what is in the box only once its search has run: until
+   * then they answer what was typed before. */
+  const matchesAreCurrent =
+    textQuery.trim() === debouncedTextQuery && !searchingTexts;
+  const currentMatches = matchesAreCurrent ? (textMatches ?? []) : [];
 
   const openFirstMatch = () => {
     const query = textQuery.trim();
@@ -620,7 +672,7 @@ const LiveControlPage = () => {
       openTextById(query);
       return;
     }
-    const first = textMatches?.[0];
+    const first = currentMatches[0];
     if (first) openTextById(first.textId, first.title);
   };
 
@@ -695,7 +747,7 @@ const LiveControlPage = () => {
    * followed on the window rather than the handle, so a finger that slides off
    * the thin divider keeps dragging, and the split is saved once it lets go.
    */
-  const startDividerDrag = (startY: number) => {
+  const startDividerDrag = (pointerId: number, startY: number) => {
     const shareAt = (clientY: number) => {
       const box = splitRef.current?.getBoundingClientRect();
       if (!box || box.height <= 0 || !Number.isFinite(clientY)) return null;
@@ -704,12 +756,15 @@ const LiveControlPage = () => {
     let latest = shareAt(startY);
     if (latest !== null) setTitlesShare(latest);
     const onMove = (moveEvent: PointerEvent) => {
+      // A second finger on the glass neither moves the split nor ends it.
+      if (moveEvent.pointerId !== pointerId) return;
       const share = shareAt(moveEvent.clientY);
       if (share === null) return;
       latest = share;
       setTitlesShare(share);
     };
-    const onEnd = () => {
+    const onEnd = (endEvent: PointerEvent) => {
+      if (endEvent.pointerId !== pointerId) return;
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onEnd);
       window.removeEventListener("pointercancel", onEnd);
@@ -920,7 +975,7 @@ const LiveControlPage = () => {
                     <span className="font-mono">{textQuery.trim()}</span>
                   </button>
                 ) : null}
-                {(textMatches ?? []).map((match) => (
+                {currentMatches.map((match) => (
                   <button
                     key={match.textId}
                     type="button"
@@ -937,12 +992,11 @@ const LiveControlPage = () => {
                   <p className="px-3 py-2.5 text-[13px] text-[#8e8e93]">
                     Keep typing…
                   </p>
-                ) : searchingTexts ||
-                  textQuery.trim() !== debouncedTextQuery ? (
+                ) : !matchesAreCurrent ? (
                   <p className="px-3 py-2.5 text-[13px] text-[#8e8e93]">
                     Searching…
                   </p>
-                ) : (textMatches ?? []).length === 0 && !looksLikeId ? (
+                ) : currentMatches.length === 0 && !looksLikeId ? (
                   <p className="px-3 py-2.5 text-[13px] text-[#8e8e93]">
                     No text by that name.
                   </p>
@@ -1040,7 +1094,7 @@ const LiveControlPage = () => {
             tabIndex={0}
             onPointerDown={(e) => {
               e.preventDefault();
-              startDividerDrag(e.clientY);
+              startDividerDrag(e.pointerId, e.clientY);
             }}
             onKeyDown={(e) => {
               if (e.key === "ArrowUp") moveTitlesShare(-0.05);
