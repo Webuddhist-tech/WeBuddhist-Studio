@@ -18,12 +18,25 @@ const {
   fetchLiturgies: vi.fn(),
   fetchTextEditions: vi.fn(),
   fetchRecitationDetails: vi.fn(),
-  publishPosition: vi.fn(
-    async (): Promise<{ ok: boolean; message?: string }> => ({ ok: true }),
-  ),
-  endRecitationSession: vi.fn(
-    async (): Promise<{ ok: boolean; message?: string }> => ({ ok: true }),
-  ),
+  // Typed as the api is called, so a test can read the cue it was given.
+  publishPosition: vi.fn<
+    (
+      eventId: string,
+      token: string,
+      position: {
+        textId: string;
+        segmentId: string;
+        index: number;
+        roundNumber: number;
+      },
+    ) => Promise<{ ok: boolean; message?: string }>
+  >(async () => ({ ok: true })),
+  endRecitationSession: vi.fn<
+    (
+      eventId: string,
+      token: string,
+    ) => Promise<{ ok: boolean; message?: string }>
+  >(async () => ({ ok: true })),
   fetchEditionSections: vi.fn(),
 }));
 
@@ -284,6 +297,79 @@ describe("LiveControlPage", () => {
     expect(inFlight).toBe(2);
     expect(order.slice(0, 2).sort()).toEqual(["root-en", "root-zh"]);
     expect(order[2]).toBe("root");
+  });
+
+  it("sends the edition on screen again when a translation is ticked on the line being read", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("recitation_emit_token", "tok-123");
+    const order: string[] = [];
+    publishPosition.mockImplementation(
+      async (_eventId: string, _token: string, cue: { textId: string }) => {
+        order.push(cue.textId);
+        return { ok: true };
+      },
+    );
+
+    renderPage();
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
+    await pressKey("Space");
+    await waitFor(() => expect(order).toEqual(["root"]));
+
+    await user.click(
+      screen.getByRole("checkbox", { name: "Follow Praise (en)" }),
+    );
+    await waitFor(() =>
+      expect(fetchRecitationDetails).toHaveBeenCalledWith("root-en", "en"),
+    );
+    // The same line again, now with a translation following it. The room already
+    // has the line being read, but it has to be posted again behind the
+    // translation: the event keeps only the last position it accepted.
+    await user.click(screen.getByText("root line 1"));
+
+    await waitFor(() => expect(order).toEqual(["root", "root-en", "root"]));
+    expect(publishPosition).toHaveBeenLastCalledWith("e1", "tok-123", {
+      textId: "root",
+      segmentId: "root-s1",
+      index: 0,
+      roundNumber: 1,
+    });
+  });
+
+  it("drops a move made while the session is being ended", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("recitation_emit_token", "tok-123");
+    const events: string[] = [];
+    let releaseFirst: () => void = () => {};
+    const firstHeld = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let calls = 0;
+    publishPosition.mockImplementation(
+      async (_eventId: string, _token: string, cue: { segmentId: string }) => {
+        calls += 1;
+        events.push(`publish ${cue.segmentId}`);
+        if (calls === 1) await firstHeld;
+        return { ok: true };
+      },
+    );
+    endRecitationSession.mockImplementation(async () => {
+      events.push("end");
+      return { ok: true };
+    });
+
+    renderPage();
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+    await pressKey("Space"); // on the wire, held
+    await user.click(screen.getByText("End session"));
+    // Pressed after End session, while the held move is still being waited on.
+    await pressKey("Space");
+    await act(async () => {
+      releaseFirst();
+    });
+
+    await waitFor(() => expect(endRecitationSession).toHaveBeenCalled());
+    expect(events).toEqual(["publish root-s1", "end"]);
   });
 
   it("stops moving an edition once it is unticked", async () => {

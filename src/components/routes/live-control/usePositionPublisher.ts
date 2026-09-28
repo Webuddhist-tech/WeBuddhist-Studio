@@ -48,8 +48,10 @@ export interface UsePositionPublisherResult {
  *
  * Sent positions are remembered per text, so an edition the room refused is
  * retried on the next move of that same line while the others are not published
- * twice. A move to a different line supersedes it: the operator has moved on,
- * and the room is better off on the line being read than on the one it missed.
+ * twice - except the edition on screen, which is sent again behind any follower
+ * so that the room is left on it. A move to a different line supersedes a
+ * refused position: the operator has moved on, and the room is better off on the
+ * line being read than on the one it missed.
  */
 export function usePositionPublisher(
   eventId: string | undefined,
@@ -66,6 +68,8 @@ export function usePositionPublisher(
   const pumpRef = useRef<Promise<void> | null>(null);
   /** Per text, the last position the room accepted, so it is not sent twice. */
   const sentKeysRef = useRef<Record<string, string>>({});
+  /** Set while a session is being ended, so no later move overtakes the end. */
+  const endingRef = useRef(false);
   const tokenRef = useRef(token);
   tokenRef.current = token;
   const mountedRef = useRef(true);
@@ -109,7 +113,13 @@ export function usePositionPublisher(
         // event is left holding.
         const driverTextId = cues[0].textId;
         const followers = pending.filter((cue) => cue.textId !== driverTextId);
-        const leaders = pending.filter((cue) => cue.textId === driverTextId);
+        // Whenever a follower is published, the leading edition is published
+        // behind it even if the room already took it: ticking another edition on
+        // the line being read would otherwise send the follower alone, and the
+        // event would be left holding that translation's segment.
+        const leaders = (followers.length > 0 ? cues : pending).filter(
+          (cue) => cue.textId === driverTextId,
+        );
 
         const sent: { cue: PositionToPublish; result: PublishResult }[] = [];
         if (followers.length > 0) {
@@ -172,6 +182,9 @@ export function usePositionPublisher(
         setNotice("Paste the emit token before driving the room.");
         return;
       }
+      // The operator has closed the session: a move made while the end request
+      // is being waited on must not follow it out to the room.
+      if (endingRef.current) return;
       targetRef.current = cues;
       // A pump already running will take this target on its next turn; starting
       // a second one would only find the first holding the lock.
@@ -185,25 +198,33 @@ export function usePositionPublisher(
       setNotice("Paste the emit token before driving the room.");
       return;
     }
-    // Drop whatever is queued and let the move already on the wire finish
-    // first. A position accepted after the end request would leave the room
-    // following a session the operator has closed, and its "publishing" would
-    // replace the notice saying the recitation is over.
-    targetRef.current = null;
-    if (pumpRef.current) {
-      await pumpRef.current;
+    // Drop whatever is queued, take no further move, and let the one already on
+    // the wire finish first. A position accepted after the end request would
+    // leave the room following a session the operator has closed, and its
+    // "publishing" would replace the notice saying the recitation is over - and
+    // the operator pressing Next during the wait must not smuggle one out.
+    endingRef.current = true;
+    try {
+      targetRef.current = null;
+      if (pumpRef.current) {
+        await pumpRef.current;
+        if (!mountedRef.current) return;
+      }
+      const result = await endRecitationSession(eventId, tokenRef.current);
       if (!mountedRef.current) return;
-    }
-    const result = await endRecitationSession(eventId, tokenRef.current);
-    if (!mountedRef.current) return;
-    if (result.ok) {
-      setState("idle");
-      setNotice("This recitation session has ended.");
-      setLastSent(null);
-      sentKeysRef.current = {};
-    } else {
-      setState("error");
-      setNotice(result.message);
+      if (result.ok) {
+        setState("idle");
+        setNotice("This recitation session has ended.");
+        setLastSent(null);
+        sentKeysRef.current = {};
+      } else {
+        setState("error");
+        setNotice(result.message);
+      }
+    } finally {
+      // An end that did not land leaves the operator driving, so moves are
+      // taken again.
+      endingRef.current = false;
     }
   }, [eventId]);
 
