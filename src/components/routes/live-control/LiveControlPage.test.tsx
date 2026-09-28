@@ -1,7 +1,13 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import LiveControlPage from "./LiveControlPage";
 import type { RecitationDetails } from "./api/liveControlApi";
 
@@ -130,6 +136,14 @@ const openTextByName = async (
   );
 };
 
+/** The sizes the page draws its lines, and its titles, at. */
+const textScaleOnPage = () =>
+  document.querySelector("[data-text-scale]")?.getAttribute("data-text-scale");
+const titlesScaleOnPage = () =>
+  document
+    .querySelector("[data-titles-scale]")
+    ?.getAttribute("data-titles-scale");
+
 const pressKey = async (code: string) => {
   await act(async () => {
     document.body.dispatchEvent(
@@ -232,34 +246,95 @@ describe("LiveControlPage", () => {
     expect(fetchRecitationDetails).not.toHaveBeenCalledWith("root-fr", "fr");
   });
 
-  it("sizes the titles and remembers the size in this browser", async () => {
+  it("sizes the lines and remembers the size in this browser", async () => {
     const user = userEvent.setup();
     renderPage();
     expect(
       await screen.findByRole("button", { name: "Refuge" }),
     ).toBeInTheDocument();
-    expect(titlesPanel().style.getPropertyValue("--title-scale")).toBe("1");
+    expect(textScaleOnPage()).toBe("1");
 
-    await user.click(screen.getByRole("button", { name: "Larger titles" }));
-    expect(titlesPanel().style.getPropertyValue("--title-scale")).toBe("1.15");
-    expect(localStorage.getItem("live-control-title-scale")).toBe("1.15");
+    const picker = screen.getByRole("combobox", { name: "Text size" });
+    await user.selectOptions(picker, "120%");
+    expect(textScaleOnPage()).toBe("1.2");
+    expect(localStorage.getItem("live-control-text-scale")).toBe("1.2");
 
-    await user.click(screen.getByRole("button", { name: "Smaller titles" }));
-    await user.click(screen.getByRole("button", { name: "Smaller titles" }));
-    expect(localStorage.getItem("live-control-title-scale")).toBe("0.85");
-    // The smallest size goes no further.
-    expect(
-      screen.getByRole("button", { name: "Smaller titles" }),
-    ).toBeDisabled();
+    await user.selectOptions(picker, "30%");
+    expect(localStorage.getItem("live-control-text-scale")).toBe("0.3");
+    expect(picker).toHaveValue("0.3");
+    // Nothing smaller than 30% or larger than 150% is offered.
+    const offered = Array.from(
+      picker.querySelectorAll("option"),
+      (option) => option.textContent,
+    );
+    expect(offered[0]).toBe("30%");
+    expect(offered[offered.length - 1]).toBe("150%");
+    expect(offered).toHaveLength(13);
   });
 
-  it("opens with the title size saved in this browser", async () => {
-    localStorage.setItem("live-control-title-scale", "1.5");
+  it("sizes the titles on their own, remembered apart from the text", async () => {
+    const user = userEvent.setup();
     renderPage();
     expect(
       await screen.findByRole("button", { name: "Refuge" }),
     ).toBeInTheDocument();
-    expect(titlesPanel().style.getPropertyValue("--title-scale")).toBe("1.5");
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Title size" }),
+      "150%",
+    );
+
+    expect(titlesScaleOnPage()).toBe("1.5");
+    expect(textScaleOnPage()).toBe("1");
+    expect(localStorage.getItem("live-control-titles-scale")).toBe("1.5");
+    expect(localStorage.getItem("live-control-text-scale")).toBeNull();
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Text size" }),
+      "80%",
+    );
+    expect(titlesScaleOnPage()).toBe("1.5");
+    expect(textScaleOnPage()).toBe("0.8");
+  });
+
+  it("moves a size saved from the older steps onto the nearest one", async () => {
+    localStorage.setItem("live-control-text-scale", "1.75");
+    localStorage.setItem("live-control-titles-scale", "0.85");
+    renderPage();
+    expect(
+      await screen.findByRole("button", { name: "Refuge" }),
+    ).toBeInTheDocument();
+
+    expect(textScaleOnPage()).toBe("1.5");
+    expect(["0.8", "0.9"]).toContain(titlesScaleOnPage());
+  });
+
+  it("opens with each pane at the size saved in this browser", async () => {
+    localStorage.setItem("live-control-text-scale", "1.3");
+    localStorage.setItem("live-control-titles-scale", "0.4");
+    renderPage();
+    expect(
+      await screen.findByRole("button", { name: "Refuge" }),
+    ).toBeInTheDocument();
+
+    expect(screen.getByRole("combobox", { name: "Text size" })).toHaveValue(
+      "1.3",
+    );
+    expect(screen.getByRole("combobox", { name: "Title size" })).toHaveValue(
+      "0.4",
+    );
+  });
+
+  it("opens with the text size saved in this browser", async () => {
+    localStorage.setItem("live-control-text-scale", "1.5");
+    renderPage();
+    expect(
+      await screen.findByRole("button", { name: "Refuge" }),
+    ).toBeInTheDocument();
+    expect(textScaleOnPage()).toBe("1.5");
+    expect(screen.getByRole("combobox", { name: "Text size" })).toHaveValue(
+      "1.5",
+    );
   });
 
   it("loads a pasted text id and its translations", async () => {
@@ -1063,7 +1138,7 @@ describe("LiveControlPage", () => {
       );
       scrollIntoView.mockClear();
 
-      await user.click(screen.getByRole("button", { name: "Titles" }));
+      await user.click(screen.getByRole("button", { name: "Show titles" }));
 
       expect(scrollIntoView).toHaveBeenCalled();
     });
@@ -1080,96 +1155,122 @@ describe("LiveControlPage", () => {
   // enough to take a fresh finger, and finding the place, titles and text packed
   // on the one screen. The layout is the stylesheet's work; what is tested here
   // is that the modes are switchable and that neither takes the driving away.
-  describe("cruise and find", () => {
-    it("opens in cruise and switches to find", async () => {
+  describe("titles and the divider", () => {
+    it("shows and hides the titles with one button", async () => {
       const user = userEvent.setup();
       renderPage();
 
       expect(await screen.findByText("root line 1")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Cruise" })).toHaveAttribute(
-        "aria-pressed",
-        "true",
-      );
-
-      await user.click(screen.getByRole("button", { name: "Find" }));
-
-      expect(screen.getByRole("button", { name: "Find" })).toHaveAttribute(
-        "aria-pressed",
-        "true",
-      );
-      expect(screen.getByRole("button", { name: "Cruise" })).toHaveAttribute(
-        "aria-pressed",
-        "false",
-      );
-    });
-
-    it("still moves the room in find mode", async () => {
-      const user = userEvent.setup();
-      localStorage.setItem("recitation_emit_token", "tok-123");
-      renderPage();
-
-      expect(await screen.findByText("root line 1")).toBeInTheDocument();
-      await user.click(screen.getByRole("button", { name: "Find" }));
-      await user.click(screen.getByRole("button", { name: "Next →" }));
-
-      await waitFor(() =>
-        expect(publishPosition).toHaveBeenCalledWith("e1", "tok-123", {
-          textId: "root",
-          segmentId: "root-s1",
-          index: 0,
-          roundNumber: 1,
-        }),
-      );
-    });
-
-    it("peeks at the titles without leaving cruise", async () => {
-      const user = userEvent.setup();
-      renderPage();
-
-      expect(await screen.findByText("root line 1")).toBeInTheDocument();
-      // Cruise gives a phone's height to the text, so the titles start folded.
+      // A phone opens on the text alone.
       expect(titlesPanel()).toHaveAttribute("data-titles", "folded");
-
-      await user.click(screen.getByRole("button", { name: "Titles" }));
-      expect(titlesPanel()).toHaveAttribute("data-titles", "unfolded");
       expect(
-        screen.getByRole("button", { name: "Hide titles" }),
-      ).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Cruise" })).toHaveAttribute(
-        "aria-pressed",
-        "true",
-      );
+        screen.queryByRole("button", { name: "Cruise" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "Find" }),
+      ).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Show titles" }));
+      expect(titlesPanel()).toHaveAttribute("data-titles", "unfolded");
 
       await user.click(screen.getByRole("button", { name: "Hide titles" }));
       expect(titlesPanel()).toHaveAttribute("data-titles", "folded");
-      expect(
-        screen.getByRole("button", { name: "Titles" }),
-      ).toBeInTheDocument();
     });
 
-    it("unfolds the titles for find mode and folds them again for cruise", async () => {
-      const user = userEvent.setup();
-      renderPage();
-
-      expect(await screen.findByText("root line 1")).toBeInTheDocument();
-
-      await user.click(screen.getByRole("button", { name: "Find" }));
-      expect(titlesPanel()).toHaveAttribute("data-titles", "unfolded");
-
-      await user.click(screen.getByRole("button", { name: "Cruise" }));
-      expect(titlesPanel()).toHaveAttribute("data-titles", "folded");
+    it("opens with the titles on a wide screen", async () => {
+      const matchMedia = vi.fn(() => ({ matches: true }));
+      vi.stubGlobal("matchMedia", matchMedia);
+      try {
+        renderPage();
+        expect(await screen.findByText("root line 1")).toBeInTheDocument();
+        expect(titlesPanel()).toHaveAttribute("data-titles", "unfolded");
+        expect(matchMedia).toHaveBeenCalledWith("(min-width: 1024px)");
+      } finally {
+        vi.unstubAllGlobals();
+      }
     });
 
-    it("folds the titles away again after a jump taken from the peek", async () => {
+    it("keeps the titles up after a jump taken from them", async () => {
       const user = userEvent.setup();
       localStorage.setItem("recitation_emit_token", "tok-123");
       renderPage();
 
       expect(await screen.findByText("root line 1")).toBeInTheDocument();
-      await user.click(screen.getByRole("button", { name: "Titles" }));
+      await user.click(screen.getByRole("button", { name: "Show titles" }));
       await user.click(screen.getByRole("button", { name: "Refuge" }));
 
-      expect(titlesPanel()).toHaveAttribute("data-titles", "folded");
+      expect(titlesPanel()).toHaveAttribute("data-titles", "unfolded");
+    });
+
+    it("drags the divider to split the height, and remembers the split", async () => {
+      const user = userEvent.setup();
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Show titles" }));
+
+      const divider = screen.getByRole("separator", { name: "Resize titles" });
+      expect(divider).toHaveAttribute("aria-valuenow", "35");
+      // The area the divider splits: 1000px tall, from the top of the screen.
+      const area = divider.parentElement as HTMLElement;
+      area.getBoundingClientRect = () => ({ top: 0, height: 1000 }) as DOMRect;
+
+      // jsdom has no PointerEvent, so one is made from a mouse event to carry
+      // where the finger is.
+      class TestPointerEvent extends MouseEvent {
+        pointerId: number;
+        constructor(type: string, init: PointerEventInit = {}) {
+          super(type, init);
+          this.pointerId = init.pointerId ?? 0;
+        }
+      }
+      vi.stubGlobal("PointerEvent", TestPointerEvent);
+      onTestFinished(() => {
+        vi.unstubAllGlobals();
+      });
+
+      // The finger goes down on the divider and is followed wherever it goes.
+      fireEvent.pointerDown(divider, { clientY: 350, pointerId: 1 });
+      fireEvent.pointerMove(window, { clientY: 420, pointerId: 1 });
+      fireEvent.pointerMove(window, { clientY: 500, pointerId: 1 });
+      expect(localStorage.getItem("live-control-titles-share")).toBeNull();
+      fireEvent.pointerUp(window, { clientY: 500, pointerId: 1 });
+
+      expect(divider).toHaveAttribute("aria-valuenow", "50");
+      expect(area.style.getPropertyValue("--titles-share")).toBe("0.5");
+      expect(localStorage.getItem("live-control-titles-share")).toBe("0.500");
+
+      // Never so far that either side is lost.
+      fireEvent.pointerDown(divider, { clientY: 500, pointerId: 1 });
+      fireEvent.pointerMove(window, { clientY: 990, pointerId: 1 });
+      fireEvent.pointerUp(window, { clientY: 990, pointerId: 1 });
+      expect(divider).toHaveAttribute("aria-valuenow", "70");
+    });
+
+    it("moves the divider from the keyboard without moving the room", async () => {
+      const user = userEvent.setup();
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Show titles" }));
+
+      const divider = screen.getByRole("separator", { name: "Resize titles" });
+      divider.focus();
+      await user.keyboard("{ArrowDown}");
+
+      expect(divider).toHaveAttribute("aria-valuenow", "40");
+      expect(publishPosition).not.toHaveBeenCalled();
+    });
+
+    it("opens with the split saved in this browser", async () => {
+      const user = userEvent.setup();
+      localStorage.setItem("live-control-titles-share", "0.6");
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Show titles" }));
+
+      expect(
+        screen.getByRole("separator", { name: "Resize titles" }),
+      ).toHaveAttribute("aria-valuenow", "60");
     });
 
     it("opens the text box on a phone when the event has no liturgies", async () => {

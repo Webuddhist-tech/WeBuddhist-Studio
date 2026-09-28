@@ -59,23 +59,34 @@ const DEFAULT_FOLLOWED_LANGUAGES = ["bo", "en", "zh"];
 const followedByDefault = (edition: TextEdition) =>
   DEFAULT_FOLLOWED_LANGUAGES.includes(edition.language.split(/[-_]/)[0]);
 
-/** How big the liturgy and section titles are drawn, relative to the default.
- * Kept per browser, like the token: it suits the screen, not the event. */
-const TITLE_SCALES = [0.85, 1, 1.15, 1.3, 1.5, 1.75];
-const TITLE_SCALE_STORAGE_KEY = "live-control-title-scale";
+/** How big the recitation lines, and separately the liturgy and section
+ * titles, are drawn relative to the default. Each is kept per browser, like the
+ * token: it suits the screen and the reader's eyes, not the event. */
+/** 30% to 150%, a tenth at a time. */
+const TEXT_SCALES = Array.from(
+  { length: 13 },
+  (_, step) => (30 + step * 10) / 100,
+);
+const TEXT_SCALE_STORAGE_KEY = "live-control-text-scale";
+const TITLES_SCALE_STORAGE_KEY = "live-control-titles-scale";
 
-const readStoredTitleScale = (): number => {
+const readStoredScale = (key: string): number => {
   try {
-    const stored = Number(localStorage.getItem(TITLE_SCALE_STORAGE_KEY));
-    return TITLE_SCALES.includes(stored) ? stored : 1;
+    const raw = localStorage.getItem(key);
+    const stored = raw === null ? NaN : Number(raw);
+    if (!Number.isFinite(stored) || stored <= 0) return 1;
+    // A size saved from an older list of steps lands on the nearest step.
+    return TEXT_SCALES.reduce((nearest, scale) =>
+      Math.abs(scale - stored) < Math.abs(nearest - stored) ? scale : nearest,
+    );
   } catch {
     return 1;
   }
 };
 
-const storeTitleScale = (scale: number) => {
+const storeScale = (key: string, scale: number) => {
   try {
-    localStorage.setItem(TITLE_SCALE_STORAGE_KEY, String(scale));
+    localStorage.setItem(key, String(scale));
   } catch {
     // Blocked site data: the size holds for this session only.
   }
@@ -121,6 +132,43 @@ const storeRecentTexts = (texts: RecentText[]) => {
   }
 };
 
+/** How much of an upright phone's height the titles take, above the lines.
+ * The operator drags the divider to set it; it is kept per browser. */
+const TITLES_SHARE_DEFAULT = 0.35;
+const TITLES_SHARE_MIN = 0.12;
+const TITLES_SHARE_MAX = 0.7;
+const TITLES_SHARE_STORAGE_KEY = "live-control-titles-share";
+
+const clampTitlesShare = (share: number) =>
+  Math.min(TITLES_SHARE_MAX, Math.max(TITLES_SHARE_MIN, share));
+
+const readStoredTitlesShare = (): number => {
+  try {
+    const stored = Number(localStorage.getItem(TITLES_SHARE_STORAGE_KEY));
+    return stored > 0 ? clampTitlesShare(stored) : TITLES_SHARE_DEFAULT;
+  } catch {
+    return TITLES_SHARE_DEFAULT;
+  }
+};
+
+const storeTitlesShare = (share: number) => {
+  try {
+    localStorage.setItem(TITLES_SHARE_STORAGE_KEY, share.toFixed(3));
+  } catch {
+    // Blocked site data: the split holds for this session only.
+  }
+};
+
+/** A wide screen opens with the titles beside the text; a phone opens on the
+ * text alone and shows the titles when asked. */
+const opensWithTitles = () => {
+  try {
+    return window.matchMedia("(min-width: 1024px)").matches;
+  } catch {
+    return false;
+  }
+};
+
 /** Shortcuts drive the liturgy, so they stay off fields and off the controls:
  * Space on "Next" or the token box must do what that control does. Lines are
  * buttons too; those keep the shortcuts. */
@@ -130,6 +178,7 @@ const allowsShortcut = (target: EventTarget | null) => {
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return false;
   if (target.isContentEditable) return false;
   if (target.closest("[data-line]")) return true;
+  if (target.closest("[role='separator']")) return false;
   if (target.closest("button, a, [role='button']")) return false;
   return true;
 };
@@ -159,22 +208,23 @@ const LiveControlPage = () => {
   const [currentIndex, setCurrentIndex] = useState(-1);
   const [round, setRound] = useState(1);
   const [loadError, setLoadError] = useState<string | null>(null);
-  /**
-   * The page is used two ways. Cruise: the operator only taps Next, so the
-   * button has to be big enough to take a fresh finger each time, and the lines
-   * are read at arm's length. Find: they have lost the place, so as many titles
-   * and lines as will fit go on the glass at once.
-   */
-  const [mode, setMode] = useState<"cruise" | "find">("cruise");
-  /** Cruise keeps the titles off a phone screen; this peeks at them in place. */
-  const [navOpen, setNavOpen] = useState(false);
+  /** The liturgy and section titles, shown or put away with one button. */
+  const [navOpen, setNavOpen] = useState(() => opensWithTitles());
+  /** An upright phone's split between the titles and the lines. */
+  const [titlesShare, setTitlesShare] = useState(() => readStoredTitlesShare());
   /** Adding a text and ticking editions is setup, not driving: on a phone it
    * stays folded so the titles get the height. */
   const [setupOpen, setSetupOpen] = useState(false);
-  const [titleScale, setTitleScale] = useState(() => readStoredTitleScale());
-  const cruise = mode === "cruise";
+  const [textScale, setTextScale] = useState(() =>
+    readStoredScale(TEXT_SCALE_STORAGE_KEY),
+  );
+  const [titlesScale, setTitlesScale] = useState(() =>
+    readStoredScale(TITLES_SCALE_STORAGE_KEY),
+  );
 
   const listRef = useRef<HTMLDivElement | null>(null);
+  /** The titles-and-lines area the divider splits. */
+  const splitRef = useRef<HTMLDivElement | null>(null);
   const sectionListRef = useRef<HTMLDivElement | null>(null);
   /** Editions already asked for, so nothing is fetched twice. */
   const requestedRef = useRef<Set<string>>(new Set());
@@ -203,9 +253,8 @@ const LiveControlPage = () => {
     !sourceTextId &&
     (!event?.collectionId ||
       (liturgies !== undefined && liturgies.length === 0));
-  /** Whether a phone has the titles unfolded. A wide screen shows them either
-   * way, so this is the fold, not what is on screen. */
-  const titlesUnfolded = !cruise || navOpen || needsText;
+  /** Whether the titles are on screen. */
+  const titlesUnfolded = navOpen || needsText;
   const setupUnfolded = setupOpen || needsText;
 
   // A text and its translations are separate library texts, each with its own
@@ -370,7 +419,7 @@ const LiveControlPage = () => {
 
   // Keep the live section in view, as the line list does: a long outline scrolls
   // past the operator's place otherwise. An element in a folded panel has no box
-  // to scroll, so every move made while cruise had the titles away was a no-op:
+  // to scroll, so every move made while the titles were away was a no-op:
   // unfolding runs this again, or the peek opens where the outline was left.
   useEffect(() => {
     if (!activeSectionId) return;
@@ -619,35 +668,99 @@ const LiveControlPage = () => {
       ? `${loaded.length} lines — does not line up`
       : `${loaded.length} lines`;
   };
-  /** One type scale per mode, for the lines and the return jumps between them:
-   * cruise is read from a cushion, find is read leaning over the book. */
-  const changeTitleScale = (delta: number) => {
-    const at = TITLE_SCALES.indexOf(titleScale);
-    const next =
-      TITLE_SCALES[Math.min(TITLE_SCALES.length - 1, Math.max(0, at + delta))];
-    setTitleScale(next);
-    storeTitleScale(next);
+  /**
+   * Dragging the divider: the titles end where the finger is. The drag is
+   * followed on the window rather than the handle, so a finger that slides off
+   * the thin divider keeps dragging, and the split is saved once it lets go.
+   */
+  const startDividerDrag = (startY: number) => {
+    const shareAt = (clientY: number) => {
+      const box = splitRef.current?.getBoundingClientRect();
+      if (!box || box.height <= 0 || !Number.isFinite(clientY)) return null;
+      return clampTitlesShare((clientY - box.top) / box.height);
+    };
+    let latest = shareAt(startY);
+    if (latest !== null) setTitlesShare(latest);
+    const onMove = (moveEvent: PointerEvent) => {
+      const share = shareAt(moveEvent.clientY);
+      if (share === null) return;
+      latest = share;
+      setTitlesShare(share);
+    };
+    const onEnd = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onEnd);
+      window.removeEventListener("pointercancel", onEnd);
+      if (latest !== null) storeTitlesShare(latest);
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onEnd);
+    window.addEventListener("pointercancel", onEnd);
   };
-  const lineClass = cruise
-    ? "px-1.5 py-1 text-[26px] leading-[1.6] lg:text-[23px] lg:leading-[1.7]"
-    : "px-1.5 py-0.5 text-[15px] leading-[1.45] lg:text-[17px] lg:leading-[1.55]";
-  const modeButton = (active: boolean) =>
-    `cursor-pointer px-3 py-1.5 text-[13px] font-semibold max-lg:px-2.5 ${
-      active ? "bg-[#e5231c] text-white" : "text-[#8e8e93] hover:bg-[#1a1a1c]"
-    }`;
+  const moveTitlesShare = (delta: number) => {
+    const next = clampTitlesShare(titlesShare + delta);
+    setTitlesShare(next);
+    storeTitlesShare(next);
+  };
+
+  const changeTextScale = (scale: number) => {
+    if (!TEXT_SCALES.includes(scale)) return;
+    setTextScale(scale);
+    storeScale(TEXT_SCALE_STORAGE_KEY, scale);
+  };
+  const changeTitlesScale = (scale: number) => {
+    if (!TEXT_SCALES.includes(scale)) return;
+    setTitlesScale(scale);
+    storeScale(TITLES_SCALE_STORAGE_KEY, scale);
+  };
+  /** The lines are read at arm's length, from a cushion. The titles start at
+   * the same size, and each pane is then sized on its own. */
+  const lineClass =
+    "px-1.5 py-1 text-[calc(26px*var(--text-scale))] leading-[1.6] lg:text-[calc(23px*var(--text-scale))] lg:leading-[1.7]";
+  const titleSize =
+    "text-[calc(26px*var(--titles-scale))] leading-[1.6] lg:text-[calc(23px*var(--titles-scale))] lg:leading-[1.7]";
+  const sizePicker = (
+    label: string,
+    value: number,
+    onChange: (scale: number) => void,
+  ) => (
+    <select
+      aria-label={label}
+      value={value}
+      onChange={(e) => onChange(Number(e.target.value))}
+      className="cursor-pointer rounded-md border border-[#2c2c2e] bg-[#1c1c1e] px-2 py-1.5 text-[13px] font-semibold text-[#f2f2f7] max-lg:py-1 max-lg:text-base"
+    >
+      {TEXT_SCALES.map((scale) => (
+        <option key={scale} value={scale}>
+          {Math.round(scale * 100)}%
+        </option>
+      ))}
+    </select>
+  );
 
   return (
     // A phone must not zoom on a quick second tap of Next, nor reload the page
     // when the operator drags down past the first line mid-puja.
-    <div className="flex h-[100dvh] touch-manipulation flex-col overflow-hidden bg-black font-sans text-[#f2f2f7]">
+    <div
+      data-text-scale={textScale}
+      data-titles-scale={titlesScale}
+      style={{
+        ["--text-scale" as string]: textScale,
+        ["--titles-scale" as string]: titlesScale,
+      }}
+      className="flex h-[100dvh] touch-manipulation flex-col overflow-hidden bg-black font-tibetan-ui text-[#f2f2f7]"
+    >
       {/* A wide screen and a phone held sideways put the titles beside the text;
        * a phone held upright puts them above it, on a strip of the height. */}
-      <div className="flex min-h-0 flex-1 flex-row max-lg:portrait:flex-col">
+      <div
+        ref={splitRef}
+        style={{ ["--titles-share" as string]: titlesShare }}
+        className="flex min-h-0 flex-1 flex-row max-lg:portrait:flex-col"
+      >
         <aside
           data-titles={titlesUnfolded ? "unfolded" : "folded"}
-          style={{ ["--title-scale" as string]: titleScale }}
-          className={`w-[320px] shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-[#2c2c2e] px-3 py-4 max-lg:w-[212px] max-lg:px-2 max-lg:py-2 max-lg:portrait:max-h-[42vh] max-lg:portrait:w-full max-lg:portrait:border-r-0 max-lg:portrait:border-b ${
-            titlesUnfolded ? "flex" : "hidden lg:flex"
+          className={`w-[320px] shrink-0 flex-col overflow-y-auto overscroll-contain border-r border-[#2c2c2e] px-3 py-4 max-lg:w-[212px] max-lg:px-2 max-lg:py-2 max-lg:portrait:h-[calc(var(--titles-share)*100%)] max-lg:portrait:w-full max-lg:portrait:border-r-0 ${
+            titlesUnfolded ? "flex" : "hidden"
           }`}
         >
           <div className="mb-2 flex items-center gap-3 border-b border-[#2c2c2e] px-2 pt-1 pb-4 max-lg:hidden">
@@ -659,28 +772,12 @@ const LiveControlPage = () => {
             </div>
           </div>
 
+          {/* The titles are sized on their own, where they are read. */}
           {order.length > 0 || sections.length > 0 ? (
-            <div className="mx-2 mb-2 flex items-center gap-1.5 text-[12px] tracking-[0.08em] text-[#8e8e93] uppercase max-lg:mx-1 max-lg:mb-1">
+            <label className="mx-2 mb-2 flex shrink-0 items-center gap-2 text-[12px] tracking-[0.08em] text-[#8e8e93] uppercase max-lg:mx-1 max-lg:mb-1">
               <span className="mr-auto">Title size</span>
-              <button
-                type="button"
-                aria-label="Smaller titles"
-                onClick={() => changeTitleScale(-1)}
-                disabled={titleScale === TITLE_SCALES[0]}
-                className="h-8 w-9 cursor-pointer rounded-md bg-[#2c2c2e] text-[13px] font-semibold text-[#f2f2f7] normal-case hover:bg-[#3a3a3c] disabled:cursor-default disabled:opacity-40"
-              >
-                A−
-              </button>
-              <button
-                type="button"
-                aria-label="Larger titles"
-                onClick={() => changeTitleScale(1)}
-                disabled={titleScale === TITLE_SCALES[TITLE_SCALES.length - 1]}
-                className="h-8 w-9 cursor-pointer rounded-md bg-[#2c2c2e] text-[16px] font-semibold text-[#f2f2f7] normal-case hover:bg-[#3a3a3c] disabled:cursor-default disabled:opacity-40"
-              >
-                A+
-              </button>
-            </div>
+              {sizePicker("Title size", titlesScale, changeTitlesScale)}
+            </label>
           ) : null}
 
           {order.length > 0 ? (
@@ -688,16 +785,15 @@ const LiveControlPage = () => {
               <h2 className="mx-2 mt-1 mb-3 text-[13px] tracking-[0.1em] text-[#8e8e93] uppercase max-lg:mx-1 max-lg:mb-1">
                 Liturgies
               </h2>
-              <div className="max-lg:portrait:grid max-lg:portrait:grid-cols-2 max-lg:portrait:gap-x-2">
+              <div>
                 {order.map((item) => (
                   <button
                     key={item.textId}
                     type="button"
                     onClick={() => {
                       openWork(item.textId);
-                      if (cruise) setNavOpen(false);
                     }}
-                    className={`mb-0.5 block w-full cursor-pointer rounded-[7px] px-3 py-2.5 text-left text-[calc(15px*var(--title-scale))] leading-relaxed max-lg:line-clamp-2 max-lg:px-2 max-lg:py-1 max-lg:text-[calc(13px*var(--title-scale))] max-lg:leading-snug ${
+                    className={`mb-0.5 block w-full cursor-pointer rounded-[7px] px-3 py-1.5 text-left ${titleSize} [overflow-wrap:anywhere] max-lg:px-2 max-lg:py-1 ${
                       item.textId === sourceTextId
                         ? "bg-[#e5231c] text-white"
                         : "text-[#8e8e93] hover:bg-[#1a1a1c]"
@@ -715,10 +811,7 @@ const LiveControlPage = () => {
               <h2 className="mx-2 mt-5 mb-2 text-[13px] tracking-[0.1em] text-[#8e8e93] uppercase max-lg:mx-1 max-lg:mt-2 max-lg:mb-1">
                 Sections
               </h2>
-              <div
-                ref={sectionListRef}
-                className="max-lg:portrait:grid max-lg:portrait:grid-cols-2 max-lg:portrait:gap-x-2"
-              >
+              <div ref={sectionListRef}>
                 {sections.map((section) => {
                   const isActive = section.id === activeSectionId;
                   const reachable = section.lineIndex >= 0;
@@ -731,14 +824,13 @@ const LiveControlPage = () => {
                       title={reachable ? undefined : "No segment to go to"}
                       onClick={() => {
                         jump(section.lineIndex);
-                        if (cruise) setNavOpen(false);
                       }}
                       // Outlines nest deeply - six levels is ordinary - so the
                       // indent stops after three and the titles keep their width.
                       style={{
                         paddingLeft: 12 + Math.min(section.depth, 3) * 12,
                       }}
-                      className={`mb-0.5 block w-full rounded-[7px] py-2.5 pr-3 text-left text-[calc(15px*var(--title-scale))] leading-relaxed max-lg:line-clamp-2 max-lg:py-1 max-lg:text-[calc(13px*var(--title-scale))] max-lg:leading-snug ${
+                      className={`mb-0.5 block w-full rounded-[7px] py-1.5 pr-3 text-left ${titleSize} [overflow-wrap:anywhere] max-lg:py-1 ${
                         isActive
                           ? "bg-[#e5231c] text-white"
                           : reachable
@@ -913,43 +1005,49 @@ const LiveControlPage = () => {
           </div>
         </aside>
 
+        {/* An upright phone stacks the titles over the lines; this divider
+         * between them is dragged to give either one more of the height. */}
+        {titlesUnfolded ? (
+          <div
+            role="separator"
+            aria-orientation="horizontal"
+            aria-label="Resize titles"
+            aria-valuemin={Math.round(TITLES_SHARE_MIN * 100)}
+            aria-valuemax={Math.round(TITLES_SHARE_MAX * 100)}
+            aria-valuenow={Math.round(titlesShare * 100)}
+            tabIndex={0}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              startDividerDrag(e.clientY);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowUp") moveTitlesShare(-0.05);
+              if (e.key === "ArrowDown") moveTitlesShare(0.05);
+            }}
+            className="hidden h-5 shrink-0 cursor-row-resize touch-none items-center justify-center border-y border-[#2c2c2e] bg-[#111113] select-none max-lg:portrait:flex"
+          >
+            <span className="h-1 w-12 rounded-full bg-[#5a5a5f]" />
+          </div>
+        ) : null}
+
         <main className="flex min-h-0 min-w-0 flex-1 flex-col px-8 pt-5 max-lg:px-3 max-lg:pt-2">
-          <div className="flex flex-wrap items-center gap-2 text-[13px] tracking-[0.04em] text-[#8e8e93] max-lg:flex-nowrap max-lg:gap-1.5">
-            <div className="flex shrink-0 overflow-hidden rounded-md border border-[#2c2c2e]">
-              <button
-                type="button"
-                onClick={() => setMode("cruise")}
-                aria-pressed={cruise}
-                title="Big Next button, lines read at arm's length"
-                className={modeButton(cruise)}
-              >
-                Cruise
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode("find")}
-                aria-pressed={!cruise}
-                title="Titles and as many lines as fit, for finding the place"
-                className={modeButton(!cruise)}
-              >
-                Find
-              </button>
-            </div>
+          <div className="flex flex-wrap items-center gap-2 text-[13px] tracking-[0.04em] text-[#8e8e93] max-lg:gap-1.5">
             <button
               type="button"
               onClick={() => setNavOpen((open) => !open)}
+              aria-pressed={titlesUnfolded}
               className={`shrink-0 cursor-pointer rounded-md bg-[#2c2c2e] px-3 py-1.5 text-[13px] font-semibold hover:bg-[#3a3a3c] max-lg:px-2.5 ${
-                cruise && !needsText ? "lg:hidden" : "hidden"
+                needsText ? "hidden" : ""
               }`}
             >
-              {navOpen ? "Hide titles" : "Titles"}
+              {titlesUnfolded ? "Hide titles" : "Show titles"}
             </button>
             <span className="max-lg:hidden">
               The WeBuddhist app follows this controller.
             </span>
             <span
               data-testid="publish-state"
-              className={`min-w-0 truncate rounded-full px-2.5 py-1 text-[13px] font-semibold whitespace-nowrap max-lg:px-2 max-lg:text-[12px] ${
+              className={`shrink-0 rounded-full px-2.5 py-1 text-[13px] font-semibold whitespace-nowrap max-lg:px-2 max-lg:text-[12px] ${
                 online
                   ? "bg-[#1f3a24] text-[#7fd598]"
                   : "bg-[#3a1f1f] text-[#e08585]"
@@ -957,20 +1055,29 @@ const LiveControlPage = () => {
             >
               {statusLabel}
             </span>
-            {/* A phone has one row for all of this, so the button says less. */}
-            <button
-              type="button"
-              aria-label={token ? "Change token" : "Add token"}
-              onClick={() => (token ? forgetToken() : setShowTokenBox(true))}
-              className="ml-auto shrink-0 rounded-md bg-[#2c2c2e] px-3 py-1.5 text-sm font-semibold whitespace-nowrap hover:bg-[#3a3a3c] max-lg:px-2.5 max-lg:text-[13px]"
-            >
-              <span className="max-lg:hidden">
-                {token ? "Change token" : "Add token"}
-              </span>
-              <span className="lg:hidden" aria-hidden="true">
-                Token
-              </span>
-            </button>
+            {/* Size and token travel together: on a phone too narrow for one
+             * row they wrap as a pair to the right, never one button alone. */}
+            <div className="ml-auto flex shrink-0 items-center gap-1.5">
+              {/* The text size suits the screen, so it is kept per browser. */}
+              <label className="flex shrink-0 items-center gap-1.5">
+                <span className="max-lg:hidden">Text size</span>
+                {sizePicker("Text size", textScale, changeTextScale)}
+              </label>
+              {/* A phone has little room for this, so the button says less. */}
+              <button
+                type="button"
+                aria-label={token ? "Change token" : "Add token"}
+                onClick={() => (token ? forgetToken() : setShowTokenBox(true))}
+                className="shrink-0 rounded-md bg-[#2c2c2e] px-3 py-1.5 text-sm font-semibold whitespace-nowrap hover:bg-[#3a3a3c] max-lg:px-2.5 max-lg:text-[13px]"
+              >
+                <span className="max-lg:hidden">
+                  {token ? "Change token" : "Add token"}
+                </span>
+                <span className="lg:hidden" aria-hidden="true">
+                  Token
+                </span>
+              </button>
+            </div>
           </div>
 
           {showTokenBox ? (
@@ -1003,7 +1110,7 @@ const LiveControlPage = () => {
             </div>
           ) : null}
 
-          <h1 className="mt-3.5 mb-0.5 text-2xl leading-relaxed [overflow-wrap:anywhere] max-lg:line-clamp-2 max-lg:mt-2 max-lg:text-base max-lg:leading-snug">
+          <h1 className="mt-3.5 mb-0.5 text-2xl leading-relaxed [overflow-wrap:anywhere] max-lg:mt-2 max-lg:text-base max-lg:leading-snug">
             {driverEdition?.title ??
               currentLiturgy?.title ??
               (sourceTextId || "No liturgy loaded")}
@@ -1068,11 +1175,7 @@ const LiveControlPage = () => {
                       <button
                         type="button"
                         onClick={() => jump(returnTo.index)}
-                        className={`mt-1 mb-4 ml-1.5 block cursor-pointer rounded-[9px] border border-[#e5231c] bg-[#2c2c2e] font-semibold text-[#f2f2f7] hover:bg-[#3a3a3c] ${
-                          cruise
-                            ? "px-5 py-2.5 text-base"
-                            : "mb-2 px-3 py-1.5 text-[13px]"
-                        }`}
+                        className="mt-1 mb-4 ml-1.5 block cursor-pointer rounded-[9px] border border-[#e5231c] bg-[#2c2c2e] px-5 py-2.5 text-base font-semibold text-[#f2f2f7] hover:bg-[#3a3a3c]"
                       >
                         {returnTo.label}
                       </button>
@@ -1084,13 +1187,8 @@ const LiveControlPage = () => {
           </div>
 
           <div className="border-t border-[#2c2c2e] pt-3 pb-4 max-lg:pt-2 max-lg:pb-2">
-            {/* The round, the session and the last cue sent: wanted now and then,
-             * never mid-cruise, so a phone in cruise gives their height to Next. */}
-            <div
-              className={`flex-wrap items-center gap-3.5 text-[13px] text-[#8e8e93] ${
-                cruise ? "hidden lg:flex" : "flex"
-              }`}
-            >
+            {/* The round, the session and the last cue sent. */}
+            <div className="flex flex-wrap items-center gap-3.5 text-[13px] text-[#8e8e93] max-lg:gap-2">
               <span className="flex items-center gap-1.5">
                 round
                 <button
@@ -1132,29 +1230,21 @@ const LiveControlPage = () => {
               </span>
             </div>
 
-            {/* Next takes the whole width left over and, in cruise, stands tall
-             * enough to take a fresh finger each time; Previous stays narrow
-             * beside it so it is not the one hit by mistake. */}
+            {/* Next takes the whole width left over and stands tall enough to
+             * take a fresh finger each time; Previous stays narrow beside it so
+             * it is not the one hit by mistake. */}
             <div className="mt-2 flex items-stretch gap-3 max-lg:gap-2">
               <button
                 type="button"
                 onClick={() => step(-1)}
-                className={`touch-manipulation cursor-pointer rounded-[9px] bg-[#2c2c2e] font-semibold select-none hover:bg-[#3a3a3c] active:bg-[#48484a] ${
-                  cruise
-                    ? "w-[28%] max-w-[200px] py-5 text-lg max-lg:text-base"
-                    : "px-6 py-3 text-base"
-                }`}
+                className="w-[28%] max-w-[200px] touch-manipulation cursor-pointer rounded-[9px] bg-[#2c2c2e] py-5 text-lg font-semibold select-none hover:bg-[#3a3a3c] active:bg-[#48484a] max-lg:text-base"
               >
                 ← Previous
               </button>
               <button
                 type="button"
                 onClick={() => step(1)}
-                className={`touch-manipulation cursor-pointer rounded-[9px] bg-[#e5231c] font-semibold text-white select-none hover:bg-[#ff3a33] active:bg-[#ff6b66] ${
-                  cruise
-                    ? "flex-1 py-5 text-2xl max-lg:portrait:min-h-[124px] max-lg:landscape:min-h-[72px]"
-                    : "px-6 py-3 text-base"
-                }`}
+                className="flex-1 touch-manipulation cursor-pointer rounded-[9px] bg-[#e5231c] py-5 text-2xl font-semibold text-white select-none hover:bg-[#ff3a33] active:bg-[#ff6b66] max-lg:portrait:min-h-[104px] max-lg:landscape:min-h-[64px]"
               >
                 Next →
               </button>

@@ -11,6 +11,10 @@
   --font-monlam: "MonlamUniOuChan2", sans-serif;
   --font-inter: "InterRegular", sans-serif;
   --font-dutsa: "dutsa-regular", sans-serif;
+  /* Tibetan in Monlam, everything else in the system UI font. */
+  --font-tibetan-ui:
+    "MonlamTibetanOnly", ui-sans-serif, system-ui, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji";
 }
 
 @font-face {
@@ -54,6 +58,16 @@
   src: url("./assets/fonts/MonlamUniOuChan2.woff") format("woff");
   font-weight: normal;
   font-style: normal;
+}
+/* Monlam for the Tibetan block only, so a page can set it first in its stack
+ * and keep Latin text in the UI font. */
+@font-face {
+  font-family: "MonlamTibetanOnly";
+  src: url("./assets/fonts/MonlamUniOuChan2.woff") format("woff");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0F00-0FFF;
 }
 @font-face {
   font-family: "InterRegular";
