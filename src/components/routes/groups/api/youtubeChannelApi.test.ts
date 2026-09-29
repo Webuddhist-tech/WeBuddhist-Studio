@@ -161,7 +161,9 @@ describe("fetchYoutubeChannelLiveVideos", () => {
       fetchYoutubeChannelLiveVideos("https://www.youtube.com/c/SomeName"),
     ).rejects.toThrow("Could not find this YouTube channel");
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(String(fetchMock.mock.calls[0][0])).toContain("forHandle=%40SomeName");
+    expect(String(fetchMock.mock.calls[0][0])).toContain(
+      "forHandle=%40SomeName",
+    );
   });
 
   it("rejects a link that is not a channel", async () => {
