@@ -30,7 +30,11 @@ import {
   type SegmentYigchung,
   type TocEntry,
 } from "./api/libraryTocApi";
-import { returnButtonForLine } from "./returnJumps";
+import {
+  passageAt,
+  returnButtonForLine,
+  returnPassages,
+} from "./returnJumps";
 import { usePositionPublisher } from "./usePositionPublisher";
 
 /** The emit token is kept per browser, so it is pasted once per machine. It is
@@ -227,9 +231,9 @@ const wideScreenQuery = (): MediaQueryList | null => {
 
 const opensWithTitles = () => wideScreenQuery()?.matches ?? false;
 
-/** Every position is sent as the first round: the operator page does not
- * count rounds. */
-const ROUND_NUMBER = 1;
+/** A line outside any repeated passage, or in one not yet returned to, is in
+ * the first round. */
+const FIRST_ROUND = 1;
 
 /** Shortcuts drive the liturgy, so they stay off fields and off the controls:
  * Space on "Next" or the token box must do what that control does. Lines are
@@ -360,19 +364,59 @@ const LiveControlPage = () => {
       storeReturnCounts(eventId, counts);
       return { eventId, counts };
     });
-  /** Another round of a return button: the count goes up by one. */
-  const countReturn = (key: string) =>
-    updateReturnCounts((current) => ({
-      ...current,
-      [key]: (current[key] ?? 1) + 1,
-    }));
+  /**
+   * Rounds the operator has begun that the room has not yet taken. The badge
+   * counts only what the room took, so a return with no token, one the room
+   * refused, or one overtaken by the next move before it went out, never moves
+   * it - but the moves made in the meantime are still sent in the new round, and
+   * the first of them the room takes settles it.
+   */
+  const [requestedRounds, setRequestedRounds] = useState<
+    Record<string, number>
+  >({});
+  useEffect(() => {
+    setRequestedRounds({});
+  }, [eventId]);
+  /** The round the room has taken for a passage. */
+  const acceptedRound = (key: string) => returnCounts[key] ?? FIRST_ROUND;
+  /** The round a passage is being recited in: begun, or else taken. */
+  const roundOf = useCallback(
+    (key: string) =>
+      Math.max(
+        returnCounts[key] ?? FIRST_ROUND,
+        requestedRounds[key] ?? FIRST_ROUND,
+      ),
+    [returnCounts, requestedRounds],
+  );
+  /** The room took a position in this round of the passage. */
+  const settleRound = (key: string, round: number) => {
+    if (round > acceptedRound(key)) {
+      updateReturnCounts((current) =>
+        round > (current[key] ?? FIRST_ROUND)
+          ? { ...current, [key]: round }
+          : current,
+      );
+    }
+    setRequestedRounds((current) => {
+      if ((current[key] ?? 0) > round) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  };
   /** Back to the first round, for the next puja. */
-  const resetReturn = (key: string) =>
+  const resetReturn = (key: string) => {
     updateReturnCounts((current) => {
       const next = { ...current };
       delete next[key];
       return next;
     });
+    setRequestedRounds((current) => {
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  };
 
   const listRef = useRef<HTMLDivElement | null>(null);
   /** The titles-and-lines area the divider splits. */
@@ -381,8 +425,10 @@ const LiveControlPage = () => {
   /** Editions already asked for, so nothing is fetched twice. */
   const requestedRef = useRef<Set<string>>(new Set());
 
+  /** What to do when the room takes a position; set once the lines are known. */
+  const onAcceptedRef = useRef<(cue: PositionToPublish) => void>(() => {});
   const { state, notice, lastSent, publish, clearNotice } =
-    usePositionPublisher(eventId, token);
+    usePositionPublisher(eventId, token, (cue) => onAcceptedRef.current(cue));
 
   const { data: event, error: eventError } = useQuery({
     queryKey: ["live-control-event", eventId],
@@ -716,16 +762,37 @@ const LiveControlPage = () => {
    * each with its own segment id and its own line number within that edition. An
    * edition that does not carry the row has nothing to send for this move.
    */
+  /** The repeated passages of the edition on screen, for the round of a line. */
+  const passages = useMemo(() => returnPassages(driverLines), [driverLines]);
+  const roundForLine = useCallback(
+    (index: number) => {
+      const passage = passageAt(passages, index);
+      return passage ? roundOf(passage.key) : FIRST_ROUND;
+    },
+    [passages, roundOf],
+  );
+
+  // A position the room took settles the round of the passage it is in - the
+  // badge follows the room, not the button.
+  onAcceptedRef.current = (cue) => {
+    if (cue.textId !== driverTextId) return;
+    if (driverLines[cue.index]?.id !== cue.segmentId) return;
+    const passage = passageAt(passages, cue.index);
+    if (passage) settleRound(passage.key, cue.roundNumber);
+  };
+
+  /** Every edition is in the same round as the one on screen: one recitation. */
   const cuesForLine = useCallback(
-    (index: number): PositionToPublish[] => {
+    (index: number, round?: number): PositionToPublish[] => {
       const driving = lines[driverTextId]?.[index];
       if (!driving) return [];
+      const roundNumber = round ?? roundForLine(index);
       const cues: PositionToPublish[] = [
         {
           textId: driverTextId,
           segmentId: driving.id,
           index,
-          roundNumber: ROUND_NUMBER,
+          roundNumber,
         },
       ];
       followed.forEach((textId) => {
@@ -736,21 +803,22 @@ const LiveControlPage = () => {
             textId,
             segmentId: match.id,
             index: match.index,
-            roundNumber: ROUND_NUMBER,
+            roundNumber,
           });
         }
       });
       return cues;
     },
-    [lines, linesByRow, followed, driverTextId],
+    [lines, linesByRow, followed, driverTextId, roundForLine],
   );
 
+  /** Moves to a line. `round` names the round when the move begins a new one. */
   const jump = useCallback(
-    (index: number) => {
+    (index: number, round?: number) => {
       if (index < 0 || index >= driverLines.length) return;
       setCurrentIndex(index);
       scrollLineIntoBand(index);
-      publish(cuesForLine(index));
+      publish(cuesForLine(index, round));
     },
     [driverLines.length, publish, cuesForLine],
   );
@@ -802,6 +870,26 @@ const LiveControlPage = () => {
     setHeldMoves([]);
     if (target !== currentIndex) jump(target);
   }, [awaitingYigchungs, heldMoves, landingFrom, currentIndex, jump]);
+
+  /**
+   * A line the operator picked - tapped, a section, Resume or Return. It is
+   * where they mean to be, so moves still held for the yigchung are dropped:
+   * made after it, they would carry the room past the line just chosen.
+   */
+  const goTo = (index: number, round?: number) => {
+    setHeldMoves((current) => (current.length > 0 ? [] : current));
+    jump(index, round);
+  };
+
+  /** Return: back to the passage's start, in the round after the room's. */
+  const beginNextRound = (key: string, index: number) => {
+    const round = acceptedRound(key) + 1;
+    // With no token nothing goes to the room, so no round is begun there.
+    if (token) {
+      setRequestedRounds((current) => ({ ...current, [key]: round }));
+    }
+    goTo(index, round);
+  };
 
   const step = useCallback(
     (delta: number) => {
@@ -1171,7 +1259,7 @@ const LiveControlPage = () => {
                         disabled={!reachable}
                         title={reachable ? undefined : "No segment to go to"}
                         onClick={() => {
-                          jump(section.lineIndex);
+                          goTo(section.lineIndex);
                         }}
                         // Outlines nest deeply - six levels is ordinary - so the
                         // indent stops after three and the titles keep their width.
@@ -1195,7 +1283,7 @@ const LiveControlPage = () => {
                           type="button"
                           aria-label={`Resume ${section.title}`}
                           title={`Resume at line ${resumeAt + 1}`}
-                          onClick={() => jump(resumeAt)}
+                          onClick={() => goTo(resumeAt)}
                           className="shrink-0 cursor-pointer rounded-[7px] border border-[#e5231c] px-2.5 py-1 text-[13px] font-semibold text-[#f2f2f7] hover:bg-[#2c2c2e] max-lg:px-2 max-lg:text-[12px]"
                         >
                           Resume
@@ -1537,7 +1625,7 @@ const LiveControlPage = () => {
                         title={
                           isYigchung ? "Yigchung · skipped by Next" : undefined
                         }
-                        onClick={() => jump(index)}
+                        onClick={() => goTo(index)}
                         className={`block w-full cursor-pointer rounded-[5px] text-left break-words ${lineClass} ${
                           isYigchung
                             ? // Instruction, not recitation: smaller, in its own
@@ -1563,15 +1651,10 @@ const LiveControlPage = () => {
                         <div className="mt-1 mb-4 ml-1.5 flex flex-wrap items-center gap-2">
                           <button
                             type="button"
-                            aria-label={`${returnTo.label}, round ${returnCounts[returnTo.key] ?? 1}`}
-                            onClick={() => {
-                              // With no token nothing goes to the room, so no
-                              // round is begun there. A publish the room refuses
-                              // still counts: the room recites the round
-                              // regardless, and the next move sends it again.
-                              if (token) countReturn(returnTo.key);
-                              jump(returnTo.index);
-                            }}
+                            aria-label={`${returnTo.label}, round ${acceptedRound(returnTo.key)}`}
+                            onClick={() =>
+                              beginNextRound(returnTo.key, returnTo.index)
+                            }
                             className="flex cursor-pointer items-center gap-3 rounded-[9px] border border-[#e5231c] bg-[#2c2c2e] py-2.5 pr-2.5 pl-5 text-left text-base font-semibold text-[#f2f2f7] hover:bg-[#3a3a3c]"
                           >
                             <span>{returnTo.label}</span>
@@ -1580,10 +1663,22 @@ const LiveControlPage = () => {
                               aria-hidden="true"
                               className="min-w-[2.25rem] shrink-0 rounded-full bg-[#e5231c] px-2.5 py-0.5 text-center text-sm font-bold text-white tabular-nums"
                             >
-                              {returnCounts[returnTo.key] ?? 1}
+                              {acceptedRound(returnTo.key)}
                             </span>
+                            {/* Begun but not yet taken by the room: shown apart,
+                             * so the badge never runs ahead of the recitation. */}
+                            {roundOf(returnTo.key) >
+                            acceptedRound(returnTo.key) ? (
+                              <span
+                                data-round-pending=""
+                                title="Waiting for the room to take this round"
+                                className="shrink-0 text-sm font-semibold text-[#8e8e93] tabular-nums"
+                              >
+                                → {roundOf(returnTo.key)}
+                              </span>
+                            ) : null}
                           </button>
-                          {(returnCounts[returnTo.key] ?? 1) > 1 ? (
+                          {roundOf(returnTo.key) > FIRST_ROUND ? (
                             <button
                               type="button"
                               aria-label={`Reset count: ${returnTo.label}`}

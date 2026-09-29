@@ -56,7 +56,11 @@ export interface UsePositionPublisherResult {
 export function usePositionPublisher(
   eventId: string | undefined,
   token: string | null,
+  /** Told of each position once the room has taken it - never before. */
+  onAccepted?: (cue: PositionToPublish) => void,
 ): UsePositionPublisherResult {
+  const onAcceptedRef = useRef(onAccepted);
+  onAcceptedRef.current = onAccepted;
   const [state, setState] = useState<PublishState>("idle");
   const [notice, setNotice] = useState<string | null>(null);
   const [lastSent, setLastSent] = useState<string | null>(null);
@@ -144,6 +148,7 @@ export function usePositionPublisher(
           if (result.ok) {
             sentKeysRef.current[cue.textId] = keyOf(cue);
             published += 1;
+            onAcceptedRef.current?.(cue);
           } else {
             // Not marked sent, so moving to this line again publishes it again.
             failure = result.message;

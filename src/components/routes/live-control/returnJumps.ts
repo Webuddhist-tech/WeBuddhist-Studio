@@ -96,6 +96,44 @@ for (const jump of RETURN_JUMPS) {
 }
 
 /**
+ * The repeated passages among these lines: from the verse a return button goes
+ * back to, through the verse it sits after. Each is recited once per round, so
+ * the round a line is in is the round of the passage holding it. `key` names the
+ * passage as its return button does.
+ */
+export const returnPassages = (
+  lines: { id: string }[],
+): { key: string; start: number; end: number }[] => {
+  const indexOf = new Map<string, number>();
+  lines.forEach((line, index) => {
+    if (!indexOf.has(line.id)) indexOf.set(line.id, index);
+  });
+  const find = (ids: Record<string, string>) =>
+    Object.values(ids)
+      .map((id) => indexOf.get(id))
+      .find((index) => index !== undefined);
+  return RETURN_JUMPS.flatMap((jump) => {
+    const start = find(jump.to);
+    const end = find(jump.after);
+    return start !== undefined && end !== undefined && start <= end
+      ? [{ key: jump.afterVerse, start, end }]
+      : [];
+  });
+};
+
+/**
+ * The passage a line is recited in: the tightest one holding it, since the
+ * Refuge return spans the praises, each of which repeats on its own.
+ */
+export const passageAt = (
+  passages: { key: string; start: number; end: number }[],
+  index: number,
+) =>
+  passages
+    .filter((passage) => passage.start <= index && index <= passage.end)
+    .sort((a, b) => a.end - a.start - (b.end - b.start))[0];
+
+/**
  * The return button under this line, if this segment is one the operator can
  * jump back from and the target verse is among the lines on screen. `key` names
  * the button the same in every edition, so its count follows it across them.

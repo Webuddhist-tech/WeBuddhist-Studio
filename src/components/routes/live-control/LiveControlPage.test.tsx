@@ -1380,15 +1380,86 @@ describe("LiveControlPage", () => {
         }),
       );
 
+      // Going back is the praise's next round.
       await waitFor(() =>
         expect(publishPosition).toHaveBeenCalledWith("e1", "tok-123", {
           textId: "root",
           segmentId: "BsajlElFFNFLoHcUjICwB",
           index: 0,
-          roundNumber: 1,
+          roundNumber: 2,
         }),
       );
       expect(screen.getByText(/line 1\/3/)).toBeInTheDocument();
+
+      // The rest of the passage is recited in that round too.
+      await user.click(screen.getByRole("button", { name: "Next →" }));
+      await waitFor(() =>
+        expect(publishPosition).toHaveBeenLastCalledWith("e1", "tok-123", {
+          textId: "root",
+          segmentId: "root-middle",
+          index: 1,
+          roundNumber: 2,
+        }),
+      );
+    });
+
+    it("moves the badge only once the room takes the new round", async () => {
+      const user = userEvent.setup();
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      fetchRecitationDetails.mockImplementation(
+        async (textId: string, language: string) =>
+          textId !== "root"
+            ? linesFor(textId, language, 3)
+            : {
+                text_id: "root",
+                title: "root",
+                segments: [
+                  {
+                    recitation: {
+                      bo: { id: "BsajlElFFNFLoHcUjICwB", content: "homage" },
+                    },
+                  },
+                  {
+                    recitation: {
+                      bo: { id: "kYNR7EmC5apQWrkYl5fiO", content: "mantra" },
+                    },
+                  },
+                ],
+              },
+      );
+      publishPosition.mockResolvedValue({
+        ok: false,
+        message: "That emit token was rejected. Check it and paste it again.",
+      });
+      renderPage();
+      const label = "↺ Return to start · 1st Praises to the 21 Tārās";
+
+      await user.click(
+        await screen.findByRole("button", { name: `${label}, round 1` }),
+      );
+      await screen.findByText(/emit token was rejected/);
+
+      // Refused: the badge stays on the round the room has, the new one waits.
+      expect(
+        screen.getByRole("button", { name: `${label}, round 1` }),
+      ).toBeInTheDocument();
+      expect(document.querySelector("[data-round-pending]")).toHaveTextContent(
+        "→ 2",
+      );
+      expect(localStorage.getItem("live-control-return-counts:e1")).toBeNull();
+
+      // Once the room takes a line of that round, the badge moves.
+      publishPosition.mockResolvedValue({ ok: true });
+      await user.click(screen.getByRole("button", { name: "Next →" }));
+      expect(
+        await screen.findByRole("button", { name: `${label}, round 2` }),
+      ).toBeInTheDocument();
+      expect(publishPosition).toHaveBeenLastCalledWith(
+        "e1",
+        "tok-123",
+        expect.objectContaining({ segmentId: "kYNR7EmC5apQWrkYl5fiO", roundNumber: 2 }),
+      );
+      expect(document.querySelector("[data-round-pending]")).toBeNull();
     });
 
     it("counts each return on the button, keeps the count, and resets it to 1", async () => {
