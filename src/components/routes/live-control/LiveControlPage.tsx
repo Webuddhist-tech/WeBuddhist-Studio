@@ -69,10 +69,14 @@ const TEXT_SCALES = Array.from(
 );
 const TEXT_SCALE_STORAGE_KEY = "live-control-text-scale";
 const TITLES_SCALE_STORAGE_KEY = "live-control-titles-scale";
+/** Where the titles size was kept before the lines got a size of their own. */
+const LEGACY_TITLES_SCALE_STORAGE_KEY = "live-control-title-scale";
 
-const readStoredScale = (key: string): number => {
+const readStoredScale = (key: string, legacyKey?: string): number => {
   try {
-    const raw = localStorage.getItem(key);
+    const raw =
+      localStorage.getItem(key) ??
+      (legacyKey ? localStorage.getItem(legacyKey) : null);
     const stored = raw === null ? NaN : Number(raw);
     if (!Number.isFinite(stored) || stored <= 0) return 1;
     // A size saved from an older list of steps lands on the nearest step.
@@ -240,7 +244,7 @@ const LiveControlPage = () => {
     readStoredScale(TEXT_SCALE_STORAGE_KEY),
   );
   const [titlesScale, setTitlesScale] = useState(() =>
-    readStoredScale(TITLES_SCALE_STORAGE_KEY),
+    readStoredScale(TITLES_SCALE_STORAGE_KEY, LEGACY_TITLES_SCALE_STORAGE_KEY),
   );
 
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -650,10 +654,11 @@ const LiveControlPage = () => {
    * Edition ids are 21 characters mixing digits and both cases - a run-together
    * title such as "RefugePrayerText" is searched for instead.
    */
+  const idShaped = /^[A-Za-z0-9_-]{21}$/.test(textQuery.trim());
   const looksLikeId = (() => {
     const query = textQuery.trim();
     return (
-      /^[A-Za-z0-9_-]{21}$/.test(query) &&
+      idShaped &&
       /[0-9]/.test(query) &&
       /[a-z]/.test(query) &&
       /[A-Z]/.test(query)
@@ -673,7 +678,13 @@ const LiveControlPage = () => {
       return;
     }
     const first = currentMatches[0];
-    if (first) openTextById(first.textId, first.title);
+    if (first) {
+      openTextById(first.textId, first.title);
+      return;
+    }
+    // An id that happens to lack a digit or one of the cases still opens once
+    // no title turns out to match it.
+    if (idShaped && matchesAreCurrent) openTextById(query);
   };
 
   const read = (edition: TextEdition) => {

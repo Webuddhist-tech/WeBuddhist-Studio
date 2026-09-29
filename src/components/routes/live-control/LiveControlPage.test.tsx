@@ -325,6 +325,16 @@ describe("LiveControlPage", () => {
     );
   });
 
+  it("keeps a titles size saved under the earlier key", async () => {
+    localStorage.setItem("live-control-title-scale", "1.3");
+    renderPage();
+    expect(
+      await screen.findByRole("button", { name: "Refuge" }),
+    ).toBeInTheDocument();
+
+    expect(titlesScaleOnPage()).toBe("1.3");
+  });
+
   it("opens with the text size saved in this browser", async () => {
     localStorage.setItem("live-control-text-scale", "1.5");
     renderPage();
@@ -431,6 +441,27 @@ describe("LiveControlPage", () => {
 
     await waitFor(() =>
       expect(fetchTextEditions).toHaveBeenCalledWith("Zt5c0fe1OMJI1Kh8rp2FM"),
+    );
+  });
+
+  it("opens an edition id without a digit once no title matches it", async () => {
+    const user = userEvent.setup();
+    fetchLiveControlEvent.mockResolvedValue({
+      title: "Tara Puja",
+      collectionId: null,
+    });
+    searchTextsByTitle.mockResolvedValue([]);
+    renderPage();
+
+    const box = await screen.findByLabelText("Search texts");
+    await user.type(box, "ZtAcBfeXOMJIaKhYrpQFM");
+    await waitFor(() =>
+      expect(searchTextsByTitle).toHaveBeenCalledWith("ZtAcBfeXOMJIaKhYrpQFM"),
+    );
+    await user.type(box, "{Enter}");
+
+    await waitFor(() =>
+      expect(fetchTextEditions).toHaveBeenCalledWith("ZtAcBfeXOMJIaKhYrpQFM"),
     );
   });
 
