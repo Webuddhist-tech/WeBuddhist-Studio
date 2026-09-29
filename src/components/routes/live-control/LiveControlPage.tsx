@@ -642,7 +642,11 @@ const LiveControlPage = () => {
 
   /** Reading another edition keeps the one it replaces in the room: it was being
    * sent a moment ago, and its readers should not be left behind by the switch. */
-  const { data: textMatches, isFetching: searchingTexts } = useQuery({
+  const {
+    data: textMatches,
+    isFetching: searchingTexts,
+    isSuccess: searchSucceeded,
+  } = useQuery({
     queryKey: ["live-control-text-search", debouncedTextQuery],
     queryFn: () => searchTextsByTitle(debouncedTextQuery),
     enabled: debouncedTextQuery.length >= 2,
@@ -683,8 +687,8 @@ const LiveControlPage = () => {
       return;
     }
     // An id that happens to lack a digit or one of the cases still opens once
-    // no title turns out to match it.
-    if (idShaped && matchesAreCurrent) openTextById(query);
+    // the search has answered that no title matches it - not when it failed.
+    if (idShaped && matchesAreCurrent && searchSucceeded) openTextById(query);
   };
 
   const read = (edition: TextEdition) => {

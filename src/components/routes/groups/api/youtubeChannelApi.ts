@@ -21,12 +21,16 @@ export type YoutubeChannelRef =
   | { kind: "username"; value: string }
   | { kind: "custom"; value: string };
 
-/** The group's YouTube social link, if it has one. */
+/** The group's YouTube social link, if it has one that names a channel. A
+ *  link to a single video has no streams to pick from, so it counts as none. */
 export const findGroupYoutubeLink = (
   links: GroupSocialLinkDTO[] | undefined,
 ): string | null =>
   links?.find(
-    (link) => link.platform.trim().toLowerCase() === "youtube" && link.url,
+    (link) =>
+      link.platform.trim().toLowerCase() === "youtube" &&
+      link.url &&
+      parseYoutubeChannelUrl(link.url) !== null,
   )?.url ?? null;
 
 /** Parse a YouTube channel URL (`/channel/UC…`, `/@handle`, `/user/…`,
@@ -98,23 +102,19 @@ async function fetchUploadsPlaylistId(ref: YoutubeChannelRef): Promise<string> {
   if (ref.kind === "id") channelId = ref.value;
 
   if (ref.kind === "custom") {
-    // Legacy custom URLs have no direct lookup; try it as a handle first,
-    // then fall back to a channel search.
+    // Legacy custom URLs have no direct lookup. YouTube turned them into
+    // handles of the same name, so that is the one lookup tried. A channel
+    // search is not: its top hit can be any channel with a similar name, and
+    // the picker would then offer someone else's streams.
     const byHandle = await youtubeGet<ChannelsResponse>("channels", {
       part: "id",
       forHandle: `@${ref.value}`,
     });
     channelId = byHandle.items?.[0]?.id ?? null;
     if (!channelId) {
-      const search = await youtubeGet<{
-        items?: { id?: { channelId?: string } }[];
-      }>("search", {
-        part: "id",
-        type: "channel",
-        q: ref.value,
-        maxResults: "1",
-      });
-      channelId = search.items?.[0]?.id?.channelId ?? null;
+      throw new Error(
+        "Could not find this YouTube channel. Use its /@handle or /channel/ link in the group's social links.",
+      );
     }
   }
 

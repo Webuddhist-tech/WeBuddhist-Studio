@@ -444,6 +444,27 @@ describe("LiveControlPage", () => {
     );
   });
 
+  it("does not open an id-shaped query when the title search fails", async () => {
+    const user = userEvent.setup();
+    fetchLiveControlEvent.mockResolvedValue({
+      title: "Tara Puja",
+      collectionId: null,
+    });
+    searchTextsByTitle.mockRejectedValue(new Error("offline"));
+    renderPage();
+
+    const box = await screen.findByLabelText("Search texts");
+    await user.type(box, "ZtAcBfeXOMJIaKhYrpQFM");
+    await waitFor(() =>
+      expect(searchTextsByTitle).toHaveBeenCalledWith("ZtAcBfeXOMJIaKhYrpQFM"),
+    );
+    await waitFor(() => expect(box).not.toHaveAttribute("aria-busy", "true"));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    await user.type(box, "{Enter}");
+
+    expect(fetchTextEditions).not.toHaveBeenCalled();
+  });
+
   it("opens an edition id without a digit once no title matches it", async () => {
     const user = userEvent.setup();
     fetchLiveControlEvent.mockResolvedValue({
