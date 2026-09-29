@@ -83,11 +83,12 @@ export const RETURN_JUMPS: ReturnJump[] = [
 
 const byAfterSegment = new Map<
   string,
-  { label: string; targetSegmentId: string }
+  { key: string; label: string; targetSegmentId: string }
 >();
 for (const jump of RETURN_JUMPS) {
   for (const language of ["bo", "en", "zh"] as const) {
     byAfterSegment.set(jump.after[language], {
+      key: jump.afterVerse,
       label: jump.label,
       targetSegmentId: jump.to[language],
     });
@@ -96,15 +97,16 @@ for (const jump of RETURN_JUMPS) {
 
 /**
  * The return button under this line, if this segment is one the operator can
- * jump back from and the target verse is among the lines on screen.
+ * jump back from and the target verse is among the lines on screen. `key` names
+ * the button the same in every edition, so its count follows it across them.
  */
 export const returnButtonForLine = (
   segmentId: string,
   lines: { id: string }[],
-): { label: string; index: number } | null => {
+): { key: string; label: string; index: number } | null => {
   const jump = byAfterSegment.get(segmentId);
   if (!jump) return null;
   const index = lines.findIndex((line) => line.id === jump.targetSegmentId);
   if (index < 0) return null;
-  return { label: jump.label, index };
+  return { key: jump.key, label: jump.label, index };
 };

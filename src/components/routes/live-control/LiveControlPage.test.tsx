@@ -19,6 +19,7 @@ const {
   publishPosition,
   endRecitationSession,
   fetchEditionSections,
+  fetchEditionYigchungs,
   searchTextsByTitle,
   fetchEditionTitle,
 } = vi.hoisted(() => ({
@@ -48,6 +49,7 @@ const {
     ) => Promise<{ ok: boolean; message?: string }>
   >(async () => ({ ok: true })),
   fetchEditionSections: vi.fn(),
+  fetchEditionYigchungs: vi.fn(),
 }));
 
 vi.mock("./api/liveControlApi", async () => {
@@ -67,7 +69,10 @@ vi.mock("./api/liveControlApi", async () => {
   };
 });
 
-vi.mock("./api/libraryTocApi", () => ({ fetchEditionSections }));
+vi.mock("./api/libraryTocApi", () => ({
+  fetchEditionSections,
+  fetchEditionYigchungs,
+}));
 
 vi.mock("react-router-dom", async () => {
   const actual =
@@ -164,6 +169,8 @@ describe("LiveControlPage", () => {
     endRecitationSession.mockResolvedValue({ ok: true });
     fetchEditionSections.mockReset();
     fetchEditionSections.mockResolvedValue([]);
+    fetchEditionYigchungs.mockReset();
+    fetchEditionYigchungs.mockResolvedValue({});
     searchTextsByTitle.mockReset();
     searchTextsByTitle.mockResolvedValue([
       { textId: "root", title: "Praise to the 21 Taras" },
@@ -873,6 +880,66 @@ describe("LiveControlPage", () => {
     );
   });
 
+  it("steps over yigchung lines with Next and Previous, and sets them apart", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("recitation_emit_token", "tok-123");
+    fetchRecitationDetails.mockImplementation(
+      async (textId: string, language: string) => linesFor(textId, language, 4),
+    );
+    // Line 2 is instruction throughout; line 3 carries some in its first word.
+    fetchEditionYigchungs.mockImplementation(async (textId: string) =>
+      textId === "root"
+        ? {
+            "root-s2": {
+              full: true,
+              ranges: [{ start: 0, end: 11 }],
+              length: 11,
+            },
+            "root-s3": {
+              full: false,
+              ranges: [{ start: 0, end: 4 }],
+              length: 11,
+            },
+          }
+        : {},
+    );
+    renderPage();
+    await followNone(user);
+    await waitFor(() =>
+      expect(document.querySelector('[data-line="1"]')).toHaveAttribute(
+        "data-yigchung",
+      ),
+    );
+    expect(
+      document.querySelector('[data-line="2"] [data-yigchung]'),
+    ).toHaveTextContent("root");
+
+    const next = screen.getByRole("button", { name: "Next →" });
+    await user.click(next);
+    await user.click(next);
+    await waitFor(() =>
+      expect(publishPosition).toHaveBeenLastCalledWith(
+        "e1",
+        "tok-123",
+        expect.objectContaining({ segmentId: "root-s3", index: 2 }),
+      ),
+    );
+    expect(publishPosition).not.toHaveBeenCalledWith(
+      "e1",
+      "tok-123",
+      expect.objectContaining({ segmentId: "root-s2" }),
+    );
+
+    await user.click(screen.getByRole("button", { name: "← Previous" }));
+    await waitFor(() =>
+      expect(publishPosition).toHaveBeenLastCalledWith(
+        "e1",
+        "tok-123",
+        expect.objectContaining({ segmentId: "root-s1", index: 0 }),
+      ),
+    );
+  });
+
   it("refuses to drive the room before a token is pasted", async () => {
     const user = userEvent.setup();
     renderPage();
@@ -1102,6 +1169,71 @@ describe("LiveControlPage", () => {
       );
     });
 
+    it("offers to resume a section left partway, where it was left", async () => {
+      const user = userEvent.setup();
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      fetchRecitationDetails.mockImplementation(
+        async (textId: string, language: string) =>
+          linesFor(textId, language, 6),
+      );
+      // Refuge is lines 1-3, Praises lines 4-6.
+      fetchEditionSections.mockResolvedValue([
+        { id: "s1", title: "Going for Refuge", depth: 0, segmentId: "root-s1" },
+        { id: "s2", title: "Praises", depth: 0, segmentId: "root-s4" },
+      ]);
+      renderPage();
+      await followNone(user);
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+      // Two lines into Refuge, then over to Praises.
+      const next = screen.getByRole("button", { name: "Next →" });
+      await user.click(next);
+      await user.click(next);
+      expect(
+        screen.queryByRole("button", { name: "Resume Going for Refuge" }),
+      ).not.toBeInTheDocument();
+      await user.click(await screen.findByRole("button", { name: "Praises" }));
+
+      // Praises was entered at its start, so only Refuge has somewhere to resume.
+      expect(
+        screen.queryByRole("button", { name: "Resume Praises" }),
+      ).not.toBeInTheDocument();
+      await user.click(
+        screen.getByRole("button", { name: "Resume Going for Refuge" }),
+      );
+      await waitFor(() =>
+        expect(publishPosition).toHaveBeenLastCalledWith(
+          "e1",
+          "tok-123",
+          expect.objectContaining({ segmentId: "root-s2", index: 1 }),
+        ),
+      );
+      expect(screen.getByText(/line 2\/6/)).toBeInTheDocument();
+    });
+
+    it("offers no resume for a section taken to its last line", async () => {
+      const user = userEvent.setup();
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      fetchRecitationDetails.mockImplementation(
+        async (textId: string, language: string) =>
+          linesFor(textId, language, 6),
+      );
+      fetchEditionSections.mockResolvedValue([
+        { id: "s1", title: "Going for Refuge", depth: 0, segmentId: "root-s1" },
+        { id: "s2", title: "Praises", depth: 0, segmentId: "root-s4" },
+      ]);
+      renderPage();
+      await followNone(user);
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+      await user.click(screen.getByText("root line 3"));
+      await user.click(await screen.findByRole("button", { name: "Praises" }));
+
+      expect(
+        screen.queryByRole("button", { name: "Resume Going for Refuge" }),
+      ).not.toBeInTheDocument();
+    });
+
     it("goes to the first segment of a section that is picked", async () => {
       const user = userEvent.setup();
       localStorage.setItem("recitation_emit_token", "tok-123");
@@ -1194,7 +1326,7 @@ describe("LiveControlPage", () => {
 
       await user.click(
         screen.getByRole("button", {
-          name: "↺ Return to start · 1st Praises to the 21 Tārās",
+          name: "↺ Return to start · 1st Praises to the 21 Tārās, round 1",
         }),
       );
 
@@ -1207,6 +1339,99 @@ describe("LiveControlPage", () => {
         }),
       );
       expect(screen.getByText(/line 1\/3/)).toBeInTheDocument();
+    });
+
+    it("counts each return on the button, keeps the count, and resets it to 1", async () => {
+      const user = userEvent.setup();
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      fetchRecitationDetails.mockImplementation(
+        async (textId: string, language: string) =>
+          textId !== "root"
+            ? linesFor(textId, language, 3)
+            : {
+                text_id: "root",
+                title: "root",
+                segments: [
+                  {
+                    recitation: {
+                      bo: { id: "BsajlElFFNFLoHcUjICwB", content: "homage" },
+                    },
+                  },
+                  {
+                    recitation: {
+                      bo: { id: "kYNR7EmC5apQWrkYl5fiO", content: "mantra" },
+                    },
+                  },
+                ],
+              },
+      );
+      renderPage();
+      const label = "↺ Return to start · 1st Praises to the 21 Tārās";
+
+      // Nothing pressed yet: the first round, and nothing to reset.
+      await user.click(
+        await screen.findByRole("button", { name: `${label}, round 1` }),
+      );
+      expect(
+        screen.getByRole("button", { name: `${label}, round 2` }),
+      ).toBeInTheDocument();
+      await user.click(
+        screen.getByRole("button", { name: `${label}, round 2` }),
+      );
+      expect(
+        screen.getByRole("button", { name: `${label}, round 3` }),
+      ).toBeInTheDocument();
+      expect(
+        JSON.parse(localStorage.getItem("live-control-return-counts") ?? "{}"),
+      ).toEqual({ "1-85": 3 });
+
+      await user.click(
+        screen.getByRole("button", { name: `Reset count: ${label}` }),
+      );
+      expect(
+        screen.getByRole("button", { name: `${label}, round 1` }),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: `Reset count: ${label}` }),
+      ).not.toBeInTheDocument();
+      expect(
+        JSON.parse(localStorage.getItem("live-control-return-counts") ?? "{}"),
+      ).toEqual({});
+    });
+
+    it("picks the return count up from this browser", async () => {
+      localStorage.setItem(
+        "live-control-return-counts",
+        JSON.stringify({ "1-85": 4 }),
+      );
+      fetchRecitationDetails.mockImplementation(
+        async (textId: string, language: string) =>
+          textId !== "root"
+            ? linesFor(textId, language, 3)
+            : {
+                text_id: "root",
+                title: "root",
+                segments: [
+                  {
+                    recitation: {
+                      bo: { id: "BsajlElFFNFLoHcUjICwB", content: "homage" },
+                    },
+                  },
+                  {
+                    recitation: {
+                      bo: { id: "kYNR7EmC5apQWrkYl5fiO", content: "mantra" },
+                    },
+                  },
+                ],
+              },
+      );
+      renderPage();
+
+      expect(
+        await screen.findByRole("button", {
+          name: "↺ Return to start · 1st Praises to the 21 Tārās, round 4",
+        }),
+      ).toBeInTheDocument();
     });
 
     it("scrolls the outline to the live section when the peek is opened", async () => {

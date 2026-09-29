@@ -24,7 +24,12 @@ import {
   type PositionToPublish,
   type TextEdition,
 } from "./api/liveControlApi";
-import { fetchEditionSections, type TocEntry } from "./api/libraryTocApi";
+import {
+  fetchEditionSections,
+  fetchEditionYigchungs,
+  type SegmentYigchung,
+  type TocEntry,
+} from "./api/libraryTocApi";
 import { returnButtonForLine } from "./returnJumps";
 import { usePositionPublisher } from "./usePositionPublisher";
 
@@ -136,6 +141,38 @@ const storeRecentTexts = (texts: RecentText[]) => {
   }
 };
 
+/** How many rounds each return button has been through, kept per browser so a
+ * reload mid-puja does not lose the count. A button never pressed is on its
+ * first round, so the count starts at one. */
+const RETURN_COUNTS_STORAGE_KEY = "live-control-return-counts";
+
+const readReturnCounts = (): Record<string, number> => {
+  try {
+    const parsed: unknown = JSON.parse(
+      localStorage.getItem(RETURN_COUNTS_STORAGE_KEY) ?? "{}",
+    );
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+    return Object.fromEntries(
+      Object.entries(parsed).filter(
+        (entry): entry is [string, number] =>
+          Number.isInteger(entry[1]) && entry[1] >= 1,
+      ),
+    );
+  } catch {
+    return {};
+  }
+};
+
+const storeReturnCounts = (counts: Record<string, number>) => {
+  try {
+    localStorage.setItem(RETURN_COUNTS_STORAGE_KEY, JSON.stringify(counts));
+  } catch {
+    // Blocked site data: the counts hold for this session only.
+  }
+};
+
 /** How much of an upright phone's height the titles take, above the lines.
  * The operator drags the divider to set it; it is kept per browser. */
 const TITLES_SHARE_DEFAULT = 0.35;
@@ -195,6 +232,50 @@ const allowsShortcut = (target: EventTarget | null) => {
   return true;
 };
 
+/** Yigchung is drawn small and in its own colour, as a printed liturgy sets it
+ * apart from the verse, so the operator reads past it at a glance. */
+const YIGCHUNG_TEXT = "text-[0.72em] text-[#c9a063]";
+
+/**
+ * A line's text with any yigchung inside it set apart. The marks are offsets
+ * into the library's text, so they are only laid over a line whose text is the
+ * same length; anything else is shown plain rather than cut in the wrong place.
+ */
+const LineContent = ({
+  content,
+  yigchung,
+}: {
+  content: string;
+  yigchung?: SegmentYigchung;
+}) => {
+  if (!yigchung || yigchung.full || content.length !== yigchung.length) {
+    return <>{content}</>;
+  }
+  const parts: { text: string; mark: boolean }[] = [];
+  let at = 0;
+  yigchung.ranges.forEach(({ start, end }) => {
+    if (start > at) parts.push({ text: content.slice(at, start), mark: false });
+    parts.push({ text: content.slice(start, end), mark: true });
+    at = end;
+  });
+  if (at < content.length) {
+    parts.push({ text: content.slice(at), mark: false });
+  }
+  return (
+    <>
+      {parts.map((part, index) =>
+        part.mark ? (
+          <span key={index} data-yigchung="" className={YIGCHUNG_TEXT}>
+            {part.text}
+          </span>
+        ) : (
+          <Fragment key={index}>{part.text}</Fragment>
+        ),
+      )}
+    </>
+  );
+};
+
 const LiveControlPage = () => {
   const { eventId } = useParams<{ eventId: string }>();
 
@@ -246,6 +327,22 @@ const LiveControlPage = () => {
   const [titlesScale, setTitlesScale] = useState(() =>
     readStoredScale(TITLES_SCALE_STORAGE_KEY, LEGACY_TITLES_SCALE_STORAGE_KEY),
   );
+  const [returnCounts, setReturnCounts] = useState(() => readReturnCounts());
+  /** Another round of a return button: the count goes up by one. */
+  const countReturn = (key: string) =>
+    setReturnCounts((current) => {
+      const next = { ...current, [key]: (current[key] ?? 1) + 1 };
+      storeReturnCounts(next);
+      return next;
+    });
+  /** Back to the first round, for the next puja. */
+  const resetReturn = (key: string) =>
+    setReturnCounts((current) => {
+      const next = { ...current };
+      delete next[key];
+      storeReturnCounts(next);
+      return next;
+    });
 
   const listRef = useRef<HTMLDivElement | null>(null);
   /** The titles-and-lines area the divider splits. */
@@ -407,6 +504,27 @@ const LiveControlPage = () => {
     staleTime: 1000 * 60 * 20,
   });
 
+  // The edition's yigchung - instructions for whoever leads, read silently - so
+  // Next can step over them and the lines can show them apart. Without it every
+  // line is recited, which is how the page behaved before.
+  const { data: yigchungs } = useQuery({
+    queryKey: ["live-control-yigchungs", driverTextId],
+    queryFn: () => fetchEditionYigchungs(driverTextId),
+    enabled: Boolean(driverTextId),
+    refetchOnWindowFocus: false,
+    retry: false,
+    staleTime: 1000 * 60 * 20,
+  });
+
+  /** A line that is instruction from end to end, which Next and Previous pass. */
+  const isYigchungLine = useCallback(
+    (index: number) => {
+      const id = driverLines[index]?.id;
+      return Boolean(id && yigchungs?.[id]?.full);
+    },
+    [driverLines, yigchungs],
+  );
+
   /** Where each line sits, so a section's anchor becomes a position to move to. */
   const indexBySegmentId = useMemo(() => {
     const positions = new Map<string, number>();
@@ -441,6 +559,62 @@ const LiveControlPage = () => {
     );
     return reached.length > 0 ? reached[reached.length - 1].id : null;
   }, [sections, currentIndex]);
+
+  /**
+   * The last line of each section: the line before the next section begins, or
+   * the last of the text. Yigchung at its tail is not recited, so a section is
+   * finished once its last recited line is reached.
+   */
+  const sectionLastLine = useMemo(() => {
+    const starts = sections
+      .map((section) => section.lineIndex)
+      .filter((index) => index >= 0);
+    const ends = new Map<string, number>();
+    sections.forEach((section) => {
+      if (section.lineIndex < 0) return;
+      const nextStart = starts
+        .filter((index) => index > section.lineIndex)
+        .reduce((lowest, index) => Math.min(lowest, index), Infinity);
+      let end = Math.min(nextStart - 1, driverLines.length - 1);
+      while (end > section.lineIndex && isYigchungLine(end)) end -= 1;
+      ends.set(section.id, end);
+    });
+    return ends;
+  }, [sections, driverLines.length, isYigchungLine]);
+
+  /**
+   * Where the operator last was in each section, by edition, so a section left
+   * partway can be picked up again. Each edition is its own library text with
+   * its own sections, so one edition's places say nothing about another's.
+   */
+  const [sectionPositions, setSectionPositions] = useState<
+    Record<string, number>
+  >({});
+  const sectionPositionKey = (sectionId: string) =>
+    `${driverTextId}:${sectionId}`;
+  useEffect(() => {
+    if (!activeSectionId || currentIndex < 0 || !driverTextId) return;
+    const key = `${driverTextId}:${activeSectionId}`;
+    setSectionPositions((current) =>
+      current[key] === currentIndex
+        ? current
+        : { ...current, [key]: currentIndex },
+    );
+  }, [activeSectionId, currentIndex, driverTextId]);
+
+  /**
+   * The line to resume a section at: one it was left on partway, away from the
+   * section being recited. A section left at its start has nothing to resume -
+   * its title goes there - and one taken to its end is done.
+   */
+  const resumeLineFor = (section: TocEntry & { lineIndex: number }) => {
+    if (section.lineIndex < 0 || section.id === activeSectionId) return null;
+    const last = sectionPositions[sectionPositionKey(section.id)];
+    const end = sectionLastLine.get(section.id);
+    if (last === undefined || end === undefined) return null;
+    if (last <= section.lineIndex || last >= end) return null;
+    return last;
+  };
 
   // Keep the live section in view, as the line list does: a long outline scrolls
   // past the operator's place otherwise. An element in a folded panel has no box
@@ -558,13 +732,18 @@ const LiveControlPage = () => {
     send(cues(at));
   }, [readyFollowedKey]);
 
+  // Yigchung is not recited, so a move passes over it to the next line the room
+  // says aloud. Tapping it still goes there: that is the operator's own choice.
   const step = useCallback(
     (delta: number) => {
-      const next = currentIndex + delta;
+      let next = currentIndex + delta;
+      while (next >= 0 && next < driverLines.length && isYigchungLine(next)) {
+        next += delta;
+      }
       if (next < 0 || next >= driverLines.length) return;
       jump(next);
     },
-    [currentIndex, driverLines.length, jump],
+    [currentIndex, driverLines.length, isYigchungLine, jump],
   );
 
   // Space / right / down advance, left / up go back: the operator drives without
@@ -807,8 +986,12 @@ const LiveControlPage = () => {
   };
   /** The lines are read at arm's length, from a cushion. The titles start at
    * the same size, and each pane is then sized on its own. */
-  const lineClass =
-    "mb-3 px-1.5 py-1.5 text-[calc(26px*var(--text-scale))] leading-[1.6] lg:text-[calc(23px*var(--text-scale))] lg:leading-[1.7]";
+  const lineClass = "mb-3 px-1.5 py-1.5 leading-[1.6] lg:leading-[1.7]";
+  const lineSize =
+    "text-[calc(26px*var(--text-scale))] lg:text-[calc(23px*var(--text-scale))]";
+  /** Yigchung lines are set smaller than the verse, as a printed liturgy does. */
+  const yigchungLineSize =
+    "text-[calc(19px*var(--text-scale))] lg:text-[calc(17px*var(--text-scale))]";
   const titleSize =
     "text-[calc(26px*var(--titles-scale))] leading-[1.6] lg:text-[calc(23px*var(--titles-scale))] lg:leading-[1.7]";
   const sizePicker = (
@@ -907,31 +1090,49 @@ const LiveControlPage = () => {
                 {sections.map((section) => {
                   const isActive = section.id === activeSectionId;
                   const reachable = section.lineIndex >= 0;
+                  const resumeAt = resumeLineFor(section);
                   return (
-                    <button
+                    <div
                       key={section.id}
-                      type="button"
-                      data-section-active={isActive}
-                      disabled={!reachable}
-                      title={reachable ? undefined : "No segment to go to"}
-                      onClick={() => {
-                        jump(section.lineIndex);
-                      }}
-                      // Outlines nest deeply - six levels is ordinary - so the
-                      // indent stops after three and the titles keep their width.
-                      style={{
-                        paddingLeft: 12 + Math.min(section.depth, 3) * 12,
-                      }}
-                      className={`mb-0.5 block w-full rounded-[7px] py-1.5 pr-3 text-left ${titleSize} [overflow-wrap:anywhere] max-lg:py-1 ${
-                        isActive
-                          ? "bg-[#e5231c] text-white"
-                          : reachable
-                            ? "cursor-pointer text-[#8e8e93] hover:bg-[#1a1a1c]"
-                            : "cursor-default text-[#5a5a5f]"
-                      }`}
+                      className="mb-0.5 flex items-center gap-1"
                     >
-                      {section.title}
-                    </button>
+                      <button
+                        type="button"
+                        data-section-active={isActive}
+                        disabled={!reachable}
+                        title={reachable ? undefined : "No segment to go to"}
+                        onClick={() => {
+                          jump(section.lineIndex);
+                        }}
+                        // Outlines nest deeply - six levels is ordinary - so the
+                        // indent stops after three and the titles keep their width.
+                        style={{
+                          paddingLeft: 12 + Math.min(section.depth, 3) * 12,
+                        }}
+                        className={`block min-w-0 flex-1 rounded-[7px] py-1.5 pr-3 text-left ${titleSize} [overflow-wrap:anywhere] max-lg:py-1 ${
+                          isActive
+                            ? "bg-[#e5231c] text-white"
+                            : reachable
+                              ? "cursor-pointer text-[#8e8e93] hover:bg-[#1a1a1c]"
+                              : "cursor-default text-[#5a5a5f]"
+                        }`}
+                      >
+                        {section.title}
+                      </button>
+                      {/* A section left partway is picked up where it was left,
+                       * not from its start. */}
+                      {resumeAt !== null ? (
+                        <button
+                          type="button"
+                          aria-label={`Resume ${section.title}`}
+                          title={`Resume at line ${resumeAt + 1}`}
+                          onClick={() => jump(resumeAt)}
+                          className="shrink-0 cursor-pointer rounded-[7px] border border-[#e5231c] px-2.5 py-1 text-[13px] font-semibold text-[#f2f2f7] hover:bg-[#2c2c2e] max-lg:px-2 max-lg:text-[12px]"
+                        >
+                          Resume
+                        </button>
+                      ) : null}
+                    </div>
                   );
                 })}
               </div>
@@ -1256,30 +1457,71 @@ const LiveControlPage = () => {
               ) : (
                 driverLines.map((segment, index) => {
                   const returnTo = returnButtonForLine(segment.id, driverLines);
+                  const yigchung = yigchungs?.[segment.id];
+                  const isYigchung = Boolean(yigchung?.full);
                   return (
                     <Fragment key={segment.id}>
                       <button
                         type="button"
                         data-line={index}
+                        data-yigchung={isYigchung ? "" : undefined}
+                        title={
+                          isYigchung ? "Yigchung · skipped by Next" : undefined
+                        }
                         onClick={() => jump(index)}
                         className={`block w-full cursor-pointer rounded-[5px] text-left break-words ${lineClass} ${
+                          isYigchung
+                            ? // Instruction, not recitation: smaller, in its own
+                              // colour, and ruled off so the verse around it reads on.
+                              `border-l-2 border-dashed border-[#c9a063]/60 pl-3 ${yigchungLineSize}`
+                            : lineSize
+                        } ${
                           index === currentIndex
                             ? // Packed lines need more than a tint to be found at a
                               // glance, so the live one is outlined as well.
                               "bg-[rgba(229,35,28,0.30)] text-white outline-1 outline-[#e5231c]"
-                            : "text-[#8e8e93] hover:bg-[#1a1a1c] hover:text-[#f2f2f7]"
+                            : isYigchung
+                              ? "text-[#c9a063]/80 hover:bg-[#1a1a1c] hover:text-[#e0bd84]"
+                              : "text-[#8e8e93] hover:bg-[#1a1a1c] hover:text-[#f2f2f7]"
                         }`}
                       >
-                        {segment.content}
+                        <LineContent
+                          content={segment.content}
+                          yigchung={yigchung}
+                        />
                       </button>
                       {returnTo ? (
-                        <button
-                          type="button"
-                          onClick={() => jump(returnTo.index)}
-                          className="mt-1 mb-4 ml-1.5 block cursor-pointer rounded-[9px] border border-[#e5231c] bg-[#2c2c2e] px-5 py-2.5 text-base font-semibold text-[#f2f2f7] hover:bg-[#3a3a3c]"
-                        >
-                          {returnTo.label}
-                        </button>
+                        <div className="mt-1 mb-4 ml-1.5 flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            aria-label={`${returnTo.label}, round ${returnCounts[returnTo.key] ?? 1}`}
+                            onClick={() => {
+                              countReturn(returnTo.key);
+                              jump(returnTo.index);
+                            }}
+                            className="flex cursor-pointer items-center gap-3 rounded-[9px] border border-[#e5231c] bg-[#2c2c2e] py-2.5 pr-2.5 pl-5 text-left text-base font-semibold text-[#f2f2f7] hover:bg-[#3a3a3c]"
+                          >
+                            <span>{returnTo.label}</span>
+                            {/* Which round this is, where the finger lands. */}
+                            <span
+                              aria-hidden="true"
+                              className="min-w-[2.25rem] shrink-0 rounded-full bg-[#e5231c] px-2.5 py-0.5 text-center text-sm font-bold text-white tabular-nums"
+                            >
+                              {returnCounts[returnTo.key] ?? 1}
+                            </span>
+                          </button>
+                          {(returnCounts[returnTo.key] ?? 1) > 1 ? (
+                            <button
+                              type="button"
+                              aria-label={`Reset count: ${returnTo.label}`}
+                              title="Reset the count to 1"
+                              onClick={() => resetReturn(returnTo.key)}
+                              className="cursor-pointer rounded-[9px] bg-[#1c1c1e] px-3 py-2.5 text-sm font-semibold text-[#8e8e93] hover:bg-[#2c2c2e] hover:text-[#f2f2f7]"
+                            >
+                              Reset to 1
+                            </button>
+                          ) : null}
+                        </div>
                       ) : null}
                     </Fragment>
                   );
