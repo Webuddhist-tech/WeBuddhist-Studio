@@ -141,15 +141,22 @@ const storeRecentTexts = (texts: RecentText[]) => {
   }
 };
 
+/** How long a move waits on the library's yigchung before going without it. */
+const YIGCHUNG_WAIT_MS = 8000;
+
 /** How many rounds each return button has been through, kept per browser so a
  * reload mid-puja does not lose the count. A button never pressed is on its
- * first round, so the count starts at one. */
-const RETURN_COUNTS_STORAGE_KEY = "live-control-return-counts";
+ * first round, so the count starts at one. Counts belong to one event: the same
+ * praise recited at another event starts again from the first round. */
+const returnCountsStorageKey = (eventId: string | undefined) =>
+  `live-control-return-counts:${eventId ?? ""}`;
 
-const readReturnCounts = (): Record<string, number> => {
+const readReturnCounts = (
+  eventId: string | undefined,
+): Record<string, number> => {
   try {
     const parsed: unknown = JSON.parse(
-      localStorage.getItem(RETURN_COUNTS_STORAGE_KEY) ?? "{}",
+      localStorage.getItem(returnCountsStorageKey(eventId)) ?? "{}",
     );
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       return {};
@@ -165,9 +172,15 @@ const readReturnCounts = (): Record<string, number> => {
   }
 };
 
-const storeReturnCounts = (counts: Record<string, number>) => {
+const storeReturnCounts = (
+  eventId: string | undefined,
+  counts: Record<string, number>,
+) => {
   try {
-    localStorage.setItem(RETURN_COUNTS_STORAGE_KEY, JSON.stringify(counts));
+    localStorage.setItem(
+      returnCountsStorageKey(eventId),
+      JSON.stringify(counts),
+    );
   } catch {
     // Blocked site data: the counts hold for this session only.
   }
@@ -327,20 +340,37 @@ const LiveControlPage = () => {
   const [titlesScale, setTitlesScale] = useState(() =>
     readStoredScale(TITLES_SCALE_STORAGE_KEY, LEGACY_TITLES_SCALE_STORAGE_KEY),
   );
-  const [returnCounts, setReturnCounts] = useState(() => readReturnCounts());
+  /** The counts, tagged with the event they were read for, so moving to another
+   * event's page reads that event's own rather than carrying these over. */
+  const [returnCountsState, setReturnCountsState] = useState(() => ({
+    eventId,
+    counts: readReturnCounts(eventId),
+  }));
+  const returnCounts =
+    returnCountsState.eventId === eventId
+      ? returnCountsState.counts
+      : readReturnCounts(eventId);
+  const updateReturnCounts = (
+    change: (current: Record<string, number>) => Record<string, number>,
+  ) =>
+    setReturnCountsState((state) => {
+      const current =
+        state.eventId === eventId ? state.counts : readReturnCounts(eventId);
+      const counts = change(current);
+      storeReturnCounts(eventId, counts);
+      return { eventId, counts };
+    });
   /** Another round of a return button: the count goes up by one. */
   const countReturn = (key: string) =>
-    setReturnCounts((current) => {
-      const next = { ...current, [key]: (current[key] ?? 1) + 1 };
-      storeReturnCounts(next);
-      return next;
-    });
+    updateReturnCounts((current) => ({
+      ...current,
+      [key]: (current[key] ?? 1) + 1,
+    }));
   /** Back to the first round, for the next puja. */
   const resetReturn = (key: string) =>
-    setReturnCounts((current) => {
+    updateReturnCounts((current) => {
       const next = { ...current };
       delete next[key];
-      storeReturnCounts(next);
       return next;
     });
 
@@ -507,14 +537,27 @@ const LiveControlPage = () => {
   // The edition's yigchung - instructions for whoever leads, read silently - so
   // Next can step over them and the lines can show them apart. Without it every
   // line is recited, which is how the page behaved before.
-  const { data: yigchungs } = useQuery({
+  const { data: yigchungs, isPending: yigchungsPending } = useQuery({
     queryKey: ["live-control-yigchungs", driverTextId],
-    queryFn: () => fetchEditionYigchungs(driverTextId),
+    // Next waits on this, so a library that does not answer is given up on
+    // rather than holding the operator: every line is then recited.
+    queryFn: () =>
+      Promise.race([
+        fetchEditionYigchungs(driverTextId),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("yigchung lookup timed out")),
+            YIGCHUNG_WAIT_MS,
+          ),
+        ),
+      ]),
     enabled: Boolean(driverTextId),
     refetchOnWindowFocus: false,
     retry: false,
     staleTime: 1000 * 60 * 20,
   });
+  /** Until the marks are in, a move cannot tell instruction from verse. */
+  const awaitingYigchungs = Boolean(driverTextId) && yigchungsPending;
 
   /** A line that is instruction from end to end, which Next and Previous pass. */
   const isYigchungLine = useCallback(
@@ -734,16 +777,42 @@ const LiveControlPage = () => {
 
   // Yigchung is not recited, so a move passes over it to the next line the room
   // says aloud. Tapping it still goes there: that is the operator's own choice.
-  const step = useCallback(
-    (delta: number) => {
-      let next = currentIndex + delta;
+  /** The line one move lands on from `from`, or `from` when there is none. */
+  const landingFrom = useCallback(
+    (from: number, delta: number) => {
+      let next = from + delta;
       while (next >= 0 && next < driverLines.length && isYigchungLine(next)) {
         next += delta;
       }
-      if (next < 0 || next >= driverLines.length) return;
-      jump(next);
+      return next < 0 || next >= driverLines.length ? from : next;
     },
-    [currentIndex, driverLines.length, isYigchungLine, jump],
+    [driverLines.length, isYigchungLine],
+  );
+
+  // The marks come from the library, apart from the lines, so a move made before
+  // they land could publish an instruction to the room. Such a move is held and
+  // made once they are in - never dropped, so a press is never lost.
+  const [heldMoves, setHeldMoves] = useState<number[]>([]);
+  useEffect(() => {
+    setHeldMoves([]);
+  }, [driverTextId]);
+  useEffect(() => {
+    if (awaitingYigchungs || heldMoves.length === 0) return;
+    const target = heldMoves.reduce(landingFrom, currentIndex);
+    setHeldMoves([]);
+    if (target !== currentIndex) jump(target);
+  }, [awaitingYigchungs, heldMoves, landingFrom, currentIndex, jump]);
+
+  const step = useCallback(
+    (delta: number) => {
+      if (awaitingYigchungs) {
+        setHeldMoves((current) => [...current, delta]);
+        return;
+      }
+      const next = landingFrom(currentIndex, delta);
+      if (next !== currentIndex) jump(next);
+    },
+    [awaitingYigchungs, currentIndex, landingFrom, jump],
   );
 
   // Space / right / down advance, left / up go back: the operator drives without
@@ -1496,7 +1565,11 @@ const LiveControlPage = () => {
                             type="button"
                             aria-label={`${returnTo.label}, round ${returnCounts[returnTo.key] ?? 1}`}
                             onClick={() => {
-                              countReturn(returnTo.key);
+                              // With no token nothing goes to the room, so no
+                              // round is begun there. A publish the room refuses
+                              // still counts: the room recites the round
+                              // regardless, and the next move sends it again.
+                              if (token) countReturn(returnTo.key);
                               jump(returnTo.index);
                             }}
                             className="flex cursor-pointer items-center gap-3 rounded-[9px] border border-[#e5231c] bg-[#2c2c2e] py-2.5 pr-2.5 pl-5 text-left text-base font-semibold text-[#f2f2f7] hover:bg-[#3a3a3c]"

@@ -940,6 +940,56 @@ describe("LiveControlPage", () => {
     );
   });
 
+  it("holds a move made before the yigchung arrives, so an instruction is never published", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("recitation_emit_token", "tok-123");
+    fetchRecitationDetails.mockImplementation(
+      async (textId: string, language: string) => linesFor(textId, language, 3),
+    );
+    // The lines are in; the marks are still on their way.
+    let deliver: (marks: Record<string, unknown>) => void = () => {};
+    fetchEditionYigchungs.mockImplementation((textId: string) =>
+      textId === "root"
+        ? new Promise((resolve) => {
+            deliver = resolve;
+          })
+        : Promise.resolve({}),
+    );
+    renderPage();
+    await followNone(user);
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+    await user.click(screen.getByText("root line 1"));
+    await waitFor(() =>
+      expect(publishPosition).toHaveBeenLastCalledWith(
+        "e1",
+        "tok-123",
+        expect.objectContaining({ segmentId: "root-s1" }),
+      ),
+    );
+    // Held, not dropped: nothing moves until the marks say what line 2 is.
+    await user.click(screen.getByRole("button", { name: "Next →" }));
+    expect(screen.getByText(/line 1\/3/)).toBeInTheDocument();
+
+    await act(async () => {
+      deliver({
+        "root-s2": { full: true, ranges: [{ start: 0, end: 11 }], length: 11 },
+      });
+    });
+    await waitFor(() =>
+      expect(publishPosition).toHaveBeenLastCalledWith(
+        "e1",
+        "tok-123",
+        expect.objectContaining({ segmentId: "root-s3" }),
+      ),
+    );
+    expect(publishPosition).not.toHaveBeenCalledWith(
+      "e1",
+      "tok-123",
+      expect.objectContaining({ segmentId: "root-s2" }),
+    );
+  });
+
   it("refuses to drive the room before a token is pasted", async () => {
     const user = userEvent.setup();
     renderPage();
@@ -1382,7 +1432,9 @@ describe("LiveControlPage", () => {
         screen.getByRole("button", { name: `${label}, round 3` }),
       ).toBeInTheDocument();
       expect(
-        JSON.parse(localStorage.getItem("live-control-return-counts") ?? "{}"),
+        JSON.parse(
+          localStorage.getItem("live-control-return-counts:e1") ?? "{}",
+        ),
       ).toEqual({ "1-85": 3 });
 
       await user.click(
@@ -1395,14 +1447,21 @@ describe("LiveControlPage", () => {
         screen.queryByRole("button", { name: `Reset count: ${label}` }),
       ).not.toBeInTheDocument();
       expect(
-        JSON.parse(localStorage.getItem("live-control-return-counts") ?? "{}"),
+        JSON.parse(
+          localStorage.getItem("live-control-return-counts:e1") ?? "{}",
+        ),
       ).toEqual({});
     });
 
-    it("picks the return count up from this browser", async () => {
+    it("picks the return count up from this browser, for this event only", async () => {
       localStorage.setItem(
-        "live-control-return-counts",
+        "live-control-return-counts:e1",
         JSON.stringify({ "1-85": 4 }),
+      );
+      // The same praise at another event has its own count.
+      localStorage.setItem(
+        "live-control-return-counts:other-event",
+        JSON.stringify({ "1-85": 9 }),
       );
       fetchRecitationDetails.mockImplementation(
         async (textId: string, language: string) =>
@@ -1432,6 +1491,42 @@ describe("LiveControlPage", () => {
           name: "↺ Return to start · 1st Praises to the 21 Tārās, round 4",
         }),
       ).toBeInTheDocument();
+    });
+
+    it("does not count a return made with no token, which reaches no room", async () => {
+      const user = userEvent.setup();
+      fetchRecitationDetails.mockImplementation(
+        async (textId: string, language: string) =>
+          textId !== "root"
+            ? linesFor(textId, language, 3)
+            : {
+                text_id: "root",
+                title: "root",
+                segments: [
+                  {
+                    recitation: {
+                      bo: { id: "BsajlElFFNFLoHcUjICwB", content: "homage" },
+                    },
+                  },
+                  {
+                    recitation: {
+                      bo: { id: "kYNR7EmC5apQWrkYl5fiO", content: "mantra" },
+                    },
+                  },
+                ],
+              },
+      );
+      renderPage();
+      const label = "↺ Return to start · 1st Praises to the 21 Tārās";
+
+      await user.click(
+        await screen.findByRole("button", { name: `${label}, round 1` }),
+      );
+
+      expect(
+        screen.getByRole("button", { name: `${label}, round 1` }),
+      ).toBeInTheDocument();
+      expect(localStorage.getItem("live-control-return-counts:e1")).toBeNull();
     });
 
     it("scrolls the outline to the live section when the peek is opened", async () => {
