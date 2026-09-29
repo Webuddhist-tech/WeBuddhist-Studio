@@ -30,11 +30,7 @@ import {
   type SegmentYigchung,
   type TocEntry,
 } from "./api/libraryTocApi";
-import {
-  passageAt,
-  returnButtonForLine,
-  returnPassages,
-} from "./returnJumps";
+import { passageAt, returnButtonForLine, returnPassages } from "./returnJumps";
 import { usePositionPublisher } from "./usePositionPublisher";
 
 /** The emit token is kept per browser, so it is pasted once per machine. It is

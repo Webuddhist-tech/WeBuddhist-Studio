@@ -990,6 +990,44 @@ describe("LiveControlPage", () => {
     );
   });
 
+  it("drops a held move when the operator taps a line before the yigchung arrives", async () => {
+    const user = userEvent.setup();
+    localStorage.setItem("recitation_emit_token", "tok-123");
+    fetchRecitationDetails.mockImplementation(
+      async (textId: string, language: string) => linesFor(textId, language, 4),
+    );
+    let deliver: (marks: Record<string, unknown>) => void = () => {};
+    fetchEditionYigchungs.mockImplementation((textId: string) =>
+      textId === "root"
+        ? new Promise((resolve) => {
+            deliver = resolve;
+          })
+        : Promise.resolve({}),
+    );
+    renderPage();
+    await followNone(user);
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+    // Next is held; then the operator picks line 3 themselves.
+    await user.click(screen.getByRole("button", { name: "Next →" }));
+    await user.click(screen.getByText("root line 3"));
+    await act(async () => {
+      deliver({});
+    });
+
+    expect(screen.getByText(/line 3\/4/)).toBeInTheDocument();
+    expect(publishPosition).toHaveBeenLastCalledWith(
+      "e1",
+      "tok-123",
+      expect.objectContaining({ segmentId: "root-s3" }),
+    );
+    expect(publishPosition).not.toHaveBeenCalledWith(
+      "e1",
+      "tok-123",
+      expect.objectContaining({ segmentId: "root-s4" }),
+    );
+  });
+
   it("refuses to drive the room before a token is pasted", async () => {
     const user = userEvent.setup();
     renderPage();
@@ -1457,7 +1495,10 @@ describe("LiveControlPage", () => {
       expect(publishPosition).toHaveBeenLastCalledWith(
         "e1",
         "tok-123",
-        expect.objectContaining({ segmentId: "kYNR7EmC5apQWrkYl5fiO", roundNumber: 2 }),
+        expect.objectContaining({
+          segmentId: "kYNR7EmC5apQWrkYl5fiO",
+          roundNumber: 2,
+        }),
       );
       expect(document.querySelector("[data-round-pending]")).toBeNull();
     });
