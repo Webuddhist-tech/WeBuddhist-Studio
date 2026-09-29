@@ -50,10 +50,17 @@ export const parseYoutubeChannelUrl = (
   const host = url.hostname.toLowerCase();
   if (host !== "youtube.com" && !host.endsWith(".youtube.com")) return null;
 
-  const [first, second] = url.pathname
-    .split("/")
-    .filter(Boolean)
-    .map((part) => decodeURIComponent(part));
+  let parts: string[];
+  try {
+    parts = url.pathname
+      .split("/")
+      .filter(Boolean)
+      .map((part) => decodeURIComponent(part));
+  } catch {
+    // A malformed escape such as `%zz` is not a channel link either.
+    return null;
+  }
+  const [first, second] = parts;
   if (!first) return null;
 
   if (first.startsWith("@")) return { kind: "handle", value: first };

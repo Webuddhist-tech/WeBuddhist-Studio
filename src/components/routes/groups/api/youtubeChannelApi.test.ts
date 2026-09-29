@@ -53,6 +53,14 @@ describe("findGroupYoutubeLink", () => {
     ).toBe("https://youtube.com/@x");
   });
 
+  it("skips a youtube link with a malformed escape", () => {
+    expect(
+      findGroupYoutubeLink([
+        { platform: "YouTube", url: "https://youtube.com/%zz" },
+      ]),
+    ).toBeNull();
+  });
+
   it("skips a youtube link to a single video", () => {
     expect(
       findGroupYoutubeLink([
