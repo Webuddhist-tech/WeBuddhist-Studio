@@ -152,12 +152,14 @@ const YIGCHUNG_WAIT_MS = 8000;
 const returnCountsStorageKey = (eventId: string | undefined) =>
   `live-control-return-counts:${eventId ?? ""}`;
 
-/** How many times each return button is to be taken this puja, set by the
- * operator so autoplay can take them itself. Kept per event, like the counts. */
-const plannedReturnsStorageKey = (eventId: string | undefined) =>
-  `live-control-planned-returns:${eventId ?? ""}`;
-/** The most returns a button can be set to take. */
-const MAX_PLANNED_RETURNS = 20;
+/** How many rounds each repeated passage is to be recited this puja, set by the
+ * operator so autoplay can take its Returns itself. Counted as the Return's
+ * badge counts: the first time through is round 1. Kept per event, like the
+ * counts. */
+const plannedRoundsStorageKey = (eventId: string | undefined) =>
+  `live-control-planned-rounds:${eventId ?? ""}`;
+/** The most rounds a passage can be set to. */
+const MAX_PLANNED_ROUNDS = 21;
 
 const readStoredCounts = (storageKey: string): Record<string, number> => {
   try {
@@ -339,9 +341,10 @@ const AutoplayProgress = ({
 };
 
 /**
- * How many times autoplay takes a return button, and how many of those are
- * left. It stands on a row of its own, apart from the return button and in
- * quieter colours, so setting the count is never a tap on the return itself.
+ * How many rounds autoplay recites a passage - counted as the Return's badge
+ * counts, from 1 - and how many Returns that leaves to take. It stands on a row
+ * of its own, apart from the Return and in quieter colours, so setting the
+ * count is never a tap on the Return itself.
  */
 const ReturnPlan = ({
   label,
@@ -352,50 +355,50 @@ const ReturnPlan = ({
   label: string;
   planned: number;
   left: number;
-  onChange: (returns: number) => void;
+  onChange: (rounds: number) => void;
 }) => {
   const stepClass =
     "size-9 shrink-0 touch-manipulation cursor-pointer rounded-md bg-[#2c2c2e] text-lg leading-none font-semibold text-[#f2f2f7] select-none hover:bg-[#3a3a3c] disabled:cursor-default disabled:opacity-40";
   return (
     <div
       role="group"
-      aria-label={`Autoplay returns: ${label}`}
+      aria-label={`Autoplay rounds: ${label}`}
       data-return-plan=""
       className="mt-1 flex basis-full items-center gap-2 font-sans text-sm text-[#8e8e93]"
     >
-      <span>Autoplay returns</span>
+      <span>Autoplay rounds</span>
       <button
         type="button"
-        aria-label="One return fewer"
-        disabled={planned <= 0}
+        aria-label="One round fewer"
+        disabled={planned <= FIRST_ROUND}
         onClick={() => onChange(planned - 1)}
         className={stepClass}
       >
         −
       </button>
       <span
-        data-planned-returns=""
+        data-planned-rounds=""
         className="min-w-[1.5rem] text-center font-semibold text-[#f2f2f7] tabular-nums"
       >
         {planned}
       </span>
       <button
         type="button"
-        aria-label="One return more"
-        disabled={planned >= MAX_PLANNED_RETURNS}
+        aria-label="One round more"
+        disabled={planned >= MAX_PLANNED_ROUNDS}
         onClick={() => onChange(planned + 1)}
         className={stepClass}
       >
         +
       </button>
-      {planned > 0 ? (
+      {planned > FIRST_ROUND ? (
         <span
           data-returns-left=""
           className={`ml-1 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${
             left > 0 ? "bg-[#1c3a24] text-[#30d158]" : "bg-[#1c1c1e]"
           }`}
         >
-          {left > 0 ? `${left} left` : "done"}
+          {left > 0 ? `${left} return${left === 1 ? "" : "s"} left` : "done"}
         </span>
       ) : null}
     </div>
@@ -515,15 +518,20 @@ const LiveControlPage = () => {
   const [returnCounts, updateReturnCounts] = useStoredCounts(
     returnCountsStorageKey(eventId),
   );
-  const [plannedReturns, updatePlannedReturns] = useStoredCounts(
-    plannedReturnsStorageKey(eventId),
+  const [plannedRounds, updatePlannedRounds] = useStoredCounts(
+    plannedRoundsStorageKey(eventId),
   );
-  /** Sets how many times a return button is to be taken; none clears it. */
-  const planReturns = (key: string, returns: number) =>
-    updatePlannedReturns((current) => {
+  /** Rounds autoplay recites a passage in: once, unless set otherwise. */
+  const plannedRoundsOf = (key: string) => plannedRounds[key] ?? FIRST_ROUND;
+  /** Sets how many rounds a passage is recited; once clears it. */
+  const planRounds = (key: string, rounds: number) =>
+    updatePlannedRounds((current) => {
       const next = { ...current };
-      const clamped = Math.min(MAX_PLANNED_RETURNS, Math.max(0, returns));
-      if (clamped > 0) next[key] = clamped;
+      const clamped = Math.min(
+        MAX_PLANNED_ROUNDS,
+        Math.max(FIRST_ROUND, rounds),
+      );
+      if (clamped > FIRST_ROUND) next[key] = clamped;
       else delete next[key];
       return next;
     });
@@ -551,9 +559,9 @@ const LiveControlPage = () => {
       ),
     [returnCounts, requestedRounds],
   );
-  /** Returns still to take at a button: planned, less those begun. */
+  /** Returns still to take at a button: one per planned round not yet begun. */
   const returnsLeft = (key: string) =>
-    Math.max(0, (plannedReturns[key] ?? 0) - (roundOf(key) - FIRST_ROUND));
+    Math.max(0, plannedRoundsOf(key) - roundOf(key));
   /** The room took a position in this round of the passage. */
   const settleRound = (key: string, round: number) => {
     if (round > acceptedRound(key)) {
@@ -1030,10 +1038,59 @@ const LiveControlPage = () => {
    * Cleared whenever the page is on no line, which is how opening another work
    * or reading another edition drops a hold that is no longer anybody's.
    */
-  const heldLineRef = useRef<{ enteredAt: number; byAutoplay: boolean } | null>(
-    null,
-  );
+  const heldLineRef = useRef<{
+    index: number;
+    enteredAt: number;
+    byAutoplay: boolean;
+  } | null>(null);
   if (currentIndex < 0) heldLineRef.current = null;
+
+  // Yigchung is not recited, so a move passes over it to the next line the room
+  // says aloud. Tapping it still goes there: that is the operator's own choice.
+  /** The line one move lands on from `from`, or `from` when there is none. */
+  const landingFrom = useCallback(
+    (from: number, delta: number) => {
+      let next = from + delta;
+      while (next >= 0 && next < driverLines.length && isYigchungLine(next)) {
+        next += delta;
+      }
+      return next < 0 || next >= driverLines.length ? from : next;
+    },
+    [driverLines.length, isYigchungLine],
+  );
+
+  /**
+   * The Return buttons reached from line `from` without reciting another line:
+   * the one under it, and any under yigchung passed over on the way on.
+   */
+  const returnsReachedFrom = useCallback(
+    (from: number) => {
+      const next = landingFrom(from, 1);
+      const upTo = next === from ? driverLines.length : next;
+      const reached: { key: string; index: number }[] = [];
+      for (let at = from; at < upTo; at += 1) {
+        const button = returnButtonForLine(driverLines[at].id, driverLines);
+        if (button) reached.push(button);
+      }
+      return reached;
+    },
+    [driverLines, landingFrom],
+  );
+
+  /**
+   * Whether moving from line `from` to `to` follows on in recitation order
+   * other than as the very next line, which the backend times by itself: Next
+   * over yigchung, or a Return under the line. Either way the line left was
+   * recited through, and its hold is its play time.
+   */
+  const followsOn = useCallback(
+    (from: number, to: number, round?: number) =>
+      to !== from + 1 &&
+      ((to !== from && to === landingFrom(from, 1)) ||
+        (round !== undefined &&
+          returnsReachedFrom(from).some((button) => button.index === to))),
+    [landingFrom, returnsReachedFrom],
+  );
 
   /**
    * Moves to a line. `round` names the round when the move begins a new one;
@@ -1063,24 +1120,41 @@ const LiveControlPage = () => {
         held && !autoplay && !held.byAutoplay
           ? Math.round(now - held.enteredAt)
           : undefined;
+      // The line left, row for row in each edition, when this move follows on
+      // from it: the backend then times it even though the move is not a step
+      // to the very next line.
+      const fromRow =
+        held && elapsedMs !== undefined && followsOn(held.index, index, round)
+          ? driverLines[held.index]?.row
+          : undefined;
+      const fromIndexIn = (textId: string) =>
+        fromRow === undefined
+          ? undefined
+          : textId === driverTextId
+            ? held?.index
+            : linesByRow[textId]?.get(fromRow)?.index;
       const lineStart = startedAt ?? now;
-      heldLineRef.current = { enteredAt: now, byAutoplay: autoplay };
+      heldLineRef.current = { index, enteredAt: now, byAutoplay: autoplay };
       setCurrentIndex(index);
       setLineStartedAt(lineStart);
       scrollLineIntoBand(index);
       const cues = cuesForLine(index, round);
       publish(
         autoplay || elapsedMs !== undefined
-          ? cues.map((cue) => ({
-              ...cue,
-              ...(autoplay ? { autoplay } : {}),
-              ...(elapsedMs === undefined ? {} : { elapsedMs }),
-            }))
+          ? cues.map((cue) => {
+              const fromIndex = fromIndexIn(cue.textId);
+              return {
+                ...cue,
+                ...(autoplay ? { autoplay } : {}),
+                ...(elapsedMs === undefined ? {} : { elapsedMs }),
+                ...(fromIndex === undefined ? {} : { fromIndex }),
+              };
+            })
           : cues,
       );
       setLineMove(moveSequenceRef.current);
     },
-    [driverLines.length, publish, cuesForLine],
+    [driverLines, driverTextId, linesByRow, followsOn, publish, cuesForLine],
   );
 
   // An edition followed from the start, or ticked mid-liturgy, is fetched in
@@ -1102,20 +1176,6 @@ const LiveControlPage = () => {
     if (at < 0 || !readyFollowedKey) return;
     send(cues(at));
   }, [readyFollowedKey]);
-
-  // Yigchung is not recited, so a move passes over it to the next line the room
-  // says aloud. Tapping it still goes there: that is the operator's own choice.
-  /** The line one move lands on from `from`, or `from` when there is none. */
-  const landingFrom = useCallback(
-    (from: number, delta: number) => {
-      let next = from + delta;
-      while (next >= 0 && next < driverLines.length && isYigchungLine(next)) {
-        next += delta;
-      }
-      return next < 0 || next >= driverLines.length ? from : next;
-    },
-    [driverLines.length, isYigchungLine],
-  );
 
   // The marks come from the library, apart from the lines, so a move made before
   // they land could publish an instruction to the room. Such a move is held and
@@ -1211,17 +1271,16 @@ const LiveControlPage = () => {
     // when catching up would race the room through lines at once.
     const now = performance.now();
     const startedAt = now - deadline < 1000 ? deadline : now;
-    const next = landingFrom(currentIndex, 1);
     // A return button with returns still planned is taken, as the operator
     // would: under this line, or under a yigchung passed over on the way.
-    const passedUpTo = next === currentIndex ? driverLines.length : next;
-    for (let at = currentIndex; at < passedUpTo; at += 1) {
-      const returnTo = returnButtonForLine(driverLines[at].id, driverLines);
-      if (returnTo && returnsLeft(returnTo.key) > 0) {
-        beginNextRound(returnTo.key, returnTo.index, startedAt);
-        return;
-      }
+    const returnTo = returnsReachedFrom(currentIndex).find(
+      (button) => returnsLeft(button.key) > 0,
+    );
+    if (returnTo) {
+      beginNextRound(returnTo.key, returnTo.index, startedAt);
+      return;
     }
+    const next = landingFrom(currentIndex, 1);
     if (next === currentIndex) {
       setAutoplay(false);
       return;
@@ -2106,10 +2165,10 @@ const LiveControlPage = () => {
                           ) : null}
                           <ReturnPlan
                             label={returnTo.label}
-                            planned={plannedReturns[returnTo.key] ?? 0}
+                            planned={plannedRoundsOf(returnTo.key)}
                             left={returnsLeft(returnTo.key)}
-                            onChange={(returns) =>
-                              planReturns(returnTo.key, returns)
+                            onChange={(rounds) =>
+                              planRounds(returnTo.key, rounds)
                             }
                           />
                         </div>

@@ -2519,7 +2519,7 @@ describe("LiveControlPage", () => {
       expect(publishPosition).toHaveBeenCalledTimes(2);
     });
 
-    describe("planned returns", () => {
+    describe("planned rounds", () => {
       const label = "↺ Return to start · 1st Praises to the 21 Tārās";
       /** A praise of two lines, whose ending carries a Return. */
       const openPraiseForAutoplay = async () => {
@@ -2557,23 +2557,30 @@ describe("LiveControlPage", () => {
         return user;
       };
       const planOf = () =>
-        screen.getByRole("group", { name: `Autoplay returns: ${label}` });
+        screen.getByRole("group", { name: `Autoplay rounds: ${label}` });
 
-      it("sets the count without taking the return", async () => {
+      it("sets the rounds from 1, without taking the return", async () => {
         const user = await openPraiseForAutoplay();
+        const more = () =>
+          within(planOf()).getByRole("button", { name: "One round more" });
+        const fewer = () =>
+          within(planOf()).getByRole("button", { name: "One round fewer" });
 
-        await user.click(
-          within(planOf()).getByRole("button", { name: "One return more" }),
-        );
-        await user.click(
-          within(planOf()).getByRole("button", { name: "One return more" }),
-        );
+        // Counted as the Return's badge counts: once through is round 1.
+        expect(
+          planOf().querySelector("[data-planned-rounds]"),
+        ).toHaveTextContent("1");
+        expect(fewer()).toBeDisabled();
+        expect(planOf().querySelector("[data-returns-left]")).toBeNull();
+
+        await user.click(more());
+        await user.click(more());
 
         expect(
-          planOf().querySelector("[data-planned-returns]"),
-        ).toHaveTextContent("2");
+          planOf().querySelector("[data-planned-rounds]"),
+        ).toHaveTextContent("3");
         expect(planOf().querySelector("[data-returns-left]")).toHaveTextContent(
-          "2 left",
+          "2 returns left",
         );
         // Nothing went to the room, and the round did not move.
         expect(publishPosition).not.toHaveBeenCalled();
@@ -2583,29 +2590,26 @@ describe("LiveControlPage", () => {
         // Kept for a reload mid-puja.
         expect(
           JSON.parse(
-            localStorage.getItem("live-control-planned-returns:e1") ?? "{}",
+            localStorage.getItem("live-control-planned-rounds:e1") ?? "{}",
           ),
-        ).toEqual({ "1-85": 2 });
+        ).toEqual({ "1-85": 3 });
 
-        await user.click(
-          within(planOf()).getByRole("button", { name: "One return fewer" }),
-        );
-        await user.click(
-          within(planOf()).getByRole("button", { name: "One return fewer" }),
-        );
+        await user.click(fewer());
+        await user.click(fewer());
         expect(planOf().querySelector("[data-returns-left]")).toBeNull();
-        expect(
-          within(planOf()).getByRole("button", { name: "One return fewer" }),
-        ).toBeDisabled();
+        expect(fewer()).toBeDisabled();
+        expect(localStorage.getItem("live-control-planned-rounds:e1")).toBe(
+          "{}",
+        );
       });
 
-      it("takes each planned return by itself, then moves on", async () => {
+      it("takes the Return by itself until the planned rounds are done", async () => {
         const user = await openPraiseForAutoplay();
         await user.click(
-          within(planOf()).getByRole("button", { name: "One return more" }),
+          within(planOf()).getByRole("button", { name: "One round more" }),
         );
         await user.click(
-          within(planOf()).getByRole("button", { name: "One return more" }),
+          within(planOf()).getByRole("button", { name: "One round more" }),
         );
 
         await user.click(screen.getByRole("button", { name: "▶ Auto" }));
@@ -2635,10 +2639,10 @@ describe("LiveControlPage", () => {
         );
       });
 
-      it("counts returns taken by hand toward the plan", async () => {
+      it("counts rounds begun by hand toward the plan", async () => {
         const user = await openPraiseForAutoplay();
         await user.click(
-          within(planOf()).getByRole("button", { name: "One return more" }),
+          within(planOf()).getByRole("button", { name: "One round more" }),
         );
         await user.click(
           await screen.findByRole("button", { name: `${label}, round 1` }),
@@ -2651,6 +2655,71 @@ describe("LiveControlPage", () => {
           "done",
         );
       });
+      it("tells the backend a Return from the passage end follows on from it", async () => {
+        const user = await openPraiseForAutoplay();
+        await user.click(screen.getByRole("button", { name: /homage/ }));
+        await user.click(screen.getByRole("button", { name: "Next →" }));
+        await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(2));
+
+        await user.click(
+          screen.getByRole("button", { name: `${label}, round 1` }),
+        );
+
+        // Back to line 1 in round 2, having recited line 2 through: line 2 is
+        // the one the room's last move was on, so its hold is its play time.
+        await waitFor(() =>
+          expect(publishPosition).toHaveBeenLastCalledWith(
+            "e1",
+            "tok-123",
+            {
+              textId: "root",
+              segmentId: "BsajlElFFNFLoHcUjICwB",
+              index: 0,
+              roundNumber: 2,
+              elapsedMs: expect.any(Number),
+              fromIndex: 1,
+            },
+            expect.any(String),
+          ),
+        );
+      });
+    });
+
+    it("tells the backend Next over yigchung follows on, and a jump does not", async () => {
+      fetchEditionYigchungs.mockImplementation(async (textId: string) =>
+        textId === "root"
+          ? {
+              "root-s2": {
+                full: true,
+                ranges: [{ start: 0, end: 11 }],
+                length: 11,
+              },
+            }
+          : {},
+      );
+      const user = await openForAutoplay();
+      await user.click(screen.getByRole("button", { name: /root line 1/ }));
+      await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(1));
+
+      // Line 2 is instruction: Next lands on line 3, the next line recited.
+      await user.click(screen.getByRole("button", { name: "Next →" }));
+      await waitFor(() =>
+        expect(publishPosition).toHaveBeenLastCalledWith(
+          "e1",
+          "tok-123",
+          expect.objectContaining({
+            segmentId: "root-s3",
+            index: 2,
+            fromIndex: 0,
+          }),
+          expect.any(String),
+        ),
+      );
+
+      // Back up to line 1 by tapping it: nothing was recited through.
+      await user.click(screen.getByRole("button", { name: /root line 1/ }));
+      await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(3));
+      expect(publishPosition.mock.calls[2][2]).not.toHaveProperty("fromIndex");
     });
 
     it("reads the times again once the room takes a timed move by hand", async () => {

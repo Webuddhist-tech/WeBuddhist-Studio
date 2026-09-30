@@ -53,6 +53,14 @@ describe("publishPosition", () => {
 
     expect(emitPost.mock.calls[0][1]).not.toHaveProperty("run");
   });
+
+  it("sends the line a move follows on from, only when there is one", async () => {
+    await publishPosition("e1", "tok", { ...position, fromIndex: 1 });
+    await publishPosition("e1", "tok", position);
+
+    expect(emitPost.mock.calls[0][1]).toMatchObject({ from_index: 1 });
+    expect(emitPost.mock.calls[1][1]).not.toHaveProperty("from_index");
+  });
 });
 
 describe("fetchRecitationDetails", () => {

@@ -79,6 +79,13 @@ export interface PositionToPublish {
    * which are not timed at all.
    */
   elapsedMs?: number;
+  /**
+   * The line, in this edition, this move follows on from in recitation order
+   * when that is not simply the line before it: Next over yigchung, or a Return
+   * taken from the end of its passage. The backend times only a step on from
+   * the room's last line, so without it those lines never learn a play time.
+   */
+  fromIndex?: number;
 }
 
 /** A publish either landed (202) or did not, with something to show the operator. */
@@ -298,6 +305,9 @@ export const publishPosition = async (
         ...(position.elapsedMs === undefined
           ? {}
           : { elapsed_ms: position.elapsedMs }),
+        ...(position.fromIndex === undefined
+          ? {}
+          : { from_index: position.fromIndex }),
       },
       { headers: { "X-Recitation-Token": token } },
     );
