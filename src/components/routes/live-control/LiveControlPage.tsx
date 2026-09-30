@@ -1099,6 +1099,9 @@ const LiveControlPage = () => {
   /** Whether autoplay is meant to be running, for callbacks made between
    * renders. Kept in step with the `autoplay` state below. */
   const autoplayRef = useRef(false);
+  /** Whether the backend runs a plan this page did not start - after a reload,
+   * or from another controller. Kept in step with `remoteAutoplay` below. */
+  const remoteAutoplayRef = useRef(false);
   /** Hands the backend a new plan from a line: how a move made by hand while
    * autoplay runs reaches the room. Set with the autoplay code below. */
   const autoplayFromRef = useRef<(index: number, round?: number) => void>(
@@ -1175,7 +1178,9 @@ const LiveControlPage = () => {
   const jump = useCallback(
     (index: number, round?: number) => {
       if (index < 0 || index >= driverLines.length) return;
-      if (autoplayRef.current) {
+      // Autoplay started elsewhere is taken over the same way: one line sent
+      // from here would be overtaken by its plan's next step.
+      if (autoplayRef.current || remoteAutoplayRef.current) {
         autoplayFromRef.current(index, round);
         return;
       }
@@ -1318,6 +1323,9 @@ const LiveControlPage = () => {
   );
   /** Counts plan hand-overs, so only the newest one's answer is acted on. */
   const autoplayStartRef = useRef(0);
+  /** A plan hand-over still waiting on the backend's answer. A stop waits for
+   * it, so the stop cannot reach the backend first and leave the plan running. */
+  const pendingStartRef = useRef<Promise<unknown> | null>(null);
 
   /**
    * The plan from line `from`: that line first, `round` naming its round when
@@ -1469,15 +1477,19 @@ const LiveControlPage = () => {
     !autoplay &&
     serverAutoplay?.status === "running" &&
     serverAutoplay.planId !== planRef.current?.planId;
+  remoteAutoplayRef.current = remoteAutoplay;
 
   /**
    * Makes a plan and hands it to the backend. `keepFirstFor` is how long the
    * room has been on the first line already, when it is not to be sent again.
+   * `byHand` is a line the operator moved to while autoplay ran: it is sent
+   * even with no recorded time, the plan then stopping on it.
    */
   const handOver = async (
     from: number,
     round: number | undefined,
     keepFirstFor?: number,
+    byHand = false,
   ) => {
     if (!eventId || !token) return;
     autoplayStartRef.current += 1;
@@ -1492,7 +1504,7 @@ const LiveControlPage = () => {
     );
     if (handOverId !== autoplayStartRef.current) return;
     const plan = buildPlan(from, round, fresh?.data ?? playTimes ?? {});
-    if (plan.noTimeAt === from && keepFirstFor === undefined) {
+    if (plan.noTimeAt === from && keepFirstFor === undefined && !byHand) {
       setAutoplay(false);
       autoplayRef.current = false;
       setAutoplayBusy(false);
@@ -1511,7 +1523,7 @@ const LiveControlPage = () => {
       setLineStartedAt(performance.now());
       scrollLineIntoBand(from);
     }
-    const started = await startAutoplay(
+    const request = startAutoplay(
       eventId,
       token,
       plan.steps,
@@ -1519,6 +1531,9 @@ const LiveControlPage = () => {
         ? undefined
         : Math.min(MAX_PLAN_STEP_MS, Math.round(keepFirstFor)),
     );
+    pendingStartRef.current = request;
+    const started = await request;
+    if (pendingStartRef.current === request) pendingStartRef.current = null;
     if (handOverId !== autoplayStartRef.current) return;
     setAutoplayBusy(false);
     if (!started.ok) {
@@ -1534,13 +1549,18 @@ const LiveControlPage = () => {
   };
   autoplayFromRef.current = (index, round) => {
     setHeldMoves((current) => (current.length > 0 ? [] : current));
-    void handOver(index, round);
+    void handOver(index, round, undefined, true);
   };
   replanRef.current = () => {
     if (!autoplayRef.current || currentIndex < 0) return;
-    const step = planRef.current?.steps.find(
-      (planned) => planned.lineIndex === currentIndex,
-    );
+    // The round is the one the backend has the room on: the step it last said
+    // it is at. A line can come up in more than one round of a plan, so the
+    // first step on it could be an earlier round. Unheard yet, the settled and
+    // requested rounds stand.
+    const plan = planRef.current;
+    const heard =
+      plan?.lastStep === undefined ? undefined : plan.steps[plan.lastStep];
+    const step = heard?.lineIndex === currentIndex ? heard : undefined;
     void handOver(
       currentIndex,
       step?.round,
@@ -1557,11 +1577,16 @@ const LiveControlPage = () => {
   /** Stops the backend's autoplay where it is. */
   const pauseAutoplay = async () => {
     autoplayStartRef.current += 1;
+    const pauseId = autoplayStartRef.current;
     planRef.current = null;
     setAutoplay(false);
     autoplayRef.current = false;
     setAutoplayBusy(false);
     if (!eventId || !token) return;
+    // A start still on its way goes first, so this stop ends what it began.
+    await pendingStartRef.current;
+    // Autoplay pressed again meanwhile: its plan replaces the one to stop.
+    if (pauseId !== autoplayStartRef.current) return;
     const stopped = await stopAutoplay(eventId, token);
     if (!stopped.ok) {
       setAutoplayNote(
@@ -1587,7 +1612,11 @@ const LiveControlPage = () => {
     autoplayRef.current = false;
     setAutoplayBusy(false);
     const { eventId: event, token: key } = stopForRef.current;
-    if (wasPlaying && event && key) void stopAutoplay(event, key);
+    if (wasPlaying && event && key) {
+      // After any start still on its way, so the stop is not overtaken by it.
+      const pending = pendingStartRef.current ?? Promise.resolve();
+      void pending.then(() => stopAutoplay(event, key));
+    }
   }, [driverTextId]);
   useEffect(() => {
     autoplayStartRef.current += 1;
