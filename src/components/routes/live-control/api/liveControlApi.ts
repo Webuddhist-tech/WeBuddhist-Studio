@@ -423,6 +423,9 @@ const autoplayFailure = (error: unknown): AutoplayResult => {
   return { ok: false, message: emitFailure(status) };
 };
 
+/** How long a start is given to answer before it counts as failed. */
+const START_TIMEOUT_MS = 15_000;
+
 /**
  * Hands a plan to the backend, which from then on moves the room on by itself
  * - whatever this page, or the phone it is on, does. Replaces any plan already
@@ -447,7 +450,9 @@ export const startAutoplay = async (
           ? {}
           : { first_step_elapsed_ms: firstStepElapsedMs }),
       },
-      { headers: { "X-Recitation-Token": token } },
+      // Pause and a change of text wait for a start to answer before stopping:
+      // one that never answers must not hold them for ever.
+      { headers: { "X-Recitation-Token": token }, timeout: START_TIMEOUT_MS },
     );
     const state = toAutoplayState(data);
     return state

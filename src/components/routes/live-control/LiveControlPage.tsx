@@ -1531,13 +1531,15 @@ const LiveControlPage = () => {
         ? undefined
         : Math.min(MAX_PLAN_STEP_MS, Math.round(keepFirstFor)),
     );
-    // Any earlier start still on its way is waited for too, so a stop follows
-    // every start sent before it.
+    // A stop waits for every start sent before it, earlier ones included. This
+    // plan is followed as soon as its own answer is in: an older start that is
+    // slow to answer does not hold the controller up.
     const inFlight = Promise.all([pendingStartRef.current, request]);
     pendingStartRef.current = inFlight;
+    void inFlight.then(() => {
+      if (pendingStartRef.current === inFlight) pendingStartRef.current = null;
+    });
     const started = await request;
-    await inFlight;
-    if (pendingStartRef.current === inFlight) pendingStartRef.current = null;
     if (handOverId !== autoplayStartRef.current) return;
     setAutoplayBusy(false);
     if (!started.ok) {
