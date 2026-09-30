@@ -1924,9 +1924,7 @@ const LiveControlPage = () => {
                           <AutoplayProgress
                             startedAt={lineStartedAt}
                             duration={playTime}
-                            running={
-                              !refreshingPlayTimes && !awaitingYigchungs
-                            }
+                            running={!refreshingPlayTimes && !awaitingYigchungs}
                           />
                         ) : null}
                       </button>
