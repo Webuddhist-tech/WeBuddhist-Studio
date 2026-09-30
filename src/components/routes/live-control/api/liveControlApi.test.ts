@@ -181,6 +181,24 @@ describe("fetchTextEditions", () => {
     ]);
   });
 
+  it("keeps the edition id the text was opened by", async () => {
+    // The library answers an edition id with its own internal id for the work.
+    vi.mocked(axiosInstance.get).mockResolvedValue({
+      data: {
+        text: { id: "internal-root", title: "Praise", language: "bo" },
+        versions: [
+          { id: "internal-root", title: "Praise", language: "bo" },
+          { id: "root-en", title: "Praise (en)", language: "en" },
+        ],
+      },
+    });
+
+    const { text, editions } = await fetchTextEditions("edition-root");
+
+    expect(text.textId).toBe("edition-root");
+    expect(editions.map((edition) => edition.textId)).toEqual(["root-en"]);
+  });
+
   it("stands in for a text the library describes sparsely", async () => {
     vi.mocked(axiosInstance.get).mockResolvedValue({ data: {} });
 

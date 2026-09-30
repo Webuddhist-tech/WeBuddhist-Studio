@@ -226,3 +226,100 @@ export const fetchEditionSections = async (
   const spans = await scanSegmentSpans(editionId);
   return flatten(sections, spans, language, 0, []);
 };
+
+type Range = { start: number; end: number };
+
+/**
+ * How much of a segment is yigchung - the small-letter instructions a liturgy
+ * carries for whoever leads it, which are read silently rather than recited.
+ * `full` means the whole segment is instruction; otherwise `ranges` marks the
+ * instruction inside it, as offsets into the segment's own text.
+ */
+export interface SegmentYigchung {
+  full: boolean;
+  ranges: Range[];
+  /** The segment's length in the library, to check the text shown matches it. */
+  length: number;
+}
+
+/** Overlapping or touching spans merged, in order. */
+const mergeRanges = (ranges: Range[]): Range[] =>
+  [...ranges]
+    .filter((range) => range.end > range.start)
+    .sort((a, b) => a.start - b.start)
+    .reduce<Range[]>((merged, range) => {
+      const last = merged[merged.length - 1];
+      if (last && range.start <= last.end) {
+        last.end = Math.max(last.end, range.end);
+      } else {
+        merged.push({ ...range });
+      }
+      return merged;
+    }, []);
+
+/**
+ * Lays the yigchung spans over one segment. A segment of several lines is read
+ * as its lines run together, so an offset counts through them in turn.
+ */
+export const yigchungInSegment = (
+  lines: Range[],
+  marks: Range[],
+): SegmentYigchung | null => {
+  // Merged first, so text two overlapping marks share is counted once.
+  const merged = mergeRanges(marks);
+  const ranges: Range[] = [];
+  let offset = 0;
+  let covered = 0;
+  let length = 0;
+  [...lines]
+    .sort((a, b) => a.start - b.start)
+    .forEach((line) => {
+      merged.forEach((mark) => {
+        const start = Math.max(mark.start, line.start);
+        const end = Math.min(mark.end, line.end);
+        if (end > start) {
+          ranges.push({
+            start: offset + start - line.start,
+            end: offset + end - line.start,
+          });
+          covered += end - start;
+        }
+      });
+      offset += line.end - line.start;
+      length += line.end - line.start;
+    });
+  if (ranges.length === 0) return null;
+  return {
+    full: length > 0 && covered >= length,
+    ranges: mergeRanges(ranges),
+    length,
+  };
+};
+
+/**
+ * The yigchung of an edition, by the segment it falls in.
+ *
+ * The library marks yigchung by character span over the edition's text, while
+ * the operator moves by segment, so each span is laid over the segment spans.
+ * An edition with none - most of them - costs one request and no scan.
+ */
+export const fetchEditionYigchungs = async (
+  textOrEditionId: string,
+): Promise<Record<string, SegmentYigchung>> => {
+  const editionId = await resolveEditionId(textOrEditionId);
+  const { data: marks } = await libraryClient.get<{ span?: Range | null }[]>(
+    `/v2/editions/${encodeURIComponent(editionId)}/yigchungs`,
+  );
+  const spans = mergeRanges(
+    (marks ?? []).flatMap((mark) => (mark.span ? [mark.span] : [])),
+  );
+  if (spans.length === 0) return {};
+
+  const segments = await scanSegmentSpans(editionId);
+  const bySegment: Record<string, SegmentYigchung> = {};
+  segments.forEach((segment) => {
+    const found = yigchungInSegment(segment.lines ?? [], spans);
+    if (found) bySegment[segment.id] = found;
+  });
+  return bySegment;
+};

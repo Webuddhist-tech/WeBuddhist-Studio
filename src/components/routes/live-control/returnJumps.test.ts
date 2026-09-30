@@ -10,17 +10,32 @@ describe("returnButtonForLine", () => {
         { id: jump.after.en },
       ];
       expect(returnButtonForLine(jump.after.en, lines)).toEqual({
+        key: jump.afterVerse,
         label: jump.label,
         index: 0,
       });
-      expect(returnButtonForLine(jump.after.bo, [{ id: jump.to.bo }, { id: jump.after.bo }])?.index).toBe(0);
-      expect(returnButtonForLine(jump.after.zh, [{ id: jump.to.zh }, { id: jump.after.zh }])?.index).toBe(0);
+      expect(
+        returnButtonForLine(jump.after.bo, [
+          { id: jump.to.bo },
+          { id: jump.after.bo },
+        ])?.index,
+      ).toBe(0);
+      expect(
+        returnButtonForLine(jump.after.zh, [
+          { id: jump.to.zh },
+          { id: jump.after.zh },
+        ])?.index,
+      ).toBe(0);
     }
   });
 
   it("draws nothing when the target verse is not in the lines on screen", () => {
     const first = RETURN_JUMPS[0];
-    expect(returnButtonForLine(first.after.bo, [{ id: first.after.bo }])).toBeNull();
-    expect(returnButtonForLine("some-other-segment", [{ id: first.to.bo }])).toBeNull();
+    expect(
+      returnButtonForLine(first.after.bo, [{ id: first.after.bo }]),
+    ).toBeNull();
+    expect(
+      returnButtonForLine("some-other-segment", [{ id: first.to.bo }]),
+    ).toBeNull();
   });
 });

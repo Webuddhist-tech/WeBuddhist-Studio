@@ -35,6 +35,7 @@ import EventDateSection from "./components/events/EventDateSection";
 import EventLinksSection from "./components/events/EventLinksSection";
 import EventUrlLinksSection from "./components/events/EventUrlLinksSection";
 import EventYoutubeSection from "./components/events/EventYoutubeSection";
+import { findGroupYoutubeLink } from "./api/youtubeChannelApi";
 import EventImageField from "./components/events/EventImageField";
 import EventFormatField from "./components/events/EventFormatField";
 import EventChatField from "./components/events/EventChatField";
@@ -61,8 +62,9 @@ const GroupEventFormPage = () => {
   }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { myRole, userInfo, readOnlyPlatform } =
+  const { group, myRole, userInfo, readOnlyPlatform } =
     useOutletContext<GroupOutletContext>();
+  const groupYoutubeUrl = findGroupYoutubeLink(group?.social_links);
 
   const isNew = !eventId;
   const canWrite =
@@ -389,6 +391,7 @@ const GroupEventFormPage = () => {
                 form={form}
                 fields={youtubeRows.fields}
                 readOnly={readOnly}
+                channelUrl={groupYoutubeUrl}
                 onAdd={addYoutubeRow}
                 onRemove={removeYoutubeRow}
                 onMove={moveYoutubeRow}

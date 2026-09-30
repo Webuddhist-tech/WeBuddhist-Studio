@@ -9,6 +9,8 @@ type EventYoutubeSectionProps = {
   form: UseFormReturn<EventFormData>;
   fields: { id: string }[];
   readOnly: boolean;
+  /** The group's YouTube channel URL, if the group has one. */
+  channelUrl?: string | null;
   onAdd: () => void;
   onRemove: (index: number) => void;
   onMove: (from: number, to: number) => void;
@@ -18,6 +20,7 @@ const EventYoutubeSection = ({
   form,
   fields,
   readOnly,
+  channelUrl = null,
   onAdd,
   onRemove,
   onMove,
@@ -38,6 +41,9 @@ const EventYoutubeSection = ({
           <h3 className="text-sm font-bold">YouTube (optional)</h3>
           <p className="text-xs text-muted-foreground">
             YouTube videos shown on the event.
+            {channelUrl && !readOnly
+              ? " Pick a live stream from the group's channel or paste a URL."
+              : ""}
           </p>
         </div>
         {!readOnly ? (
@@ -71,6 +77,7 @@ const EventYoutubeSection = ({
               index={index}
               readOnly={readOnly}
               canReorder={canReorder}
+              channelUrl={channelUrl}
               onRemove={onRemove}
             />
           ))}

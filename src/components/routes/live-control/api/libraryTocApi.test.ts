@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { fetchEditionSections } from "./libraryTocApi";
+import {
+  fetchEditionSections,
+  fetchEditionYigchungs,
+  yigchungInSegment,
+} from "./libraryTocApi";
 
 const { get } = vi.hoisted(() => ({ get: vi.fn() }));
 
@@ -28,11 +32,12 @@ type Routes = {
   edition?: unknown;
   editions?: unknown;
   toc?: unknown;
+  yigchungs?: unknown;
   pages?: { items: unknown[]; has_more: boolean }[];
 };
 
 /** Answers each library path the module reads, in the order it reads them. */
-const serve = ({ edition, editions, toc, pages = [] }: Routes) => {
+const serve = ({ edition, editions, toc, yigchungs, pages = [] }: Routes) => {
   let page = 0;
   get.mockImplementation(async (url: string) => {
     if (url.endsWith("/segmentation/segments")) {
@@ -41,6 +46,7 @@ const serve = ({ edition, editions, toc, pages = [] }: Routes) => {
       return { data: current };
     }
     if (url.endsWith("/table-of-contents")) return { data: toc ?? [] };
+    if (url.endsWith("/yigchungs")) return { data: yigchungs ?? [] };
     if (url.endsWith("/editions")) return { data: editions ?? [] };
     if (
       edition instanceof Error ||
@@ -312,5 +318,74 @@ describe("fetchEditionSections", () => {
       "/v2/texts/ed-1/editions",
       expect.anything(),
     );
+  });
+});
+
+describe("yigchungInSegment", () => {
+  it("is full when the marks cover the whole segment, even split in two", () => {
+    expect(
+      yigchungInSegment(
+        [{ start: 10, end: 20 }],
+        [
+          { start: 5, end: 14 },
+          { start: 14, end: 25 },
+        ],
+      ),
+    ).toEqual({ full: true, ranges: [{ start: 0, end: 10 }], length: 10 });
+  });
+
+  it("marks the part of a segment that is instruction, from its own start", () => {
+    expect(
+      yigchungInSegment([{ start: 10, end: 20 }], [{ start: 16, end: 30 }]),
+    ).toEqual({ full: false, ranges: [{ start: 6, end: 10 }], length: 10 });
+  });
+
+  it("counts through a segment's lines in turn", () => {
+    expect(
+      yigchungInSegment(
+        [
+          { start: 0, end: 5 },
+          { start: 10, end: 15 },
+        ],
+        [{ start: 10, end: 12 }],
+      ),
+    ).toEqual({ full: false, ranges: [{ start: 5, end: 7 }], length: 10 });
+  });
+
+  it("is nothing for a segment no mark reaches", () => {
+    expect(
+      yigchungInSegment([{ start: 0, end: 10 }], [{ start: 10, end: 20 }]),
+    ).toBeNull();
+  });
+});
+
+describe("fetchEditionYigchungs", () => {
+  beforeEach(() => {
+    get.mockReset();
+  });
+
+  it("lays each mark over the segments it falls in", async () => {
+    serve({
+      yigchungs: [
+        { id: "y1", span: { start: 10, end: 20 } },
+        { id: "y2", span: { start: 25, end: 30 } },
+      ],
+      pages: [{ items: spans(4), has_more: false }],
+    });
+
+    await expect(fetchEditionYigchungs("ed-1")).resolves.toEqual({
+      "seg-2": { full: true, ranges: [{ start: 0, end: 10 }], length: 10 },
+      "seg-3": { full: false, ranges: [{ start: 5, end: 10 }], length: 10 },
+    });
+    expect(get).toHaveBeenCalledWith("/v2/editions/ed-1/yigchungs");
+  });
+
+  it("does not scan spans for an edition with no yigchung", async () => {
+    serve({ yigchungs: [] });
+
+    await expect(fetchEditionYigchungs("ed-1")).resolves.toEqual({});
+    expect(
+      get.mock.calls.filter(([url]) => url.endsWith("/segmentation/segments")),
+    ).toHaveLength(0);
   });
 });
