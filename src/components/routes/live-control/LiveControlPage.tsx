@@ -16,6 +16,7 @@ import {
   fetchLiturgies,
   fetchLiveControlEvent,
   fetchRecitationDetails,
+  fetchSegmentPlayTimes,
   fetchTextEditions,
   searchTextsByTitle,
   toOperatorSegments,
@@ -598,6 +599,16 @@ const LiveControlPage = () => {
     retry: false,
     staleTime: 1000 * 60 * 20,
   });
+  // How long each line of the edition on screen takes to recite, learned by the
+  // backend from earlier pujas: what autoplay paces the room by.
+  const { data: playTimes, refetch: refetchPlayTimes } = useQuery({
+    queryKey: ["live-control-play-times", driverTextId, token],
+    queryFn: () => fetchSegmentPlayTimes(driverTextId, token ?? ""),
+    enabled: Boolean(driverTextId && token),
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+
   /** Until the marks are in, a move cannot tell instruction from verse. */
   const awaitingYigchungs = Boolean(driverTextId) && yigchungsPending;
 
@@ -808,13 +819,18 @@ const LiveControlPage = () => {
     [lines, linesByRow, followed, driverTextId, roundForLine],
   );
 
-  /** Moves to a line. `round` names the round when the move begins a new one. */
+  /**
+   * Moves to a line. `round` names the round when the move begins a new one;
+   * `autoplay` marks a move the controller made on its own, which the backend
+   * then does not time back into the play times it came from.
+   */
   const jump = useCallback(
-    (index: number, round?: number) => {
+    (index: number, round?: number, autoplay = false) => {
       if (index < 0 || index >= driverLines.length) return;
       setCurrentIndex(index);
       scrollLineIntoBand(index);
-      publish(cuesForLine(index, round));
+      const cues = cuesForLine(index, round);
+      publish(autoplay ? cues.map((cue) => ({ ...cue, autoplay })) : cues);
     },
     [driverLines.length, publish, cuesForLine],
   );
@@ -898,6 +914,63 @@ const LiveControlPage = () => {
     },
     [awaitingYigchungs, currentIndex, landingFrom, jump],
   );
+
+  /**
+   * Autoplay: the controller moves the room on by itself, each line held for as
+   * long as it has taken to recite before. Every move still goes out from here,
+   * exactly as a press of Next would, so the operator can step in at any time -
+   * any move they make restarts the clock on the line they chose.
+   */
+  const [autoplay, setAutoplay] = useState(false);
+  const [autoplayNote, setAutoplayNote] = useState<string | null>(null);
+  useEffect(() => {
+    setAutoplay(false);
+  }, [driverTextId, token]);
+
+  const autoplayNextRef = useRef(() => {});
+  autoplayNextRef.current = () => {
+    const next = landingFrom(currentIndex, 1);
+    if (next === currentIndex) {
+      setAutoplay(false);
+      return;
+    }
+    jump(next, undefined, true);
+  };
+
+  const currentLineId = driverLines[currentIndex]?.id;
+  const currentPlayTime = currentLineId
+    ? playTimes?.[currentLineId]
+    : undefined;
+  useEffect(() => {
+    // Waits, rather than guesses, while the times or the yigchung are loading.
+    if (!autoplay || currentIndex < 0 || awaitingYigchungs || !playTimes) {
+      return;
+    }
+    if (currentPlayTime === undefined) {
+      setAutoplay(false);
+      setAutoplayNote(
+        `Autoplay stopped at line ${currentIndex + 1}: it has not been recited here before, so there is no time to hold it for. Move on by hand and it will be learned.`,
+      );
+      return;
+    }
+    const timer = window.setTimeout(
+      () => autoplayNextRef.current(),
+      currentPlayTime,
+    );
+    return () => window.clearTimeout(timer);
+  }, [autoplay, currentIndex, currentPlayTime, awaitingYigchungs, playTimes]);
+
+  const toggleAutoplay = () => {
+    if (autoplay) {
+      setAutoplay(false);
+      return;
+    }
+    setAutoplayNote(null);
+    // Times learned since the page opened count too.
+    void refetchPlayTimes();
+    if (currentIndex < 0) step(1);
+    setAutoplay(true);
+  };
 
   // Space / right / down advance, left / up go back: the operator drives without
   // leaving the liturgy, exactly as on the puja controller.
@@ -1047,9 +1120,10 @@ const LiveControlPage = () => {
 
   /** The one problem the page is showing, if any. */
   const errorMessage =
-    eventError || editionsError || loadError || notice
+    eventError || editionsError || loadError || notice || autoplayNote
       ? (loadError ??
         notice ??
+        autoplayNote ??
         getApiErrorMessage(
           eventError ?? editionsError,
           "Could not load this event.",
@@ -1709,6 +1783,24 @@ const LiveControlPage = () => {
                   className="w-[28%] max-w-[200px] touch-manipulation cursor-pointer rounded-[9px] bg-[#2c2c2e] py-4 text-base font-semibold select-none hover:bg-[#3a3a3c] active:bg-[#48484a] max-lg:py-3 max-lg:text-[15px] max-lg:landscape:w-full max-lg:landscape:max-w-none"
                 >
                   ← Previous
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleAutoplay}
+                  aria-pressed={autoplay}
+                  disabled={!token || driverLines.length === 0}
+                  title={
+                    token
+                      ? "Move the room on by itself, at the pace this text was recited before"
+                      : "Add the emit token to use autoplay"
+                  }
+                  className={`w-[22%] max-w-[160px] touch-manipulation cursor-pointer rounded-[9px] py-4 text-base font-semibold select-none disabled:cursor-not-allowed disabled:opacity-40 max-lg:py-3 max-lg:text-[15px] max-lg:landscape:w-full max-lg:landscape:max-w-none ${
+                    autoplay
+                      ? "bg-[#1f3a24] text-[#7fd598] hover:bg-[#274a2e]"
+                      : "bg-[#2c2c2e] hover:bg-[#3a3a3c] active:bg-[#48484a]"
+                  }`}
+                >
+                  {autoplay ? "❚❚ Pause" : "▶ Auto"}
                 </button>
                 <button
                   type="button"

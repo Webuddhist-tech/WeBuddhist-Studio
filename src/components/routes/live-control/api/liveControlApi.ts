@@ -67,6 +67,8 @@ export interface PositionToPublish {
   segmentId: string;
   index: number;
   roundNumber: number;
+  /** Made by autoplay, so the backend does not time it back into the play times. */
+  autoplay?: boolean;
 }
 
 /** A publish either landed (202) or did not, with something to show the operator. */
@@ -265,6 +267,7 @@ export const publishPosition = async (
         segment_id: position.segmentId,
         index: position.index,
         round_number: position.roundNumber,
+        ...(position.autoplay ? { autoplay: true } : {}),
       },
       { headers: { "X-Recitation-Token": token } },
     );
@@ -295,4 +298,30 @@ export const endRecitationSession = async (
       : undefined;
     return { ok: false, message: emitFailure(status) };
   }
+};
+
+interface SegmentPlayTimesResponse {
+  text_id: string;
+  segments: { segment_id: string; average_duration_ms: number }[];
+}
+
+/**
+ * How long each line of an edition takes to recite, by segment id, as the
+ * backend learned it from earlier pujas. A line never recited through to the
+ * next one is absent.
+ */
+export const fetchSegmentPlayTimes = async (
+  textId: string,
+  token: string,
+): Promise<Record<string, number>> => {
+  const { data } = await emitClient.get<SegmentPlayTimesResponse>(
+    `/api/v1/events/recitation/texts/${encodeURIComponent(textId)}/segment-play-times`,
+    { headers: { "X-Recitation-Token": token } },
+  );
+  return Object.fromEntries(
+    data.segments.map((segment) => [
+      segment.segment_id,
+      segment.average_duration_ms,
+    ]),
+  );
 };

@@ -22,7 +22,9 @@ const {
   fetchEditionYigchungs,
   searchTextsByTitle,
   fetchEditionTitle,
+  fetchSegmentPlayTimes,
 } = vi.hoisted(() => ({
+  fetchSegmentPlayTimes: vi.fn(),
   searchTextsByTitle: vi.fn(),
   fetchEditionTitle: vi.fn(),
   fetchLiveControlEvent: vi.fn(),
@@ -39,6 +41,7 @@ const {
         segmentId: string;
         index: number;
         roundNumber: number;
+        autoplay?: boolean;
       },
     ) => Promise<{ ok: boolean; message?: string }>
   >(async () => ({ ok: true })),
@@ -66,6 +69,7 @@ vi.mock("./api/liveControlApi", async () => {
     endRecitationSession,
     searchTextsByTitle,
     fetchEditionTitle,
+    fetchSegmentPlayTimes,
   };
 });
 
@@ -179,6 +183,8 @@ describe("LiveControlPage", () => {
     fetchEditionTitle.mockImplementation(
       async (textId: string) => `Title of ${textId}`,
     );
+    fetchSegmentPlayTimes.mockReset();
+    fetchSegmentPlayTimes.mockResolvedValue({});
     localStorage.clear();
     Element.prototype.scrollIntoView = vi.fn();
 
@@ -1907,6 +1913,97 @@ describe("LiveControlPage", () => {
       expect(
         await screen.findByText(/1 more edition following/),
       ).toBeInTheDocument();
+    });
+  });
+
+  describe("autoplay", () => {
+    /** Opens the first liturgy with a token, driving the Tibetan alone. */
+    const openForAutoplay = async () => {
+      const user = userEvent.setup();
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+      await followNone(user);
+      await waitFor(() =>
+        expect(fetchSegmentPlayTimes).toHaveBeenCalledWith("root", "tok-123"),
+      );
+      publishPosition.mockClear();
+      return user;
+    };
+
+    it("moves the room on by itself at the pace each line was recited", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue({
+        "root-s1": 20,
+        "root-s2": 20,
+        "root-s3": 20,
+      });
+      const user = await openForAutoplay();
+
+      await user.click(screen.getByRole("button", { name: "▶ Auto" }));
+
+      await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(3));
+      // The first line is the operator's own start; the rest autoplay made,
+      // and say so, so they are not timed back into the play times.
+      expect(publishPosition.mock.calls.map((call) => call[2])).toEqual([
+        { textId: "root", segmentId: "root-s1", index: 0, roundNumber: 1 },
+        {
+          textId: "root",
+          segmentId: "root-s2",
+          index: 1,
+          roundNumber: 1,
+          autoplay: true,
+        },
+        {
+          textId: "root",
+          segmentId: "root-s3",
+          index: 2,
+          roundNumber: 1,
+          autoplay: true,
+        },
+      ]);
+      // Nothing after the last line: autoplay lets go.
+      expect(
+        await screen.findByRole("button", { name: "▶ Auto" }),
+      ).toBeInTheDocument();
+    });
+
+    it("stops, and says why, at a line with no recorded time", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue({ "root-s1": 20 });
+      const user = await openForAutoplay();
+
+      await user.click(screen.getByRole("button", { name: "▶ Auto" }));
+
+      expect(
+        await screen.findByText(/Autoplay stopped at line 2/),
+      ).toBeInTheDocument();
+      expect(publishPosition).toHaveBeenCalledTimes(2);
+      expect(
+        screen.getByRole("button", { name: "▶ Auto" }),
+      ).toBeInTheDocument();
+    });
+
+    it("moves nothing once paused", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue({
+        "root-s1": 400,
+        "root-s2": 400,
+        "root-s3": 400,
+      });
+      const user = await openForAutoplay();
+
+      await user.click(screen.getByRole("button", { name: "▶ Auto" }));
+      await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(1));
+      await user.click(screen.getByRole("button", { name: "❚❚ Pause" }));
+      await new Promise((resolve) => setTimeout(resolve, 600));
+
+      expect(publishPosition).toHaveBeenCalledTimes(1);
+    });
+
+    it("cannot be started without the emit token", async () => {
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+      expect(screen.getByRole("button", { name: "▶ Auto" })).toBeDisabled();
+      expect(fetchSegmentPlayTimes).not.toHaveBeenCalled();
     });
   });
 });
