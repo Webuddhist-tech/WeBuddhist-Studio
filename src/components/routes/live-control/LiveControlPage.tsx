@@ -2126,7 +2126,9 @@ const LiveControlPage = () => {
                       key={liturgy.textId}
                       type="button"
                       aria-pressed={isOpen}
-                      onClick={() => openTextById(liturgy.textId, liturgy.title)}
+                      onClick={() =>
+                        openTextById(liturgy.textId, liturgy.title)
+                      }
                       className={`mb-0.5 block w-full cursor-pointer rounded-[7px] px-3 py-1.5 text-left ${titleSize} [overflow-wrap:anywhere] max-lg:py-1 ${
                         isOpen
                           ? "bg-[#e5231c] text-white"
