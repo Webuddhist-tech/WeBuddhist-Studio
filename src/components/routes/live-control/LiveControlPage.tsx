@@ -1529,7 +1529,8 @@ const LiveControlPage = () => {
       return;
     }
     planRef.current = { ...plan, planId: started.state.planId };
-    followAutoplay(started.state);
+    // Followed by the newest render's hand: this one's counts may be stale.
+    followAutoplayRef.current(started.state);
   };
   autoplayFromRef.current = (index, round) => {
     setHeldMoves((current) => (current.length > 0 ? [] : current));
@@ -2316,7 +2317,11 @@ const LiveControlPage = () => {
                   ? "Room"
                   : socket.status === "connecting"
                     ? "Connecting to the room…"
-                    : "Room offline · moves go by HTTP"}
+                    : socket.status === "refused"
+                      ? `The room turned the controller away (${
+                          socket.refusal ?? "refused"
+                        }) · moves go by HTTP. The server may not take the emit token on its socket yet.`
+                      : "Room offline · moves go by HTTP"}
               </span>
               {socket.status === "open" ? (
                 <span data-room-line className="min-w-0 truncate">

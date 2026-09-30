@@ -17,7 +17,13 @@ export interface RoomPosition {
   revision: number | null;
 }
 
-export type SocketStatus = "idle" | "connecting" | "open" | "closed";
+export type SocketStatus =
+  | "idle"
+  | "connecting"
+  | "open"
+  | "closed"
+  /** The server answered, and turned the controller away. */
+  | "refused";
 
 export interface RecitationSocket {
   status: SocketStatus;
@@ -26,6 +32,8 @@ export interface RecitationSocket {
   /** How many people are following, not counting this controller. */
   people: number | null;
   autoplay: AutoplayState | null;
+  /** Why the server turned the socket away, in its own words, while it does. */
+  refusal: string | null;
   /**
    * Sends one move over the socket and resolves once the room has taken it -
    * or null at once when the socket is not open, so the caller sends it some
@@ -73,7 +81,11 @@ export function useRecitationSocket(
   const [room, setRoom] = useState<RoomPosition | null>(null);
   const [people, setPeople] = useState<number | null>(null);
   const [autoplay, setAutoplay] = useState<AutoplayState | null>(null);
+  const [refusal, setRefusal] = useState<string | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
+  /** Whether the server has said hello on the socket now held: only then may
+   * a move go over it. */
+  const helloRef = useRef(false);
   const pendingRef = useRef(
     new Map<
       string,
@@ -113,11 +125,15 @@ export function useRecitationSocket(
         return;
       }
       socketRef.current = socket;
+      helloRef.current = false;
 
+      // The server accepts before it checks the token, then says why it will
+      // not have the socket and closes it: until it has said hello, the socket
+      // is not open to the room.
+      let turnedAway: string | null = null;
+      let hello = false;
       socket.onopen = () => {
         if (disposed) return;
-        retryDelay = RECONNECT_MIN_MS;
-        setStatus("open");
         pingTimer = window.setInterval(() => {
           if (socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({ type: "ping" }));
@@ -163,8 +179,24 @@ export function useRecitationSocket(
             setRoom(null);
             return;
           case "session_info":
+            hello = true;
+            helloRef.current = true;
+            retryDelay = RECONNECT_MIN_MS;
+            setRefusal(null);
+            setStatus("open");
+            if (typeof frame.count === "number") setPeople(frame.count);
+            return;
           case "presence":
             if (typeof frame.count === "number") setPeople(frame.count);
+            return;
+          case "error":
+            // Before hello, an error is the server turning the socket away.
+            if (!hello) {
+              turnedAway =
+                typeof frame.message === "string" && frame.message
+                  ? frame.message
+                  : String(frame.code ?? "refused");
+            }
             return;
           case "autoplay": {
             const state = toAutoplayState(frame);
@@ -194,7 +226,10 @@ export function useRecitationSocket(
 
       socket.onclose = () => {
         window.clearInterval(pingTimer);
-        if (socketRef.current === socket) socketRef.current = null;
+        if (socketRef.current === socket) {
+          socketRef.current = null;
+          helloRef.current = false;
+        }
         // Whatever was on its way may or may not have landed; the publisher
         // treats it as not taken and sends the line again on the next move.
         settleAll({
@@ -203,7 +238,15 @@ export function useRecitationSocket(
           message: "Lost the connection to the room. Reconnecting…",
         });
         if (disposed) return;
-        setStatus("closed");
+        if (turnedAway) {
+          // Asking again at once will be refused again - but a server being
+          // redeployed may take the token soon, so it is asked now and then.
+          setRefusal(turnedAway);
+          setStatus("refused");
+          retryDelay = RECONNECT_MAX_MS;
+        } else {
+          setStatus("closed");
+        }
         retryTimer = window.setTimeout(connect, retryDelay);
         retryDelay = Math.min(retryDelay * 2, RECONNECT_MAX_MS);
       };
@@ -230,13 +273,20 @@ export function useRecitationSocket(
       setRoom(null);
       setAutoplay(null);
       setPeople(null);
+      setRefusal(null);
     };
   }, [eventId, token]);
 
   const sendMove = useCallback(
     (positions: MovePosition[]): Promise<SocketMoveResult> | null => {
       const socket = socketRef.current;
-      if (!socket || socket.readyState !== WebSocket.OPEN) return null;
+      if (
+        !socket ||
+        socket.readyState !== WebSocket.OPEN ||
+        !helloRef.current
+      ) {
+        return null;
+      }
       const moveId = newMoveId();
       return new Promise<SocketMoveResult>((resolve) => {
         const timer = window.setTimeout(() => {
@@ -273,5 +323,5 @@ export function useRecitationSocket(
     [],
   );
 
-  return { status, room, people, autoplay, sendMove };
+  return { status, room, people, autoplay, refusal, sendMove };
 }

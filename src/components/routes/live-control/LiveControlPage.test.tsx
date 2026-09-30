@@ -103,6 +103,7 @@ const {
       room: null,
       people: null,
       autoplay: null,
+      refusal: null,
       sendMove: () => null,
     });
     let state = closed();
@@ -2802,6 +2803,18 @@ describe("LiveControlPage", () => {
         expect(document.querySelector("[data-room]")).toHaveTextContent(
           /line 3 · root line 3/,
         ),
+      );
+    });
+
+    it("says why when the server turns the controller's socket away", async () => {
+      socketStore.set({
+        status: "refused",
+        refusal: "Invalid or no token found",
+      });
+      await openForAutoplay();
+
+      expect(document.querySelector("[data-room]")).toHaveTextContent(
+        /turned the controller away \(Invalid or no token found\) · moves go by HTTP/,
       );
     });
 

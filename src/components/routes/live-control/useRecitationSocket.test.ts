@@ -41,6 +41,12 @@ class FakeSocket {
     this.onopen?.();
   }
 
+  /** Opens, and says hello as the server does once the token is taken. */
+  accept(count = 0) {
+    this.open();
+    this.say({ type: "session_info", is_operator: true, count });
+  }
+
   say(frame: Record<string, unknown>) {
     this.onmessage?.({ data: JSON.stringify(frame) });
   }
@@ -84,8 +90,46 @@ describe("useRecitationSocket", () => {
       "wss://api.example.org/api/v1/events/e1/recitation/live?token=tok",
     );
     expect(result.current.status).toBe("connecting");
+    // Open, but not yet let in: the server checks the token first.
     act(() => latest().open());
+    expect(result.current.status).toBe("connecting");
+    expect(result.current.sendMove(move)).toBeNull();
+    act(() =>
+      latest().say({ type: "session_info", is_operator: true, count: 0 }),
+    );
     expect(result.current.status).toBe("open");
+  });
+
+  it("says why the server turned it away, and asks again only now and then", () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useRecitationSocket("e1", "tok"));
+
+    act(() => {
+      latest().open();
+      latest().say({
+        type: "error",
+        code: "UNAUTHORIZED",
+        message: "Invalid or no token found",
+      });
+      latest().drop();
+    });
+
+    expect(result.current.status).toBe("refused");
+    expect(result.current.refusal).toBe("Invalid or no token found");
+    expect(result.current.sendMove(move)).toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+    expect(FakeSocket.made).toHaveLength(1);
+    act(() => {
+      vi.advanceTimersByTime(10_000);
+    });
+    expect(FakeSocket.made).toHaveLength(2);
+
+    // Taken this time - the server was redeployed, say.
+    act(() => latest().accept());
+    expect(result.current.status).toBe("open");
+    expect(result.current.refusal).toBeNull();
   });
 
   it("opens nothing without a token", () => {
@@ -98,7 +142,7 @@ describe("useRecitationSocket", () => {
 
   it("follows the room's position, never backwards", () => {
     const { result } = renderHook(() => useRecitationSocket("e1", "tok"));
-    act(() => latest().open());
+    act(() => latest().accept());
 
     act(() =>
       latest().say({
@@ -135,7 +179,7 @@ describe("useRecitationSocket", () => {
 
   it("hears how many follow, and where autoplay is", () => {
     const { result } = renderHook(() => useRecitationSocket("e1", "tok"));
-    act(() => latest().open());
+    act(() => latest().accept());
 
     act(() =>
       latest().say({ type: "session_info", is_operator: true, count: 3 }),
@@ -160,7 +204,7 @@ describe("useRecitationSocket", () => {
 
   it("sends a move and resolves once the room has taken it", async () => {
     const { result } = renderHook(() => useRecitationSocket("e1", "tok"));
-    act(() => latest().open());
+    act(() => latest().accept());
 
     const answer = result.current.sendMove(move);
     const sent = latest().sent[0];
@@ -185,7 +229,7 @@ describe("useRecitationSocket", () => {
 
   it("tells a refused move from a lost one", async () => {
     const { result } = renderHook(() => useRecitationSocket("e1", "tok"));
-    act(() => latest().open());
+    act(() => latest().accept());
 
     const refused = result.current.sendMove(move);
     act(() =>
@@ -209,7 +253,7 @@ describe("useRecitationSocket", () => {
   it("gives a move up as lost when the room does not answer in time", async () => {
     vi.useFakeTimers();
     const { result } = renderHook(() => useRecitationSocket("e1", "tok"));
-    act(() => latest().open());
+    act(() => latest().accept());
 
     const answer = result.current.sendMove(move);
     act(() => {
@@ -245,14 +289,14 @@ describe("useRecitationSocket", () => {
     });
     expect(FakeSocket.made).toHaveLength(3);
 
-    act(() => latest().open());
+    act(() => latest().accept());
     expect(result.current.status).toBe("open");
   });
 
   it("keeps a quiet socket alive with pings", () => {
     vi.useFakeTimers();
     renderHook(() => useRecitationSocket("e1", "tok"));
-    act(() => latest().open());
+    act(() => latest().accept());
 
     act(() => {
       vi.advanceTimersByTime(25_000);
@@ -264,7 +308,7 @@ describe("useRecitationSocket", () => {
   it("closes for good when the page goes, without reconnecting", () => {
     vi.useFakeTimers();
     const { unmount } = renderHook(() => useRecitationSocket("e1", "tok"));
-    act(() => latest().open());
+    act(() => latest().accept());
     const socket = latest();
 
     unmount();
