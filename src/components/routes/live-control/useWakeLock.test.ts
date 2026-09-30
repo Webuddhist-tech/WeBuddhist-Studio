@@ -46,6 +46,38 @@ describe("useWakeLock", () => {
     expect(request).not.toHaveBeenCalled();
   });
 
+  it("does not ask again while the first request is still waiting", async () => {
+    let resolveRequest: (value: {
+      release: ReturnType<typeof vi.fn>;
+      addEventListener: ReturnType<typeof vi.fn>;
+    }) => void = () => {};
+    request.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveRequest = resolve;
+        }),
+    );
+    const { unmount } = renderHook(() => useWakeLock(true));
+    await waitFor(() => expect(request).toHaveBeenCalledTimes(1));
+
+    visibility = "hidden";
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    visibility = "visible";
+    act(() => {
+      document.dispatchEvent(new Event("visibilitychange"));
+    });
+    expect(request).toHaveBeenCalledTimes(1);
+
+    const release = vi.fn(async () => {});
+    await act(async () => {
+      resolveRequest({ release, addEventListener: vi.fn() });
+    });
+    unmount();
+    await waitFor(() => expect(release).toHaveBeenCalled());
+  });
+
   it("asks again when the page comes back, since the browser let it go", async () => {
     renderHook(() => useWakeLock(true));
     await waitFor(() => expect(request).toHaveBeenCalledTimes(1));

@@ -15,6 +15,8 @@ import { getApiErrorMessage } from "@/lib/apiErrors";
 import {
   fetchAutoplayState,
   fetchEditionTitle,
+  fetchLiturgies,
+  fetchLiveControlEvent,
   fetchRecitationDetails,
   fetchSegmentPlayTimes,
   fetchTextEditions,
@@ -25,6 +27,7 @@ import {
   SUGGESTED_TEXT_IDS,
   toOperatorSegments,
   type AutoplayPlanStep,
+  type AutoplayResult,
   type AutoplayState,
   type OperatorSegment,
   type PositionToPublish,
@@ -36,6 +39,11 @@ import {
   type SegmentYigchung,
   type TocEntry,
 } from "./api/libraryTocApi";
+import {
+  carryPlannedReturns,
+  MAX_PLANNED_ROUNDS,
+  plannedRoundsStorageKey,
+} from "./plannedRounds";
 import { passageAt, returnButtonForLine, returnPassages } from "./returnJumps";
 import { usePositionPublisher, type SendMove } from "./usePositionPublisher";
 import { useRecitationSocket } from "./useRecitationSocket";
@@ -187,14 +195,28 @@ const YIGCHUNG_WAIT_MS = 8000;
 const returnCountsStorageKey = (eventId: string | undefined) =>
   `live-control-return-counts:${eventId ?? ""}`;
 
-/** How many rounds each repeated passage is to be recited this puja, set by the
- * operator so autoplay can take its Returns itself. Counted as the Return's
- * badge counts: the first time through is round 1. Kept per event, like the
- * counts. */
-const plannedRoundsStorageKey = (eventId: string | undefined) =>
-  `live-control-planned-rounds:${eventId ?? ""}`;
-/** The most rounds a passage can be set to. */
-const MAX_PLANNED_ROUNDS = 21;
+/** The text last opened for one event, so another event in this browser does
+ * not inherit it. */
+const openTextStorageKey = (eventId: string | undefined) =>
+  `live-control-open-text:${eventId ?? ""}`;
+
+const readOpenText = (eventId: string | undefined) => {
+  try {
+    return localStorage.getItem(openTextStorageKey(eventId)) ?? "";
+  } catch {
+    return "";
+  }
+};
+
+const storeOpenText = (eventId: string | undefined, textId: string) => {
+  try {
+    if (!eventId) return;
+    if (textId) localStorage.setItem(openTextStorageKey(eventId), textId);
+    else localStorage.removeItem(openTextStorageKey(eventId));
+  } catch {
+    // Blocked site data: the open text holds for this session only.
+  }
+};
 
 const readStoredCounts = (storageKey: string): Record<string, number> => {
   try {
@@ -490,11 +512,21 @@ const LiveControlPage = () => {
   const [token, setToken] = useState<string | null>(() => readStoredToken());
   const [tokenDraft, setTokenDraft] = useState("");
   const [showTokenBox, setShowTokenBox] = useState(() => !readStoredToken());
-  /** The work the operator is on: one found by title or pasted by id. The page
-   * opens on the one last opened in this browser, so a reload mid-puja lands
-   * back on it. */
-  const [sourceTextId, setSourceTextId] = useState(
-    () => readRecentTexts()[0]?.textId ?? "",
+  /** The work the operator is on: this event's liturgy, or one found by title
+   * or pasted by id. A reload of the same event lands back on it. A text
+   * opened for another event is not carried over. */
+  const [opened, setOpened] = useState(() => ({
+    eventId,
+    textId: readOpenText(eventId),
+  }));
+  const sourceTextId =
+    opened.eventId === eventId ? opened.textId : readOpenText(eventId);
+  const setSourceTextId = useCallback(
+    (textId: string) => {
+      storeOpenText(eventId, textId);
+      setOpened({ eventId, textId });
+    },
+    [eventId],
   );
   /** What the operator has typed to find a text: a title, or an edition id. */
   const [textQuery, setTextQuery] = useState("");
@@ -548,6 +580,9 @@ const LiveControlPage = () => {
   const [returnCounts, updateReturnCounts] = useStoredCounts(
     returnCountsStorageKey(eventId),
   );
+  // Before the rounds are read, including when the event changes: a return
+  // count saved earlier is the same plan, one round more.
+  carryPlannedReturns(eventId);
   const [plannedRounds, updatePlannedRounds] = useStoredCounts(
     plannedRoundsStorageKey(eventId),
   );
@@ -686,9 +721,27 @@ const LiveControlPage = () => {
     [publishCues],
   );
 
-  /** With no text open, finding one is the only way in, so a phone shows that
-   * box rather than folding it two taps away. */
-  const needsText = !sourceTextId;
+  const { data: event, error: eventError } = useQuery({
+    queryKey: ["live-control-event", eventId],
+    queryFn: () => fetchLiveControlEvent(eventId ?? ""),
+    enabled: Boolean(eventId),
+    refetchOnWindowFocus: false,
+  });
+  const { data: liturgies } = useQuery({
+    queryKey: ["live-control-liturgies", event?.collectionId],
+    queryFn: () => fetchLiturgies(event?.collectionId ?? ""),
+    enabled: Boolean(event?.collectionId),
+    refetchOnWindowFocus: false,
+  });
+
+  /** With no text open, and none coming from this event, finding one is the
+   * only way in, so a phone shows that box rather than folding it two taps
+   * away. Held back while the event's liturgies are still being read, so the
+   * box does not flash before the first liturgy opens. */
+  const eventPending = Boolean(eventId) && event === undefined && !eventError;
+  const liturgiesPending =
+    Boolean(event?.collectionId) && liturgies === undefined && !sourceTextId;
+  const needsText = !sourceTextId && !eventPending && !liturgiesPending;
   /** Whether the titles are on screen. */
   const titlesUnfolded = navOpen || needsText;
   const setupUnfolded = setupOpen || needsText;
@@ -767,8 +820,16 @@ const LiveControlPage = () => {
       setCurrentIndex(-1);
       setLoadError(null);
     },
-    [sourceTextId],
+    [sourceTextId, setSourceTextId],
   );
+
+  // Nothing remembered for this event: open its first liturgy. A text opened
+  // for another event is not a stand-in, and an event with no liturgies leaves
+  // the text empty so one can be found.
+  useEffect(() => {
+    if (sourceTextId || !liturgies?.length) return;
+    openWork(liturgies[0].textId);
+  }, [sourceTextId, liturgies, openWork]);
 
   // A new work brings its own editions: the work itself leads, and its Tibetan,
   // English and Chinese translations follow from the start, so readers of those
@@ -1321,6 +1382,8 @@ const LiveControlPage = () => {
   const [serverAutoplay, setServerAutoplay] = useState<AutoplayState | null>(
     null,
   );
+  const serverAutoplayRef = useRef(serverAutoplay);
+  serverAutoplayRef.current = serverAutoplay;
   /** Counts plan hand-overs, so only the newest one's answer is acted on. */
   const autoplayStartRef = useRef(0);
   /** A plan hand-over still waiting on the backend's answer. A stop waits for
@@ -1523,29 +1586,66 @@ const LiveControlPage = () => {
       setLineStartedAt(performance.now());
       scrollLineIntoBand(from);
     }
-    // So a slow answer is not taken for this plan while the previous one
-    // is still the one the server is running.
-    const priorPlanId =
-      planRef.current?.planId ?? serverAutoplay?.planId ?? null;
-    const request = startAutoplay(
-      eventId,
-      token,
-      plan.steps,
-      keepFirstFor === undefined
-        ? undefined
-        : Math.min(MAX_PLAN_STEP_MS, Math.round(keepFirstFor)),
-      priorPlanId,
+    // Replacement plans go out one after another. The plan the operator chose
+    // last is the one the server receives last, so it is the plan that stays.
+    // A stop waits on the same chain, and cannot pass a start that is still out.
+    const previous = pendingStartRef.current;
+    let finish: (result: AutoplayResult) => void = () => {};
+    const request = new Promise<AutoplayResult>((resolve) => {
+      finish = resolve;
+    });
+    const settled = request.then(
+      () => undefined,
+      () => undefined,
     );
-    // A stop waits for every start sent before it, earlier ones included. This
-    // plan is followed as soon as its own answer is in: an older start that is
-    // slow to answer does not hold the controller up.
-    const inFlight = Promise.all([pendingStartRef.current, request]);
+    const inFlight = previous
+      ? Promise.all([previous, settled]).then(() => undefined)
+      : settled;
     pendingStartRef.current = inFlight;
     void inFlight.then(() => {
       if (pendingStartRef.current === inFlight) pendingStartRef.current = null;
     });
+    void (async () => {
+      try {
+        await previous;
+        // A newer plan, or a pause, took over while this one waited its turn.
+        // It is not sent: the newer request is the one that must arrive last.
+        if (handOverId !== autoplayStartRef.current) {
+          finish({ ok: false, message: "" });
+          return;
+        }
+        const priorPlanId =
+          planRef.current?.planId ?? serverAutoplayRef.current?.planId ?? null;
+        finish(
+          await startAutoplay(
+            eventId,
+            token,
+            plan.steps,
+            keepFirstFor === undefined
+              ? undefined
+              : Math.min(MAX_PLAN_STEP_MS, Math.round(keepFirstFor)),
+            priorPlanId,
+          ),
+        );
+      } catch {
+        finish({
+          ok: false,
+          message: "The server could not run autoplay just now. Try again.",
+        });
+      }
+    })();
     const started = await request;
-    if (handOverId !== autoplayStartRef.current) return;
+    // A newer hand-over or a pause has taken over. A start that did land is
+    // still remembered, so Pause can see the plan if the stop does not.
+    if (handOverId !== autoplayStartRef.current) {
+      if (started.ok) {
+        // Written now, not on the next render: the plan waiting its turn
+        // reads this as what the server is already running.
+        serverAutoplayRef.current = started.state;
+        setServerAutoplay(started.state);
+      }
+      return;
+    }
     setAutoplayBusy(false);
     if (!started.ok) {
       planRef.current = null;
@@ -1595,20 +1695,25 @@ const LiveControlPage = () => {
     if (planChanges > 0) replanRef.current();
   }, [planChanges]);
 
-  /** Stops the backend's autoplay where it is. */
+  /** Stops the backend's autoplay where it is. Pause stays on the button until
+   * the server says it stopped: a start still on its way, or a stop that does
+   * not land, leaves the room moving. */
   const pauseAutoplay = async () => {
     autoplayStartRef.current += 1;
     const pauseId = autoplayStartRef.current;
     planRef.current = null;
-    setAutoplay(false);
-    autoplayRef.current = false;
     setAutoplayBusy(false);
-    if (!eventId || !token) return;
+    if (!eventId || !token) {
+      setAutoplay(false);
+      autoplayRef.current = false;
+      return;
+    }
     // A start still on its way goes first, so this stop ends what it began.
     await pendingStartRef.current;
     // Autoplay pressed again meanwhile: its plan replaces the one to stop.
     if (pauseId !== autoplayStartRef.current) return;
     const stopped = await stopAutoplay(eventId, token);
+    if (pauseId !== autoplayStartRef.current) return;
     if (!stopped.ok) {
       setAutoplayNote(
         `Autoplay could not be paused: ${stopped.message} It is still moving the room - press Pause again.`,
@@ -1618,6 +1723,8 @@ const LiveControlPage = () => {
       );
       return;
     }
+    setAutoplay(false);
+    autoplayRef.current = false;
     setServerAutoplay(stopped.state);
   };
 
@@ -1704,10 +1811,12 @@ const LiveControlPage = () => {
   const openTextById = (textId: string, title?: string) => {
     openWork(textId);
     setTextQuery("");
+    const libraryTitle =
+      editionData?.text.textId === textId ? editionData.text.title : undefined;
     setRecentTexts((current) => {
       const known = current.find((item) => item.textId === textId);
       const next = [
-        { textId, title: title ?? known?.title },
+        { textId, title: libraryTitle ?? title ?? known?.title },
         ...current.filter((item) => item.textId !== textId),
       ].slice(0, MAX_RECENT_TEXTS);
       storeRecentTexts(next);
@@ -1813,12 +1922,12 @@ const LiveControlPage = () => {
   };
 
   /** The one problem the page is showing, if any. */
+  const libraryError = editionsError
+    ? getApiErrorMessage(editionsError, "Could not load this text.")
+    : getApiErrorMessage(eventError, "Could not load this event.");
   const errorMessage =
-    editionsError || loadError || notice || autoplayNote
-      ? (loadError ??
-        notice ??
-        autoplayNote ??
-        getApiErrorMessage(editionsError, "Could not load this text."))
+    editionsError || eventError || loadError || notice || autoplayNote
+      ? (loadError ?? notice ?? autoplayNote ?? libraryError)
       : null;
   // Once the problem is gone, closing it is forgotten: if it comes back, it
   // is news again.
@@ -2002,6 +2111,34 @@ const LiveControlPage = () => {
               <span className="mr-auto">Title size</span>
               {sizePicker("Title size", titlesScale, changeTitlesScale)}
             </label>
+          ) : null}
+
+          {liturgies && liturgies.length > 0 ? (
+            <>
+              <h2 className="mx-2 mt-5 mb-2 text-[13px] tracking-[0.1em] text-[#8e8e93] uppercase max-lg:mx-1 max-lg:mt-2 max-lg:mb-1">
+                Liturgies
+              </h2>
+              <div>
+                {liturgies.map((liturgy) => {
+                  const isOpen = liturgy.textId === sourceTextId;
+                  return (
+                    <button
+                      key={liturgy.textId}
+                      type="button"
+                      aria-pressed={isOpen}
+                      onClick={() => openTextById(liturgy.textId, liturgy.title)}
+                      className={`mb-0.5 block w-full cursor-pointer rounded-[7px] px-3 py-1.5 text-left ${titleSize} [overflow-wrap:anywhere] max-lg:py-1 ${
+                        isOpen
+                          ? "bg-[#e5231c] text-white"
+                          : "text-[#8e8e93] hover:bg-[#1a1a1c]"
+                      }`}
+                    >
+                      {liturgy.title}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
           ) : null}
 
           {sections.length > 0 ? (
