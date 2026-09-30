@@ -313,9 +313,13 @@ const LiveControlPage = () => {
   const [lines, setLines] = useState<Record<string, OperatorSegment[]>>({});
   const [preparing, setPreparing] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(-1);
-  /** The last line of the edition on screen the room took, as
-   * `textId|index|segmentId`. */
-  const [acceptedLine, setAcceptedLine] = useState<string | null>(null);
+  /**
+   * The newest move sent, and the newest one the room has taken - by move, not
+   * by line, so a line the room took before is not taken again until the move
+   * back to it is.
+   */
+  const [sentMove, setSentMove] = useState(0);
+  const [takenMove, setTakenMove] = useState<number | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   /** A message the operator closed. It stays closed until the page shows a
    * different one, or the problem goes away and comes back. */
@@ -448,10 +452,12 @@ const LiveControlPage = () => {
    * later reset. */
   const publish = useCallback(
     (cues: PositionToPublish[]) => {
-      moveSequenceRef.current += 1;
-      cues.forEach((cue) =>
-        cueMoveRef.current.set(cue, moveSequenceRef.current),
-      );
+      if (cues.length > 0) {
+        moveSequenceRef.current += 1;
+        const move = moveSequenceRef.current;
+        cues.forEach((cue) => cueMoveRef.current.set(cue, move));
+        setSentMove(move);
+      }
       publishCues(cues);
     },
     [publishCues],
@@ -814,7 +820,12 @@ const LiveControlPage = () => {
   onAcceptedRef.current = (cue) => {
     if (cue.textId !== driverTextId) return;
     if (driverLines[cue.index]?.id !== cue.segmentId) return;
-    setAcceptedLine(`${cue.textId}|${cue.index}|${cue.segmentId}`);
+    const taken = cueMoveRef.current.get(cue);
+    if (taken !== undefined) {
+      setTakenMove((current) =>
+        current === null || taken > current ? taken : current,
+      );
+    }
     const passage = passageAt(passages, cue.index);
     if (!passage) return;
     // Sent before the count was reset: the reset stands.
@@ -996,8 +1007,7 @@ const LiveControlPage = () => {
   // A line is held from when the room took it, never from when it was sent:
   // the times were measured between the room taking one line and the next, and
   // a slow or failing publish must not leave the room behind the controller.
-  const currentLineTaken =
-    acceptedLine === `${driverTextId}|${currentIndex}|${currentLineId}`;
+  const currentLineTaken = takenMove === sentMove;
   useEffect(() => {
     // Waits, rather than guesses, while the times or the yigchung are loading.
     if (
@@ -1042,7 +1052,11 @@ const LiveControlPage = () => {
     // missing until the fresh ones are in.
     setRefreshingPlayTimes(true);
     void refetchPlayTimes().finally(() => setRefreshingPlayTimes(false));
+    // The line on screen is sent again, so the clock starts from the room
+    // taking it: one refused earlier would otherwise be waited on forever, and
+    // one the room already holds is confirmed straight back.
     if (currentIndex < 0) step(1);
+    else jump(currentIndex);
     setAutoplay(true);
   };
 

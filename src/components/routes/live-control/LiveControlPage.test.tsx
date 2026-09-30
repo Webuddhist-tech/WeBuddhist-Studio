@@ -2187,6 +2187,72 @@ describe("LiveControlPage", () => {
       expect(screen.queryByText(/Autoplay stopped/)).not.toBeInTheDocument();
     });
 
+    it("does not take a line the room held before as taken by a move still on its way", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue({
+        "root-s1": 20,
+        "root-s2": 20,
+        "root-s3": 20,
+      });
+      const user = await openForAutoplay();
+      await user.click(screen.getByRole("button", { name: /root line 2/ }));
+      await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(1));
+
+      // Back a line, held on the wire, then forward again to the line the room
+      // took before - and autoplay started there.
+      let release = () => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      publishPosition.mockImplementation(async (_event, _token, cue) => {
+        if (cue.segmentId === "root-s1") await gate;
+        return { ok: true };
+      });
+      await user.click(screen.getByRole("button", { name: "← Previous" }));
+      await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(2));
+      await user.click(screen.getByRole("button", { name: "Next →" }));
+      await user.click(screen.getByRole("button", { name: "▶ Auto" }));
+
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      expect(screen.getByText(/line 2\/3/)).toBeInTheDocument();
+      expect(publishPosition).not.toHaveBeenCalledWith(
+        "e1",
+        "tok-123",
+        expect.objectContaining({ segmentId: "root-s3" }),
+      );
+
+      await act(async () => release());
+      await waitFor(() =>
+        expect(publishPosition).toHaveBeenLastCalledWith(
+          "e1",
+          "tok-123",
+          expect.objectContaining({ segmentId: "root-s3", autoplay: true }),
+        ),
+      );
+    });
+
+    it("starts from a line the room already holds without waiting on it", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue({
+        "root-s1": 20,
+        "root-s2": 20,
+        "root-s3": 20,
+      });
+      const user = await openForAutoplay();
+      await user.click(screen.getByRole("button", { name: /root line 2/ }));
+      await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(1));
+
+      // The room is on line 2 already, so starting sends nothing for it.
+      await user.click(screen.getByRole("button", { name: "▶ Auto" }));
+
+      await waitFor(() =>
+        expect(publishPosition).toHaveBeenLastCalledWith(
+          "e1",
+          "tok-123",
+          expect.objectContaining({ segmentId: "root-s3", autoplay: true }),
+        ),
+      );
+      expect(publishPosition).toHaveBeenCalledTimes(2);
+    });
+
     it("cannot be started without the emit token", async () => {
       renderPage();
       expect(await screen.findByText("root line 1")).toBeInTheDocument();

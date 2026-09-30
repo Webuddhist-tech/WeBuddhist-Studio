@@ -56,7 +56,9 @@ export interface UsePositionPublisherResult {
 export function usePositionPublisher(
   eventId: string | undefined,
   token: string | null,
-  /** Told of each position once the room has taken it - never before. */
+  /** Told of each position once the room has taken it - never before. A move
+   * to the position the room already holds is not posted again, but is told
+   * of as taken. */
   onAccepted?: (cue: PositionToPublish) => void,
 ): UsePositionPublisherResult {
   const onAcceptedRef = useRef(onAccepted);
@@ -108,7 +110,13 @@ export function usePositionPublisher(
         const pending = cues.filter(
           (cue) => sentKeysRef.current[cue.textId] !== keyOf(cue),
         );
-        if (pending.length === 0) continue;
+        if (pending.length === 0) {
+          // Nothing to post: the room already holds every one of these. Said
+          // so, all the same - whoever made the move is waiting on the room
+          // taking it, and the room has.
+          cues.forEach((cue) => onAcceptedRef.current?.(cue));
+          continue;
+        }
 
         if (mountedRef.current) setState("publishing");
         // The edition on screen leads, and `cues` carries it first. Everything
