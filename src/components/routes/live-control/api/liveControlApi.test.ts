@@ -246,6 +246,61 @@ describe("autoplay", () => {
       ok: false,
       message: expect.stringMatching(/could not run autoplay/),
     });
+    expect(emitGet).not.toHaveBeenCalled();
+  });
+
+  it("takes a plan the server is already running when the answer is late", async () => {
+    vi.useFakeTimers();
+    try {
+      emitPost.mockReturnValue(new Promise(() => {}));
+      emitGet.mockResolvedValue({
+        data: { ...wireState, plan_id: "new-plan" },
+      });
+
+      const pending = startAutoplay("e1", "tok", [], undefined, "old-plan");
+      await vi.advanceTimersByTimeAsync(15_000);
+
+      await expect(pending).resolves.toMatchObject({
+        ok: true,
+        state: { planId: "new-plan", status: "running" },
+      });
+      expect(emitGet).toHaveBeenCalledWith(
+        "/api/v1/events/e1/recitation/autoplay",
+        auth,
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("waits out a start that has not replaced the plan already running", async () => {
+    vi.useFakeTimers();
+    try {
+      let finish: (value: { data: typeof wireState }) => void = () => {};
+      emitPost.mockReturnValue(
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+      );
+      emitGet.mockResolvedValue({
+        data: { ...wireState, status: "stopped", reason: "stopped" },
+      });
+
+      const pending = startAutoplay("e1", "tok", [], undefined, "p1");
+      const seen = vi.fn();
+      void pending.then(seen);
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(seen).not.toHaveBeenCalled();
+
+      finish({ data: { ...wireState, plan_id: "new-plan" } });
+
+      await expect(pending).resolves.toMatchObject({
+        ok: true,
+        state: { planId: "new-plan" },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("stops, and reads where it is", async () => {

@@ -1523,6 +1523,10 @@ const LiveControlPage = () => {
       setLineStartedAt(performance.now());
       scrollLineIntoBand(from);
     }
+    // So a slow answer is not taken for this plan while the previous one
+    // is still the one the server is running.
+    const priorPlanId =
+      planRef.current?.planId ?? serverAutoplay?.planId ?? null;
     const request = startAutoplay(
       eventId,
       token,
@@ -1530,6 +1534,7 @@ const LiveControlPage = () => {
       keepFirstFor === undefined
         ? undefined
         : Math.min(MAX_PLAN_STEP_MS, Math.round(keepFirstFor)),
+      priorPlanId,
     );
     // A stop waits for every start sent before it, earlier ones included. This
     // plan is followed as soon as its own answer is in: an older start that is

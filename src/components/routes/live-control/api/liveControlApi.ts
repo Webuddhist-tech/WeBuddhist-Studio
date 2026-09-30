@@ -423,23 +423,50 @@ const autoplayFailure = (error: unknown): AutoplayResult => {
   return { ok: false, message: emitFailure(status) };
 };
 
-/** How long a start is given to answer before it counts as failed. */
-const START_TIMEOUT_MS = 15_000;
+/**
+ * How long a start is given before the page asks the server whether a new
+ * plan is already running. The request itself is still waited out: treating
+ * this mark as a failed start would let a pause stop before that start lands,
+ * and leave autoplay running.
+ */
+const START_OBSERVE_MS = 15_000;
+
+/**
+ * The plan this start put in place, if the server is already running one that
+ * is not `priorPlanId`. Null when the answer so far is the plan that was
+ * already running, or none.
+ */
+const startedPlan = (
+  state: AutoplayState | null,
+  priorPlanId: string | null,
+): AutoplayResult | null => {
+  if (state?.status !== "running") return null;
+  if (!state.planId || (priorPlanId !== null && state.planId === priorPlanId)) {
+    return null;
+  }
+  return { ok: true, state };
+};
 
 /**
  * Hands a plan to the backend, which from then on moves the room on by itself
  * - whatever this page, or the phone it is on, does. Replaces any plan already
  * running. `firstStepElapsedMs` says the first line is already with the room
  * and has been for that long, so it is not sent again.
+ *
+ * `priorPlanId` is the plan already running, when there is one. A late answer
+ * is not read as a failed start while the server shows a different plan
+ * running: that plan is this start. Until the request itself finishes, a
+ * following pause keeps waiting, so its stop cannot arrive first.
  */
 export const startAutoplay = async (
   eventId: string,
   token: string,
   steps: AutoplayPlanStep[],
   firstStepElapsedMs?: number,
+  priorPlanId: string | null = null,
 ): Promise<AutoplayResult> => {
-  try {
-    const { data } = await emitClient.post(
+  const post = emitClient
+    .post(
       `/api/v1/events/${encodeURIComponent(eventId)}/recitation/autoplay`,
       {
         steps: steps.map((step) => ({
@@ -450,16 +477,38 @@ export const startAutoplay = async (
           ? {}
           : { first_step_elapsed_ms: firstStepElapsedMs }),
       },
-      // Pause and a change of text wait for a start to answer before stopping:
-      // one that never answers must not hold them for ever.
-      { headers: { "X-Recitation-Token": token }, timeout: START_TIMEOUT_MS },
-    );
-    const state = toAutoplayState(data);
-    return state
-      ? { ok: true, state }
-      : { ok: false, message: "The server's answer could not be read." };
-  } catch (error) {
-    return autoplayFailure(error);
+      { headers: { "X-Recitation-Token": token } },
+    )
+    .then(({ data }) => {
+      const state = toAutoplayState(data);
+      return state
+        ? ({ ok: true, state } as const)
+        : ({
+            ok: false,
+            message: "The server's answer could not be read.",
+          } as const);
+    })
+    .catch((error: unknown) => autoplayFailure(error));
+
+  let observeTimer: ReturnType<typeof setTimeout> | undefined;
+  const observed = new Promise<AutoplayResult | null>((resolve) => {
+    observeTimer = setTimeout(() => {
+      void fetchAutoplayState(eventId, token).then((state) => {
+        resolve(startedPlan(state, priorPlanId));
+      });
+    }, START_OBSERVE_MS);
+  });
+
+  try {
+    const winner = await Promise.race([
+      post.then((result) => ({ fromPost: true as const, result })),
+      observed.then((result) => ({ fromPost: false as const, result })),
+    ]);
+    if (winner.fromPost) return winner.result;
+    if (winner.result) return winner.result;
+    return await post;
+  } finally {
+    if (observeTimer !== undefined) clearTimeout(observeTimer);
   }
 };
 
