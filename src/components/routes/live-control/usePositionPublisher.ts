@@ -13,6 +13,28 @@ import {
  */
 const MOVE_MIN_GAP_MS = 150;
 
+/**
+ * A fresh run id. `crypto.randomUUID` exists only on secure pages, and an
+ * operator may drive the room from a tablet on a plain local HTTP address, so
+ * the same v4 shape is built from `getRandomValues` where it is missing.
+ */
+const newRunId = (): string => {
+  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0"));
+  return [
+    hex.slice(0, 4),
+    hex.slice(4, 6),
+    hex.slice(6, 8),
+    hex.slice(8, 10),
+    hex.slice(10, 16),
+  ]
+    .map((part) => part.join(""))
+    .join("-");
+};
+
 export type PublishState = "idle" | "publishing" | "live" | "error";
 
 export interface UsePositionPublisherResult {
@@ -74,6 +96,13 @@ export function usePositionPublisher(
   const pumpRef = useRef<Promise<void> | null>(null);
   /** Per text, the last position the room accepted, so it is not sent twice. */
   const sentKeysRef = useRef<Record<string, string>>({});
+  /**
+   * Per text, the run it is in: kept for as long as every move includes the
+   * text, dropped by the first move that leaves it out. The backend times one
+   * line against the next only within a run, so a text the operator left and
+   * came back to is not billed for the time spent on the other one.
+   */
+  const runsRef = useRef<Record<string, string>>({});
   /** Set while a session is being ended, so no later move overtakes the end. */
   const endingRef = useRef(false);
   const tokenRef = useRef(token);
@@ -103,6 +132,16 @@ export function usePositionPublisher(
         targetRef.current = null;
         const currentToken = tokenRef.current;
         if (!eventId || !currentToken) return;
+
+        // Every text in this move carries its run on; any text left out of it
+        // loses its run, so returning to it later starts a new one. A move
+        // with nothing left to post still counts: its texts stayed with the
+        // room.
+        const runs: Record<string, string> = {};
+        cues.forEach((cue) => {
+          runs[cue.textId] = runsRef.current[cue.textId] ?? newRunId();
+        });
+        runsRef.current = runs;
 
         const keyOf = (cue: PositionToPublish) =>
           `${cue.segmentId}|${cue.roundNumber}`;
@@ -136,7 +175,9 @@ export function usePositionPublisher(
         const sent: { cue: PositionToPublish; result: PublishResult }[] = [];
         if (followers.length > 0) {
           const followerResults = await Promise.all(
-            followers.map((cue) => publishPosition(eventId, currentToken, cue)),
+            followers.map((cue) =>
+              publishPosition(eventId, currentToken, cue, runs[cue.textId]),
+            ),
           );
           followers.forEach((cue, index) =>
             sent.push({ cue, result: followerResults[index] }),
@@ -145,7 +186,12 @@ export function usePositionPublisher(
         for (const cue of leaders) {
           sent.push({
             cue,
-            result: await publishPosition(eventId, currentToken, cue),
+            result: await publishPosition(
+              eventId,
+              currentToken,
+              cue,
+              runs[cue.textId],
+            ),
           });
         }
         if (!mountedRef.current) return;
@@ -198,6 +244,16 @@ export function usePositionPublisher(
       // The operator has closed the session: a move made while the end request
       // is being waited on must not follow it out to the room.
       if (endingRef.current) return;
+      // A text this move leaves out loses its run now, not when the pump takes
+      // the move: a newer move may replace this one in the queue first, and a
+      // text left and returned to meanwhile must still start a new run.
+      // A new object, not an edit: the move in flight still reads its own.
+      const kept: Record<string, string> = {};
+      cues.forEach((cue) => {
+        const run = runsRef.current[cue.textId];
+        if (run) kept[cue.textId] = run;
+      });
+      runsRef.current = kept;
       targetRef.current = cues;
       // A pump already running will take this target on its next turn; starting
       // a second one would only find the first holding the lock.
@@ -230,6 +286,7 @@ export function usePositionPublisher(
         setNotice("This recitation session has ended.");
         setLastSent(null);
         sentKeysRef.current = {};
+        runsRef.current = {};
       } else {
         setState("error");
         setNotice(result.message);

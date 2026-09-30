@@ -43,6 +43,7 @@ const {
         roundNumber: number;
         autoplay?: boolean;
       },
+      run?: string,
     ) => Promise<{ ok: boolean; message?: string }>
   >(async () => ({ ok: true })),
   endRecitationSession: vi.fn<
@@ -596,24 +597,39 @@ describe("LiveControlPage", () => {
 
     // One position per edition: each is its own library text with its own ids.
     await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(3));
-    expect(publishPosition).toHaveBeenCalledWith("e1", "tok-123", {
-      textId: "root",
-      segmentId: "root-s1",
-      index: 0,
-      roundNumber: 1,
-    });
-    expect(publishPosition).toHaveBeenCalledWith("e1", "tok-123", {
-      textId: "root-en",
-      segmentId: "root-en-s1",
-      index: 0,
-      roundNumber: 1,
-    });
-    expect(publishPosition).toHaveBeenCalledWith("e1", "tok-123", {
-      textId: "root-zh",
-      segmentId: "root-zh-s1",
-      index: 0,
-      roundNumber: 1,
-    });
+    expect(publishPosition).toHaveBeenCalledWith(
+      "e1",
+      "tok-123",
+      {
+        textId: "root",
+        segmentId: "root-s1",
+        index: 0,
+        roundNumber: 1,
+      },
+      expect.any(String),
+    );
+    expect(publishPosition).toHaveBeenCalledWith(
+      "e1",
+      "tok-123",
+      {
+        textId: "root-en",
+        segmentId: "root-en-s1",
+        index: 0,
+        roundNumber: 1,
+      },
+      expect.any(String),
+    );
+    expect(publishPosition).toHaveBeenCalledWith(
+      "e1",
+      "tok-123",
+      {
+        textId: "root-zh",
+        segmentId: "root-zh-s1",
+        index: 0,
+        roundNumber: 1,
+      },
+      expect.any(String),
+    );
   });
 
   it("sends the followed editions together, then the one on screen last", async () => {
@@ -683,12 +699,59 @@ describe("LiveControlPage", () => {
     await user.click(screen.getByText("root line 1"));
 
     await waitFor(() => expect(order).toEqual(["root", "root-en", "root"]));
-    expect(publishPosition).toHaveBeenLastCalledWith("e1", "tok-123", {
-      textId: "root",
-      segmentId: "root-s1",
-      index: 0,
-      roundNumber: 1,
+    expect(publishPosition).toHaveBeenLastCalledWith(
+      "e1",
+      "tok-123",
+      {
+        textId: "root",
+        segmentId: "root-s1",
+        index: 0,
+        roundNumber: 1,
+      },
+      expect.any(String),
+    );
+  });
+
+  it("keeps an edition's run while it moves, and starts a new one once it was left out", async () => {
+    // The backend only times a line against the next within one run: an
+    // edition that sat out a move must not be billed for the time it sat out.
+    const user = userEvent.setup();
+    localStorage.setItem("recitation_emit_token", "tok-123");
+    renderPage();
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
+    await screen.findByText(/2 more editions following/);
+    publishPosition.mockClear();
+    const runsOf = (textId: string) =>
+      publishPosition.mock.calls
+        .filter((call) => call[2].textId === textId)
+        .map((call) => call[3]);
+
+    await pressKey("Space");
+    await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(3));
+    await pressKey("Space");
+    await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(6));
+
+    const english = screen.getByRole("checkbox", {
+      name: "Follow Praise (en)",
     });
+    await user.click(english);
+    await pressKey("Space");
+    await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(8));
+
+    await user.click(english);
+    await waitFor(() =>
+      expect(fetchRecitationDetails).toHaveBeenCalledWith("root-en", "en"),
+    );
+    await user.click(screen.getByText("root line 3"));
+    await waitFor(() => expect(runsOf("root-en")).toHaveLength(3));
+
+    const [first, second, afterReturn] = runsOf("root-en");
+    expect(first).toEqual(expect.any(String));
+    expect(second).toBe(first);
+    expect(afterReturn).not.toBe(first);
+    // The edition on screen was in every move, so its run never changed.
+    expect(new Set(runsOf("root")).size).toBe(1);
+    expect(new Set(runsOf("root-zh")).size).toBe(1);
   });
 
   it("stops moving an edition once it is unticked", async () => {
@@ -715,6 +778,7 @@ describe("LiveControlPage", () => {
       "e1",
       "tok-123",
       expect.objectContaining({ textId: "root" }),
+      expect.any(String),
     );
   });
 
@@ -730,12 +794,17 @@ describe("LiveControlPage", () => {
     await pressKey("Space");
 
     await waitFor(() =>
-      expect(publishPosition).toHaveBeenCalledWith("e1", "tok-123", {
-        textId: "root-en",
-        segmentId: "root-en-s1",
-        index: 0,
-        roundNumber: 1,
-      }),
+      expect(publishPosition).toHaveBeenCalledWith(
+        "e1",
+        "tok-123",
+        {
+          textId: "root-en",
+          segmentId: "root-en-s1",
+          index: 0,
+          roundNumber: 1,
+        },
+        expect.any(String),
+      ),
     );
   });
 
@@ -760,6 +829,7 @@ describe("LiveControlPage", () => {
       "e1",
       "tok-123",
       expect.objectContaining({ textId: "other", segmentId: "other-s1" }),
+      expect.any(String),
     );
   });
 
@@ -806,17 +876,23 @@ describe("LiveControlPage", () => {
     // Second line of the text being read is the second row, which this edition
     // holds as its first line - not its second.
     await waitFor(() =>
-      expect(publishPosition).toHaveBeenCalledWith("e1", "tok-123", {
-        textId: "root-en",
-        segmentId: "root-en-s2",
-        index: 0,
-        roundNumber: 1,
-      }),
+      expect(publishPosition).toHaveBeenCalledWith(
+        "e1",
+        "tok-123",
+        {
+          textId: "root-en",
+          segmentId: "root-en-s2",
+          index: 0,
+          roundNumber: 1,
+        },
+        expect.any(String),
+      ),
     );
     expect(publishPosition).not.toHaveBeenCalledWith(
       "e1",
       "tok-123",
       expect.objectContaining({ segmentId: "root-en-s3" }),
+      expect.any(String),
     );
   });
 
@@ -849,6 +925,7 @@ describe("LiveControlPage", () => {
       "e1",
       "tok-123",
       expect.objectContaining({ segmentId: "root-s2" }),
+      expect.any(String),
     );
   });
 
@@ -877,12 +954,17 @@ describe("LiveControlPage", () => {
     await user.click(screen.getByRole("button", { name: "Next →" }));
 
     await waitFor(() =>
-      expect(publishPosition).toHaveBeenCalledWith("e1", "tok-123", {
-        textId: "root",
-        segmentId: "root-s1",
-        index: 0,
-        roundNumber: 1,
-      }),
+      expect(publishPosition).toHaveBeenCalledWith(
+        "e1",
+        "tok-123",
+        {
+          textId: "root",
+          segmentId: "root-s1",
+          index: 0,
+          roundNumber: 1,
+        },
+        expect.any(String),
+      ),
     );
   });
 
@@ -928,12 +1010,14 @@ describe("LiveControlPage", () => {
         "e1",
         "tok-123",
         expect.objectContaining({ segmentId: "root-s3", index: 2 }),
+        expect.any(String),
       ),
     );
     expect(publishPosition).not.toHaveBeenCalledWith(
       "e1",
       "tok-123",
       expect.objectContaining({ segmentId: "root-s2" }),
+      expect.any(String),
     );
 
     await user.click(screen.getByRole("button", { name: "← Previous" }));
@@ -942,6 +1026,7 @@ describe("LiveControlPage", () => {
         "e1",
         "tok-123",
         expect.objectContaining({ segmentId: "root-s1", index: 0 }),
+        expect.any(String),
       ),
     );
   });
@@ -971,6 +1056,7 @@ describe("LiveControlPage", () => {
         "e1",
         "tok-123",
         expect.objectContaining({ segmentId: "root-s1" }),
+        expect.any(String),
       ),
     );
     // Held, not dropped: nothing moves until the marks say what line 2 is.
@@ -987,12 +1073,14 @@ describe("LiveControlPage", () => {
         "e1",
         "tok-123",
         expect.objectContaining({ segmentId: "root-s3" }),
+        expect.any(String),
       ),
     );
     expect(publishPosition).not.toHaveBeenCalledWith(
       "e1",
       "tok-123",
       expect.objectContaining({ segmentId: "root-s2" }),
+      expect.any(String),
     );
   });
 
@@ -1026,11 +1114,13 @@ describe("LiveControlPage", () => {
       "e1",
       "tok-123",
       expect.objectContaining({ segmentId: "root-s3" }),
+      expect.any(String),
     );
     expect(publishPosition).not.toHaveBeenCalledWith(
       "e1",
       "tok-123",
       expect.objectContaining({ segmentId: "root-s4" }),
+      expect.any(String),
     );
   });
 
@@ -1113,12 +1203,14 @@ describe("LiveControlPage", () => {
         "e1",
         "tok-123",
         expect.objectContaining({ textId: "root", segmentId: "root-s1" }),
+        expect.any(String),
       ),
     );
     expect(publishPosition).not.toHaveBeenCalledWith(
       "e1",
       "tok-123",
       expect.objectContaining({ textId: "root-en" }),
+      expect.any(String),
     );
 
     await act(async () => {
@@ -1127,12 +1219,17 @@ describe("LiveControlPage", () => {
 
     // Its readers are brought to the line the room is on.
     await waitFor(() =>
-      expect(publishPosition).toHaveBeenCalledWith("e1", "tok-123", {
-        textId: "root-en",
-        segmentId: "root-en-s1",
-        index: 0,
-        roundNumber: 1,
-      }),
+      expect(publishPosition).toHaveBeenCalledWith(
+        "e1",
+        "tok-123",
+        {
+          textId: "root-en",
+          segmentId: "root-en-s1",
+          index: 0,
+          roundNumber: 1,
+        },
+        expect.any(String),
+      ),
     );
     // And the room is left on the edition being read.
     await waitFor(() =>
@@ -1140,6 +1237,7 @@ describe("LiveControlPage", () => {
         "e1",
         "tok-123",
         expect.objectContaining({ textId: "root" }),
+        expect.any(String),
       ),
     );
   });
@@ -1166,6 +1264,7 @@ describe("LiveControlPage", () => {
         "e1",
         "tok-123",
         expect.objectContaining({ segmentId: "root-s1", index: 0 }),
+        expect.any(String),
       ),
     );
 
@@ -1175,6 +1274,7 @@ describe("LiveControlPage", () => {
         "e1",
         "tok-123",
         expect.objectContaining({ segmentId: "root-s2", index: 1 }),
+        expect.any(String),
       ),
     );
 
@@ -1184,6 +1284,7 @@ describe("LiveControlPage", () => {
         "e1",
         "tok-123",
         expect.objectContaining({ segmentId: "root-s1", index: 0 }),
+        expect.any(String),
       ),
     );
 
@@ -1300,6 +1401,7 @@ describe("LiveControlPage", () => {
           "e1",
           "tok-123",
           expect.objectContaining({ segmentId: "root-s2", index: 1 }),
+          expect.any(String),
         ),
       );
       expect(screen.getByText(/line 2\/6/)).toBeInTheDocument();
@@ -1338,12 +1440,17 @@ describe("LiveControlPage", () => {
       await user.click(await screen.findByRole("button", { name: "Praises" }));
 
       await waitFor(() =>
-        expect(publishPosition).toHaveBeenCalledWith("e1", "tok-123", {
-          textId: "root",
-          segmentId: "root-s3",
-          index: 2,
-          roundNumber: 1,
-        }),
+        expect(publishPosition).toHaveBeenCalledWith(
+          "e1",
+          "tok-123",
+          {
+            textId: "root",
+            segmentId: "root-s3",
+            index: 2,
+            roundNumber: 1,
+          },
+          expect.any(String),
+        ),
       );
       expect(screen.getByText(/line 3\/3/)).toBeInTheDocument();
     });
@@ -1426,24 +1533,34 @@ describe("LiveControlPage", () => {
 
       // Going back is the praise's next round.
       await waitFor(() =>
-        expect(publishPosition).toHaveBeenCalledWith("e1", "tok-123", {
-          textId: "root",
-          segmentId: "BsajlElFFNFLoHcUjICwB",
-          index: 0,
-          roundNumber: 2,
-        }),
+        expect(publishPosition).toHaveBeenCalledWith(
+          "e1",
+          "tok-123",
+          {
+            textId: "root",
+            segmentId: "BsajlElFFNFLoHcUjICwB",
+            index: 0,
+            roundNumber: 2,
+          },
+          expect.any(String),
+        ),
       );
       expect(screen.getByText(/line 1\/3/)).toBeInTheDocument();
 
       // The rest of the passage is recited in that round too.
       await user.click(screen.getByRole("button", { name: "Next →" }));
       await waitFor(() =>
-        expect(publishPosition).toHaveBeenLastCalledWith("e1", "tok-123", {
-          textId: "root",
-          segmentId: "root-middle",
-          index: 1,
-          roundNumber: 2,
-        }),
+        expect(publishPosition).toHaveBeenLastCalledWith(
+          "e1",
+          "tok-123",
+          {
+            textId: "root",
+            segmentId: "root-middle",
+            index: 1,
+            roundNumber: 2,
+          },
+          expect.any(String),
+        ),
       );
     });
 
@@ -1505,6 +1622,7 @@ describe("LiveControlPage", () => {
           segmentId: "kYNR7EmC5apQWrkYl5fiO",
           roundNumber: 2,
         }),
+        expect.any(String),
       );
       expect(document.querySelector("[data-round-pending]")).toBeNull();
     });
@@ -1701,6 +1819,7 @@ describe("LiveControlPage", () => {
           "e1",
           "tok-123",
           expect.objectContaining({ textId: "root", roundNumber: 2 }),
+          expect.any(String),
         ),
       );
       // Still on its way: the next return is the round after it.
@@ -1710,12 +1829,17 @@ describe("LiveControlPage", () => {
       await release();
 
       await waitFor(() =>
-        expect(publishPosition).toHaveBeenLastCalledWith("e1", "tok-123", {
-          textId: "root",
-          segmentId: "BsajlElFFNFLoHcUjICwB",
-          index: 0,
-          roundNumber: 3,
-        }),
+        expect(publishPosition).toHaveBeenLastCalledWith(
+          "e1",
+          "tok-123",
+          {
+            textId: "root",
+            segmentId: "BsajlElFFNFLoHcUjICwB",
+            index: 0,
+            roundNumber: 3,
+          },
+          expect.any(String),
+        ),
       );
       expect(
         await screen.findByRole("button", { name: `${label}, round 3` }),
@@ -1739,6 +1863,7 @@ describe("LiveControlPage", () => {
           "e1",
           "tok-123",
           expect.objectContaining({ textId: "root", roundNumber: 3 }),
+          expect.any(String),
         ),
       );
       await user.click(
@@ -2140,6 +2265,7 @@ describe("LiveControlPage", () => {
           "e1",
           "tok-123",
           expect.objectContaining({ segmentId: "root-s3", autoplay: true }),
+          expect.any(String),
         ),
       );
     });
@@ -2182,6 +2308,7 @@ describe("LiveControlPage", () => {
           "e1",
           "tok-123",
           expect.objectContaining({ segmentId: "root-s3", autoplay: true }),
+          expect.any(String),
         ),
       );
       expect(screen.queryByText(/Autoplay stopped/)).not.toBeInTheDocument();
@@ -2218,6 +2345,7 @@ describe("LiveControlPage", () => {
         "e1",
         "tok-123",
         expect.objectContaining({ segmentId: "root-s3" }),
+        expect.any(String),
       );
 
       await act(async () => release());
@@ -2226,6 +2354,7 @@ describe("LiveControlPage", () => {
           "e1",
           "tok-123",
           expect.objectContaining({ segmentId: "root-s3", autoplay: true }),
+          expect.any(String),
         ),
       );
     });
@@ -2248,6 +2377,7 @@ describe("LiveControlPage", () => {
           "e1",
           "tok-123",
           expect.objectContaining({ segmentId: "root-s3", autoplay: true }),
+          expect.any(String),
         ),
       );
       expect(publishPosition).toHaveBeenCalledTimes(2);
