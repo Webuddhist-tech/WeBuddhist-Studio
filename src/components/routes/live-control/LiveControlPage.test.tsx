@@ -82,6 +82,7 @@ const {
         token: string,
         steps: AutoplayPlanStep[],
         firstStepElapsedMs?: number,
+        priorPlanId?: string | null,
       ) => Promise<
         { ok: true; state: AutoplayState } | { ok: false; message: string }
       >
@@ -404,7 +405,7 @@ describe("LiveControlPage", () => {
     expect(driver).toBeChecked();
     expect(driver).toBeDisabled();
 
-    await user.click(screen.getByRole("button", { name: "Refuge", exact: true }));
+    await user.click(screen.getByRole("button", { name: /^Refuge$/ }));
     expect(await screen.findByText("other line 1")).toBeInTheDocument();
   });
 
