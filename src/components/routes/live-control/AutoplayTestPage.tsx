@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import {
@@ -11,6 +11,8 @@ import {
   toOperatorSegments,
 } from "./api/liveControlApi";
 import { fetchEditionYigchungs } from "./api/libraryTocApi";
+import { readEventPlannedRounds } from "./plannedRounds";
+import { returnButtonForLine } from "./returnJumps";
 
 /**
  * A dry run of autoplay. It reads the same texts and learned play times as the
@@ -59,6 +61,32 @@ const readRecentTexts = (): { textId: string; title: string | null }[] => {
   }
 };
 
+/** Where a planned return sends the dry run, and the round count after taking it.
+ * The same rule as the room: jump back while rounds are still left. */
+const plannedReturnAt = (
+  at: number,
+  lines: { id: string }[],
+  forward: number | null,
+  planned: Record<string, number>,
+  rounds: Record<string, number>,
+): { index: number; rounds: Record<string, number> } | null => {
+  const upTo = forward ?? lines.length;
+  for (let index = at; index < upTo; index += 1) {
+    const id = lines[index]?.id;
+    if (!id) continue;
+    const button = returnButtonForLine(id, lines);
+    if (!button) continue;
+    const plannedRounds = planned[button.key] ?? 1;
+    const round = rounds[button.key] ?? 1;
+    if (plannedRounds - round <= 0) continue;
+    return {
+      index: button.index,
+      rounds: { ...rounds, [button.key]: round + 1 },
+    };
+  }
+  return null;
+};
+
 const formatMs = (ms: number) => {
   if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
   const total = Math.round(ms / 1000);
@@ -71,6 +99,7 @@ const formatMs = (ms: number) => {
 };
 
 const AutoplayTestPage = () => {
+  const { eventId } = useParams<{ eventId: string }>();
   /** `?text=<text_id>` is the text on screen; with none, the page opens on the
    * picker. Picking a text writes it here, so the link reopens it. */
   const [searchParams, setSearchParams] = useSearchParams();
@@ -197,7 +226,11 @@ const AutoplayTestPage = () => {
   /** Set while the play times are read afresh for a start. */
   const [refreshing, setRefreshing] = useState(false);
 
-  // A new text starts from the top, stopped.
+  /** Which round each repeated passage is in. A planned return jumps back, the
+   * same way the room's autoplay does, until those rounds are done. */
+  const roundsRef = useRef<Record<string, number>>({});
+
+  // A new text starts from the top, stopped, its rounds back at the first.
   useEffect(() => {
     setPlaying(false);
     indexRef.current = -1;
@@ -205,6 +238,7 @@ const AutoplayTestPage = () => {
     elapsedRef.current = 0;
     setElapsed(0);
     setNote(null);
+    roundsRef.current = {};
   }, [editionId]);
 
   /** Instruction lines are not recited, so autoplay steps over them - the
@@ -306,10 +340,11 @@ const AutoplayTestPage = () => {
   /** The clock waits, rather than guesses, while either is still loading. */
   const clockReady = playing && !refreshing && !awaitingMarks;
 
-  // The clock: while playing, the current line's hold runs down and the next
-  // recited line takes over when it is spent.
-  const clockRef = useRef({ durationAt, speed, nextRecited });
-  clockRef.current = { durationAt, speed, nextRecited };
+  // The clock: while playing, the current line's hold runs down. A return
+  // planned for this event jumps back, as it does in the room; otherwise the
+  // next recited line takes over.
+  const clockRef = useRef({ durationAt, speed, nextRecited, lines, eventId });
+  clockRef.current = { durationAt, speed, nextRecited, lines, eventId };
   useEffect(() => {
     if (!clockReady) return;
     // The first line is chosen only now, once instruction lines are known.
@@ -330,6 +365,8 @@ const AutoplayTestPage = () => {
         durationAt: holdOf,
         speed: rate,
         nextRecited: next,
+        lines: linesNow,
+        eventId: eventNow,
       } = clockRef.current;
       const at = indexRef.current;
       const duration = holdOf(at);
@@ -346,15 +383,28 @@ const AutoplayTestPage = () => {
         setElapsed(grown);
         return;
       }
-      const target = next(at, 1);
-      if (target === null) {
+      const forward = next(at, 1);
+      const planned = readEventPlannedRounds(eventNow);
+      const jumped = plannedReturnAt(
+        at,
+        linesNow,
+        forward,
+        planned,
+        roundsRef.current,
+      );
+      if (jumped) {
+        roundsRef.current = jumped.rounds;
+        goTo(jumped.index);
+        return;
+      }
+      if (forward === null) {
         setPlaying(false);
         setNote("Reached the end of the text.");
         elapsedRef.current = duration;
         setElapsed(duration);
         return;
       }
-      goTo(target);
+      goTo(forward);
     }, TICK_MS);
     return () => window.clearInterval(timer);
     // goTo only touches refs and state setters.
@@ -387,8 +437,13 @@ const AutoplayTestPage = () => {
     elapsedRef.current = 0;
     setElapsed(0);
     setNote(null);
+    roundsRef.current = {};
     listRef.current?.scrollTo({ top: 0 });
   };
+
+  const includesPlannedReturns = Object.values(
+    readEventPlannedRounds(eventId),
+  ).some((rounds) => rounds > 1);
 
   // Space plays and pauses; the arrows step, as on the controller.
   const shortcutsRef = useRef({ togglePlay, step });
@@ -631,6 +686,11 @@ const AutoplayTestPage = () => {
             </button>
           </div>
         </div>
+        {includesPlannedReturns ? (
+          <p className="px-4 pt-1 text-center font-sans text-[11px] text-[#8e8e93]">
+            Planned returns for this event are included.
+          </p>
+        ) : null}
         <p className="pb-2 text-center font-sans text-[11px] text-[#636366] tabular-nums">
           {playing && (refreshing || awaitingMarks)
             ? "Waiting for the play times and instruction marks… · "

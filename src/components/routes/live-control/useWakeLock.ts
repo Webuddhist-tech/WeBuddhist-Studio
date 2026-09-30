@@ -21,14 +21,18 @@ export function useWakeLock(active: boolean): void {
       .wakeLock;
     if (!active || !wakeLock) return;
     let sentinel: WakeLockSentinelLike | null = null;
+    let pending = false;
     let disposed = false;
 
     const acquire = async () => {
-      if (document.visibilityState !== "visible" || sentinel) return;
+      // A second ask while the first request is still out would replace its
+      // lock, and cleanup would release only the later one.
+      if (document.visibilityState !== "visible" || sentinel || pending) return;
+      pending = true;
       try {
         const held = await wakeLock.request("screen");
-        if (disposed) {
-          void held.release();
+        if (disposed || sentinel) {
+          void held.release().catch(() => {});
           return;
         }
         sentinel = held;
@@ -37,6 +41,8 @@ export function useWakeLock(active: boolean): void {
         });
       } catch {
         // Refused - low battery, a policy, a background tab. Not worth a word.
+      } finally {
+        pending = false;
       }
     };
 

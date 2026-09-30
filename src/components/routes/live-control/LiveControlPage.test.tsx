@@ -20,6 +20,7 @@ import type { RecitationSocket, SocketMoveResult } from "./useRecitationSocket";
 
 const {
   fetchLiveControlEvent,
+  fetchLiturgies,
   fetchTextEditions,
   fetchRecitationDetails,
   publishPosition,
@@ -39,6 +40,7 @@ const {
   searchTextsByTitle: vi.fn(),
   fetchEditionTitle: vi.fn(),
   fetchLiveControlEvent: vi.fn(),
+  fetchLiturgies: vi.fn(),
   fetchTextEditions: vi.fn(),
   fetchRecitationDetails: vi.fn(),
   // Typed as the api is called, so a test can read the cue it was given.
@@ -134,6 +136,7 @@ vi.mock("./api/liveControlApi", async () => {
   return {
     ...actual,
     fetchLiveControlEvent,
+    fetchLiturgies,
     fetchTextEditions,
     fetchRecitationDetails,
     publishPosition,
@@ -212,6 +215,14 @@ const linesFor = (
   })),
 });
 
+/** An event with no liturgies: the page opens on the text box. */
+const noEventLiturgies = () => {
+  fetchLiveControlEvent.mockResolvedValue({
+    title: "Tara Puja",
+    collectionId: null,
+  });
+};
+
 const renderPage = () => {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -272,6 +283,15 @@ const pressKey = async (code: string) => {
 describe("LiveControlPage", () => {
   beforeEach(() => {
     fetchLiveControlEvent.mockReset();
+    fetchLiveControlEvent.mockResolvedValue({
+      title: "Tara Puja",
+      collectionId: "col-1",
+    });
+    fetchLiturgies.mockReset();
+    fetchLiturgies.mockResolvedValue([
+      { textId: "root", title: "Praise to the 21 Tārās" },
+      { textId: "other", title: "Refuge" },
+    ]);
     fetchTextEditions.mockReset();
     fetchRecitationDetails.mockReset();
     publishPosition.mockClear();
@@ -328,8 +348,8 @@ describe("LiveControlPage", () => {
     localStorage.clear();
     Element.prototype.scrollIntoView = vi.fn();
 
-    // Texts opened in this browser before, newest first: the page opens on
-    // the first of them.
+    // Shortcuts from texts opened in this browser. The page itself opens on
+    // this event's first liturgy, not on whichever text was opened last.
     localStorage.setItem(
       "live-control-recent-texts",
       JSON.stringify([
@@ -357,14 +377,21 @@ describe("LiveControlPage", () => {
     );
   });
 
-  it("opens the text last opened here and follows every translation of it", async () => {
+  it("opens this event's first liturgy and follows every translation of it", async () => {
+    const user = userEvent.setup();
+    // The text last opened anywhere in this browser belongs to another event.
+    localStorage.setItem(
+      "live-control-recent-texts",
+      JSON.stringify([{ textId: "other", title: "Refuge" }]),
+    );
     renderPage();
 
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
+    expect(fetchLiveControlEvent).toHaveBeenCalledWith("e1");
+    expect(fetchLiturgies).toHaveBeenCalledWith("col-1");
     expect(fetchRecitationDetails).toHaveBeenCalledWith("root", "bo");
-    // The event's record is not read: it needs a session the controller
-    // does not have.
-    expect(fetchLiveControlEvent).not.toHaveBeenCalled();
+    expect(screen.queryByText("other line 1")).not.toBeInTheDocument();
+    expect(localStorage.getItem("live-control-open-text:e1")).toBe("root");
     // Every edition moves with the room unless the operator unticks it.
     expect(
       screen.getByRole("checkbox", { name: "Follow Praise (en)" }),
@@ -376,6 +403,30 @@ describe("LiveControlPage", () => {
     const driver = screen.getByRole("checkbox", { name: "Follow Praise (bo)" });
     expect(driver).toBeChecked();
     expect(driver).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "Refuge", exact: true }));
+    expect(await screen.findByText("other line 1")).toBeInTheDocument();
+  });
+
+  it("reopens the text last opened for this event", async () => {
+    localStorage.setItem("live-control-open-text:e1", "other");
+    renderPage();
+
+    expect(await screen.findByText("other line 1")).toBeInTheDocument();
+    expect(fetchRecitationDetails).not.toHaveBeenCalledWith("root", "bo");
+  });
+
+  it("does not open another event's text when this event has no liturgy", async () => {
+    localStorage.setItem(
+      "live-control-recent-texts",
+      JSON.stringify([{ textId: "other", title: "Refuge" }]),
+    );
+    noEventLiturgies();
+    renderPage();
+
+    await waitFor(() => expect(fetchLiveControlEvent).toHaveBeenCalled());
+    expect(screen.queryByText("other line 1")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Search texts")).toBeInTheDocument();
   });
 
   it("follows only the Tibetan, English and Chinese editions by default", async () => {
@@ -529,6 +580,7 @@ describe("LiveControlPage", () => {
   it("does not open an earlier search's result on Enter", async () => {
     const user = userEvent.setup();
     localStorage.removeItem("live-control-recent-texts");
+    noEventLiturgies();
     renderPage();
 
     const box = await screen.findByLabelText("Search texts");
@@ -583,6 +635,7 @@ describe("LiveControlPage", () => {
   it("does not open an id-shaped query when the title search fails", async () => {
     const user = userEvent.setup();
     localStorage.removeItem("live-control-recent-texts");
+    noEventLiturgies();
     searchTextsByTitle.mockRejectedValue(new Error("offline"));
     renderPage();
 
@@ -2304,6 +2357,7 @@ describe("LiveControlPage", () => {
 
     it("opens the text box on a phone when no text is open", async () => {
       localStorage.removeItem("live-control-recent-texts");
+      noEventLiturgies();
       const user = userEvent.setup();
       renderPage();
 
@@ -2650,7 +2704,7 @@ describe("LiveControlPage", () => {
       expect(pauseButton()).toBeInTheDocument();
     });
 
-    it("acts only on the newest hand-over when two cross", async () => {
+    it("sends a replacement plan only after the one already out, so the newest arrives last", async () => {
       fetchSegmentPlayTimes.mockResolvedValue(times);
       let answerFirst: (
         value: Awaited<ReturnType<typeof startAutoplay>>,
@@ -2669,19 +2723,63 @@ describe("LiveControlPage", () => {
       await user.click(autoButton());
       await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
       await user.click(screen.getByRole("button", { name: /root line 3/ }));
-      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(2));
 
-      // The first answers last: it is not the plan the page follows.
+      // The second plan waits: it must not pass the first on the way.
+      expect(await screen.findByText(/line 3\/3/)).toBeInTheDocument();
+      expect(startAutoplay).toHaveBeenCalledTimes(1);
+
       await act(async () =>
         answerFirst({
           ok: true,
           state: autoplayState({ planId: "plan-1", step: 1 }),
         }),
       );
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(2));
+      expect(startAutoplay.mock.calls[1][4]).toBe("plan-1");
 
+      // The first plan's word does not move the page off the plan it follows.
       expect(screen.getByText(/line 3\/3/)).toBeInTheDocument();
       hearAutoplay({ planId: "plan-1", step: 1 });
       expect(screen.getByText(/line 3\/3/)).toBeInTheDocument();
+    });
+
+    it("keeps Pause until a stop sent before the start answers is confirmed", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue(times);
+      let answerStart: (
+        value: Awaited<ReturnType<typeof startAutoplay>>,
+      ) => void = () => {};
+      startAutoplay.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            answerStart = resolve;
+          }),
+      );
+      stopAutoplay.mockResolvedValueOnce({
+        ok: false,
+        message: "Could not reach the room.",
+      });
+      const user = await openForAutoplay();
+      await user.click(autoButton());
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+
+      await user.click(pauseButton());
+      expect(pauseButton()).toBeInTheDocument();
+      expect(stopAutoplay).not.toHaveBeenCalled();
+
+      await act(async () =>
+        answerStart({
+          ok: true,
+          state: autoplayState({ planId: "plan-1", step: 0 }),
+        }),
+      );
+
+      expect(
+        await screen.findByText(/Autoplay could not be paused/),
+      ).toBeInTheDocument();
+      expect(pauseButton()).toBeInTheDocument();
+      // The late start is remembered, and its later word does not resume it.
+      hearAutoplay({ planId: "plan-1", step: 2 });
+      expect(screen.getByText(/line 1\/3/)).toBeInTheDocument();
     });
 
     it("runs a time bar under the live line for the backend's hold", async () => {
@@ -2704,9 +2802,11 @@ describe("LiveControlPage", () => {
       expect(bar.parentElement?.textContent).toMatch(/ \/ 1:00$/);
 
       await user.click(pauseButton());
-      expect(
-        screen.queryByRole("progressbar", { name: /Autoplay/ }),
-      ).not.toBeInTheDocument();
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("progressbar", { name: /Autoplay/ }),
+        ).not.toBeInTheDocument(),
+      );
     });
 
     it("shows autoplay running on the server that it did not start, and can pause it", async () => {
@@ -2907,6 +3007,29 @@ describe("LiveControlPage", () => {
         expect(fewer()).toBeDisabled();
         expect(localStorage.getItem("live-control-planned-rounds:e1")).toBe(
           "{}",
+        );
+      });
+
+      it("carries a saved return count over as one more round", async () => {
+        localStorage.setItem(
+          "live-control-planned-returns:e1",
+          JSON.stringify({ "1-85": 2 }),
+        );
+        await openPraiseForAutoplay();
+
+        expect(
+          planOf().querySelector("[data-planned-rounds]"),
+        ).toHaveTextContent("3");
+        expect(planOf().querySelector("[data-returns-left]")).toHaveTextContent(
+          "2 returns left",
+        );
+        expect(
+          JSON.parse(
+            localStorage.getItem("live-control-planned-rounds:e1") ?? "{}",
+          ),
+        ).toEqual({ "1-85": 3 });
+        expect(localStorage.getItem("live-control-planned-returns:e1")).toBe(
+          null,
         );
       });
 

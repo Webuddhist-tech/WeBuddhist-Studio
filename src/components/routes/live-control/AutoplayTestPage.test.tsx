@@ -227,6 +227,58 @@ describe("AutoplayTestPage", () => {
     expect(screen.queryByText(/Stopped at line/)).not.toBeInTheDocument();
   });
 
+  it("jumps back for a return planned on this event", async () => {
+    localStorage.setItem(
+      "live-control-planned-returns:e1",
+      JSON.stringify({ "1-85": 1 }),
+    );
+    fetchRecitationDetails.mockResolvedValue({
+      text_id: "root",
+      title: "root",
+      segments: [
+        {
+          recitation: {
+            bo: { id: "BsajlElFFNFLoHcUjICwB", content: "homage" },
+          },
+        },
+        {
+          recitation: {
+            bo: { id: "kYNR7EmC5apQWrkYl5fiO", content: "mantra" },
+          },
+        },
+      ],
+    });
+    fetchSegmentPlayTimes.mockResolvedValue({
+      BsajlElFFNFLoHcUjICwB: 80,
+      kYNR7EmC5apQWrkYl5fiO: 80,
+    });
+    const user = userEvent.setup();
+    renderPage("?text=root");
+
+    expect(await screen.findByText("homage")).toBeInTheDocument();
+    expect(
+      screen.getByText("Planned returns for this event are included."),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Play" }));
+
+    const seen: string[] = [];
+    await waitFor(
+      () => {
+        const line = activeLine();
+        if (line && seen[seen.length - 1] !== line) seen.push(line);
+        expect(
+          screen.getByText("Reached the end of the text."),
+        ).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
+    // One saved return is two rounds: homage, mantra, then both again.
+    expect(seen).toEqual(["0", "1", "0", "1"]);
+    expect(localStorage.getItem("live-control-planned-returns:e1")).toBe(
+      JSON.stringify({ "1-85": 1 }),
+    );
+  });
+
   it("counts no time for the instruction lines it skips", async () => {
     fetchSegmentPlayTimes.mockResolvedValue({
       "root-s1": 1000,
