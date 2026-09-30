@@ -246,8 +246,68 @@ const allowsShortcut = (target: EventTarget | null) => {
   return true;
 };
 
-/** A line's learned play time, as its badge reads: seconds to a tenth. */
-const formatPlayTime = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
+/** A line's learned play time, as its badge reads: seconds to a tenth, or
+ * minutes and seconds for a long one. */
+const formatPlayTime = (ms: number) => {
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  const total = Math.round(ms / 1000);
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+};
+
+/**
+ * The live line's hold under autoplay, running down as a bar beneath it, as
+ * the autoplay test shows it. It reads the same start and time the autoplay
+ * clock does, so the bar fills the moment the room is moved on. While the
+ * clock waits (fresh play times, the yigchung) the bar waits too.
+ */
+const AutoplayProgress = ({
+  startedAt,
+  duration,
+  running,
+}: {
+  startedAt: number;
+  duration: number;
+  running: boolean;
+}) => {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!running) {
+      setElapsed(0);
+      return;
+    }
+    let frame = 0;
+    const tick = () => {
+      setElapsed(Math.min(duration, performance.now() - startedAt));
+      frame = requestAnimationFrame(tick);
+    };
+    tick();
+    return () => cancelAnimationFrame(frame);
+  }, [startedAt, duration, running]);
+  const progress = duration > 0 ? Math.max(0, elapsed) / duration : 0;
+  return (
+    <span
+      data-autoplay-progress=""
+      className="mt-1.5 flex items-center gap-2 font-sans"
+    >
+      <span
+        role="progressbar"
+        aria-label="Autoplay: time left on this line"
+        aria-valuemin={0}
+        aria-valuemax={Math.round(duration)}
+        aria-valuenow={Math.round(Math.max(0, elapsed))}
+        className="block h-1 flex-1 overflow-hidden rounded-full bg-[#2c2c2e]"
+      >
+        <span
+          className="block h-full rounded-full bg-[#30d158]"
+          style={{ width: `${Math.min(1, progress) * 100}%` }}
+        />
+      </span>
+      <span className="shrink-0 text-[11px] text-[#aeaeb2] tabular-nums">
+        {formatPlayTime(Math.max(0, elapsed))} / {formatPlayTime(duration)}
+      </span>
+    </span>
+  );
+};
 
 /** Yigchung is drawn small and in its own colour, as a printed liturgy sets it
  * apart from the verse, so the operator reads past it at a glance. */
@@ -1846,7 +1906,7 @@ const LiveControlPage = () => {
                             className={`float-right mt-1 ml-2 rounded-full px-2 py-0.5 font-sans text-[11px] leading-none tabular-nums ${
                               playTime === undefined
                                 ? "text-[#636366]"
-                                : "bg-[#1c1c1e] text-[#8e8e93]"
+                                : "bg-[#1c1c1e] text-[#c7c7cc]"
                             }`}
                           >
                             {playTime === undefined
@@ -1858,6 +1918,17 @@ const LiveControlPage = () => {
                           content={segment.content}
                           yigchung={yigchung}
                         />
+                        {autoplay &&
+                        index === currentIndex &&
+                        playTime !== undefined ? (
+                          <AutoplayProgress
+                            startedAt={lineStartedAt}
+                            duration={playTime}
+                            running={
+                              !refreshingPlayTimes && !awaitingYigchungs
+                            }
+                          />
+                        ) : null}
                       </button>
                       {returnTo ? (
                         <div className="mt-1 mb-4 ml-1.5 flex flex-wrap items-center gap-2">

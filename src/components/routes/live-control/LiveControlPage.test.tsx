@@ -2239,6 +2239,31 @@ describe("LiveControlPage", () => {
       expect(second?.querySelector("[data-play-time]")?.textContent).toBe("—");
     });
 
+    it("runs a time bar under the live line only while autoplay is on", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue({
+        "root-s1": 60_000,
+        "root-s2": 60_000,
+      });
+      const user = await openForAutoplay();
+      expect(
+        screen.queryByRole("progressbar", { name: /Autoplay/ }),
+      ).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "▶ Auto" }));
+
+      const bar = await screen.findByRole("progressbar", { name: /Autoplay/ });
+      expect(bar).toHaveAttribute("aria-valuemax", "60000");
+      expect(
+        screen.getByText("root line 1").closest("[data-line]"),
+      ).toContainElement(bar);
+      expect(bar.parentElement?.textContent).toMatch(/ \/ 1:00$/);
+
+      await user.click(screen.getByRole("button", { name: "❚❚ Pause" }));
+      expect(
+        screen.queryByRole("progressbar", { name: /Autoplay/ }),
+      ).not.toBeInTheDocument();
+    });
+
     it("stops, and says why, at a line with no recorded time", async () => {
       fetchSegmentPlayTimes.mockResolvedValue({ "root-s1": 20 });
       const user = await openForAutoplay();
