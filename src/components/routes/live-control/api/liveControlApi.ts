@@ -69,6 +69,16 @@ export interface PositionToPublish {
   roundNumber: number;
   /** Made by autoplay, so the backend does not time it back into the play times. */
   autoplay?: boolean;
+  /**
+   * How long the line this move leaves behind was held, on this page's
+   * monotonic clock. Measured here because this is the only place that knows
+   * when the operator actually left the line: the backend can only subtract two
+   * request arrivals, which carries the network, its own liveness check and
+   * throttle, and this publisher's send pacing into a figure meant to be speech
+   * alone. Left off the first move of a run, and off autoplay's own moves,
+   * which are not timed at all.
+   */
+  elapsedMs?: number;
 }
 
 /** A publish either landed (202) or did not, with something to show the operator. */
@@ -264,6 +274,10 @@ const emitFailure = (status: number | undefined): string => {
  * `run` names the unbroken stretch of moves the text has been part of. The
  * backend only times one line against the next within a run, so time the room
  * spent on another text is never learned as this text's.
+ *
+ * `elapsedMs` on the position is how long the line being left was held. The
+ * backend records it rather than timing the move itself, and still decides on
+ * its own whether the move is one that may be timed.
  */
 export const publishPosition = async (
   eventId: string,
@@ -281,6 +295,9 @@ export const publishPosition = async (
         round_number: position.roundNumber,
         ...(position.autoplay ? { autoplay: true } : {}),
         ...(run ? { run } : {}),
+        ...(position.elapsedMs === undefined
+          ? {}
+          : { elapsed_ms: position.elapsedMs }),
       },
       { headers: { "X-Recitation-Token": token } },
     );

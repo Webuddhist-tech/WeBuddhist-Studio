@@ -14,15 +14,12 @@ import { useDebounce } from "use-debounce";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import {
   fetchEditionTitle,
-  fetchLiturgies,
-  fetchLiveControlEvent,
   fetchRecitationDetails,
   fetchSegmentPlayTimes,
   fetchTextEditions,
   searchTextsByTitle,
   SUGGESTED_TEXT_IDS,
   toOperatorSegments,
-  type Liturgy,
   type OperatorSegment,
   type PositionToPublish,
   type TextEdition,
@@ -142,6 +139,9 @@ const storeRecentTexts = (texts: RecentText[]) => {
   }
 };
 
+/** How long after the last timed move the play times are read again. */
+const PLAY_TIMES_REFRESH_DELAY_MS = 1500;
+
 /** How long a move waits on the library's yigchung before going without it. */
 const YIGCHUNG_WAIT_MS = 8000;
 
@@ -152,12 +152,17 @@ const YIGCHUNG_WAIT_MS = 8000;
 const returnCountsStorageKey = (eventId: string | undefined) =>
   `live-control-return-counts:${eventId ?? ""}`;
 
-const readReturnCounts = (
-  eventId: string | undefined,
-): Record<string, number> => {
+/** How many times each return button is to be taken this puja, set by the
+ * operator so autoplay can take them itself. Kept per event, like the counts. */
+const plannedReturnsStorageKey = (eventId: string | undefined) =>
+  `live-control-planned-returns:${eventId ?? ""}`;
+/** The most returns a button can be set to take. */
+const MAX_PLANNED_RETURNS = 20;
+
+const readStoredCounts = (storageKey: string): Record<string, number> => {
   try {
     const parsed: unknown = JSON.parse(
-      localStorage.getItem(returnCountsStorageKey(eventId)) ?? "{}",
+      localStorage.getItem(storageKey) ?? "{}",
     );
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
       return {};
@@ -173,18 +178,42 @@ const readReturnCounts = (
   }
 };
 
-const storeReturnCounts = (
-  eventId: string | undefined,
-  counts: Record<string, number>,
-) => {
+const storeCounts = (storageKey: string, counts: Record<string, number>) => {
   try {
-    localStorage.setItem(
-      returnCountsStorageKey(eventId),
-      JSON.stringify(counts),
-    );
+    localStorage.setItem(storageKey, JSON.stringify(counts));
   } catch {
     // Blocked site data: the counts hold for this session only.
   }
+};
+
+/**
+ * Counts by return button, kept under `storageKey`. The counts are tagged with
+ * the key they were read for, so moving to another event's page reads that
+ * event's own rather than carrying these over.
+ */
+const useStoredCounts = (storageKey: string) => {
+  const [state, setState] = useState(() => ({
+    storageKey,
+    counts: readStoredCounts(storageKey),
+  }));
+  const counts =
+    state.storageKey === storageKey
+      ? state.counts
+      : readStoredCounts(storageKey);
+  const update = useCallback(
+    (change: (current: Record<string, number>) => Record<string, number>) =>
+      setState((current) => {
+        const next = change(
+          current.storageKey === storageKey
+            ? current.counts
+            : readStoredCounts(storageKey),
+        );
+        storeCounts(storageKey, next);
+        return { storageKey, counts: next };
+      }),
+    [storageKey],
+  );
+  return [counts, update] as const;
 };
 
 /** How much of an upright phone's height the titles take, above the lines.
@@ -309,6 +338,70 @@ const AutoplayProgress = ({
   );
 };
 
+/**
+ * How many times autoplay takes a return button, and how many of those are
+ * left. It stands on a row of its own, apart from the return button and in
+ * quieter colours, so setting the count is never a tap on the return itself.
+ */
+const ReturnPlan = ({
+  label,
+  planned,
+  left,
+  onChange,
+}: {
+  label: string;
+  planned: number;
+  left: number;
+  onChange: (returns: number) => void;
+}) => {
+  const stepClass =
+    "size-9 shrink-0 touch-manipulation cursor-pointer rounded-md bg-[#2c2c2e] text-lg leading-none font-semibold text-[#f2f2f7] select-none hover:bg-[#3a3a3c] disabled:cursor-default disabled:opacity-40";
+  return (
+    <div
+      role="group"
+      aria-label={`Autoplay returns: ${label}`}
+      data-return-plan=""
+      className="mt-1 flex basis-full items-center gap-2 font-sans text-sm text-[#8e8e93]"
+    >
+      <span>Autoplay returns</span>
+      <button
+        type="button"
+        aria-label="One return fewer"
+        disabled={planned <= 0}
+        onClick={() => onChange(planned - 1)}
+        className={stepClass}
+      >
+        −
+      </button>
+      <span
+        data-planned-returns=""
+        className="min-w-[1.5rem] text-center font-semibold text-[#f2f2f7] tabular-nums"
+      >
+        {planned}
+      </span>
+      <button
+        type="button"
+        aria-label="One return more"
+        disabled={planned >= MAX_PLANNED_RETURNS}
+        onClick={() => onChange(planned + 1)}
+        className={stepClass}
+      >
+        +
+      </button>
+      {planned > 0 ? (
+        <span
+          data-returns-left=""
+          className={`ml-1 rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums ${
+            left > 0 ? "bg-[#1c3a24] text-[#30d158]" : "bg-[#1c1c1e]"
+          }`}
+        >
+          {left > 0 ? `${left} left` : "done"}
+        </span>
+      ) : null}
+    </div>
+  );
+};
+
 /** Yigchung is drawn small and in its own colour, as a printed liturgy sets it
  * apart from the verse, so the operator reads past it at a glance. */
 const YIGCHUNG_TEXT = "text-[0.72em] text-[#c9a063]";
@@ -359,8 +452,12 @@ const LiveControlPage = () => {
   const [token, setToken] = useState<string | null>(() => readStoredToken());
   const [tokenDraft, setTokenDraft] = useState("");
   const [showTokenBox, setShowTokenBox] = useState(() => !readStoredToken());
-  /** The work the operator is on: a liturgy of the event, or a pasted text id. */
-  const [sourceTextId, setSourceTextId] = useState("");
+  /** The work the operator is on: one found by title or pasted by id. The page
+   * opens on the one last opened in this browser, so a reload mid-puja lands
+   * back on it. */
+  const [sourceTextId, setSourceTextId] = useState(
+    () => readRecentTexts()[0]?.textId ?? "",
+  );
   /** What the operator has typed to find a text: a title, or an edition id. */
   const [textQuery, setTextQuery] = useState("");
   const [debouncedTextQuery] = useDebounce(textQuery.trim(), 300);
@@ -378,10 +475,15 @@ const LiveControlPage = () => {
   const [currentIndex, setCurrentIndex] = useState(-1);
   /**
    * When the line on screen was moved to, on this page's clock. Autoplay holds
-   * each line from here - never from the room confirming it - so the network
-   * never stretches a line past its recorded time.
+   * each line from here, not from the room confirming it, so a quick answer
+   * does not add to its recorded time.
    */
   const [lineStartedAt, setLineStartedAt] = useState(0);
+  /** The move that put the line on screen, and the newest move the room has
+   * taken for the edition on screen: autoplay moves on only once the room is
+   * on the line, so no line is passed before the room has shown it. */
+  const [lineMove, setLineMove] = useState(0);
+  const [roomMove, setRoomMove] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   /** A message the operator closed. It stays closed until the page shows a
    * different one, or the problem goes away and comes back. */
@@ -410,25 +512,20 @@ const LiveControlPage = () => {
   const [titlesScale, setTitlesScale] = useState(() =>
     readStoredScale(TITLES_SCALE_STORAGE_KEY, LEGACY_TITLES_SCALE_STORAGE_KEY),
   );
-  /** The counts, tagged with the event they were read for, so moving to another
-   * event's page reads that event's own rather than carrying these over. */
-  const [returnCountsState, setReturnCountsState] = useState(() => ({
-    eventId,
-    counts: readReturnCounts(eventId),
-  }));
-  const returnCounts =
-    returnCountsState.eventId === eventId
-      ? returnCountsState.counts
-      : readReturnCounts(eventId);
-  const updateReturnCounts = (
-    change: (current: Record<string, number>) => Record<string, number>,
-  ) =>
-    setReturnCountsState((state) => {
-      const current =
-        state.eventId === eventId ? state.counts : readReturnCounts(eventId);
-      const counts = change(current);
-      storeReturnCounts(eventId, counts);
-      return { eventId, counts };
+  const [returnCounts, updateReturnCounts] = useStoredCounts(
+    returnCountsStorageKey(eventId),
+  );
+  const [plannedReturns, updatePlannedReturns] = useStoredCounts(
+    plannedReturnsStorageKey(eventId),
+  );
+  /** Sets how many times a return button is to be taken; none clears it. */
+  const planReturns = (key: string, returns: number) =>
+    updatePlannedReturns((current) => {
+      const next = { ...current };
+      const clamped = Math.min(MAX_PLANNED_RETURNS, Math.max(0, returns));
+      if (clamped > 0) next[key] = clamped;
+      else delete next[key];
+      return next;
     });
   /**
    * Rounds the operator has begun that the room has not yet taken. The badge
@@ -454,6 +551,9 @@ const LiveControlPage = () => {
       ),
     [returnCounts, requestedRounds],
   );
+  /** Returns still to take at a button: planned, less those begun. */
+  const returnsLeft = (key: string) =>
+    Math.max(0, (plannedReturns[key] ?? 0) - (roundOf(key) - FIRST_ROUND));
   /** The room took a position in this round of the passage. */
   const settleRound = (key: string, round: number) => {
     if (round > acceptedRound(key)) {
@@ -524,27 +624,9 @@ const LiveControlPage = () => {
     [publishCues],
   );
 
-  const { data: event, error: eventError } = useQuery({
-    queryKey: ["live-control-event", eventId],
-    queryFn: () => fetchLiveControlEvent(eventId ?? ""),
-    enabled: Boolean(eventId),
-    refetchOnWindowFocus: false,
-  });
-
-  const { data: liturgies } = useQuery({
-    queryKey: ["live-control-liturgies", event?.collectionId],
-    queryFn: () => fetchLiturgies(event?.collectionId ?? ""),
-    enabled: Boolean(event?.collectionId),
-    refetchOnWindowFocus: false,
-  });
-
-  /** An event with no liturgies opens on nothing: pasting a text id is the only
-   * way in, so a phone shows that box rather than folding it two taps away. */
-  const needsText =
-    Boolean(event) &&
-    !sourceTextId &&
-    (!event?.collectionId ||
-      (liturgies !== undefined && liturgies.length === 0));
+  /** With no text open, finding one is the only way in, so a phone shows that
+   * box rather than folding it two taps away. */
+  const needsText = !sourceTextId;
   /** Whether the titles are on screen. */
   const titlesUnfolded = navOpen || needsText;
   const setupUnfolded = setupOpen || needsText;
@@ -557,8 +639,6 @@ const LiveControlPage = () => {
     enabled: Boolean(sourceTextId),
     refetchOnWindowFocus: false,
   });
-
-  const order: Liturgy[] = useMemo(() => liturgies ?? [], [liturgies]);
 
   // A remembered text is named once the library says what it is, so the list
   // reads as titles rather than ids.
@@ -627,13 +707,6 @@ const LiveControlPage = () => {
     },
     [sourceTextId],
   );
-
-  // The first liturgy of the order is what the puja opens with, so it is on
-  // screen before the operator touches anything.
-  useEffect(() => {
-    if (sourceTextId || order.length === 0) return;
-    openWork(order[0].textId);
-  }, [order, sourceTextId, openWork]);
 
   // A new work brings its own editions: the work itself leads, and its Tibetan,
   // English and Chinese translations follow from the start, so readers of those
@@ -705,6 +778,25 @@ const LiveControlPage = () => {
     refetchOnWindowFocus: false,
     retry: false,
   });
+  /**
+   * A timed move the room took has taught the backend how long the line before
+   * it was held, so the times are read again - once the operator pauses, not on
+   * every press of a quick run of them. Joins a read already on its way rather
+   * than cancelling it: autoplay's start waits on that one.
+   */
+  const playTimesRefreshRef = useRef<number | undefined>(undefined);
+  const refreshPlayTimesSoon = () => {
+    window.clearTimeout(playTimesRefreshRef.current);
+    playTimesRefreshRef.current = window.setTimeout(() => {
+      void refetchPlayTimes({ cancelRefetch: false });
+    }, PLAY_TIMES_REFRESH_DELAY_MS);
+  };
+  useEffect(() => () => window.clearTimeout(playTimesRefreshRef.current), []);
+  // Another edition's times are not this one's: a refresh still waiting is
+  // dropped with the edition it was for.
+  useEffect(() => {
+    window.clearTimeout(playTimesRefreshRef.current);
+  }, [driverTextId]);
 
   /** Until the marks are in, a move cannot tell instruction from verse. */
   const awaitingYigchungs = Boolean(driverTextId) && yigchungsPending;
@@ -881,10 +973,17 @@ const LiveControlPage = () => {
   onAcceptedRef.current = (cue) => {
     if (cue.textId !== driverTextId) return;
     if (driverLines[cue.index]?.id !== cue.segmentId) return;
+    const taken = cueMoveRef.current.get(cue);
+    if (taken !== undefined) {
+      setRoomMove((current) => Math.max(current, taken));
+    }
+    // Only a move carrying how long the last line was held teaches the backend
+    // anything; autoplay's own moves never carry it.
+    if (cue.elapsedMs !== undefined && !cue.autoplay) refreshPlayTimesSoon();
     const passage = passageAt(passages, cue.index);
     if (!passage) return;
     // Sent before the count was reset: the reset stands.
-    const move = cueMoveRef.current.get(cue) ?? Infinity;
+    const move = taken ?? Infinity;
     if (move <= (resetAfterMoveRef.current[passage.key] ?? 0)) return;
     settleRound(passage.key, cue.roundNumber);
   };
@@ -921,19 +1020,65 @@ const LiveControlPage = () => {
   );
 
   /**
+   * The line the room is on: when the operator arrived at it, and whether
+   * autoplay is what put them there. Written by `jump` alone, which is the
+   * moment of arrival - deliberately not read off `lineStartedAt`, which
+   * autoplay restarts mid-line to pace its own hold. Measuring from that would
+   * under-report every line the operator took back by hand after starting
+   * autoplay on it.
+   *
+   * Cleared whenever the page is on no line, which is how opening another work
+   * or reading another edition drops a hold that is no longer anybody's.
+   */
+  const heldLineRef = useRef<{ enteredAt: number; byAutoplay: boolean } | null>(
+    null,
+  );
+  if (currentIndex < 0) heldLineRef.current = null;
+
+  /**
    * Moves to a line. `round` names the round when the move begins a new one;
    * `autoplay` marks a move the controller made on its own, which the backend
    * then does not time back into the play times it came from. `startedAt` is
    * when the line's hold begins; by default, now.
+   *
+   * The move also carries how long the line it leaves behind was held, which is
+   * what the backend records as that line's play time. It is measured here
+   * because this is the only place that knows when the operator left the line:
+   * the backend can only subtract two request arrivals, and that figure carries
+   * the network, its own liveness check and throttle, and the publisher's send
+   * pacing - none of which the room spent reciting. `performance.now()` is
+   * monotonic, so a clock correction mid-puja cannot distort it either.
+   *
+   * Nothing is reported for the first move onto a text, or for a line autoplay
+   * either landed on or is leaving: autoplay's hold came from these very figures
+   * and its `startedAt` is the deadline it was scheduled for rather than a real
+   * hold, so there is no measurement to make.
    */
   const jump = useCallback(
     (index: number, round?: number, autoplay = false, startedAt?: number) => {
       if (index < 0 || index >= driverLines.length) return;
+      const now = performance.now();
+      const held = heldLineRef.current;
+      const elapsedMs =
+        held && !autoplay && !held.byAutoplay
+          ? Math.round(now - held.enteredAt)
+          : undefined;
+      const lineStart = startedAt ?? now;
+      heldLineRef.current = { enteredAt: now, byAutoplay: autoplay };
       setCurrentIndex(index);
-      setLineStartedAt(startedAt ?? performance.now());
+      setLineStartedAt(lineStart);
       scrollLineIntoBand(index);
       const cues = cuesForLine(index, round);
-      publish(autoplay ? cues.map((cue) => ({ ...cue, autoplay })) : cues);
+      publish(
+        autoplay || elapsedMs !== undefined
+          ? cues.map((cue) => ({
+              ...cue,
+              ...(autoplay ? { autoplay } : {}),
+              ...(elapsedMs === undefined ? {} : { elapsedMs }),
+            }))
+          : cues,
+      );
+      setLineMove(moveSequenceRef.current);
     },
     [driverLines.length, publish, cuesForLine],
   );
@@ -1001,13 +1146,19 @@ const LiveControlPage = () => {
    * its way to the room counts too - a second return made before the first is
    * taken is the round after it, not the same round sent again.
    */
-  const beginNextRound = (key: string, index: number) => {
+  const beginNextRound = (
+    key: string,
+    index: number,
+    /** When autoplay takes the return, with the start of the line's hold. */
+    autoplayStartedAt?: number,
+  ) => {
     const round = roundOf(key) + 1;
     // With no token nothing goes to the room, so no round is begun there.
     if (token) {
       setRequestedRounds((current) => ({ ...current, [key]: round }));
     }
-    goTo(index, round);
+    if (autoplayStartedAt === undefined) goTo(index, round);
+    else jump(index, round, true, autoplayStartedAt);
   };
 
   const step = useCallback(
@@ -1055,26 +1206,40 @@ const LiveControlPage = () => {
   /** Moves on once a line's hold, which ended at `deadline`, is spent. */
   const autoplayNextRef = useRef((deadline: number) => void deadline);
   autoplayNextRef.current = (deadline) => {
-    const next = landingFrom(currentIndex, 1);
-    if (next === currentIndex) {
-      setAutoplay(false);
-      return;
-    }
     // The next line starts where this one ended, so a late timer is not added
     // to every line after it - unless it is far late (a tab in the background),
     // when catching up would race the room through lines at once.
     const now = performance.now();
-    jump(next, undefined, true, now - deadline < 1000 ? deadline : now);
+    const startedAt = now - deadline < 1000 ? deadline : now;
+    const next = landingFrom(currentIndex, 1);
+    // A return button with returns still planned is taken, as the operator
+    // would: under this line, or under a yigchung passed over on the way.
+    const passedUpTo = next === currentIndex ? driverLines.length : next;
+    for (let at = currentIndex; at < passedUpTo; at += 1) {
+      const returnTo = returnButtonForLine(driverLines[at].id, driverLines);
+      if (returnTo && returnsLeft(returnTo.key) > 0) {
+        beginNextRound(returnTo.key, returnTo.index, startedAt);
+        return;
+      }
+    }
+    if (next === currentIndex) {
+      setAutoplay(false);
+      return;
+    }
+    jump(next, undefined, true, startedAt);
   };
 
   const currentLineId = driverLines[currentIndex]?.id;
   const currentPlayTime = currentLineId
     ? playTimes?.[currentLineId]
     : undefined;
-  // A line is held from when it was moved to, whatever the network is doing:
-  // the next line starts the moment this one's time is spent. A move the room
-  // refuses stops autoplay (above), and one still on the wire is overtaken by
-  // the next, so the room is never left holding a stale line.
+  /** Whether the room has taken the line on screen. */
+  const roomOnLine = roomMove >= lineMove;
+  // A line is held from when it was moved to, and the next line starts the
+  // moment this one's time is spent - but never before the room has taken this
+  // one. The publisher keeps only the newest waiting move, so moving on while a
+  // line is still on the wire would drop it: the room would pass it unshown.
+  // A move the room refuses stops autoplay (above).
   useEffect(() => {
     // Waits, rather than guesses, while the times or the yigchung are loading.
     if (
@@ -1082,7 +1247,8 @@ const LiveControlPage = () => {
       currentIndex < 0 ||
       awaitingYigchungs ||
       refreshingPlayTimes ||
-      !playTimes
+      !playTimes ||
+      !roomOnLine
     ) {
       return;
     }
@@ -1094,8 +1260,12 @@ const LiveControlPage = () => {
       return;
     }
     // From the line's own start, so a re-run mid-line (fresh play times) does
-    // not begin its hold again.
-    const deadline = lineStartedAt + currentPlayTime;
+    // not begin its hold again. A room that answered after the time was spent
+    // held the line up: the next one starts now, with its whole time.
+    const deadline = Math.max(
+      lineStartedAt + currentPlayTime,
+      performance.now(),
+    );
     const timer = window.setTimeout(
       () => autoplayNextRef.current(deadline),
       Math.max(0, deadline - performance.now()),
@@ -1109,6 +1279,7 @@ const LiveControlPage = () => {
     awaitingYigchungs,
     refreshingPlayTimes,
     playTimes,
+    roomOnLine,
   ]);
 
   const toggleAutoplay = () => {
@@ -1284,14 +1455,11 @@ const LiveControlPage = () => {
 
   /** The one problem the page is showing, if any. */
   const errorMessage =
-    eventError || editionsError || loadError || notice || autoplayNote
+    editionsError || loadError || notice || autoplayNote
       ? (loadError ??
         notice ??
         autoplayNote ??
-        getApiErrorMessage(
-          eventError ?? editionsError,
-          "Could not load this event.",
-        ))
+        getApiErrorMessage(editionsError, "Could not load this text."))
       : null;
   // Once the problem is gone, closing it is forgotten: if it comes back, it
   // is news again.
@@ -1299,9 +1467,6 @@ const LiveControlPage = () => {
     if (!errorMessage) setDismissedError(null);
   }, [errorMessage]);
 
-  const currentLiturgy = order.find((item) => item.textId === sourceTextId);
-  const liturgyNumber =
-    order.findIndex((item) => item.textId === sourceTextId) + 1;
   const followedCount = followed.filter((id) => Boolean(lines[id])).length;
   const statusLabel = !token
     ? "no emit token"
@@ -1439,37 +1604,11 @@ const LiveControlPage = () => {
           </div>
 
           {/* The titles are sized on their own, where they are read. */}
-          {order.length > 0 || sections.length > 0 ? (
+          {sections.length > 0 ? (
             <label className="mx-2 mb-2 flex shrink-0 items-center gap-2 text-[12px] tracking-[0.08em] text-[#8e8e93] uppercase max-lg:mx-1 max-lg:mb-1">
               <span className="mr-auto">Title size</span>
               {sizePicker("Title size", titlesScale, changeTitlesScale)}
             </label>
-          ) : null}
-
-          {order.length > 0 ? (
-            <>
-              <h2 className="mx-2 mt-1 mb-3 text-[13px] tracking-[0.1em] text-[#8e8e93] uppercase max-lg:mx-1 max-lg:mb-1">
-                Liturgies
-              </h2>
-              <div>
-                {order.map((item) => (
-                  <button
-                    key={item.textId}
-                    type="button"
-                    onClick={() => {
-                      openWork(item.textId);
-                    }}
-                    className={`mb-0.5 block w-full cursor-pointer rounded-[7px] px-3 py-1.5 text-left ${titleSize} [overflow-wrap:anywhere] max-lg:px-2 max-lg:py-1 ${
-                      item.textId === sourceTextId
-                        ? "bg-[#e5231c] text-white"
-                        : "text-[#8e8e93] hover:bg-[#1a1a1c]"
-                    }`}
-                  >
-                    {item.title}
-                  </button>
-                ))}
-              </div>
-            </>
           ) : null}
 
           {sections.length > 0 ? (
@@ -1810,16 +1949,11 @@ const LiveControlPage = () => {
           ) : null}
 
           <h1 className="mt-3.5 mb-0.5 text-2xl leading-relaxed [overflow-wrap:anywhere] max-lg:mt-2 max-lg:text-base max-lg:leading-snug">
-            {driverEdition?.title ??
-              currentLiturgy?.title ??
-              (sourceTextId || "No liturgy loaded")}
+            {driverEdition?.title ?? (sourceTextId || "No text loaded")}
           </h1>
           {/* Where the room is, at every width and in both modes: the line that
            * answers "where are we" without reading the text. */}
           <div className="mb-3 text-[13px] text-[#8e8e93] max-lg:mb-1 max-lg:text-[12px]">
-            {order.length > 0 && liturgyNumber > 0
-              ? `Liturgy ${liturgyNumber}/${order.length} · `
-              : null}
             {driverLines.length > 0
               ? `line ${currentIndex + 1}/${driverLines.length}`
               : "nothing loaded yet"}
@@ -1970,6 +2104,14 @@ const LiveControlPage = () => {
                               Reset to 1
                             </button>
                           ) : null}
+                          <ReturnPlan
+                            label={returnTo.label}
+                            planned={plannedReturns[returnTo.key] ?? 0}
+                            left={returnsLeft(returnTo.key)}
+                            onChange={(returns) =>
+                              planReturns(returnTo.key, returns)
+                            }
+                          />
                         </div>
                       ) : null}
                     </Fragment>
