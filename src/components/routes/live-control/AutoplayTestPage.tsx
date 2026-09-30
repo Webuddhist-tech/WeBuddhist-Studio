@@ -34,6 +34,8 @@ const UNTIMED_OPTIONS = [
   { value: 8000, label: "Hold 8s" },
 ];
 const TICK_MS = 50;
+/** How long the clock waits on the library's yigchung before going without. */
+const YIGCHUNG_WAIT_MS = 8000;
 
 const formatMs = (ms: number) => {
   if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
@@ -84,7 +86,7 @@ const AutoplayTestPage = () => {
     refetchOnWindowFocus: false,
   });
 
-  const { data: liturgies } = useQuery({
+  const { data: liturgies, error: liturgiesError } = useQuery({
     queryKey: ["live-control-liturgies", event?.collectionId],
     queryFn: () => fetchLiturgies(event?.collectionId ?? ""),
     enabled: Boolean(event?.collectionId),
@@ -149,9 +151,20 @@ const AutoplayTestPage = () => {
     refetchOnWindowFocus: false,
   });
 
-  const { data: yigchungs } = useQuery({
+  const { data: yigchungs, isPending: yigchungsPending } = useQuery({
     queryKey: ["live-control-yigchungs", editionId],
-    queryFn: () => fetchEditionYigchungs(editionId),
+    // The clock waits on this, so a library that does not answer is given up
+    // on, as the controller does: every line is then recited.
+    queryFn: () =>
+      Promise.race([
+        fetchEditionYigchungs(editionId),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("yigchung lookup timed out")),
+            YIGCHUNG_WAIT_MS,
+          ),
+        ),
+      ]),
     enabled: Boolean(editionId),
     refetchOnWindowFocus: false,
     retry: false,
@@ -171,9 +184,15 @@ const AutoplayTestPage = () => {
     retry: false,
   });
 
+  /** Until the marks are in, a line cannot be told apart from an instruction. */
+  const awaitingMarks = Boolean(editionId) && yigchungsPending;
+  /** Set while the play times are read afresh for a start. */
+  const [refreshing, setRefreshing] = useState(false);
+
   // A new text starts from the top, stopped.
   useEffect(() => {
     setPlaying(false);
+    indexRef.current = -1;
     setCurrentIndex(-1);
     elapsedRef.current = 0;
     setElapsed(0);
@@ -209,21 +228,37 @@ const AutoplayTestPage = () => {
     [lines, playTimes],
   );
 
+  // Skipped lines play no time, so none of theirs is counted.
+  const recitedCount = useMemo(
+    () => lines.filter((_, index) => !isYigchungLine(index)).length,
+    [lines, isYigchungLine],
+  );
   const timedCount = useMemo(
-    () => lines.filter((line) => playTimes?.[line.id] !== undefined).length,
-    [lines, playTimes],
+    () =>
+      lines.filter(
+        (line, index) =>
+          !isYigchungLine(index) && playTimes?.[line.id] !== undefined,
+      ).length,
+    [lines, playTimes, isYigchungLine],
+  );
+  const timeBefore = useCallback(
+    (end: number) => {
+      let sum = 0;
+      for (let index = 0; index < end; index += 1) {
+        if (!isYigchungLine(index)) sum += playTimes?.[lines[index]?.id] ?? 0;
+      }
+      return sum;
+    },
+    [lines, playTimes, isYigchungLine],
   );
   const totalTimed = useMemo(
-    () => lines.reduce((sum, line) => sum + (playTimes?.[line.id] ?? 0), 0),
-    [lines, playTimes],
+    () => timeBefore(lines.length),
+    [timeBefore, lines.length],
   );
-  const reachedTimed = useMemo(() => {
-    let sum = 0;
-    for (let index = 0; index < currentIndex; index += 1) {
-      sum += playTimes?.[lines[index]?.id] ?? 0;
-    }
-    return sum;
-  }, [lines, playTimes, currentIndex]);
+  const reachedTimed = useMemo(
+    () => (currentIndex < 0 ? 0 : timeBefore(currentIndex)),
+    [timeBefore, currentIndex],
+  );
 
   const scrollToLine = (index: number) => {
     const box = listRef.current;
@@ -240,40 +275,56 @@ const AutoplayTestPage = () => {
     }
   };
 
+  /** The line on screen, as the clock reads it between renders. */
+  const indexRef = useRef(currentIndex);
+  indexRef.current = currentIndex;
+
   const goTo = (index: number) => {
+    indexRef.current = index;
     setCurrentIndex(index);
     elapsedRef.current = 0;
     setElapsed(0);
     scrollToLine(index);
   };
 
+  /** How long a line is held: its recorded time, else the untimed hold. */
+  const durationAt = useCallback(
+    (index: number) => durationOf(index) ?? (untimedHold || undefined),
+    [durationOf, untimedHold],
+  );
   const currentDuration =
-    currentIndex >= 0
-      ? (durationOf(currentIndex) ?? (untimedHold || undefined))
-      : undefined;
+    currentIndex >= 0 ? durationAt(currentIndex) : undefined;
+
+  /** The clock waits, rather than guesses, while either is still loading. */
+  const clockReady = playing && !refreshing && !awaitingMarks;
 
   // The clock: while playing, the current line's hold runs down and the next
   // recited line takes over when it is spent.
-  const clockRef = useRef({
-    currentDuration,
-    currentIndex,
-    speed,
-    nextRecited,
-  });
-  clockRef.current = { currentDuration, currentIndex, speed, nextRecited };
+  const clockRef = useRef({ durationAt, speed, nextRecited });
+  clockRef.current = { durationAt, speed, nextRecited };
   useEffect(() => {
-    if (!playing) return;
+    if (!clockReady) return;
+    // The first line is chosen only now, once instruction lines are known.
+    if (indexRef.current < 0) {
+      const first = clockRef.current.nextRecited(-1, 1);
+      if (first === null) {
+        setPlaying(false);
+        return;
+      }
+      goTo(first);
+    }
     let last = performance.now();
     const timer = window.setInterval(() => {
       const now = performance.now();
       const dt = now - last;
       last = now;
       const {
-        currentDuration: duration,
-        currentIndex: at,
+        durationAt: holdOf,
         speed: rate,
         nextRecited: next,
       } = clockRef.current;
+      const at = indexRef.current;
+      const duration = holdOf(at);
       if (duration === undefined) {
         setPlaying(false);
         setNote(
@@ -295,16 +346,12 @@ const AutoplayTestPage = () => {
         setElapsed(duration);
         return;
       }
-      // Moved on here rather than on the next render, so a slow render never
-      // lets the old line's hold be spent twice.
-      clockRef.current = { ...clockRef.current, currentIndex: target };
-      elapsedRef.current = 0;
-      setElapsed(0);
-      setCurrentIndex(target);
-      scrollToLine(target);
+      goTo(target);
     }, TICK_MS);
     return () => window.clearInterval(timer);
-  }, [playing]);
+    // goTo only touches refs and state setters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clockReady]);
 
   const togglePlay = () => {
     if (playing) {
@@ -312,22 +359,22 @@ const AutoplayTestPage = () => {
       return;
     }
     setNote(null);
-    void refetchPlayTimes();
-    if (currentIndex < 0) {
-      const first = nextRecited(-1, 1);
-      if (first === null) return;
-      goTo(first);
-    }
+    // Times learned since the page opened count too, so no line is judged
+    // untimed until the fresh ones are in.
+    setRefreshing(true);
+    void refetchPlayTimes().finally(() => setRefreshing(false));
     setPlaying(true);
   };
 
   const step = (delta: number) => {
+    if (awaitingMarks) return;
     const target = nextRecited(currentIndex, delta);
     if (target !== null) goTo(target);
   };
 
   const restart = () => {
     setPlaying(false);
+    indexRef.current = -1;
     setCurrentIndex(-1);
     elapsedRef.current = 0;
     setElapsed(0);
@@ -407,7 +454,14 @@ const AutoplayTestPage = () => {
               </span>
             </button>
           ))}
-          {event?.collectionId && !liturgies && !eventError ? (
+          {eventError || liturgiesError ? (
+            <p className="text-sm text-[#ff453a]">
+              {getApiErrorMessage(
+                eventError ?? liturgiesError,
+                "Could not load this event's liturgies.",
+              )}
+            </p>
+          ) : event?.collectionId && !liturgies ? (
             <p className="text-sm text-[#8e8e93]">
               Loading the event&apos;s liturgies…
             </p>
@@ -438,6 +492,7 @@ const AutoplayTestPage = () => {
                 key={`${line.id}-${index}`}
                 type="button"
                 data-line={index}
+                aria-current={active ? "true" : undefined}
                 onClick={() => goTo(index)}
                 className={`mb-2 block w-full rounded-md px-2 py-1.5 text-left break-words ${
                   active
@@ -517,7 +572,7 @@ const AutoplayTestPage = () => {
               type="button"
               onClick={() => step(-1)}
               className={iconButtonClass}
-              disabled={lines.length === 0}
+              disabled={lines.length === 0 || awaitingMarks}
               aria-label="Previous line"
             >
               ⏮
@@ -537,7 +592,7 @@ const AutoplayTestPage = () => {
               type="button"
               onClick={() => step(1)}
               className={iconButtonClass}
-              disabled={lines.length === 0}
+              disabled={lines.length === 0 || awaitingMarks}
               aria-label="Next line"
             >
               ⏭
@@ -582,9 +637,12 @@ const AutoplayTestPage = () => {
           </div>
         </div>
         <p className="pb-2 text-center font-sans text-[11px] text-[#636366] tabular-nums">
+          {playing && (refreshing || awaitingMarks)
+            ? "Waiting for the play times and instruction marks… · "
+            : ""}
           {loadingPlayTimes
             ? "Loading play times…"
-            : `${timedCount}/${lines.length} lines timed · total ${formatMs(totalTimed)}`}
+            : `${timedCount}/${recitedCount} lines timed · total ${formatMs(totalTimed)}`}
           {currentIndex >= 0
             ? ` · line ${currentIndex + 1} ${formatMs(elapsed)}${
                 currentDuration ? ` / ${formatMs(currentDuration)}` : ""

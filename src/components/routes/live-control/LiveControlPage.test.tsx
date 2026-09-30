@@ -2154,6 +2154,17 @@ describe("LiveControlPage", () => {
     });
   });
 
+  it("links to the autoplay dry run for the text open here", async () => {
+    renderPage();
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+    const link = screen.getByRole("link", {
+      name: /Test autoplay without the room/,
+    });
+    expect(link).toHaveAttribute("href", "/live/e1/autoplay-test?text=root");
+    expect(link).toHaveAttribute("target", "_blank");
+  });
+
   describe("autoplay", () => {
     /** Opens the first liturgy with a token, driving the Tibetan alone. */
     const openForAutoplay = async () => {
@@ -2313,6 +2324,37 @@ describe("LiveControlPage", () => {
         "tok-123",
         expect.objectContaining({ segmentId: "root-s3" }),
         expect.any(String),
+      );
+    });
+
+    it("starts the first line's hold once fresh play times are in", async () => {
+      const user = await openForAutoplay();
+      let refreshed = false;
+      fetchSegmentPlayTimes.mockImplementation(async () => {
+        // Slower than line 1's whole hold.
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        refreshed = true;
+        return { "root-s1": 200, "root-s2": 200, "root-s3": 200 };
+      });
+
+      await user.click(screen.getByRole("button", { name: "▶ Auto" }));
+      await waitFor(() => expect(refreshed).toBe(true));
+      await new Promise((resolve) => setTimeout(resolve, 60));
+      // Line 1 still has most of its hold left: the wait did not use it up.
+      expect(publishPosition).not.toHaveBeenCalledWith(
+        "e1",
+        "tok-123",
+        expect.objectContaining({ segmentId: "root-s2" }),
+        expect.any(String),
+      );
+
+      await waitFor(() =>
+        expect(publishPosition).toHaveBeenCalledWith(
+          "e1",
+          "tok-123",
+          expect.objectContaining({ segmentId: "root-s2", autoplay: true }),
+          expect.any(String),
+        ),
       );
     });
 

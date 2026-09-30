@@ -8,6 +8,7 @@ import {
 } from "react";
 import { useParams } from "react-router-dom";
 import { RECITATION_EMIT_TOKEN } from "@/lib/constant";
+import { ROUTES } from "@/routes/paths";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { useDebounce } from "use-debounce";
 import { getApiErrorMessage } from "@/lib/apiErrors";
@@ -1054,7 +1055,12 @@ const LiveControlPage = () => {
     // Times learned since the page opened count too, so nothing is judged
     // missing until the fresh ones are in.
     setRefreshingPlayTimes(true);
-    void refetchPlayTimes().finally(() => setRefreshingPlayTimes(false));
+    // Nothing moves on until they are, so the line's hold starts then: time
+    // spent waiting on them is not taken off it.
+    void refetchPlayTimes().finally(() => {
+      setLineStartedAt(performance.now());
+      setRefreshingPlayTimes(false);
+    });
     // The line on screen is sent again and its clock starts now: one the room
     // refused earlier gets another chance, and the hold is a whole line's.
     if (currentIndex < 0) step(1);
@@ -1472,6 +1478,22 @@ const LiveControlPage = () => {
             data-setup={setupUnfolded ? "unfolded" : "folded"}
             className={setupUnfolded ? "block" : "hidden lg:block"}
           >
+            {/* A dry run of autoplay in its own tab, on the text open here:
+             * it plays on that screen alone and never moves the room. */}
+            {eventId ? (
+              <a
+                href={`${ROUTES.liveAutoplayTest(eventId)}${
+                  sourceTextId
+                    ? `?text=${encodeURIComponent(sourceTextId)}`
+                    : ""
+                }`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mx-2 mt-4 block text-[13px] text-[#0a84ff] hover:underline max-lg:mx-1 max-lg:mt-2"
+              >
+                Test autoplay without the room ↗
+              </a>
+            ) : null}
             <h2 className="mx-2 mt-5 mb-2 text-[13px] tracking-[0.1em] text-[#8e8e93] uppercase max-lg:mx-1 max-lg:mt-2">
               Add a text
             </h2>
