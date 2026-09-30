@@ -253,11 +253,16 @@ const emitFailure = (status: number | undefined): string => {
 /**
  * Publishes one position. The event holds a single position, so callers send
  * only the newest one they have landed on.
+ *
+ * `run` names the unbroken stretch of moves the text has been part of. The
+ * backend only times one line against the next within a run, so time the room
+ * spent on another text is never learned as this text's.
  */
 export const publishPosition = async (
   eventId: string,
   token: string,
   position: PositionToPublish,
+  run?: string,
 ): Promise<PublishResult> => {
   try {
     await emitClient.post(
@@ -268,6 +273,7 @@ export const publishPosition = async (
         index: position.index,
         round_number: position.roundNumber,
         ...(position.autoplay ? { autoplay: true } : {}),
+        ...(run ? { run } : {}),
       },
       { headers: { "X-Recitation-Token": token } },
     );

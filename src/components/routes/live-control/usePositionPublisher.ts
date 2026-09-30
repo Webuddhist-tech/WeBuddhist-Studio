@@ -74,6 +74,13 @@ export function usePositionPublisher(
   const pumpRef = useRef<Promise<void> | null>(null);
   /** Per text, the last position the room accepted, so it is not sent twice. */
   const sentKeysRef = useRef<Record<string, string>>({});
+  /**
+   * Per text, the run it is in: kept for as long as every move includes the
+   * text, dropped by the first move that leaves it out. The backend times one
+   * line against the next only within a run, so a text the operator left and
+   * came back to is not billed for the time spent on the other one.
+   */
+  const runsRef = useRef<Record<string, string>>({});
   /** Set while a session is being ended, so no later move overtakes the end. */
   const endingRef = useRef(false);
   const tokenRef = useRef(token);
@@ -103,6 +110,16 @@ export function usePositionPublisher(
         targetRef.current = null;
         const currentToken = tokenRef.current;
         if (!eventId || !currentToken) return;
+
+        // Every text in this move carries its run on; any text left out of it
+        // loses its run, so returning to it later starts a new one. A move
+        // with nothing left to post still counts: its texts stayed with the
+        // room.
+        const runs: Record<string, string> = {};
+        cues.forEach((cue) => {
+          runs[cue.textId] = runsRef.current[cue.textId] ?? crypto.randomUUID();
+        });
+        runsRef.current = runs;
 
         const keyOf = (cue: PositionToPublish) =>
           `${cue.segmentId}|${cue.roundNumber}`;
@@ -136,7 +153,9 @@ export function usePositionPublisher(
         const sent: { cue: PositionToPublish; result: PublishResult }[] = [];
         if (followers.length > 0) {
           const followerResults = await Promise.all(
-            followers.map((cue) => publishPosition(eventId, currentToken, cue)),
+            followers.map((cue) =>
+              publishPosition(eventId, currentToken, cue, runs[cue.textId]),
+            ),
           );
           followers.forEach((cue, index) =>
             sent.push({ cue, result: followerResults[index] }),
@@ -145,7 +164,12 @@ export function usePositionPublisher(
         for (const cue of leaders) {
           sent.push({
             cue,
-            result: await publishPosition(eventId, currentToken, cue),
+            result: await publishPosition(
+              eventId,
+              currentToken,
+              cue,
+              runs[cue.textId],
+            ),
           });
         }
         if (!mountedRef.current) return;
@@ -230,6 +254,7 @@ export function usePositionPublisher(
         setNotice("This recitation session has ended.");
         setLastSent(null);
         sentKeysRef.current = {};
+        runsRef.current = {};
       } else {
         setState("error");
         setNotice(result.message);
