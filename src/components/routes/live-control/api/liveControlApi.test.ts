@@ -5,6 +5,7 @@ import {
   fetchLiveControlEvent,
   fetchRecitationDetails,
   fetchTextEditions,
+  publishPosition,
   toOperatorSegments,
   type RecitationSegmentRow,
 } from "./liveControlApi";
@@ -12,6 +13,47 @@ import {
 vi.mock("@/config/axios-config", () => ({
   default: { post: vi.fn(), get: vi.fn() },
 }));
+
+const { emitPost } = vi.hoisted(() => ({ emitPost: vi.fn() }));
+
+vi.mock("axios", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("axios")>();
+  return {
+    ...actual,
+    default: { ...actual.default, create: vi.fn(() => ({ post: emitPost })) },
+  };
+});
+
+describe("publishPosition", () => {
+  const position = { textId: "t1", segmentId: "s1", index: 3, roundNumber: 2 };
+
+  beforeEach(() => {
+    emitPost.mockReset();
+    emitPost.mockResolvedValue({ status: 202 });
+  });
+
+  it("posts the run the text is in", async () => {
+    await publishPosition("e1", "tok", position, "run-1");
+
+    expect(emitPost).toHaveBeenCalledWith(
+      "/api/v1/events/e1/recitation/position",
+      {
+        text_id: "t1",
+        segment_id: "s1",
+        index: 3,
+        round_number: 2,
+        run: "run-1",
+      },
+      { headers: { "X-Recitation-Token": "tok" } },
+    );
+  });
+
+  it("leaves the run out when there is none", async () => {
+    await publishPosition("e1", "tok", position);
+
+    expect(emitPost.mock.calls[0][1]).not.toHaveProperty("run");
+  });
+});
 
 describe("fetchRecitationDetails", () => {
   beforeEach(() => {
