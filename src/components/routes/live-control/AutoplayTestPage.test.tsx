@@ -8,7 +8,6 @@ import type { RecitationDetails } from "./api/liveControlApi";
 
 const {
   fetchLiveControlEvent,
-  fetchLiturgies,
   fetchTextEditions,
   fetchRecitationDetails,
   fetchEditionTitle,
@@ -16,7 +15,6 @@ const {
   fetchEditionYigchungs,
 } = vi.hoisted(() => ({
   fetchLiveControlEvent: vi.fn(),
-  fetchLiturgies: vi.fn(),
   fetchTextEditions: vi.fn(),
   fetchRecitationDetails: vi.fn(),
   fetchEditionTitle: vi.fn(),
@@ -31,7 +29,6 @@ vi.mock("./api/liveControlApi", async () => {
   return {
     ...actual,
     fetchLiveControlEvent,
-    fetchLiturgies,
     fetchTextEditions,
     fetchRecitationDetails,
     fetchEditionTitle,
@@ -86,12 +83,12 @@ describe("AutoplayTestPage", () => {
   beforeEach(() => {
     Element.prototype.scrollTo = vi.fn();
     fetchLiveControlEvent.mockReset();
-    fetchLiveControlEvent.mockResolvedValue({
-      title: "Tara Puja",
-      collectionId: "col-1",
-    });
-    fetchLiturgies.mockReset();
-    fetchLiturgies.mockResolvedValue([{ textId: "root", title: "Praise" }]);
+    localStorage.clear();
+    // Opened in the controller in this browser before.
+    localStorage.setItem(
+      "live-control-recent-texts",
+      JSON.stringify([{ textId: "root", title: "Praise" }]),
+    );
     fetchTextEditions.mockReset();
     fetchTextEditions.mockImplementation(async (textId: string) => ({
       text: { textId, title: textId, language: "bo" },
@@ -127,14 +124,28 @@ describe("AutoplayTestPage", () => {
     expect(screen.queryByText("Choose a text")).not.toBeInTheDocument();
   });
 
-  it("says why the event's liturgies are missing when they fail to load", async () => {
-    fetchLiturgies.mockRejectedValue(new Error("boom"));
+  it("offers the texts opened in the controller, and never reads the event", async () => {
     renderPage();
 
     expect(
-      await screen.findByText(/Could not load this event's liturgies|boom/),
+      await screen.findByRole("heading", { name: "Choose a text" }),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/Loading the event/)).not.toBeInTheDocument();
+    expect(screen.getByText("Opened in the controller")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Praise/ })).toBeInTheDocument();
+    // The event's record needs a session this page does not have.
+    expect(fetchLiveControlEvent).not.toHaveBeenCalled();
+  });
+
+  it("offers the suggested texts when nothing was opened here", async () => {
+    localStorage.clear();
+    renderPage();
+
+    expect(
+      await screen.findByText("Title of Zt5c0fe1OMJI1Kh8rp2FM"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText("Opened in the controller"),
+    ).not.toBeInTheDocument();
   });
 
   it("plays each line for its recorded time, then stops at the end", async () => {

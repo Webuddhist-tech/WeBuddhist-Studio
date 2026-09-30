@@ -1,11 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import axiosInstance from "@/config/axios-config";
 import {
+  fetchAutoplayState,
   fetchLiturgies,
   fetchLiveControlEvent,
   fetchRecitationDetails,
   fetchTextEditions,
+  publishMove,
   publishPosition,
+  recitationSocketUrl,
+  startAutoplay,
+  stopAutoplay,
+  toAutoplayState,
   toOperatorSegments,
   type RecitationSegmentRow,
 } from "./liveControlApi";
@@ -14,13 +20,19 @@ vi.mock("@/config/axios-config", () => ({
   default: { post: vi.fn(), get: vi.fn() },
 }));
 
-const { emitPost } = vi.hoisted(() => ({ emitPost: vi.fn() }));
+const { emitPost, emitGet } = vi.hoisted(() => ({
+  emitPost: vi.fn(),
+  emitGet: vi.fn(),
+}));
 
 vi.mock("axios", async (importOriginal) => {
   const actual = await importOriginal<typeof import("axios")>();
   return {
     ...actual,
-    default: { ...actual.default, create: vi.fn(() => ({ post: emitPost })) },
+    default: {
+      ...actual.default,
+      create: vi.fn(() => ({ post: emitPost, get: emitGet })),
+    },
   };
 });
 
@@ -60,6 +72,309 @@ describe("publishPosition", () => {
 
     expect(emitPost.mock.calls[0][1]).toMatchObject({ from_index: 1 });
     expect(emitPost.mock.calls[1][1]).not.toHaveProperty("from_index");
+  });
+});
+
+const auth = { headers: { "X-Recitation-Token": "tok" } };
+const wireState = {
+  type: "autoplay",
+  event_id: "e1",
+  plan_id: "p1",
+  status: "running",
+  reason: null,
+  step: 2,
+  total_steps: 9,
+  step_started_at_ms: 5_000,
+  step_duration_ms: 1_200,
+  server_time_ms: 5_400,
+};
+const httpError = (status: number) =>
+  Object.assign(new Error(`HTTP ${status}`), {
+    isAxiosError: true,
+    response: { status },
+  });
+
+describe("publishMove", () => {
+  beforeEach(() => {
+    emitPost.mockReset();
+    emitPost.mockResolvedValue({ status: 202 });
+  });
+
+  it("sends every edition of the move in one request, in the order given", async () => {
+    const result = await publishMove("e1", "tok", [
+      {
+        position: { textId: "en", segmentId: "en-3", index: 2, roundNumber: 1 },
+        run: "run-en",
+      },
+      {
+        position: {
+          textId: "bo",
+          segmentId: "bo-3",
+          index: 2,
+          roundNumber: 1,
+          elapsedMs: 900,
+          fromIndex: 1,
+        },
+        run: "run-bo",
+      },
+    ]);
+
+    expect(result).toEqual({ ok: true });
+    expect(emitPost).toHaveBeenCalledTimes(1);
+    expect(emitPost).toHaveBeenCalledWith(
+      "/api/v1/events/e1/recitation/move",
+      {
+        positions: [
+          {
+            text_id: "en",
+            segment_id: "en-3",
+            index: 2,
+            round_number: 1,
+            run: "run-en",
+          },
+          {
+            text_id: "bo",
+            segment_id: "bo-3",
+            index: 2,
+            round_number: 1,
+            run: "run-bo",
+            elapsed_ms: 900,
+            from_index: 1,
+          },
+        ],
+      },
+      auth,
+    );
+  });
+
+  it("says what went wrong in words the operator can act on", async () => {
+    emitPost.mockRejectedValueOnce(httpError(429));
+    const throttled = await publishMove("e1", "tok", [
+      { position: { textId: "bo", segmentId: "s", index: 0, roundNumber: 1 } },
+    ]);
+    emitPost.mockRejectedValueOnce(httpError(401));
+    const refused = await publishMove("e1", "tok", [
+      { position: { textId: "bo", segmentId: "s", index: 0, roundNumber: 1 } },
+    ]);
+
+    expect(throttled).toEqual({
+      ok: false,
+      message: expect.stringMatching(/slow down/),
+    });
+    expect(refused).toEqual({
+      ok: false,
+      message: expect.stringMatching(/token was rejected/),
+    });
+  });
+});
+
+describe("autoplay", () => {
+  beforeEach(() => {
+    emitPost.mockReset();
+    emitGet.mockReset();
+  });
+
+  it("hands the plan over, each step with its positions and hold", async () => {
+    emitPost.mockResolvedValue({ data: wireState });
+
+    const result = await startAutoplay("e1", "tok", [
+      {
+        positions: [
+          { textId: "bo", segmentId: "bo-1", index: 0, roundNumber: 1 },
+        ],
+        durationMs: 1_500,
+      },
+    ]);
+
+    expect(emitPost).toHaveBeenCalledWith(
+      "/api/v1/events/e1/recitation/autoplay",
+      {
+        steps: [
+          {
+            positions: [
+              { text_id: "bo", segment_id: "bo-1", index: 0, round_number: 1 },
+            ],
+            duration_ms: 1_500,
+          },
+        ],
+      },
+      auth,
+    );
+    expect(result).toEqual({
+      ok: true,
+      state: {
+        planId: "p1",
+        status: "running",
+        reason: null,
+        step: 2,
+        totalSteps: 9,
+        stepStartedAtMs: 5_000,
+        stepDurationMs: 1_200,
+        serverTimeMs: 5_400,
+      },
+    });
+  });
+
+  it("says how long the first line has been showing when it is not to be sent again", async () => {
+    emitPost.mockResolvedValue({ data: wireState });
+
+    await startAutoplay(
+      "e1",
+      "tok",
+      [
+        {
+          positions: [
+            { textId: "bo", segmentId: "b", index: 0, roundNumber: 1 },
+          ],
+          durationMs: 900,
+        },
+      ],
+      750,
+    );
+
+    expect(emitPost.mock.calls[0][1]).toMatchObject({
+      first_step_elapsed_ms: 750,
+    });
+  });
+
+  it("reports a start the server could not run", async () => {
+    emitPost.mockRejectedValue(httpError(503));
+
+    const result = await startAutoplay("e1", "tok", []);
+
+    expect(result).toEqual({
+      ok: false,
+      message: expect.stringMatching(/could not run autoplay/),
+    });
+    expect(emitGet).not.toHaveBeenCalled();
+  });
+
+  it("takes a plan the server is already running when the answer is late", async () => {
+    vi.useFakeTimers();
+    try {
+      emitPost.mockReturnValue(new Promise(() => {}));
+      emitGet.mockResolvedValue({
+        data: { ...wireState, plan_id: "new-plan" },
+      });
+
+      const pending = startAutoplay("e1", "tok", [], undefined, "old-plan");
+      await vi.advanceTimersByTimeAsync(15_000);
+
+      await expect(pending).resolves.toMatchObject({
+        ok: true,
+        state: { planId: "new-plan", status: "running" },
+      });
+      expect(emitGet).toHaveBeenCalledWith(
+        "/api/v1/events/e1/recitation/autoplay",
+        auth,
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("waits out a start that has not replaced the plan already running", async () => {
+    vi.useFakeTimers();
+    try {
+      let finish: (value: { data: typeof wireState }) => void = () => {};
+      emitPost.mockReturnValue(
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+      );
+      emitGet.mockResolvedValue({
+        data: { ...wireState, status: "stopped", reason: "stopped" },
+      });
+
+      const pending = startAutoplay("e1", "tok", [], undefined, "p1");
+      const seen = vi.fn();
+      void pending.then(seen);
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(seen).not.toHaveBeenCalled();
+
+      finish({ data: { ...wireState, plan_id: "new-plan" } });
+
+      await expect(pending).resolves.toMatchObject({
+        ok: true,
+        state: { planId: "new-plan" },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stops, and reads where it is", async () => {
+    emitPost.mockResolvedValue({
+      data: { ...wireState, status: "stopped", reason: "stopped" },
+    });
+    emitGet.mockResolvedValue({ data: wireState });
+
+    const stopped = await stopAutoplay("e1", "tok");
+    const read = await fetchAutoplayState("e1", "tok");
+
+    expect(emitPost).toHaveBeenCalledWith(
+      "/api/v1/events/e1/recitation/autoplay/stop",
+      {},
+      auth,
+    );
+    expect(stopped).toMatchObject({
+      ok: true,
+      state: { status: "stopped", reason: "stopped" },
+    });
+    expect(emitGet).toHaveBeenCalledWith(
+      "/api/v1/events/e1/recitation/autoplay",
+      auth,
+    );
+    expect(read?.step).toBe(2);
+  });
+
+  it("reads nothing when the server cannot be asked", async () => {
+    emitGet.mockRejectedValue(httpError(503));
+
+    expect(await fetchAutoplayState("e1", "tok")).toBeNull();
+  });
+
+  it("takes only autoplay frames as state", () => {
+    expect(toAutoplayState({ type: "position", status: "live" })).toBeNull();
+    expect(toAutoplayState(null)).toBeNull();
+    expect(toAutoplayState(wireState)?.planId).toBe("p1");
+  });
+});
+
+describe("recitationSocketUrl", () => {
+  it("opens the event's live socket on the backend, with the token", () => {
+    vi.stubEnv("VITE_BACKEND_BASE_URL", "https://api.example.org");
+    try {
+      expect(recitationSocketUrl("e/1", "a b")).toBe(
+        "wss://api.example.org/api/v1/events/e%2F1/recitation/live?token=a+b",
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("uses a plain socket for a plain-HTTP backend, keeping any path it sits under", () => {
+    vi.stubEnv("VITE_BACKEND_BASE_URL", "http://localhost:8000/backend/");
+    try {
+      expect(recitationSocketUrl("e1", "tok")).toBe(
+        "ws://localhost:8000/backend/api/v1/events/e1/recitation/live?token=tok",
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("goes to this origin's root, not the page's path, when the build names no backend", () => {
+    vi.stubEnv("VITE_BACKEND_BASE_URL", "");
+    window.history.pushState({}, "", "/live-control/e1");
+    try {
+      expect(recitationSocketUrl("e1", "tok")).toBe(
+        `ws://${window.location.host}/api/v1/events/e1/recitation/live?token=tok`,
+      );
+    } finally {
+      window.history.pushState({}, "", "/");
+      vi.unstubAllEnvs();
+    }
   });
 });
 
