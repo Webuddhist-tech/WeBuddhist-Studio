@@ -291,7 +291,7 @@ const AutoplayProgress = ({
     >
       <span
         role="progressbar"
-        aria-label="Autoplay: time left on this line"
+        aria-label="Autoplay: time spent on this line"
         aria-valuemin={0}
         aria-valuemax={Math.round(duration)}
         aria-valuenow={Math.round(Math.max(0, elapsed))}
