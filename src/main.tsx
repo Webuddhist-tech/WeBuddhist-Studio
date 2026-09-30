@@ -48,6 +48,7 @@ import GroupEventsPage from "./components/routes/groups/GroupEventsPage.tsx";
 import GroupEventFormPage from "./components/routes/groups/GroupEventFormPage.tsx";
 import GroupEventDetailPage from "./components/routes/groups/GroupEventDetailPage.tsx";
 import LiveControlPage from "./components/routes/live-control/LiveControlPage.tsx";
+import AutoplayTestPage from "./components/routes/live-control/AutoplayTestPage.tsx";
 import GroupChantsPage from "./components/routes/groups/GroupChantsPage.tsx";
 import GroupChantFormPage from "./components/routes/groups/GroupChantFormPage.tsx";
 import GroupChantDetailPage from "./components/routes/groups/GroupChantDetailPage.tsx";
@@ -90,6 +91,12 @@ const router = createBrowserRouter([
   {
     path: "/live-control/:eventId",
     element: <LiveControlPage />,
+  },
+  // Plays a text back by its recorded times on this screen only: no socket,
+  // nothing published, so autoplay can be checked without moving a room.
+  {
+    path: "/live/:eventId/autoplay-test",
+    element: <AutoplayTestPage />,
   },
   {
     path: "/",

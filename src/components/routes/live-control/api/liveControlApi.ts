@@ -196,6 +196,13 @@ export const fetchTextEditions = async (
   return { text: { ...text, textId }, editions };
 };
 
+/** Texts offered to open with one tap, by edition id - on the controller until
+ * opened in that browser, and always on the autoplay test. */
+export const SUGGESTED_TEXT_IDS = [
+  "Zt5c0fe1OMJI1Kh8rp2FM",
+  "lEmYv8BrRQkOMPY9ymQpS",
+];
+
 /** A text found by name: the edition id to open it by, and what to call it. */
 export interface TextSearchResult {
   textId: string;
@@ -318,11 +325,10 @@ interface SegmentPlayTimesResponse {
  */
 export const fetchSegmentPlayTimes = async (
   textId: string,
-  token: string,
 ): Promise<Record<string, number>> => {
+  // Public: the times are durations of a public text, read with no token.
   const { data } = await emitClient.get<SegmentPlayTimesResponse>(
     `/api/v1/events/recitation/texts/${encodeURIComponent(textId)}/segment-play-times`,
-    { headers: { "X-Recitation-Token": token } },
   );
   return Object.fromEntries(
     data.segments.map((segment) => [

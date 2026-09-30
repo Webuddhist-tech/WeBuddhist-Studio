@@ -2163,7 +2163,7 @@ describe("LiveControlPage", () => {
       expect(await screen.findByText("root line 1")).toBeInTheDocument();
       await followNone(user);
       await waitFor(() =>
-        expect(fetchSegmentPlayTimes).toHaveBeenCalledWith("root", "tok-123"),
+        expect(fetchSegmentPlayTimes).toHaveBeenCalledWith("root"),
       );
       publishPosition.mockClear();
       return user;
@@ -2203,6 +2203,20 @@ describe("LiveControlPage", () => {
       expect(
         await screen.findByRole("button", { name: "▶ Auto" }),
       ).toBeInTheDocument();
+    });
+
+    it("shows each line's play time, and a dash where there is none", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue({ "root-s1": 4200 });
+      await openForAutoplay();
+
+      const first = screen.getByText("root line 1").closest("[data-line]");
+      const second = screen.getByText("root line 2").closest("[data-line]");
+      await waitFor(() =>
+        expect(
+          first?.querySelector("[data-play-time]")?.textContent,
+        ).toBe("4.2s"),
+      );
+      expect(second?.querySelector("[data-play-time]")?.textContent).toBe("—");
     });
 
     it("stops, and says why, at a line with no recorded time", async () => {
@@ -2388,7 +2402,10 @@ describe("LiveControlPage", () => {
       expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
       expect(screen.getByRole("button", { name: "▶ Auto" })).toBeDisabled();
-      expect(fetchSegmentPlayTimes).not.toHaveBeenCalled();
+      // The times are public, so they still load and show on the lines.
+      await waitFor(() =>
+        expect(fetchSegmentPlayTimes).toHaveBeenCalledWith("root"),
+      );
     });
   });
 });

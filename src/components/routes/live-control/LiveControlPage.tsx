@@ -19,6 +19,7 @@ import {
   fetchSegmentPlayTimes,
   fetchTextEditions,
   searchTextsByTitle,
+  SUGGESTED_TEXT_IDS,
   toOperatorSegments,
   type Liturgy,
   type OperatorSegment,
@@ -110,8 +111,6 @@ interface RecentText {
 }
 const RECENT_TEXTS_STORAGE_KEY = "live-control-recent-texts";
 const MAX_RECENT_TEXTS = 6;
-/** Offered until they have been opened in this browser, by edition id. */
-const SUGGESTED_TEXT_IDS = ["Zt5c0fe1OMJI1Kh8rp2FM", "lEmYv8BrRQkOMPY9ymQpS"];
 
 const readRecentTexts = (): RecentText[] => {
   try {
@@ -245,6 +244,9 @@ const allowsShortcut = (target: EventTarget | null) => {
   if (target.closest("button, a, [role='button']")) return false;
   return true;
 };
+
+/** A line's learned play time, as its badge reads: seconds to a tenth. */
+const formatPlayTime = (ms: number) => `${(ms / 1000).toFixed(1)}s`;
 
 /** Yigchung is drawn small and in its own colour, as a printed liturgy sets it
  * apart from the verse, so the operator reads past it at a glance. */
@@ -638,9 +640,9 @@ const LiveControlPage = () => {
   // How long each line of the edition on screen takes to recite, learned by the
   // backend from earlier pujas: what autoplay paces the room by.
   const { data: playTimes, refetch: refetchPlayTimes } = useQuery({
-    queryKey: ["live-control-play-times", driverTextId, token],
-    queryFn: () => fetchSegmentPlayTimes(driverTextId, token ?? ""),
-    enabled: Boolean(driverTextId && token),
+    queryKey: ["live-control-play-times", driverTextId],
+    queryFn: () => fetchSegmentPlayTimes(driverTextId),
+    enabled: Boolean(driverTextId),
     refetchOnWindowFocus: false,
     retry: false,
   });
@@ -1774,6 +1776,7 @@ const LiveControlPage = () => {
                   const returnTo = returnButtonForLine(segment.id, driverLines);
                   const yigchung = yigchungs?.[segment.id];
                   const isYigchung = Boolean(yigchung?.full);
+                  const playTime = playTimes?.[segment.id];
                   return (
                     <Fragment key={segment.id}>
                       <button
@@ -1800,6 +1803,27 @@ const LiveControlPage = () => {
                               : "text-[#8e8e93] hover:bg-[#1a1a1c] hover:text-[#f2f2f7]"
                         }`}
                       >
+                        {/* What autoplay holds the line for; a dash is a line
+                         * it stops at, never having been recited through. */}
+                        {playTimes && !isYigchung ? (
+                          <span
+                            data-play-time={playTime ?? ""}
+                            title={
+                              playTime === undefined
+                                ? "No play time yet · autoplay stops here"
+                                : "Play time learned from earlier pujas"
+                            }
+                            className={`float-right mt-1 ml-2 rounded-full px-2 py-0.5 font-sans text-[11px] leading-none tabular-nums ${
+                              playTime === undefined
+                                ? "text-[#636366]"
+                                : "bg-[#1c1c1e] text-[#8e8e93]"
+                            }`}
+                          >
+                            {playTime === undefined
+                              ? "—"
+                              : formatPlayTime(playTime)}
+                          </span>
+                        ) : null}
                         <LineContent
                           content={segment.content}
                           yigchung={yigchung}
