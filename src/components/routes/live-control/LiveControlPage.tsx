@@ -313,6 +313,9 @@ const LiveControlPage = () => {
   const [lines, setLines] = useState<Record<string, OperatorSegment[]>>({});
   const [preparing, setPreparing] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(-1);
+  /** The last line of the edition on screen the room took, as
+   * `textId|index|segmentId`. */
+  const [acceptedLine, setAcceptedLine] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   /** A message the operator closed. It stays closed until the page shows a
    * different one, or the problem goes away and comes back. */
@@ -401,8 +404,18 @@ const LiveControlPage = () => {
       return next;
     });
   };
+  /**
+   * Every move is numbered as it is sent, and each passage remembers the move it
+   * was reset after. A move sent before the reset may still be on the wire when
+   * the operator resets; the room taking it later must not put the old count
+   * back.
+   */
+  const moveSequenceRef = useRef(0);
+  const cueMoveRef = useRef(new WeakMap<PositionToPublish, number>());
+  const resetAfterMoveRef = useRef<Record<string, number>>({});
   /** Back to the first round, for the next puja. */
   const resetReturn = (key: string) => {
+    resetAfterMoveRef.current[key] = moveSequenceRef.current;
     updateReturnCounts((current) => {
       const next = { ...current };
       delete next[key];
@@ -424,8 +437,25 @@ const LiveControlPage = () => {
 
   /** What to do when the room takes a position; set once the lines are known. */
   const onAcceptedRef = useRef<(cue: PositionToPublish) => void>(() => {});
-  const { state, notice, lastSent, publish, clearNotice } =
-    usePositionPublisher(eventId, token, (cue) => onAcceptedRef.current(cue));
+  const {
+    state,
+    notice,
+    lastSent,
+    publish: publishCues,
+    clearNotice,
+  } = usePositionPublisher(eventId, token, (cue) => onAcceptedRef.current(cue));
+  /** Publishes one move, numbered so an acceptance can be told apart from a
+   * later reset. */
+  const publish = useCallback(
+    (cues: PositionToPublish[]) => {
+      moveSequenceRef.current += 1;
+      cues.forEach((cue) =>
+        cueMoveRef.current.set(cue, moveSequenceRef.current),
+      );
+      publishCues(cues);
+    },
+    [publishCues],
+  );
 
   const { data: event, error: eventError } = useQuery({
     queryKey: ["live-control-event", eventId],
@@ -784,8 +814,13 @@ const LiveControlPage = () => {
   onAcceptedRef.current = (cue) => {
     if (cue.textId !== driverTextId) return;
     if (driverLines[cue.index]?.id !== cue.segmentId) return;
+    setAcceptedLine(`${cue.textId}|${cue.index}|${cue.segmentId}`);
     const passage = passageAt(passages, cue.index);
-    if (passage) settleRound(passage.key, cue.roundNumber);
+    if (!passage) return;
+    // Sent before the count was reset: the reset stands.
+    const move = cueMoveRef.current.get(cue) ?? Infinity;
+    if (move <= (resetAfterMoveRef.current[passage.key] ?? 0)) return;
+    settleRound(passage.key, cue.roundNumber);
   };
 
   /** Every edition is in the same round as the one on screen: one recitation. */
@@ -893,9 +928,13 @@ const LiveControlPage = () => {
     jump(index, round);
   };
 
-  /** Return: back to the passage's start, in the round after the room's. */
+  /**
+   * Return: back to the passage's start, in the next round. A return still on
+   * its way to the room counts too - a second return made before the first is
+   * taken is the round after it, not the same round sent again.
+   */
   const beginNextRound = (key: string, index: number) => {
-    const round = acceptedRound(key) + 1;
+    const round = roundOf(key) + 1;
     // With no token nothing goes to the room, so no round is begun there.
     if (token) {
       setRequestedRounds((current) => ({ ...current, [key]: round }));
@@ -923,9 +962,22 @@ const LiveControlPage = () => {
    */
   const [autoplay, setAutoplay] = useState(false);
   const [autoplayNote, setAutoplayNote] = useState<string | null>(null);
+  /** Set while the play times are being read afresh for a start. */
+  const [refreshingPlayTimes, setRefreshingPlayTimes] = useState(false);
   useEffect(() => {
     setAutoplay(false);
   }, [driverTextId, token]);
+  // A line the room did not take is not retried until the next move, so
+  // autoplay would wait on it forever: it hands back to the operator instead.
+  const autoplayRef = useRef(autoplay);
+  autoplayRef.current = autoplay;
+  useEffect(() => {
+    if (state !== "error" || !autoplayRef.current) return;
+    setAutoplay(false);
+    setAutoplayNote(
+      "Autoplay stopped: the room did not take the last line. Move on by hand, or start autoplay again.",
+    );
+  }, [state]);
 
   const autoplayNextRef = useRef(() => {});
   autoplayNextRef.current = () => {
@@ -941,9 +993,20 @@ const LiveControlPage = () => {
   const currentPlayTime = currentLineId
     ? playTimes?.[currentLineId]
     : undefined;
+  // A line is held from when the room took it, never from when it was sent:
+  // the times were measured between the room taking one line and the next, and
+  // a slow or failing publish must not leave the room behind the controller.
+  const currentLineTaken =
+    acceptedLine === `${driverTextId}|${currentIndex}|${currentLineId}`;
   useEffect(() => {
     // Waits, rather than guesses, while the times or the yigchung are loading.
-    if (!autoplay || currentIndex < 0 || awaitingYigchungs || !playTimes) {
+    if (
+      !autoplay ||
+      currentIndex < 0 ||
+      awaitingYigchungs ||
+      refreshingPlayTimes ||
+      !playTimes
+    ) {
       return;
     }
     if (currentPlayTime === undefined) {
@@ -953,12 +1016,21 @@ const LiveControlPage = () => {
       );
       return;
     }
+    if (!currentLineTaken) return;
     const timer = window.setTimeout(
       () => autoplayNextRef.current(),
       currentPlayTime,
     );
     return () => window.clearTimeout(timer);
-  }, [autoplay, currentIndex, currentPlayTime, awaitingYigchungs, playTimes]);
+  }, [
+    autoplay,
+    currentIndex,
+    currentPlayTime,
+    currentLineTaken,
+    awaitingYigchungs,
+    refreshingPlayTimes,
+    playTimes,
+  ]);
 
   const toggleAutoplay = () => {
     if (autoplay) {
@@ -966,8 +1038,10 @@ const LiveControlPage = () => {
       return;
     }
     setAutoplayNote(null);
-    // Times learned since the page opened count too.
-    void refetchPlayTimes();
+    // Times learned since the page opened count too, so nothing is judged
+    // missing until the fresh ones are in.
+    setRefreshingPlayTimes(true);
+    void refetchPlayTimes().finally(() => setRefreshingPlayTimes(false));
     if (currentIndex < 0) step(1);
     setAutoplay(true);
   };

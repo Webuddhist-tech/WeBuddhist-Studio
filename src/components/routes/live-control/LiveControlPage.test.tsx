@@ -1647,6 +1647,119 @@ describe("LiveControlPage", () => {
       expect(localStorage.getItem("live-control-return-counts:e1")).toBeNull();
     });
 
+    /** A praise of two lines, whose ending carries a Return. */
+    const openPraise = async () => {
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      fetchRecitationDetails.mockImplementation(
+        async (textId: string, language: string) =>
+          textId !== "root"
+            ? linesFor(textId, language, 3)
+            : {
+                text_id: "root",
+                title: "root",
+                segments: [
+                  {
+                    recitation: {
+                      bo: { id: "BsajlElFFNFLoHcUjICwB", content: "homage" },
+                    },
+                  },
+                  {
+                    recitation: {
+                      bo: { id: "kYNR7EmC5apQWrkYl5fiO", content: "mantra" },
+                    },
+                  },
+                ],
+              },
+      );
+      renderPage();
+      return "↺ Return to start · 1st Praises to the 21 Tārās";
+    };
+
+    /** Holds the room's answer to round `round` of the praise until released. */
+    const holdRound = (round: number) => {
+      let release = () => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      publishPosition.mockImplementation(async (_event, _token, cue) => {
+        if (cue.textId === "root" && cue.roundNumber === round) await gate;
+        return { ok: true };
+      });
+      return () => act(async () => release());
+    };
+
+    it("counts a second return made before the room took the first", async () => {
+      const user = userEvent.setup();
+      const release = holdRound(2);
+      const label = await openPraise();
+
+      await user.click(
+        await screen.findByRole("button", { name: `${label}, round 1` }),
+      );
+      await waitFor(() =>
+        expect(publishPosition).toHaveBeenCalledWith(
+          "e1",
+          "tok-123",
+          expect.objectContaining({ textId: "root", roundNumber: 2 }),
+        ),
+      );
+      // Still on its way: the next return is the round after it.
+      await user.click(
+        screen.getByRole("button", { name: `${label}, round 1` }),
+      );
+      await release();
+
+      await waitFor(() =>
+        expect(publishPosition).toHaveBeenLastCalledWith("e1", "tok-123", {
+          textId: "root",
+          segmentId: "BsajlElFFNFLoHcUjICwB",
+          index: 0,
+          roundNumber: 3,
+        }),
+      );
+      expect(
+        await screen.findByRole("button", { name: `${label}, round 3` }),
+      ).toBeInTheDocument();
+    });
+
+    it("keeps a reset made while a return was still on its way", async () => {
+      const user = userEvent.setup();
+      localStorage.setItem(
+        "live-control-return-counts:e1",
+        JSON.stringify({ "1-85": 2 }),
+      );
+      const release = holdRound(3);
+      const label = await openPraise();
+
+      await user.click(
+        await screen.findByRole("button", { name: `${label}, round 2` }),
+      );
+      await waitFor(() =>
+        expect(publishPosition).toHaveBeenCalledWith(
+          "e1",
+          "tok-123",
+          expect.objectContaining({ textId: "root", roundNumber: 3 }),
+        ),
+      );
+      await user.click(
+        screen.getByRole("button", { name: `Reset count: ${label}` }),
+      );
+      // The room takes the return only now, after the reset.
+      await release();
+      await waitFor(() =>
+        expect(screen.getByText(/sent line 1/)).toBeInTheDocument(),
+      );
+
+      expect(
+        screen.getByRole("button", { name: `${label}, round 1` }),
+      ).toBeInTheDocument();
+      expect(
+        JSON.parse(
+          localStorage.getItem("live-control-return-counts:e1") ?? "{}",
+        ),
+      ).toEqual({});
+    });
+
     it("scrolls the outline to the live section when the peek is opened", async () => {
       const user = userEvent.setup();
       const scrollIntoView = vi.mocked(Element.prototype.scrollIntoView);
@@ -1996,6 +2109,82 @@ describe("LiveControlPage", () => {
       await new Promise((resolve) => setTimeout(resolve, 600));
 
       expect(publishPosition).toHaveBeenCalledTimes(1);
+    });
+
+    it("holds each line from when the room takes it, never ahead of the room", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue({
+        "root-s1": 20,
+        "root-s2": 20,
+        "root-s3": 20,
+      });
+      const user = await openForAutoplay();
+      let release = () => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      publishPosition.mockImplementation(async (_event, _token, cue) => {
+        if (cue.segmentId === "root-s2") await gate;
+        return { ok: true };
+      });
+
+      await user.click(screen.getByRole("button", { name: "▶ Auto" }));
+      await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(2));
+      // Line 2 is still on its way: autoplay does not move past it.
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      expect(screen.getByText(/line 2\/3/)).toBeInTheDocument();
+      expect(publishPosition).toHaveBeenCalledTimes(2);
+
+      await act(async () => release());
+      await waitFor(() =>
+        expect(publishPosition).toHaveBeenLastCalledWith(
+          "e1",
+          "tok-123",
+          expect.objectContaining({ segmentId: "root-s3", autoplay: true }),
+        ),
+      );
+    });
+
+    it("hands back to the operator when the room refuses a line", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue({
+        "root-s1": 20,
+        "root-s2": 20,
+        "root-s3": 20,
+      });
+      const user = await openForAutoplay();
+      publishPosition.mockImplementation(async (_event, _token, cue) =>
+        cue.segmentId === "root-s2"
+          ? { ok: false, message: "Could not reach the room." }
+          : { ok: true },
+      );
+
+      await user.click(screen.getByRole("button", { name: "▶ Auto" }));
+
+      expect(
+        await screen.findByRole("button", { name: "▶ Auto" }),
+      ).toBeInTheDocument();
+      await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(2));
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(publishPosition).toHaveBeenCalledTimes(2);
+    });
+
+    it("waits for fresh play times before judging a line has none", async () => {
+      let fresh = false;
+      fetchSegmentPlayTimes.mockImplementation(async () =>
+        fresh ? { "root-s1": 20, "root-s2": 20, "root-s3": 20 } : {},
+      );
+      const user = await openForAutoplay();
+
+      fresh = true;
+      await user.click(screen.getByRole("button", { name: "▶ Auto" }));
+
+      await waitFor(() =>
+        expect(publishPosition).toHaveBeenLastCalledWith(
+          "e1",
+          "tok-123",
+          expect.objectContaining({ segmentId: "root-s3", autoplay: true }),
+        ),
+      );
+      expect(screen.queryByText(/Autoplay stopped/)).not.toBeInTheDocument();
     });
 
     it("cannot be started without the emit token", async () => {
