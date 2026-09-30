@@ -972,8 +972,13 @@ const LiveControlPage = () => {
   const [autoplayNote, setAutoplayNote] = useState<string | null>(null);
   /** Set while the play times are being read afresh for a start. */
   const [refreshingPlayTimes, setRefreshingPlayTimes] = useState(false);
+  /** Counts autoplay starts, so a refresh only settles the start that made it:
+   * one begun for another text, answering late, must not clear this one. */
+  const autoplayStartRef = useRef(0);
   useEffect(() => {
+    autoplayStartRef.current += 1;
     setAutoplay(false);
+    setRefreshingPlayTimes(false);
   }, [driverTextId, token]);
   // A line the room did not take is not retried until the next move, so
   // autoplay would wait on it forever: it hands back to the operator instead.
@@ -1054,10 +1059,13 @@ const LiveControlPage = () => {
     setAutoplayNote(null);
     // Times learned since the page opened count too, so nothing is judged
     // missing until the fresh ones are in.
+    autoplayStartRef.current += 1;
+    const start = autoplayStartRef.current;
     setRefreshingPlayTimes(true);
     // Nothing moves on until they are, so the line's hold starts then: time
     // spent waiting on them is not taken off it.
     void refetchPlayTimes().finally(() => {
+      if (start !== autoplayStartRef.current) return;
       setLineStartedAt(performance.now());
       setRefreshingPlayTimes(false);
     });
@@ -1483,8 +1491,8 @@ const LiveControlPage = () => {
             {eventId ? (
               <a
                 href={`${ROUTES.liveAutoplayTest(eventId)}${
-                  sourceTextId
-                    ? `?text=${encodeURIComponent(sourceTextId)}`
+                  driverTextId || sourceTextId
+                    ? `?text=${encodeURIComponent(driverTextId || sourceTextId)}`
                     : ""
                 }`}
                 target="_blank"

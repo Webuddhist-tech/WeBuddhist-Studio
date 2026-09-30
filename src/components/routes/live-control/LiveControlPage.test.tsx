@@ -2163,6 +2163,15 @@ describe("LiveControlPage", () => {
     });
     expect(link).toHaveAttribute("href", "/live/e1/autoplay-test?text=root");
     expect(link).toHaveAttribute("target", "_blank");
+
+    // Reading a translation, the dry run opens that edition, as it is driven.
+    await userEvent.click(
+      screen.getByRole("button", { name: /Praise \(en\)/ }),
+    );
+    expect(await screen.findByText("root-en line 1")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /Test autoplay without the room/ }),
+    ).toHaveAttribute("href", "/live/e1/autoplay-test?text=root-en");
   });
 
   describe("autoplay", () => {
@@ -2356,6 +2365,55 @@ describe("LiveControlPage", () => {
           expect.any(String),
         ),
       );
+    });
+
+    it("does not let a refresh from an earlier start release a later one", async () => {
+      const user = await openForAutoplay();
+      fetchSegmentPlayTimes.mockResolvedValue({
+        "root-en-s1": 20,
+        "root-en-s2": 20,
+        "root-en-s3": 20,
+      });
+      let releaseOld = () => {};
+      fetchSegmentPlayTimes.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            releaseOld = () => resolve({ "root-s1": 20 });
+          }),
+      );
+      await user.click(screen.getByRole("button", { name: "▶ Auto" }));
+
+      // Another edition, and autoplay started again on it while the first
+      // refresh is still out.
+      await user.click(screen.getByRole("button", { name: /Praise \(en\)/ }));
+      expect(await screen.findByText("root-en line 1")).toBeInTheDocument();
+      await waitFor(() =>
+        expect(fetchSegmentPlayTimes).toHaveBeenCalledWith("root-en"),
+      );
+      let releaseNew = () => {};
+      fetchSegmentPlayTimes.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            releaseNew = () =>
+              resolve({
+                "root-en-s1": 20,
+                "root-en-s2": 20,
+                "root-en-s3": 20,
+              });
+          }),
+      );
+      await user.click(screen.getByRole("button", { name: "▶ Auto" }));
+
+      const movedOnInEnglish = () =>
+        publishPosition.mock.calls.some(
+          (call) => call[2].segmentId === "root-en-s2",
+        );
+      await act(async () => releaseOld());
+      await new Promise((resolve) => setTimeout(resolve, 150));
+      expect(movedOnInEnglish()).toBe(false);
+
+      await act(async () => releaseNew());
+      await waitFor(() => expect(movedOnInEnglish()).toBe(true));
     });
 
     it("waits for fresh play times before judging a line has none", async () => {
