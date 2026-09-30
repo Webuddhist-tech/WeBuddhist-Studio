@@ -295,19 +295,58 @@ export const publishPosition = async (
   try {
     await emitClient.post(
       `/api/v1/events/${encodeURIComponent(eventId)}/recitation/position`,
+      toWirePosition(position, run),
+      { headers: { "X-Recitation-Token": token } },
+    );
+    return { ok: true };
+  } catch (error) {
+    const status = axios.isAxiosError(error)
+      ? error.response?.status
+      : undefined;
+    return { ok: false, message: emitFailure(status) };
+  }
+};
+
+/** A position as the backend reads it, in a `set`, a move or an autoplay step. */
+export const toWirePosition = (position: PositionToPublish, run?: string) => ({
+  text_id: position.textId,
+  segment_id: position.segmentId,
+  index: position.index,
+  round_number: position.roundNumber,
+  ...(position.autoplay ? { autoplay: true } : {}),
+  ...(run ? { run } : {}),
+  ...(position.elapsedMs === undefined
+    ? {}
+    : { elapsed_ms: position.elapsedMs }),
+  ...(position.fromIndex === undefined
+    ? {}
+    : { from_index: position.fromIndex }),
+});
+
+/** One edition's position within a move, with the run it belongs to. */
+export interface MovePosition {
+  position: PositionToPublish;
+  run?: string;
+}
+
+/**
+ * Publishes one move - the same line in every edition - in one request. The
+ * room is sent the positions in this order and the event keeps the last, so
+ * the edition on screen goes last. One request rather than one per edition, so
+ * that edition is never held back a round trip behind the others.
+ */
+export const publishMove = async (
+  eventId: string,
+  token: string,
+  positions: MovePosition[],
+): Promise<PublishResult> => {
+  try {
+    await emitClient.post(
+      `/api/v1/events/${encodeURIComponent(eventId)}/recitation/move`,
       {
-        text_id: position.textId,
-        segment_id: position.segmentId,
-        index: position.index,
-        round_number: position.roundNumber,
-        ...(position.autoplay ? { autoplay: true } : {}),
-        ...(run ? { run } : {}),
-        ...(position.elapsedMs === undefined
-          ? {}
-          : { elapsed_ms: position.elapsedMs }),
-        ...(position.fromIndex === undefined
-          ? {}
-          : { from_index: position.fromIndex }),
+        positions: positions.map(({ position, run }) =>
+          toWirePosition(position, run),
+        ),
       },
       { headers: { "X-Recitation-Token": token } },
     );
@@ -318,6 +357,157 @@ export const publishPosition = async (
       : undefined;
     return { ok: false, message: emitFailure(status) };
   }
+};
+
+/** One line of an autoplay plan: every edition's position, and its hold. */
+export interface AutoplayPlanStep {
+  positions: PositionToPublish[];
+  durationMs: number;
+}
+
+/** Where the backend's autoplay is, as it reports it. */
+export interface AutoplayState {
+  planId: string | null;
+  status: "running" | "stopped";
+  /** Why it stopped: finished, stopped, ended or failed. */
+  reason: string | null;
+  step: number;
+  totalSteps: number;
+  /** When the current step went out, on the server's clock. */
+  stepStartedAtMs: number | null;
+  stepDurationMs: number | null;
+  /** The server's clock when this was sent, to line it up with this page's. */
+  serverTimeMs: number;
+}
+
+interface AutoplayStateWire {
+  plan_id: string | null;
+  status: string;
+  reason: string | null;
+  step: number;
+  total_steps: number;
+  step_started_at_ms: number | null;
+  step_duration_ms: number | null;
+  server_time_ms: number;
+}
+
+/** Reads an autoplay frame or response; null for anything that is not one. */
+export const toAutoplayState = (data: unknown): AutoplayState | null => {
+  if (!data || typeof data !== "object") return null;
+  const wire = data as Partial<AutoplayStateWire>;
+  if (wire.status !== "running" && wire.status !== "stopped") return null;
+  return {
+    planId: wire.plan_id ?? null,
+    status: wire.status,
+    reason: wire.reason ?? null,
+    step: wire.step ?? 0,
+    totalSteps: wire.total_steps ?? 0,
+    stepStartedAtMs: wire.step_started_at_ms ?? null,
+    stepDurationMs: wire.step_duration_ms ?? null,
+    serverTimeMs: wire.server_time_ms ?? Date.now(),
+  };
+};
+
+export type AutoplayResult =
+  | { ok: true; state: AutoplayState }
+  | { ok: false; message: string };
+
+const autoplayFailure = (error: unknown): AutoplayResult => {
+  const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+  if (status === 503) {
+    return {
+      ok: false,
+      message: "The server could not run autoplay just now. Try again.",
+    };
+  }
+  return { ok: false, message: emitFailure(status) };
+};
+
+/**
+ * Hands a plan to the backend, which from then on moves the room on by itself
+ * - whatever this page, or the phone it is on, does. Replaces any plan already
+ * running. `firstStepElapsedMs` says the first line is already with the room
+ * and has been for that long, so it is not sent again.
+ */
+export const startAutoplay = async (
+  eventId: string,
+  token: string,
+  steps: AutoplayPlanStep[],
+  firstStepElapsedMs?: number,
+): Promise<AutoplayResult> => {
+  try {
+    const { data } = await emitClient.post(
+      `/api/v1/events/${encodeURIComponent(eventId)}/recitation/autoplay`,
+      {
+        steps: steps.map((step) => ({
+          positions: step.positions.map((position) => toWirePosition(position)),
+          duration_ms: step.durationMs,
+        })),
+        ...(firstStepElapsedMs === undefined
+          ? {}
+          : { first_step_elapsed_ms: firstStepElapsedMs }),
+      },
+      { headers: { "X-Recitation-Token": token } },
+    );
+    const state = toAutoplayState(data);
+    return state
+      ? { ok: true, state }
+      : { ok: false, message: "The server's answer could not be read." };
+  } catch (error) {
+    return autoplayFailure(error);
+  }
+};
+
+export const stopAutoplay = async (
+  eventId: string,
+  token: string,
+): Promise<AutoplayResult> => {
+  try {
+    const { data } = await emitClient.post(
+      `/api/v1/events/${encodeURIComponent(eventId)}/recitation/autoplay/stop`,
+      {},
+      { headers: { "X-Recitation-Token": token } },
+    );
+    const state = toAutoplayState(data);
+    return state
+      ? { ok: true, state }
+      : { ok: false, message: "The server's answer could not be read." };
+  } catch (error) {
+    return autoplayFailure(error);
+  }
+};
+
+export const fetchAutoplayState = async (
+  eventId: string,
+  token: string,
+): Promise<AutoplayState | null> => {
+  try {
+    const { data } = await emitClient.get(
+      `/api/v1/events/${encodeURIComponent(eventId)}/recitation/autoplay`,
+      { headers: { "X-Recitation-Token": token } },
+    );
+    return toAutoplayState(data);
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * The event's live socket, opened with the emit token: the controller drives
+ * the room over it and hears where the room and autoplay are. The browser
+ * cannot set headers on a socket, so the token rides in the query string, as
+ * the app's own tokens do.
+ */
+export const recitationSocketUrl = (eventId: string, token: string): string => {
+  const base = new URL(
+    String(import.meta.env.VITE_BACKEND_BASE_URL ?? ""),
+    window.location.href,
+  );
+  base.protocol = base.protocol === "https:" ? "wss:" : "ws:";
+  const path = base.pathname.replace(/\/$/, "");
+  base.pathname = `${path}/api/v1/events/${encodeURIComponent(eventId)}/recitation/live`;
+  base.search = new URLSearchParams({ token }).toString();
+  return base.toString();
 };
 
 /** Ends the session for everyone following it. */

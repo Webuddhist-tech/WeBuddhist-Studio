@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import {
   fetchEditionTitle,
-  fetchLiturgies,
-  fetchLiveControlEvent,
   fetchRecitationDetails,
   fetchSegmentPlayTimes,
   fetchTextEditions,
@@ -15,8 +13,8 @@ import {
 import { fetchEditionYigchungs } from "./api/libraryTocApi";
 
 /**
- * A dry run of autoplay. It reads the same event, liturgies and learned play
- * times as the controller, but never opens the live socket and never publishes:
+ * A dry run of autoplay. It reads the same texts and learned play times as the
+ * controller, but never opens the live socket and never publishes:
  * the lines step by on this screen only, each held for its recorded time, so
  * the timings can be checked without moving a room. It runs signed out and
  * needs no emit token: every read here is public.
@@ -37,6 +35,30 @@ const TICK_MS = 50;
 /** How long the clock waits on the library's yigchung before going without. */
 const YIGCHUNG_WAIT_MS = 8000;
 
+/** The controller's texts opened in this browser, newest first - the same list
+ * it keeps under this key - so a text in use there is one tap away here. */
+const RECENT_TEXTS_STORAGE_KEY = "live-control-recent-texts";
+const readRecentTexts = (): { textId: string; title: string | null }[] => {
+  try {
+    const parsed: unknown = JSON.parse(
+      localStorage.getItem(RECENT_TEXTS_STORAGE_KEY) ?? "[]",
+    );
+    if (!Array.isArray(parsed)) return [];
+    return parsed.flatMap((item) =>
+      item && typeof item === "object" && typeof item.textId === "string"
+        ? [
+            {
+              textId: item.textId,
+              title: typeof item.title === "string" ? item.title : null,
+            },
+          ]
+        : [],
+    );
+  } catch {
+    return [];
+  }
+};
+
 const formatMs = (ms: number) => {
   if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
   const total = Math.round(ms / 1000);
@@ -49,8 +71,6 @@ const formatMs = (ms: number) => {
 };
 
 const AutoplayTestPage = () => {
-  const { eventId } = useParams<{ eventId: string }>();
-
   /** `?text=<text_id>` is the text on screen; with none, the page opens on the
    * picker. Picking a text writes it here, so the link reopens it. */
   const [searchParams, setSearchParams] = useSearchParams();
@@ -79,19 +99,7 @@ const AutoplayTestPage = () => {
   const [note, setNote] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
 
-  const { data: event, error: eventError } = useQuery({
-    queryKey: ["live-control-event", eventId],
-    queryFn: () => fetchLiveControlEvent(eventId ?? ""),
-    enabled: Boolean(eventId),
-    refetchOnWindowFocus: false,
-  });
-
-  const { data: liturgies, error: liturgiesError } = useQuery({
-    queryKey: ["live-control-liturgies", event?.collectionId],
-    queryFn: () => fetchLiturgies(event?.collectionId ?? ""),
-    enabled: Boolean(event?.collectionId),
-    refetchOnWindowFocus: false,
-  });
+  const [recentTexts] = useState(readRecentTexts);
 
   // Named by the library, under the same key as the controller's shortcuts.
   const suggestionTitles = useQueries({
@@ -104,20 +112,20 @@ const AutoplayTestPage = () => {
     })),
   });
 
-  /** What the picker offers: the suggested texts, then the event's liturgies. */
+  /** What the picker offers: the texts opened in the controller here, then
+   * the suggested ones. */
   const choices = [
-    ...SUGGESTED_TEXT_IDS.map((textId, index) => ({
+    ...recentTexts.map((text) => ({
+      ...text,
+      group: "Opened in the controller",
+    })),
+    ...SUGGESTED_TEXT_IDS.filter(
+      (textId) => !recentTexts.some((text) => text.textId === textId),
+    ).map((textId) => ({
       textId,
-      title: suggestionTitles[index]?.data ?? null,
+      title: suggestionTitles[SUGGESTED_TEXT_IDS.indexOf(textId)]?.data ?? null,
       group: "Suggested",
     })),
-    ...(liturgies ?? [])
-      .filter((liturgy) => !SUGGESTED_TEXT_IDS.includes(liturgy.textId))
-      .map((liturgy, index) => ({
-        textId: liturgy.textId,
-        title: liturgy.title,
-        group: `Liturgy ${index + 1}`,
-      })),
   ];
 
   const { data: editionData } = useQuery({
@@ -436,7 +444,6 @@ const AutoplayTestPage = () => {
             <h1 className="text-2xl font-bold">Choose a text</h1>
             <p className="mt-1 text-sm text-[#8e8e93]">
               Autoplay test · plays on this screen only
-              {event?.title ? ` · ${event.title}` : ""}
             </p>
           </div>
           {choices.map((choice) => (
@@ -454,18 +461,6 @@ const AutoplayTestPage = () => {
               </span>
             </button>
           ))}
-          {eventError || liturgiesError ? (
-            <p className="text-sm text-[#ff453a]">
-              {getApiErrorMessage(
-                eventError ?? liturgiesError,
-                "Could not load this event's liturgies.",
-              )}
-            </p>
-          ) : event?.collectionId && !liturgies ? (
-            <p className="text-sm text-[#8e8e93]">
-              Loading the event&apos;s liturgies…
-            </p>
-          ) : null}
         </div>
       </div>
     );
