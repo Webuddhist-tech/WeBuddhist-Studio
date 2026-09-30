@@ -1531,9 +1531,13 @@ const LiveControlPage = () => {
         ? undefined
         : Math.min(MAX_PLAN_STEP_MS, Math.round(keepFirstFor)),
     );
-    pendingStartRef.current = request;
+    // Any earlier start still on its way is waited for too, so a stop follows
+    // every start sent before it.
+    const inFlight = Promise.all([pendingStartRef.current, request]);
+    pendingStartRef.current = inFlight;
     const started = await request;
-    if (pendingStartRef.current === request) pendingStartRef.current = null;
+    await inFlight;
+    if (pendingStartRef.current === inFlight) pendingStartRef.current = null;
     if (handOverId !== autoplayStartRef.current) return;
     setAutoplayBusy(false);
     if (!started.ok) {
@@ -1560,7 +1564,17 @@ const LiveControlPage = () => {
     const plan = planRef.current;
     const heard =
       plan?.lastStep === undefined ? undefined : plan.steps[plan.lastStep];
-    const step = heard?.lineIndex === currentIndex ? heard : undefined;
+    // A reset since that plan was made puts the passage back to its first
+    // round: the heard step's round no longer stands.
+    const step =
+      heard?.lineIndex === currentIndex &&
+      plan &&
+      !(
+        heard.passageKey &&
+        plan.move <= (resetAfterMoveRef.current[heard.passageKey] ?? 0)
+      )
+        ? heard
+        : undefined;
     void handOver(
       currentIndex,
       step?.round,
@@ -1607,6 +1621,7 @@ const LiveControlPage = () => {
   useEffect(() => {
     const wasPlaying = autoplayRef.current;
     autoplayStartRef.current += 1;
+    const stopId = autoplayStartRef.current;
     planRef.current = null;
     setAutoplay(false);
     autoplayRef.current = false;
@@ -1614,8 +1629,13 @@ const LiveControlPage = () => {
     const { eventId: event, token: key } = stopForRef.current;
     if (wasPlaying && event && key) {
       // After any start still on its way, so the stop is not overtaken by it.
+      // Autoplay started on the new text meanwhile replaces the old plan
+      // itself, and must not be ended by this stop.
       const pending = pendingStartRef.current ?? Promise.resolve();
-      void pending.then(() => stopAutoplay(event, key));
+      void pending.then(() => {
+        if (stopId !== autoplayStartRef.current) return;
+        return stopAutoplay(event, key);
+      });
     }
   }, [driverTextId]);
   useEffect(() => {
