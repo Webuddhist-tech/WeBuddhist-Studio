@@ -497,11 +497,14 @@ export const fetchAutoplayState = async (
  * the room over it and hears where the room and autoplay are. The browser
  * cannot set headers on a socket, so the token rides in the query string, as
  * the app's own tokens do.
+ *
+ * With no backend URL in the build - the deployed Studio, whose nginx proxies
+ * `/api` - the socket goes to this origin's root, never to the page's own path.
  */
 export const recitationSocketUrl = (eventId: string, token: string): string => {
   const base = new URL(
-    String(import.meta.env.VITE_BACKEND_BASE_URL ?? ""),
-    window.location.href,
+    String(import.meta.env.VITE_BACKEND_BASE_URL ?? "") || "/",
+    window.location.origin,
   );
   base.protocol = base.protocol === "https:" ? "wss:" : "ws:";
   const path = base.pathname.replace(/\/$/, "");

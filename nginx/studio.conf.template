@@ -13,6 +13,17 @@ server {
       include /etc/nginx/security-headers.conf;
   }
 
+  # The live-control socket: nginx passes a WebSocket through only when told to
+  # carry the upgrade, and holds it open for a whole puja, not five minutes.
+  location ~ ^/api/v1/events/[^/]+/recitation/live$ {
+      proxy_pass ${VITE_BACKEND_BASE_URL};
+      proxy_ssl_server_name on;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+      proxy_read_timeout 4h;
+      proxy_send_timeout 4h;
+  }
+
   location /api {
       proxy_pass ${VITE_BACKEND_BASE_URL};
       proxy_ssl_server_name on;

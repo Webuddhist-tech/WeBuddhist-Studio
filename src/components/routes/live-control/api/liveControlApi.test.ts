@@ -308,6 +308,19 @@ describe("recitationSocketUrl", () => {
       vi.unstubAllEnvs();
     }
   });
+
+  it("goes to this origin's root, not the page's path, when the build names no backend", () => {
+    vi.stubEnv("VITE_BACKEND_BASE_URL", "");
+    window.history.pushState({}, "", "/live-control/e1");
+    try {
+      expect(recitationSocketUrl("e1", "tok")).toBe(
+        `ws://${window.location.host}/api/v1/events/e1/recitation/live?token=tok`,
+      );
+    } finally {
+      window.history.pushState({}, "", "/");
+      vi.unstubAllEnvs();
+    }
+  });
 });
 
 describe("fetchRecitationDetails", () => {
