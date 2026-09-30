@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import {
@@ -13,7 +13,6 @@ import {
   toOperatorSegments,
 } from "./api/liveControlApi";
 import { fetchEditionYigchungs } from "./api/libraryTocApi";
-import { ROUTES } from "@/routes/paths";
 
 /**
  * A dry run of autoplay. It reads the same event, liturgies and learned play
@@ -50,8 +49,8 @@ const formatMs = (ms: number) => {
 const AutoplayTestPage = () => {
   const { eventId } = useParams<{ eventId: string }>();
 
-  /** `?text=<text_id>` opens that text straight away, liturgy of the event or
-   * not; picking another text writes it back, so the link reopens it. */
+  /** `?text=<text_id>` is the text on screen; with none, the page opens on the
+   * picker. Picking a text writes it here, so the link reopens it. */
   const [searchParams, setSearchParams] = useSearchParams();
   const liturgyId = searchParams.get("text")?.trim() ?? "";
   const setLiturgyId = useCallback(
@@ -63,7 +62,7 @@ const AutoplayTestPage = () => {
           else next.delete("text");
           return next;
         },
-        { replace: true },
+        // A history entry per text, so Back returns to the picker.
       ),
     [setSearchParams],
   );
@@ -92,13 +91,6 @@ const AutoplayTestPage = () => {
     refetchOnWindowFocus: false,
   });
 
-  // The puja opens on the first liturgy of the order, so the test does too.
-  useEffect(() => {
-    if (!liturgyId && liturgies && liturgies.length > 0) {
-      setLiturgyId(liturgies[0].textId);
-    }
-  }, [liturgies, liturgyId, setLiturgyId]);
-
   // Named by the library, under the same key as the controller's shortcuts.
   const suggestionTitles = useQueries({
     queries: SUGGESTED_TEXT_IDS.map((textId) => ({
@@ -109,6 +101,22 @@ const AutoplayTestPage = () => {
       refetchOnWindowFocus: false,
     })),
   });
+
+  /** What the picker offers: the suggested texts, then the event's liturgies. */
+  const choices = [
+    ...SUGGESTED_TEXT_IDS.map((textId, index) => ({
+      textId,
+      title: suggestionTitles[index]?.data ?? null,
+      group: "Suggested",
+    })),
+    ...(liturgies ?? [])
+      .filter((liturgy) => !SUGGESTED_TEXT_IDS.includes(liturgy.textId))
+      .map((liturgy, index) => ({
+        textId: liturgy.textId,
+        title: liturgy.title,
+        group: `Liturgy ${index + 1}`,
+      })),
+  ];
 
   const { data: editionData } = useQuery({
     queryKey: ["live-control-editions", liturgyId],
@@ -206,8 +214,7 @@ const AutoplayTestPage = () => {
     [lines, playTimes],
   );
   const totalTimed = useMemo(
-    () =>
-      lines.reduce((sum, line) => sum + (playTimes?.[line.id] ?? 0), 0),
+    () => lines.reduce((sum, line) => sum + (playTimes?.[line.id] ?? 0), 0),
     [lines, playTimes],
   );
   const reachedTimed = useMemo(() => {
@@ -247,7 +254,12 @@ const AutoplayTestPage = () => {
 
   // The clock: while playing, the current line's hold runs down and the next
   // recited line takes over when it is spent.
-  const clockRef = useRef({ currentDuration, currentIndex, speed, nextRecited });
+  const clockRef = useRef({
+    currentDuration,
+    currentIndex,
+    speed,
+    nextRecited,
+  });
   clockRef.current = { currentDuration, currentIndex, speed, nextRecited };
   useEffect(() => {
     if (!playing) return;
@@ -349,12 +361,12 @@ const AutoplayTestPage = () => {
   }, []);
 
   const errorMessage =
-    eventError || linesError || playTimesError
+    linesError || playTimesError
       ? getApiErrorMessage(
-          eventError ?? linesError ?? playTimesError,
-          playTimesError && !eventError && !linesError
-            ? "Could not load the play times."
-            : "Could not load this event.",
+          linesError ?? playTimesError,
+          linesError
+            ? "Could not load this text."
+            : "Could not load the play times.",
         )
       : null;
 
@@ -365,243 +377,220 @@ const AutoplayTestPage = () => {
 
   const selectClass =
     "cursor-pointer rounded-md border border-[#2c2c2e] bg-[#1c1c1e] px-2 py-1.5 text-[13px] font-semibold text-[#f2f2f7]";
-  const buttonClass =
-    "rounded-md border border-[#2c2c2e] bg-[#1c1c1e] px-3 py-1.5 text-[13px] font-semibold text-[#f2f2f7] hover:bg-[#2c2c2e] disabled:cursor-not-allowed disabled:opacity-40";
+  const iconButtonClass =
+    "flex h-11 w-11 items-center justify-center rounded-full bg-[#1c1c1e] text-lg text-[#f2f2f7] hover:bg-[#2c2c2e] disabled:cursor-not-allowed disabled:opacity-40";
+
+  // Start: nothing but the texts to choose from, large enough to tap.
+  if (!liturgyId) {
+    return (
+      <div className="min-h-[100dvh] bg-black font-tibetan-ui text-[#f2f2f7]">
+        <div className="mx-auto flex max-w-3xl flex-col gap-4 px-5 py-10">
+          <div className="mb-2">
+            <h1 className="text-2xl font-bold">Choose a text</h1>
+            <p className="mt-1 text-sm text-[#8e8e93]">
+              Autoplay test · plays on this screen only
+              {event?.title ? ` · ${event.title}` : ""}
+            </p>
+          </div>
+          {choices.map((choice) => (
+            <button
+              key={choice.textId}
+              type="button"
+              onClick={() => setLiturgyId(choice.textId)}
+              className="flex w-full flex-col items-start gap-1 rounded-2xl border border-[#2c2c2e] bg-[#111113] px-6 py-5 text-left hover:border-[#30d158] hover:bg-[#15201a]"
+            >
+              <span className="text-[11px] font-medium tracking-[0.11em] text-[#8e8e93] uppercase">
+                {choice.group}
+              </span>
+              <span className="text-[26px] leading-[1.5] break-words">
+                {choice.title ?? choice.textId}
+              </span>
+            </button>
+          ))}
+          {event?.collectionId && !liturgies && !eventError ? (
+            <p className="text-sm text-[#8e8e93]">
+              Loading the event&apos;s liturgies…
+            </p>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-[100dvh] touch-manipulation flex-col overflow-hidden bg-black font-tibetan-ui text-[#f2f2f7]">
-      <header className="flex flex-wrap items-center gap-3 border-b border-[#2c2c2e] px-4 py-3">
-        <div className="mr-auto flex min-w-0 flex-col leading-tight">
-          <span className="truncate text-lg font-bold">
-            {event?.title ?? "Loading event…"}
-          </span>
-          <span className="mt-0.5 text-[11px] font-medium tracking-[0.11em] text-[#8e8e93] uppercase">
-            Autoplay test · not connected to the room
-          </span>
-        </div>
-        {eventId ? (
-          <Link
-            to={ROUTES.liveControl(eventId)}
-            className="text-[13px] text-[#0a84ff] hover:underline"
-          >
-            Open live control
-          </Link>
-        ) : null}
-      </header>
-
-      <div className="flex flex-wrap items-center gap-2 border-b border-[#2c2c2e] px-4 py-3">
-        <select
-          aria-label="Liturgy"
-          value={liturgyId}
-          onChange={(e) => setLiturgyId(e.target.value)}
-          className={`${selectClass} max-w-[16rem]`}
-          disabled={!liturgies?.length}
-        >
-          {/* A text from the link that is not in the event's order still shows. */}
-          {liturgyId &&
-          !liturgies?.some((liturgy) => liturgy.textId === liturgyId) ? (
-            <option value={liturgyId}>
-              {editionData?.text.title ?? liturgyId}
-            </option>
-          ) : !liturgies?.length ? (
-            <option value="">
-              {event && !event.collectionId ? "No liturgies" : "Loading…"}
-            </option>
-          ) : null}
-          {liturgies?.map((liturgy, index) => (
-            <option key={liturgy.textId} value={liturgy.textId}>
-              {index + 1}. {liturgy.title}
-            </option>
-          ))}
-        </select>
-        <select
-          aria-label="Edition"
-          value={editionId}
-          onChange={(e) => setEditionId(e.target.value)}
-          className={`${selectClass} max-w-[14rem]`}
-          disabled={editions.length === 0}
-        >
-          {editions.map((item) => (
-            <option key={item.textId} value={item.textId}>
-              {item.language || "?"} · {item.title}
-            </option>
-          ))}
-        </select>
-
-        <span className="mx-1 h-6 w-px bg-[#2c2c2e]" />
-
-        <button
-          type="button"
-          onClick={() => step(-1)}
-          className={buttonClass}
-          disabled={lines.length === 0}
-          aria-label="Previous line"
-        >
-          ◀
-        </button>
-        <button
-          type="button"
-          onClick={togglePlay}
-          disabled={lines.length === 0 || !playTimes}
-          className={`rounded-md px-4 py-1.5 text-[13px] font-bold disabled:cursor-not-allowed disabled:opacity-40 ${
-            playing
-              ? "bg-[#ff9f0a] text-black"
-              : "bg-[#30d158] text-black hover:bg-[#28b84c]"
-          }`}
-        >
-          {playing ? "❚❚ Pause" : "▶ Play"}
-        </button>
-        <button
-          type="button"
-          onClick={() => step(1)}
-          className={buttonClass}
-          disabled={lines.length === 0}
-          aria-label="Next line"
-        >
-          ▶
-        </button>
-        <button
-          type="button"
-          onClick={restart}
-          className={buttonClass}
-          disabled={currentIndex < 0}
-        >
-          Restart
-        </button>
-
-        <label className="flex items-center gap-1.5 text-[12px] text-[#8e8e93]">
-          Speed
-          <select
-            value={speed}
-            onChange={(e) => setSpeed(Number(e.target.value))}
-            className={selectClass}
-          >
-            {SPEEDS.map((value) => (
-              <option key={value} value={value}>
-                {value}×
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex items-center gap-1.5 text-[12px] text-[#8e8e93]">
-          Untimed lines
-          <select
-            value={untimedHold}
-            onChange={(e) => setUntimedHold(Number(e.target.value))}
-            className={selectClass}
-          >
-            {UNTIMED_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2 border-b border-[#2c2c2e] px-4 py-2">
-        <span className="text-[12px] text-[#8e8e93]">Suggested</span>
-        {SUGGESTED_TEXT_IDS.map((textId, index) => (
-          <button
-            key={textId}
-            type="button"
-            onClick={() => setLiturgyId(textId)}
-            aria-pressed={liturgyId === textId}
-            className={`max-w-[18rem] truncate rounded-full border px-3 py-1 text-[13px] ${
-              liturgyId === textId
-                ? "border-[#30d158] bg-[#1c3a24] text-white"
-                : "border-[#2c2c2e] bg-[#1c1c1e] text-[#f2f2f7] hover:bg-[#2c2c2e]"
-            }`}
-          >
-            {suggestionTitles[index]?.data ?? textId}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 text-[12px] text-[#8e8e93]">
-        <span>
-          {loadingLines
-            ? "Loading lines…"
-            : `${lines.length} lines · ${timedCount} with a play time`}
-        </span>
-        <span>
-          {loadingPlayTimes
-            ? "Loading play times…"
-            : `Recorded total ${formatMs(totalTimed)}`}
-        </span>
-        {currentIndex >= 0 ? (
-          <span>
-            Line {currentIndex + 1} · {formatMs(elapsed)}
-            {currentDuration ? ` / ${formatMs(currentDuration)}` : ""} ·
-            elapsed {formatMs(reachedTimed + elapsed)}
-          </span>
-        ) : null}
-      </div>
-      <div className="h-1 w-full bg-[#1c1c1e]">
-        <div
-          className="h-full bg-[#30d158]"
-          style={{ width: `${progress * 100}%` }}
-        />
-      </div>
-
-      {errorMessage || note ? (
-        <div className="border-b border-[#2c2c2e] bg-[#2a1a00] px-4 py-2 text-[13px] text-[#ffd60a]">
-          {errorMessage ?? note}
-        </div>
-      ) : null}
-
       <div
         ref={listRef}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-6 pb-48 lg:px-10"
       >
-        {lines.map((line, index) => {
-          const duration = playTimes?.[line.id];
-          const yigchung = isYigchungLine(index);
-          const active = index === currentIndex;
-          return (
+        {lines.length === 0 ? (
+          <p className="py-12 text-center text-sm text-[#8e8e93]">
+            {loadingLines ? "Loading…" : "This text has no lines."}
+          </p>
+        ) : null}
+        <div className="mx-auto max-w-4xl">
+          {lines.map((line, index) => {
+            const duration = playTimes?.[line.id];
+            const yigchung = isYigchungLine(index);
+            const active = index === currentIndex;
+            return (
+              <button
+                key={`${line.id}-${index}`}
+                type="button"
+                data-line={index}
+                onClick={() => goTo(index)}
+                className={`mb-2 block w-full rounded-md px-2 py-1.5 text-left break-words ${
+                  active
+                    ? "bg-[#1c3a24] ring-1 ring-[#30d158]"
+                    : "hover:bg-[#111]"
+                }`}
+              >
+                {!yigchung ? (
+                  <span
+                    data-play-time={duration ?? ""}
+                    className={`float-right mt-1 ml-3 font-sans text-[11px] tabular-nums ${
+                      duration === undefined
+                        ? "text-[#ff453a]"
+                        : "text-[#636366]"
+                    }`}
+                  >
+                    {duration === undefined ? "—" : formatMs(duration)}
+                  </span>
+                ) : null}
+                <span
+                  className={`leading-[1.6] ${
+                    yigchung
+                      ? "text-[17px] text-[#c9a063]"
+                      : active
+                        ? "text-[23px] text-white"
+                        : "text-[23px] text-[#aeaeb2]"
+                  }`}
+                >
+                  {line.content}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Every control in one bar, fixed at the foot, so the text has the page. */}
+      <div className="fixed inset-x-0 bottom-0 border-t border-[#2c2c2e] bg-[#0b0b0c]/95 backdrop-blur">
+        <div className="h-1 w-full bg-[#1c1c1e]">
+          <div
+            className="h-full bg-[#30d158]"
+            style={{ width: `${progress * 100}%` }}
+          />
+        </div>
+        {errorMessage || note ? (
+          <p className="px-4 pt-2 text-center text-[12px] text-[#ffd60a]">
+            {errorMessage ?? note}
+          </p>
+        ) : null}
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-2">
             <button
-              key={`${line.id}-${index}`}
               type="button"
-              data-line={index}
-              onClick={() => goTo(index)}
-              className={`mb-2 flex w-full items-start gap-3 rounded-md px-2 py-1.5 text-left ${
-                active
-                  ? "bg-[#1c3a24] ring-1 ring-[#30d158]"
-                  : "hover:bg-[#111]"
+              onClick={() => setLiturgyId("")}
+              className="rounded-md px-2 py-1.5 text-[13px] font-semibold text-[#0a84ff] hover:bg-[#1c1c1e]"
+            >
+              ← Texts
+            </button>
+            {editions.length > 1 ? (
+              <select
+                aria-label="Edition"
+                value={editionId}
+                onChange={(e) => setEditionId(e.target.value)}
+                className={`${selectClass} max-w-[10rem]`}
+              >
+                {editions.map((item) => (
+                  <option key={item.textId} value={item.textId}>
+                    {item.language || "?"} · {item.title}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => step(-1)}
+              className={iconButtonClass}
+              disabled={lines.length === 0}
+              aria-label="Previous line"
+            >
+              ⏮
+            </button>
+            <button
+              type="button"
+              onClick={togglePlay}
+              disabled={lines.length === 0 || !playTimes}
+              aria-label={playing ? "Pause" : "Play"}
+              className={`flex h-14 w-14 items-center justify-center rounded-full text-xl font-bold text-black disabled:cursor-not-allowed disabled:opacity-40 ${
+                playing ? "bg-[#ff9f0a]" : "bg-[#30d158] hover:bg-[#28b84c]"
               }`}
             >
-              <span className="w-10 shrink-0 pt-1 text-right text-[11px] text-[#636366]">
-                {index + 1}
-              </span>
-              <span
-                className={`flex-1 leading-[1.6] ${
-                  yigchung
-                    ? "text-[17px] text-[#c9a063]"
-                    : active
-                      ? "text-[23px] text-white"
-                      : "text-[23px] text-[#aeaeb2]"
-                }`}
-              >
-                {line.content}
-              </span>
-              <span
-                className={`w-14 shrink-0 pt-1 text-right text-[11px] tabular-nums ${
-                  yigchung
-                    ? "text-[#636366]"
-                    : duration === undefined
-                      ? "text-[#ff453a]"
-                      : "text-[#8e8e93]"
-                }`}
-              >
-                {yigchung
-                  ? "skip"
-                  : duration === undefined
-                    ? "—"
-                    : formatMs(duration)}
-              </span>
+              {playing ? "❚❚" : "▶"}
             </button>
-          );
-        })}
+            <button
+              type="button"
+              onClick={() => step(1)}
+              className={iconButtonClass}
+              disabled={lines.length === 0}
+              aria-label="Next line"
+            >
+              ⏭
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <select
+              aria-label="Speed"
+              value={speed}
+              onChange={(e) => setSpeed(Number(e.target.value))}
+              className={selectClass}
+            >
+              {SPEEDS.map((value) => (
+                <option key={value} value={value}>
+                  {value}×
+                </option>
+              ))}
+            </select>
+            <select
+              aria-label="Untimed lines"
+              title="What a line with no recorded time does"
+              value={untimedHold}
+              onChange={(e) => setUntimedHold(Number(e.target.value))}
+              className={selectClass}
+            >
+              {UNTIMED_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  Untimed: {option.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={restart}
+              disabled={currentIndex < 0}
+              aria-label="Restart"
+              className={iconButtonClass}
+            >
+              ↺
+            </button>
+          </div>
+        </div>
+        <p className="pb-2 text-center font-sans text-[11px] text-[#636366] tabular-nums">
+          {loadingPlayTimes
+            ? "Loading play times…"
+            : `${timedCount}/${lines.length} lines timed · total ${formatMs(totalTimed)}`}
+          {currentIndex >= 0
+            ? ` · line ${currentIndex + 1} ${formatMs(elapsed)}${
+                currentDuration ? ` / ${formatMs(currentDuration)}` : ""
+              } · elapsed ${formatMs(reachedTimed + elapsed)}`
+            : ""}
+        </p>
       </div>
     </div>
   );

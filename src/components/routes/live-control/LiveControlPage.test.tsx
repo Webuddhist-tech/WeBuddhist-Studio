@@ -2212,9 +2212,9 @@ describe("LiveControlPage", () => {
       const first = screen.getByText("root line 1").closest("[data-line]");
       const second = screen.getByText("root line 2").closest("[data-line]");
       await waitFor(() =>
-        expect(
-          first?.querySelector("[data-play-time]")?.textContent,
-        ).toBe("4.2s"),
+        expect(first?.querySelector("[data-play-time]")?.textContent).toBe(
+          "4.2s",
+        ),
       );
       expect(second?.querySelector("[data-play-time]")?.textContent).toBe("—");
     });
@@ -2250,7 +2250,7 @@ describe("LiveControlPage", () => {
       expect(publishPosition).toHaveBeenCalledTimes(1);
     });
 
-    it("holds each line from when the room takes it, never ahead of the room", async () => {
+    it("times each line from the last one ending, not from the room answering", async () => {
       fetchSegmentPlayTimes.mockResolvedValue({
         "root-s1": 20,
         "root-s2": 20,
@@ -2267,12 +2267,11 @@ describe("LiveControlPage", () => {
       });
 
       await user.click(screen.getByRole("button", { name: "▶ Auto" }));
-      await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(2));
-      // Line 2 is still on its way: autoplay does not move past it.
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      expect(screen.getByText(/line 2\/3/)).toBeInTheDocument();
-      expect(publishPosition).toHaveBeenCalledTimes(2);
+      // Line 2 is still on its way, and its time is spent all the same: the
+      // page moves on to line 3 without waiting on the room's answer.
+      expect(await screen.findByText(/line 3\/3/)).toBeInTheDocument();
 
+      // The room's late answer sends the newest line, not the stale one.
       await act(async () => release());
       await waitFor(() =>
         expect(publishPosition).toHaveBeenLastCalledWith(
@@ -2287,24 +2286,34 @@ describe("LiveControlPage", () => {
     it("hands back to the operator when the room refuses a line", async () => {
       fetchSegmentPlayTimes.mockResolvedValue({
         "root-s1": 20,
-        "root-s2": 20,
+        "root-s2": 300,
         "root-s3": 20,
       });
       const user = await openForAutoplay();
+      // The connection drops after the first line: every move from then on is
+      // refused.
       publishPosition.mockImplementation(async (_event, _token, cue) =>
-        cue.segmentId === "root-s2"
-          ? { ok: false, message: "Could not reach the room." }
-          : { ok: true },
+        cue.segmentId === "root-s1"
+          ? { ok: true }
+          : { ok: false, message: "Could not reach the room." },
       );
 
       await user.click(screen.getByRole("button", { name: "▶ Auto" }));
 
       expect(
+        await screen.findByText("Could not reach the room."),
+      ).toBeInTheDocument();
+      expect(
         await screen.findByRole("button", { name: "▶ Auto" }),
       ).toBeInTheDocument();
-      await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(2));
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      expect(publishPosition).toHaveBeenCalledTimes(2);
+      // Stopped by the refusal, not by line 2's time running out.
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      expect(publishPosition).not.toHaveBeenCalledWith(
+        "e1",
+        "tok-123",
+        expect.objectContaining({ segmentId: "root-s3" }),
+        expect.any(String),
+      );
     });
 
     it("waits for fresh play times before judging a line has none", async () => {
@@ -2326,51 +2335,6 @@ describe("LiveControlPage", () => {
         ),
       );
       expect(screen.queryByText(/Autoplay stopped/)).not.toBeInTheDocument();
-    });
-
-    it("does not take a line the room held before as taken by a move still on its way", async () => {
-      fetchSegmentPlayTimes.mockResolvedValue({
-        "root-s1": 20,
-        "root-s2": 20,
-        "root-s3": 20,
-      });
-      const user = await openForAutoplay();
-      await user.click(screen.getByRole("button", { name: /root line 2/ }));
-      await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(1));
-
-      // Back a line, held on the wire, then forward again to the line the room
-      // took before - and autoplay started there.
-      let release = () => {};
-      const gate = new Promise<void>((resolve) => {
-        release = resolve;
-      });
-      publishPosition.mockImplementation(async (_event, _token, cue) => {
-        if (cue.segmentId === "root-s1") await gate;
-        return { ok: true };
-      });
-      await user.click(screen.getByRole("button", { name: "← Previous" }));
-      await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(2));
-      await user.click(screen.getByRole("button", { name: "Next →" }));
-      await user.click(screen.getByRole("button", { name: "▶ Auto" }));
-
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      expect(screen.getByText(/line 2\/3/)).toBeInTheDocument();
-      expect(publishPosition).not.toHaveBeenCalledWith(
-        "e1",
-        "tok-123",
-        expect.objectContaining({ segmentId: "root-s3" }),
-        expect.any(String),
-      );
-
-      await act(async () => release());
-      await waitFor(() =>
-        expect(publishPosition).toHaveBeenLastCalledWith(
-          "e1",
-          "tok-123",
-          expect.objectContaining({ segmentId: "root-s3", autoplay: true }),
-          expect.any(String),
-        ),
-      );
     });
 
     it("starts from a line the room already holds without waiting on it", async () => {

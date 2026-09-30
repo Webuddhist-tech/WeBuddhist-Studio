@@ -316,12 +316,11 @@ const LiveControlPage = () => {
   const [preparing, setPreparing] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(-1);
   /**
-   * The newest move sent, and the newest one the room has taken - by move, not
-   * by line, so a line the room took before is not taken again until the move
-   * back to it is.
+   * When the line on screen was moved to, on this page's clock. Autoplay holds
+   * each line from here - never from the room confirming it - so the network
+   * never stretches a line past its recorded time.
    */
-  const [sentMove, setSentMove] = useState(0);
-  const [takenMove, setTakenMove] = useState<number | null>(null);
+  const [lineStartedAt, setLineStartedAt] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   /** A message the operator closed. It stays closed until the page shows a
    * different one, or the problem goes away and comes back. */
@@ -458,7 +457,6 @@ const LiveControlPage = () => {
         moveSequenceRef.current += 1;
         const move = moveSequenceRef.current;
         cues.forEach((cue) => cueMoveRef.current.set(cue, move));
-        setSentMove(move);
       }
       publishCues(cues);
     },
@@ -822,12 +820,6 @@ const LiveControlPage = () => {
   onAcceptedRef.current = (cue) => {
     if (cue.textId !== driverTextId) return;
     if (driverLines[cue.index]?.id !== cue.segmentId) return;
-    const taken = cueMoveRef.current.get(cue);
-    if (taken !== undefined) {
-      setTakenMove((current) =>
-        current === null || taken > current ? taken : current,
-      );
-    }
     const passage = passageAt(passages, cue.index);
     if (!passage) return;
     // Sent before the count was reset: the reset stands.
@@ -870,12 +862,14 @@ const LiveControlPage = () => {
   /**
    * Moves to a line. `round` names the round when the move begins a new one;
    * `autoplay` marks a move the controller made on its own, which the backend
-   * then does not time back into the play times it came from.
+   * then does not time back into the play times it came from. `startedAt` is
+   * when the line's hold begins; by default, now.
    */
   const jump = useCallback(
-    (index: number, round?: number, autoplay = false) => {
+    (index: number, round?: number, autoplay = false, startedAt?: number) => {
       if (index < 0 || index >= driverLines.length) return;
       setCurrentIndex(index);
+      setLineStartedAt(startedAt ?? performance.now());
       scrollLineIntoBand(index);
       const cues = cuesForLine(index, round);
       publish(autoplay ? cues.map((cue) => ({ ...cue, autoplay })) : cues);
@@ -992,24 +986,29 @@ const LiveControlPage = () => {
     );
   }, [state]);
 
-  const autoplayNextRef = useRef(() => {});
-  autoplayNextRef.current = () => {
+  /** Moves on once a line's hold, which ended at `deadline`, is spent. */
+  const autoplayNextRef = useRef((deadline: number) => void deadline);
+  autoplayNextRef.current = (deadline) => {
     const next = landingFrom(currentIndex, 1);
     if (next === currentIndex) {
       setAutoplay(false);
       return;
     }
-    jump(next, undefined, true);
+    // The next line starts where this one ended, so a late timer is not added
+    // to every line after it - unless it is far late (a tab in the background),
+    // when catching up would race the room through lines at once.
+    const now = performance.now();
+    jump(next, undefined, true, now - deadline < 1000 ? deadline : now);
   };
 
   const currentLineId = driverLines[currentIndex]?.id;
   const currentPlayTime = currentLineId
     ? playTimes?.[currentLineId]
     : undefined;
-  // A line is held from when the room took it, never from when it was sent:
-  // the times were measured between the room taking one line and the next, and
-  // a slow or failing publish must not leave the room behind the controller.
-  const currentLineTaken = takenMove === sentMove;
+  // A line is held from when it was moved to, whatever the network is doing:
+  // the next line starts the moment this one's time is spent. A move the room
+  // refuses stops autoplay (above), and one still on the wire is overtaken by
+  // the next, so the room is never left holding a stale line.
   useEffect(() => {
     // Waits, rather than guesses, while the times or the yigchung are loading.
     if (
@@ -1028,17 +1027,19 @@ const LiveControlPage = () => {
       );
       return;
     }
-    if (!currentLineTaken) return;
+    // From the line's own start, so a re-run mid-line (fresh play times) does
+    // not begin its hold again.
+    const deadline = lineStartedAt + currentPlayTime;
     const timer = window.setTimeout(
-      () => autoplayNextRef.current(),
-      currentPlayTime,
+      () => autoplayNextRef.current(deadline),
+      Math.max(0, deadline - performance.now()),
     );
     return () => window.clearTimeout(timer);
   }, [
     autoplay,
     currentIndex,
     currentPlayTime,
-    currentLineTaken,
+    lineStartedAt,
     awaitingYigchungs,
     refreshingPlayTimes,
     playTimes,
@@ -1054,9 +1055,8 @@ const LiveControlPage = () => {
     // missing until the fresh ones are in.
     setRefreshingPlayTimes(true);
     void refetchPlayTimes().finally(() => setRefreshingPlayTimes(false));
-    // The line on screen is sent again, so the clock starts from the room
-    // taking it: one refused earlier would otherwise be waited on forever, and
-    // one the room already holds is confirmed straight back.
+    // The line on screen is sent again and its clock starts now: one the room
+    // refused earlier gets another chance, and the hold is a whole line's.
     if (currentIndex < 0) step(1);
     else jump(currentIndex);
     setAutoplay(true);
