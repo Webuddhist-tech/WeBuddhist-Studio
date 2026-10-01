@@ -21,6 +21,7 @@ const ImageContentData = ({
     previewUrl,
     isCropOpen,
     setIsCropOpen,
+    isCropped,
     uploadUiBusy,
     handleCropComplete,
     handleUpload,
@@ -81,6 +82,16 @@ const ImageContentData = ({
                 </p>
 
                 <div className="flex gap-2">
+                  {!isCropped && (
+                    <Button
+                      size="sm"
+                      onClick={() => setIsCropOpen(true)}
+                      className="bg-[#A51C21] text-white hover:bg-[#A51C21]/90 transition-colors"
+                      disabled={uploadUiBusy}
+                    >
+                      Crop
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="outline"

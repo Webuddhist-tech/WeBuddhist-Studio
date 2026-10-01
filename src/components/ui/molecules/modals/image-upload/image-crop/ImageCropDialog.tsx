@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Pecha } from "@/components/ui/shadimport";
+import { toJpegName } from "@/components/routes/task/hooks/useImageUploadDraft";
 import ImageCropContent from "./ImageCropModal";
 
 interface ImageCropDialogProps {
@@ -29,7 +30,10 @@ const ImageCropDialog = ({ file, onDone, onCancel }: ImageCropDialogProps) => {
         if (!open) onCancel();
       }}
     >
-      <Pecha.DialogContent showCloseButton={true}>
+      <Pecha.DialogContent
+        showCloseButton={true}
+        className="max-h-[90vh] overflow-y-auto"
+      >
         <Pecha.DialogHeader>
           <Pecha.DialogTitle>Crop image</Pecha.DialogTitle>
         </Pecha.DialogHeader>
@@ -38,7 +42,9 @@ const ImageCropDialog = ({ file, onDone, onCancel }: ImageCropDialogProps) => {
             imageSrc={previewUrl}
             onBack={() => onDone(file)}
             onCropComplete={(blob) =>
-              onDone(new File([blob], file.name, { type: "image/jpeg" }))
+              onDone(
+                new File([blob], toJpegName(file.name), { type: "image/jpeg" }),
+              )
             }
           />
         )}

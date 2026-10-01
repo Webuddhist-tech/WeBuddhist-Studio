@@ -137,7 +137,7 @@ const CropContainer = ({
   }) => void;
   isProfilePage?: boolean;
 }) => (
-  <div className="relative w-full h-96 bg-[#b23434] dark:bg-[#c44848]">
+  <div className="relative w-full h-[40vh] max-h-96 min-h-48 bg-[#b23434] dark:bg-[#c44848]">
     <Cropper
       image={imageSrc}
       crop={crop}

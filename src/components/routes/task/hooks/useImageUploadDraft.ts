@@ -8,6 +8,10 @@ export interface UseImageUploadDraftOptions {
   isExternallyBusy?: boolean;
 }
 
+/** Cropped output is JPEG, so make the file name match. */
+export const toJpegName = (name?: string) =>
+  `${(name || "cropped").replace(/\.[^./\\]+$/, "")}.jpg`;
+
 export function useImageUploadDraft({
   onUpload,
   onCropComplete,
@@ -16,11 +20,13 @@ export function useImageUploadDraft({
   const [selectedFile, setSelectedFileState] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isCropOpen, setIsCropOpen] = useState(false);
+  const [isCropped, setIsCropped] = useState(false);
 
   // Picking a new file opens the cropper right away.
   const setSelectedFile = (file: File | null) => {
     setSelectedFileState(file);
     setIsCropOpen(!!file);
+    setIsCropped(false);
   };
   const [isUploading, setIsUploading] = useState(false);
   const uploadLockRef = useRef(false);
@@ -40,10 +46,11 @@ export function useImageUploadDraft({
   const handleCropComplete = (croppedBlob: Blob) => {
     const croppedFile = new File(
       [croppedBlob],
-      selectedFile?.name || "cropped.jpg",
+      toJpegName(selectedFile?.name),
       { type: "image/jpeg" },
     );
     setSelectedFileState(croppedFile);
+    setIsCropped(true);
     setIsCropOpen(false);
     onCropComplete?.(croppedFile);
   };
@@ -76,6 +83,7 @@ export function useImageUploadDraft({
     previewUrl,
     isCropOpen,
     setIsCropOpen,
+    isCropped,
     uploadUiBusy,
     handleCropComplete,
     handleUpload,
