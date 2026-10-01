@@ -1225,11 +1225,12 @@ const LiveControlPage = () => {
   };
 
   /** Where a section's title takes the room: its first line, or the first line
-   * after it that is recited when it opens on yigchung. */
+   * after it that is recited when it opens on yigchung. -1 when nothing from
+   * there on is recited: the instruction is never sent to the room. */
   const sectionLandingLine = (lineIndex: number) => {
-    if (!isYigchungLine(lineIndex)) return lineIndex;
+    if (lineIndex < 0 || !isYigchungLine(lineIndex)) return lineIndex;
     const next = landingFrom(lineIndex - 1, 1);
-    return next === lineIndex - 1 ? lineIndex : next;
+    return next === lineIndex - 1 ? -1 : next;
   };
 
   // Keep the live section in view, as the line list does: a long outline scrolls
@@ -1578,8 +1579,18 @@ const LiveControlPage = () => {
     }
     return keys.size > 1 ? last : null;
   }, [driverLines]);
+  /** A fresh puja to hand to autoplay from this line, once the counts it was
+   * started with are cleared from state. */
+  const [freshPujaFrom, setFreshPujaFrom] = useState<number | null>(null);
   const finishWithLastReturn = (index: number) => {
     resetAllReturns();
+    // A running plan still holds the old puja's rounds: seeking into it would
+    // carry them on. The new puja is a plan of its own, built after the reset.
+    if (autoplayRef.current || remoteAutoplayRef.current) {
+      setHeldMoves((current) => (current.length > 0 ? [] : current));
+      setFreshPujaFrom(index);
+      return;
+    }
     goTo(index, FIRST_ROUND);
   };
 
@@ -1829,8 +1840,8 @@ const LiveControlPage = () => {
     setAutoplayBusy(true);
     setAutoplayNote(null);
     // Times learned since the page opened count too. A hand move does not wait
-    // for them: the room is waiting on it, and the times on hand are close
-    // enough for the lines after it; they are refreshed for the next plan.
+    // for them: the room is waiting on it. Its plan goes out on the times on
+    // hand and is rebuilt below if the fresh ones turn out different.
     const refreshed = refetchPlayTimes({ cancelRefetch: false }).catch(
       () => null,
     );
@@ -1927,6 +1938,22 @@ const LiveControlPage = () => {
     planRef.current = { ...plan, planId: started.state.planId };
     // Followed by the newest render's hand: this one's counts may be stale.
     followAutoplayRef.current(started.state);
+    if (!byHand) return;
+    // The hand move went out on the times on hand. Once the fresh ones are in,
+    // a line they time differently - or time at all, where the plan stopped -
+    // is the plan rebuilt from where the room is, at the pace now known.
+    const latest = (await refreshed)?.data;
+    if (!latest || handOverId !== autoplayStartRef.current) return;
+    if (planRef.current?.planId !== started.state.planId) return;
+    const outdated = plan.steps.some((step) => {
+      const time = latest[driverLines[step.lineIndex]?.id ?? ""];
+      const durationMs =
+        time === undefined
+          ? MIN_PLAN_STEP_MS
+          : Math.min(MAX_PLAN_STEP_MS, Math.max(MIN_PLAN_STEP_MS, time));
+      return durationMs !== step.durationMs;
+    });
+    if (outdated) replanRef.current();
   };
   /**
    * A command to the backend's autoplay: over the socket when it is open, by
@@ -1967,7 +1994,12 @@ const LiveControlPage = () => {
   };
 
   /** Moves the screen to step `target` of `plan` at once and sends the seek. */
-  const seekTo = (plan: RunningPlan, at: number, target: number) => {
+  const seekTo = (
+    plan: RunningPlan,
+    at: number,
+    target: number,
+    retried = false,
+  ) => {
     const step = plan.steps[target];
     const planId = plan.planId;
     if (!step || !planId) return;
@@ -1990,11 +2022,30 @@ const LiveControlPage = () => {
       planId,
       step: target,
       expectedStep: at,
-    }).then((result) => {
+    }).then(async (result) => {
+      if (planRef.current !== plan || plan.pendingSeek !== target) return;
+      if (result.ok) {
+        plan.pendingSeek = undefined;
+        followAutoplayRef.current(result.state);
+        return;
+      }
+      // A failure is a refusal or an answer that never came back - and a seek
+      // whose answer was lost may have been made. What the server is running
+      // says which, before any plan is replaced.
+      const now =
+        eventId && token ? await fetchAutoplayState(eventId, token) : null;
       if (planRef.current !== plan || plan.pendingSeek !== target) return;
       plan.pendingSeek = undefined;
-      if (result.ok) {
-        followAutoplayRef.current(result.state);
+      const stillRunning = now?.status === "running" && now.planId === planId;
+      // Still where it was: the seek never landed, and is sent once more.
+      if (stillRunning && now.step === at && !retried) {
+        seekTo(plan, at, target, true);
+        return;
+      }
+      // Landed, or the plan has moved on by itself: it is followed as is.
+      if (stillRunning && now.step !== at) {
+        followAutoplayRef.current(now);
+        if (now.step !== target) setAutoplayNote(result.message);
         return;
       }
       // Turned down: the plan is not the one running any more. The line the
@@ -2102,6 +2153,17 @@ const LiveControlPage = () => {
   useEffect(() => {
     if (planChanges > 0) replanRef.current();
   }, [planChanges]);
+
+  // The last Return mid-autoplay: rendered with every count cleared, the plan
+  // from the passage's start is the next puja's.
+  const freshPujaRef = useRef<(index: number) => void>(() => {});
+  freshPujaRef.current = (index) =>
+    void handOver(index, FIRST_ROUND, undefined, true);
+  useEffect(() => {
+    if (freshPujaFrom === null) return;
+    setFreshPujaFrom(null);
+    freshPujaRef.current(freshPujaFrom);
+  }, [freshPujaFrom]);
 
   /** Stops the backend's autoplay where it is. Pause stays on the button until
    * the server says it stopped: a start still on its way, or a stop that does
@@ -2584,7 +2646,8 @@ const LiveControlPage = () => {
               <div ref={sectionListRef}>
                 {sections.map((section) => {
                   const isActive = section.id === activeSectionId;
-                  const reachable = section.lineIndex >= 0;
+                  const landing = sectionLandingLine(section.lineIndex);
+                  const reachable = landing >= 0;
                   const resumeAt = resumeLineFor(section);
                   return (
                     <div
@@ -2595,9 +2658,15 @@ const LiveControlPage = () => {
                         type="button"
                         data-section-active={isActive}
                         disabled={!reachable}
-                        title={reachable ? undefined : "No segment to go to"}
+                        title={
+                          reachable
+                            ? undefined
+                            : section.lineIndex >= 0
+                              ? "Nothing in this section is recited"
+                              : "No segment to go to"
+                        }
                         onClick={() => {
-                          goTo(sectionLandingLine(section.lineIndex));
+                          if (reachable) goTo(landing);
                         }}
                         // Outlines nest deeply - six levels is ordinary - so the
                         // indent stops after three and the titles keep their width.
