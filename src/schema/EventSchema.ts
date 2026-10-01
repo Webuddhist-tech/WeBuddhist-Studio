@@ -230,6 +230,7 @@ const baseEventSchema = z.object({
   event_format: z.enum(eventFormatValues),
   chat_enabled: z.boolean(),
   notifications_enabled: z.boolean(),
+  intention_ids: z.array(z.string()),
 });
 
 const commonValidation = (
@@ -367,4 +368,5 @@ export const defaultEventFormValues = (): EventFormData => ({
   event_format: "hybrid",
   chat_enabled: true,
   notifications_enabled: true,
+  intention_ids: [],
 });

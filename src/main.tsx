@@ -35,6 +35,7 @@ import Tags from "./components/routes/tags/Tags.tsx";
 import TraditionsPage from "./components/routes/traditions/TraditionsPage.tsx";
 import VerseOfDay from "./components/routes/verse-of-day/VerseOfDay.tsx";
 import Poems from "./components/routes/poems/Poems.tsx";
+import PrayerIntentionsPage from "./components/routes/prayer-intentions/PrayerIntentionsPage.tsx";
 import Groups from "./components/routes/groups/Groups.tsx";
 import GroupLayout from "./components/routes/groups/GroupLayout.tsx";
 import GroupAboutPage from "./components/routes/groups/GroupAboutPage.tsx";
@@ -251,6 +252,14 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <Poems />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: ROUTES.prayerIntentions,
+        element: (
+          <ProtectedRoute>
+            <PrayerIntentionsPage />
           </ProtectedRoute>
         ),
       },

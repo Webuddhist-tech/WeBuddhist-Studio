@@ -20,6 +20,7 @@ import {
   createCmsEvent,
   fetchCmsEvent,
   mapEventToFormData,
+  intentionIdsFromEventSlugs,
   resolveLinkedAccumulator,
   resolveLinkedGroupAccumulator,
   resolveLinkedChantCollection,
@@ -39,7 +40,9 @@ import { findGroupYoutubeLink } from "./api/youtubeChannelApi";
 import EventImageField from "./components/events/EventImageField";
 import EventFormatField from "./components/events/EventFormatField";
 import EventChatField from "./components/events/EventChatField";
+import EventIntentionsField from "./components/events/EventIntentionsField";
 import EventNotificationsField from "./components/events/EventNotificationsField";
+import { fetchPrayerIntentions } from "@/components/routes/prayer-intentions/api/prayerIntentionsApi";
 import EventSendNotificationDialog from "./components/events/EventSendNotificationDialog";
 import LocationPicker from "./components/locations/LocationPicker";
 import type { EventLocation } from "./api/locationsApi";
@@ -120,10 +123,19 @@ const GroupEventFormPage = () => {
   });
   const eventData = eventQuery.data;
 
+  const prayerIntentionsQuery = useQuery({
+    queryKey: ["cms-prayer-intentions"],
+    queryFn: fetchPrayerIntentions,
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
+  });
+
   const originalRef = useRef<EventFormData | null>(null);
   const hydratedIdRef = useRef<string | null>(null);
+  const intentionIdsSyncedRef = useRef<string | null>(null);
   useEffect(() => {
     hydratedIdRef.current = null;
+    intentionIdsSyncedRef.current = null;
   }, [eventId]);
 
   useEffect(() => {
@@ -172,6 +184,21 @@ const GroupEventFormPage = () => {
     }
     setLocationValue(eventData.location ?? null);
   }, [isNew, eventData, form, groupId, setImagePreview, setSelectedImage]);
+
+  useEffect(() => {
+    if (isNew || !eventData || !prayerIntentionsQuery.data) return;
+    if (hydratedIdRef.current !== eventData.id) return;
+    if (intentionIdsSyncedRef.current === eventData.id) return;
+    intentionIdsSyncedRef.current = eventData.id;
+    const ids = intentionIdsFromEventSlugs(
+      eventData.intentions,
+      prayerIntentionsQuery.data.intentions,
+    );
+    form.setValue("intention_ids", ids);
+    if (originalRef.current) {
+      originalRef.current = { ...originalRef.current, intention_ids: ids };
+    }
+  }, [isNew, eventData, form, prayerIntentionsQuery.data]);
 
   const eventsListPath = groupId ? ROUTES.groupEvents(groupId) : ROUTES.groups;
 
@@ -432,10 +459,12 @@ const GroupEventFormPage = () => {
               forceMount
               className="data-[state=inactive]:hidden"
             >
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4">
                 <EventChatField form={form} readOnly={readOnly} />
 
                 <EventNotificationsField form={form} readOnly={readOnly} />
+
+                <EventIntentionsField form={form} readOnly={readOnly} />
               </div>
             </Pecha.TabsContent>
           </Pecha.Tabs>

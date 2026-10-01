@@ -87,6 +87,14 @@ export interface RecurrenceInput {
   duration_days: number;
 }
 
+export interface EventPrayerIntentionDTO {
+  slug: string;
+  label: string;
+  color: string;
+  description: string;
+  display_order: number;
+}
+
 export interface EventDTO {
   id: string;
   group_id: string;
@@ -100,6 +108,7 @@ export interface EventDTO {
   event_format: EventFormat;
   chat_enabled?: boolean;
   notifications_enabled?: boolean;
+  intentions?: EventPrayerIntentionDTO[];
   chat_room_id?: string | null;
   start_date: string;
   end_date: string;
@@ -166,6 +175,7 @@ export interface CreateEventRequest {
   event_format?: EventFormat;
   chat_enabled?: boolean;
   notifications_enabled?: boolean;
+  intention_ids?: string[];
   recurrence?: RecurrenceInput;
 }
 
@@ -187,6 +197,7 @@ export interface UpdateEventRequest {
   event_format?: EventFormat;
   chat_enabled?: boolean;
   notifications_enabled?: boolean;
+  intention_ids?: string[];
   recurrence?: RecurrenceInput | null;
 }
 
@@ -403,7 +414,25 @@ export function mapEventToFormData(event: EventDTO): EventFormData {
     event_format: event.event_format ?? "hybrid",
     chat_enabled: event.chat_enabled ?? true,
     notifications_enabled: event.notifications_enabled ?? true,
+    intention_ids: [],
   };
+}
+
+function intentionIdsEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const sortedA = [...a].sort();
+  const sortedB = [...b].sort();
+  return sortedA.every((id, index) => id === sortedB[index]);
+}
+
+/** Map linked intention slugs from the event to CMS catalog ids. */
+export function intentionIdsFromEventSlugs(
+  eventIntentions: EventPrayerIntentionDTO[] | undefined,
+  catalog: { id: string; slug: string }[],
+): string[] {
+  if (!eventIntentions?.length) return [];
+  const slugs = new Set(eventIntentions.map((row) => row.slug));
+  return catalog.filter((row) => slugs.has(row.slug)).map((row) => row.id);
 }
 
 function buildLinksInput(rows: EventLinkRow[]): EventLinkInput[] {
@@ -534,6 +563,7 @@ export function buildCreateEventBody(
     event_format: data.event_format,
     chat_enabled: data.chat_enabled,
     notifications_enabled: data.notifications_enabled,
+    ...(data.intention_ids.length ? { intention_ids: data.intention_ids } : {}),
   };
 
   if (data.is_recurring && data.recurrence) {
@@ -744,6 +774,10 @@ export function buildUpdateEventBody(
   }
   if (data.chat_enabled !== original.chat_enabled) {
     body.chat_enabled = data.chat_enabled;
+  }
+
+  if (!intentionIdsEqual(data.intention_ids, original.intention_ids)) {
+    body.intention_ids = data.intention_ids;
   }
 
   // Handle recurrence changes

@@ -20,6 +20,7 @@ export const ROUTES = {
   traditions: "/traditions",
   verseOfDay: "/verse-of-day",
   poems: "/poems",
+  prayerIntentions: "/prayer-intentions",
   groups: "/groups",
   groupNew: "/groups/new",
   group: (groupId: string) => `/groups/${groupId}`,
