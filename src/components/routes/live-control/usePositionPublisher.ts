@@ -1,10 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   endRecitationSession,
-  publishPosition,
+  publishMove,
+  type MovePosition,
   type PositionToPublish,
   type PublishResult,
 } from "./api/liveControlApi";
+
+/** How one move reaches the room: over the socket or by HTTP, as the page has
+ * it. The positions go in the order the room should receive them. */
+export type SendMove = (
+  eventId: string,
+  token: string,
+  positions: MovePosition[],
+) => Promise<PublishResult>;
 
 /**
  * Held between one move and the next, never between the editions of a single
@@ -60,13 +69,13 @@ export interface UsePositionPublisherResult {
  * once the room has taken it - so a throttled or failed publish is retried on
  * the next move instead of being silently dropped.
  *
- * Each edition is a separate library text with its own segment ids, so a move is
- * published once per edition: readers of each language then find their own line.
- * The event holds a single position, though, so the last post the room accepts
- * is the one it keeps and the one anybody joining later resumes on. The edition
- * on screen is therefore published last, after the followed ones have landed -
- * the room settles on the line the operator is actually reading, never on a
- * translation that merely happened to answer last.
+ * Each edition is a separate library text with its own segment ids, so a move
+ * carries a position per edition: readers of each language then find their own
+ * line. The event holds a single position, though, so the last one the room
+ * takes is the one it keeps and the one anybody joining later resumes on. The
+ * edition on screen therefore goes last in the move, and the whole move is one
+ * send - the backend keeps that order, so the edition being read is never held
+ * back a round trip behind the others.
  *
  * Sent positions are remembered per text, so an edition the room refused is
  * retried on the next move of that same line while the others are not published
@@ -82,9 +91,13 @@ export function usePositionPublisher(
    * to the position the room already holds is not posted again, but is told
    * of as taken. */
   onAccepted?: (cue: PositionToPublish) => void,
+  /** How a move is sent; by HTTP unless the page has a better way. */
+  send: SendMove = publishMove,
 ): UsePositionPublisherResult {
   const onAcceptedRef = useRef(onAccepted);
   onAcceptedRef.current = onAccepted;
+  const sendRef = useRef(send);
+  sendRef.current = send;
   const [state, setState] = useState<PublishState>("idle");
   const [notice, setNotice] = useState<string | null>(null);
   const [lastSent, setLastSent] = useState<string | null>(null);
@@ -158,10 +171,9 @@ export function usePositionPublisher(
         }
 
         if (mountedRef.current) setState("publishing");
-        // The edition on screen leads, and `cues` carries it first. Everything
-        // else goes out together - one gap for the whole move, not one per
-        // language - and the leading edition follows, so it is the position the
-        // event is left holding.
+        // The edition on screen leads, and `cues` carries it first. It goes
+        // last in the move, behind every other edition, so it is the position
+        // the event is left holding.
         const driverTextId = cues[0].textId;
         const followers = pending.filter((cue) => cue.textId !== driverTextId);
         // Whenever a follower is published, the leading edition is published
@@ -171,29 +183,20 @@ export function usePositionPublisher(
         const leaders = (followers.length > 0 ? cues : pending).filter(
           (cue) => cue.textId === driverTextId,
         );
+        const ordered = [...followers, ...leaders];
 
-        const sent: { cue: PositionToPublish; result: PublishResult }[] = [];
-        if (followers.length > 0) {
-          const followerResults = await Promise.all(
-            followers.map((cue) =>
-              publishPosition(eventId, currentToken, cue, runs[cue.textId]),
-            ),
+        // One send for the whole move: the room takes it, or none of it.
+        let result: PublishResult;
+        try {
+          result = await sendRef.current(
+            eventId,
+            currentToken,
+            ordered.map((cue) => ({ position: cue, run: runs[cue.textId] })),
           );
-          followers.forEach((cue, index) =>
-            sent.push({ cue, result: followerResults[index] }),
-          );
+        } catch {
+          result = { ok: false, message: "Could not reach the room." };
         }
-        for (const cue of leaders) {
-          sent.push({
-            cue,
-            result: await publishPosition(
-              eventId,
-              currentToken,
-              cue,
-              runs[cue.textId],
-            ),
-          });
-        }
+        const sent = ordered.map((cue) => ({ cue, result }));
         if (!mountedRef.current) return;
 
         let published = 0;

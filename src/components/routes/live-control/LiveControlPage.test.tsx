@@ -4,12 +4,19 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import LiveControlPage from "./LiveControlPage";
-import type { RecitationDetails } from "./api/liveControlApi";
+import type {
+  AutoplayPlanStep,
+  AutoplayState,
+  MovePosition,
+  RecitationDetails,
+} from "./api/liveControlApi";
+import type { RecitationSocket, SocketMoveResult } from "./useRecitationSocket";
 
 const {
   fetchLiveControlEvent,
@@ -23,6 +30,11 @@ const {
   searchTextsByTitle,
   fetchEditionTitle,
   fetchSegmentPlayTimes,
+  publishMove,
+  startAutoplay,
+  stopAutoplay,
+  fetchAutoplayState,
+  socketStore,
 } = vi.hoisted(() => ({
   fetchSegmentPlayTimes: vi.fn(),
   searchTextsByTitle: vi.fn(),
@@ -42,6 +54,7 @@ const {
         index: number;
         roundNumber: number;
         autoplay?: boolean;
+        elapsedMs?: number;
       },
       run?: string,
     ) => Promise<{ ok: boolean; message?: string }>
@@ -54,6 +67,67 @@ const {
   >(async () => ({ ok: true })),
   fetchEditionSections: vi.fn(),
   fetchEditionYigchungs: vi.fn(),
+  publishMove:
+    vi.fn<
+      (
+        eventId: string,
+        token: string,
+        positions: MovePosition[],
+      ) => Promise<{ ok: boolean; message?: string }>
+    >(),
+  startAutoplay:
+    vi.fn<
+      (
+        eventId: string,
+        token: string,
+        steps: AutoplayPlanStep[],
+        firstStepElapsedMs?: number,
+        priorPlanId?: string | null,
+      ) => Promise<
+        { ok: true; state: AutoplayState } | { ok: false; message: string }
+      >
+    >(),
+  stopAutoplay:
+    vi.fn<
+      (
+        eventId: string,
+        token: string,
+      ) => Promise<
+        { ok: true; state: AutoplayState } | { ok: false; message: string }
+      >
+    >(),
+  fetchAutoplayState:
+    vi.fn<(eventId: string, token: string) => Promise<AutoplayState | null>>(),
+  /** The controller's socket, as a test drives it: whatever is set here is
+   * what the page hears. */
+  socketStore: (() => {
+    const closed = (): RecitationSocket => ({
+      status: "closed",
+      room: null,
+      people: null,
+      autoplay: null,
+      refusal: null,
+      sendMove: () => null,
+    });
+    let state = closed();
+    const listeners = new Set<() => void>();
+    return {
+      get: () => state,
+      set: (patch: Partial<RecitationSocket>) => {
+        state = { ...state, ...patch };
+        listeners.forEach((listener) => listener());
+      },
+      subscribe: (listener: () => void) => {
+        listeners.add(listener);
+        return () => {
+          listeners.delete(listener);
+        };
+      },
+      reset: () => {
+        state = closed();
+      },
+    };
+  })(),
 }));
 
 vi.mock("./api/liveControlApi", async () => {
@@ -71,6 +145,19 @@ vi.mock("./api/liveControlApi", async () => {
     searchTextsByTitle,
     fetchEditionTitle,
     fetchSegmentPlayTimes,
+    publishMove,
+    startAutoplay,
+    stopAutoplay,
+    fetchAutoplayState,
+  };
+});
+
+vi.mock("./useRecitationSocket", async () => {
+  const { useSyncExternalStore } = await import("react");
+  return {
+    MOVE_ACK_TIMEOUT_MS: 4000,
+    useRecitationSocket: () =>
+      useSyncExternalStore(socketStore.subscribe, socketStore.get),
   };
 });
 
@@ -86,6 +173,30 @@ vi.mock("react-router-dom", async () => {
     );
   return { ...actual, useParams: () => ({ eventId: "e1" }) };
 });
+
+/** How many plans the backend has been handed this test: plan ids count up. */
+let planCount = 0;
+
+/** The backend's autoplay as it would report it. */
+const autoplayState = (
+  overrides: Partial<AutoplayState> = {},
+): AutoplayState => ({
+  planId: "plan-1",
+  status: "running",
+  reason: null,
+  step: 0,
+  totalSteps: 3,
+  stepStartedAtMs: 1_000,
+  stepDurationMs: 20,
+  serverTimeMs: 1_000,
+  ...overrides,
+});
+
+/** The backend tells the page, over the socket, where its autoplay is. */
+const hearAutoplay = (overrides: Partial<AutoplayState> = {}) =>
+  act(() => {
+    socketStore.set({ autoplay: autoplayState(overrides) });
+  });
 
 /** A text of `count` lines, whose ids and content name the edition. */
 const linesFor = (
@@ -104,6 +215,14 @@ const linesFor = (
     },
   })),
 });
+
+/** An event with no liturgies: the page opens on the text box. */
+const noEventLiturgies = () => {
+  fetchLiveControlEvent.mockResolvedValue({
+    title: "Tara Puja",
+    collectionId: null,
+  });
+};
 
 const renderPage = () => {
   const queryClient = new QueryClient({
@@ -165,7 +284,15 @@ const pressKey = async (code: string) => {
 describe("LiveControlPage", () => {
   beforeEach(() => {
     fetchLiveControlEvent.mockReset();
+    fetchLiveControlEvent.mockResolvedValue({
+      title: "Tara Puja",
+      collectionId: "col-1",
+    });
     fetchLiturgies.mockReset();
+    fetchLiturgies.mockResolvedValue([
+      { textId: "root", title: "Praise to the 21 Tārās" },
+      { textId: "other", title: "Refuge" },
+    ]);
     fetchTextEditions.mockReset();
     fetchRecitationDetails.mockReset();
     publishPosition.mockClear();
@@ -186,17 +313,51 @@ describe("LiveControlPage", () => {
     );
     fetchSegmentPlayTimes.mockReset();
     fetchSegmentPlayTimes.mockResolvedValue({});
+    // A move reaches the room edition by edition, in the order given: each is
+    // seen here as the single-position call the tests read. The room takes
+    // the whole move or none of it.
+    publishMove.mockReset();
+    publishMove.mockImplementation(async (event, key, positions) => {
+      let failure: { ok: boolean; message?: string } | null = null;
+      for (const { position, run } of positions) {
+        const result = await publishPosition(event, key, position, run);
+        if (!result.ok && !failure) failure = result;
+      }
+      return failure ?? { ok: true };
+    });
+    planCount = 0;
+    startAutoplay.mockReset();
+    startAutoplay.mockImplementation(async () => {
+      planCount += 1;
+      return {
+        ok: true,
+        state: autoplayState({ planId: `plan-${planCount}` }),
+      };
+    });
+    stopAutoplay.mockReset();
+    stopAutoplay.mockImplementation(async () => ({
+      ok: true,
+      state: autoplayState({
+        planId: `plan-${planCount}`,
+        status: "stopped",
+        reason: "stopped",
+      }),
+    }));
+    fetchAutoplayState.mockReset();
+    fetchAutoplayState.mockResolvedValue(null);
+    socketStore.reset();
     localStorage.clear();
     Element.prototype.scrollIntoView = vi.fn();
 
-    fetchLiveControlEvent.mockResolvedValue({
-      title: "Tara Puja",
-      collectionId: "col-1",
-    });
-    fetchLiturgies.mockResolvedValue([
-      { textId: "root", title: "Praise to the 21 Tārās" },
-      { textId: "other", title: "Refuge" },
-    ]);
+    // Shortcuts from texts opened in this browser. The page itself opens on
+    // this event's first liturgy, not on whichever text was opened last.
+    localStorage.setItem(
+      "live-control-recent-texts",
+      JSON.stringify([
+        { textId: "root", title: "Praise to the 21 Tārās" },
+        { textId: "other", title: "Refuge" },
+      ]),
+    );
     // The work, plus the two translations the library holds of it.
     fetchTextEditions.mockImplementation(async (textId: string) =>
       textId === "root"
@@ -217,11 +378,21 @@ describe("LiveControlPage", () => {
     );
   });
 
-  it("opens the first liturgy and follows every translation of it", async () => {
+  it("opens this event's first liturgy and follows every translation of it", async () => {
+    const user = userEvent.setup();
+    // The text last opened anywhere in this browser belongs to another event.
+    localStorage.setItem(
+      "live-control-recent-texts",
+      JSON.stringify([{ textId: "other", title: "Refuge" }]),
+    );
     renderPage();
 
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
+    expect(fetchLiveControlEvent).toHaveBeenCalledWith("e1");
+    expect(fetchLiturgies).toHaveBeenCalledWith("col-1");
     expect(fetchRecitationDetails).toHaveBeenCalledWith("root", "bo");
+    expect(screen.queryByText("other line 1")).not.toBeInTheDocument();
+    expect(localStorage.getItem("live-control-open-text:e1")).toBe("root");
     // Every edition moves with the room unless the operator unticks it.
     expect(
       screen.getByRole("checkbox", { name: "Follow Praise (en)" }),
@@ -233,6 +404,30 @@ describe("LiveControlPage", () => {
     const driver = screen.getByRole("checkbox", { name: "Follow Praise (bo)" });
     expect(driver).toBeChecked();
     expect(driver).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: /^Refuge$/ }));
+    expect(await screen.findByText("other line 1")).toBeInTheDocument();
+  });
+
+  it("reopens the text last opened for this event", async () => {
+    localStorage.setItem("live-control-open-text:e1", "other");
+    renderPage();
+
+    expect(await screen.findByText("other line 1")).toBeInTheDocument();
+    expect(fetchRecitationDetails).not.toHaveBeenCalledWith("root", "bo");
+  });
+
+  it("does not open another event's text when this event has no liturgy", async () => {
+    localStorage.setItem(
+      "live-control-recent-texts",
+      JSON.stringify([{ textId: "other", title: "Refuge" }]),
+    );
+    noEventLiturgies();
+    renderPage();
+
+    await waitFor(() => expect(fetchLiveControlEvent).toHaveBeenCalled());
+    expect(screen.queryByText("other line 1")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Search texts")).toBeInTheDocument();
   });
 
   it("follows only the Tibetan, English and Chinese editions by default", async () => {
@@ -263,9 +458,7 @@ describe("LiveControlPage", () => {
   it("sizes the lines and remembers the size in this browser", async () => {
     const user = userEvent.setup();
     renderPage();
-    expect(
-      await screen.findByRole("button", { name: "Refuge" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
     expect(textScaleOnPage()).toBe("1");
 
     const picker = screen.getByRole("combobox", { name: "Text size" });
@@ -288,13 +481,14 @@ describe("LiveControlPage", () => {
 
   it("sizes the titles on their own, remembered apart from the text", async () => {
     const user = userEvent.setup();
+    fetchEditionSections.mockResolvedValue([
+      { id: "s1", title: "Going for Refuge", depth: 0, segmentId: "root-s1" },
+    ]);
     renderPage();
-    expect(
-      await screen.findByRole("button", { name: "Refuge" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
     await user.selectOptions(
-      screen.getByRole("combobox", { name: "Title size" }),
+      await screen.findByRole("combobox", { name: "Title size" }),
       "150%",
     );
 
@@ -315,9 +509,7 @@ describe("LiveControlPage", () => {
     localStorage.setItem("live-control-text-scale", "1.75");
     localStorage.setItem("live-control-titles-scale", "0.85");
     renderPage();
-    expect(
-      await screen.findByRole("button", { name: "Refuge" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
     expect(textScaleOnPage()).toBe("1.5");
     expect(["0.8", "0.9"]).toContain(titlesScaleOnPage());
@@ -326,25 +518,24 @@ describe("LiveControlPage", () => {
   it("opens with each pane at the size saved in this browser", async () => {
     localStorage.setItem("live-control-text-scale", "1.3");
     localStorage.setItem("live-control-titles-scale", "0.4");
+    fetchEditionSections.mockResolvedValue([
+      { id: "s1", title: "Going for Refuge", depth: 0, segmentId: "root-s1" },
+    ]);
     renderPage();
-    expect(
-      await screen.findByRole("button", { name: "Refuge" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
     expect(screen.getByRole("combobox", { name: "Text size" })).toHaveValue(
       "1.3",
     );
-    expect(screen.getByRole("combobox", { name: "Title size" })).toHaveValue(
-      "0.4",
-    );
+    expect(
+      await screen.findByRole("combobox", { name: "Title size" }),
+    ).toHaveValue("0.4");
   });
 
   it("keeps a titles size saved under the earlier key", async () => {
     localStorage.setItem("live-control-title-scale", "1.3");
     renderPage();
-    expect(
-      await screen.findByRole("button", { name: "Refuge" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
     expect(titlesScaleOnPage()).toBe("1.3");
   });
@@ -352,9 +543,7 @@ describe("LiveControlPage", () => {
   it("opens with the text size saved in this browser", async () => {
     localStorage.setItem("live-control-text-scale", "1.5");
     renderPage();
-    expect(
-      await screen.findByRole("button", { name: "Refuge" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
     expect(textScaleOnPage()).toBe("1.5");
     expect(screen.getByRole("combobox", { name: "Text size" })).toHaveValue(
       "1.5",
@@ -363,10 +552,7 @@ describe("LiveControlPage", () => {
 
   it("loads a pasted text id and its translations", async () => {
     const user = userEvent.setup();
-    fetchLiveControlEvent.mockResolvedValue({
-      title: "Tara Puja",
-      collectionId: null,
-    });
+    localStorage.removeItem("live-control-recent-texts");
     renderPage();
 
     await openTextByName(user, "Praise");
@@ -380,10 +566,7 @@ describe("LiveControlPage", () => {
 
   it("finds a text by name and opens it by its edition id", async () => {
     const user = userEvent.setup();
-    fetchLiveControlEvent.mockResolvedValue({
-      title: "Tara Puja",
-      collectionId: null,
-    });
+    localStorage.removeItem("live-control-recent-texts");
     renderPage();
 
     await openTextByName(user, "Praise");
@@ -397,10 +580,8 @@ describe("LiveControlPage", () => {
 
   it("does not open an earlier search's result on Enter", async () => {
     const user = userEvent.setup();
-    fetchLiveControlEvent.mockResolvedValue({
-      title: "Tara Puja",
-      collectionId: null,
-    });
+    localStorage.removeItem("live-control-recent-texts");
+    noEventLiturgies();
     renderPage();
 
     const box = await screen.findByLabelText("Search texts");
@@ -420,10 +601,7 @@ describe("LiveControlPage", () => {
 
   it("searches a long run-together title rather than opening it as an id", async () => {
     const user = userEvent.setup();
-    fetchLiveControlEvent.mockResolvedValue({
-      title: "Tara Puja",
-      collectionId: null,
-    });
+    localStorage.removeItem("live-control-recent-texts");
     renderPage();
 
     const box = await screen.findByLabelText("Search texts");
@@ -442,10 +620,7 @@ describe("LiveControlPage", () => {
 
   it("still opens a pasted edition id as it is", async () => {
     const user = userEvent.setup();
-    fetchLiveControlEvent.mockResolvedValue({
-      title: "Tara Puja",
-      collectionId: null,
-    });
+    localStorage.removeItem("live-control-recent-texts");
     renderPage();
 
     await user.type(
@@ -460,10 +635,8 @@ describe("LiveControlPage", () => {
 
   it("does not open an id-shaped query when the title search fails", async () => {
     const user = userEvent.setup();
-    fetchLiveControlEvent.mockResolvedValue({
-      title: "Tara Puja",
-      collectionId: null,
-    });
+    localStorage.removeItem("live-control-recent-texts");
+    noEventLiturgies();
     searchTextsByTitle.mockRejectedValue(new Error("offline"));
     renderPage();
 
@@ -481,10 +654,7 @@ describe("LiveControlPage", () => {
 
   it("opens an edition id without a digit once no title matches it", async () => {
     const user = userEvent.setup();
-    fetchLiveControlEvent.mockResolvedValue({
-      title: "Tara Puja",
-      collectionId: null,
-    });
+    localStorage.removeItem("live-control-recent-texts");
     searchTextsByTitle.mockResolvedValue([]);
     renderPage();
 
@@ -501,10 +671,7 @@ describe("LiveControlPage", () => {
   });
 
   it("names the suggested texts instead of showing their ids", async () => {
-    fetchLiveControlEvent.mockResolvedValue({
-      title: "Tara Puja",
-      collectionId: null,
-    });
+    localStorage.removeItem("live-control-recent-texts");
     renderPage();
 
     expect(
@@ -521,10 +688,7 @@ describe("LiveControlPage", () => {
 
   it("remembers a pasted text id in this browser, under its title", async () => {
     const user = userEvent.setup();
-    fetchLiveControlEvent.mockResolvedValue({
-      title: "Tara Puja",
-      collectionId: null,
-    });
+    localStorage.removeItem("live-control-recent-texts");
     renderPage();
 
     await openTextByName(user, "Praise");
@@ -546,10 +710,6 @@ describe("LiveControlPage", () => {
       "live-control-recent-texts",
       JSON.stringify([{ textId: "root", title: "Praise (bo)" }]),
     );
-    fetchLiveControlEvent.mockResolvedValue({
-      title: "Tara Puja",
-      collectionId: null,
-    });
     renderPage();
 
     expect(
@@ -632,42 +792,134 @@ describe("LiveControlPage", () => {
     );
   });
 
-  it("sends the followed editions together, then the one on screen last", async () => {
+  it("reports how long each line was held, rather than leaving the backend to time the moves", async () => {
+    // The backend can only subtract two request arrivals, which carries the
+    // network, its liveness check and throttle, and this page's send pacing into
+    // a figure meant to be speech alone. The hold is measured here instead, off
+    // a monotonic clock, and sent with the move that ends it.
     localStorage.setItem("recitation_emit_token", "tok-123");
-    // The event holds one position, so the last post accepted is what the room
-    // keeps: it has to be the edition being read, not a translation that
-    // happened to answer last. The two followed ones still go out together -
-    // both are in flight before either is released.
-    const order: string[] = [];
-    let inFlight = 0;
-    let releaseFollowers: () => void = () => {};
-    const bothInFlight = new Promise<void>((resolve) => {
-      releaseFollowers = resolve;
-    });
-    publishPosition.mockImplementation(
-      async (_eventId: string, _token: string, cue: { textId: string }) => {
-        order.push(cue.textId);
-        if (cue.textId === "root") return { ok: true };
-        inFlight += 1;
-        if (inFlight === 2) releaseFollowers();
-        await bothInFlight;
-        return { ok: true };
-      },
-    );
+    let clock = 1_000;
+    const now = vi.spyOn(performance, "now").mockImplementation(() => clock);
+    onTestFinished(() => now.mockRestore());
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
+    await followNone(user);
+    publishPosition.mockClear();
 
+    // The first move has no line behind it, so there is nothing to report.
+    await pressKey("Space");
+    await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(1));
+    expect(publishPosition.mock.calls[0][2].elapsedMs).toBeUndefined();
+
+    clock += 2_500;
+    await pressKey("Space");
+    await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(2));
+    // The first line's own hold, to the millisecond - not the gap between two
+    // posts landing.
+    expect(publishPosition.mock.calls[1][2]).toEqual({
+      textId: "root",
+      segmentId: "root-s2",
+      index: 1,
+      roundNumber: 1,
+      elapsedMs: 2_500,
+    });
+  });
+
+  it("reports one hold to every edition of the move", async () => {
+    // A move lands on all the followed editions at once, so each is told the
+    // same hold: the backend keeps its own marks per text and decides for each
+    // whether the two lines may be timed against each other.
+    localStorage.setItem("recitation_emit_token", "tok-123");
+    let clock = 1_000;
+    const now = vi.spyOn(performance, "now").mockImplementation(() => clock);
+    onTestFinished(() => now.mockRestore());
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
     await screen.findByText(/2 more editions following/);
     publishPosition.mockClear();
-    order.length = 0;
-    inFlight = 0;
+
+    await pressKey("Space");
+    await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(3));
+    clock += 1_800;
+    await pressKey("Space");
+    await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(6));
+    expect(
+      publishPosition.mock.calls.slice(3).map((call) => call[2].elapsedMs),
+    ).toEqual([1_800, 1_800, 1_800]);
+  });
+
+  it("sends a whole move in one request, the edition on screen last", async () => {
+    localStorage.setItem("recitation_emit_token", "tok-123");
+    renderPage();
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
+    await screen.findByText(/2 more editions following/);
+    publishMove.mockClear();
 
     await pressKey("Space");
 
-    await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(3));
-    expect(inFlight).toBe(2);
-    expect(order.slice(0, 2).sort()).toEqual(["root-en", "root-zh"]);
-    expect(order[2]).toBe("root");
+    // One request for every edition, not one each: the edition being read is
+    // not held back a round trip behind the others. The event keeps the last
+    // position it is sent, so that edition goes last.
+    await waitFor(() => expect(publishMove).toHaveBeenCalledTimes(1));
+    const [, token, positions] = publishMove.mock.calls[0];
+    expect(token).toBe("tok-123");
+    expect(positions.map(({ position }) => position.textId)).toEqual([
+      "root-en",
+      "root-zh",
+      "root",
+    ]);
+    // Each edition carries its own run, so each is timed on its own.
+    expect(positions.every(({ run }) => typeof run === "string")).toBe(true);
+  });
+
+  it("sends a move over the socket while it is open, and by HTTP when it is lost", async () => {
+    localStorage.setItem("recitation_emit_token", "tok-123");
+    const overSocket = vi.fn<
+      (positions: MovePosition[]) => Promise<SocketMoveResult>
+    >(async () => ({ ok: true }));
+    socketStore.set({ status: "open", sendMove: overSocket });
+    renderPage();
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
+    await screen.findByText(/2 more editions following/);
+    publishMove.mockClear();
+
+    await pressKey("Space");
+    await waitFor(() => expect(overSocket).toHaveBeenCalledTimes(1));
+    expect(
+      overSocket.mock.calls[0][0].map(({ position }) => position.textId),
+    ).toEqual(["root-en", "root-zh", "root"]);
+    expect(publishMove).not.toHaveBeenCalled();
+
+    // The socket went quiet on the next one: it goes by HTTP instead.
+    overSocket.mockResolvedValueOnce({
+      ok: false,
+      lost: true,
+      message: "gone",
+    });
+    await pressKey("Space");
+    await waitFor(() => expect(publishMove).toHaveBeenCalledTimes(1));
+    expect(
+      publishMove.mock.calls[0][2].map(({ position }) => position.segmentId),
+    ).toEqual(["root-en-s2", "root-zh-s2", "root-s2"]);
+  });
+
+  it("does not send a move the room refused over the socket again by HTTP", async () => {
+    localStorage.setItem("recitation_emit_token", "tok-123");
+    const overSocket = vi.fn(async () => ({
+      ok: false,
+      message:
+        "The room is taking positions as fast as it can; slow down a little.",
+    }));
+    socketStore.set({ status: "open", sendMove: overSocket });
+    renderPage();
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
+    publishMove.mockClear();
+
+    await pressKey("Space");
+
+    expect(await screen.findByText(/slow down a little/)).toBeInTheDocument();
+    expect(publishMove).not.toHaveBeenCalled();
   });
 
   it("sends the edition on screen again when a translation is ticked on the line being read", async () => {
@@ -808,14 +1060,14 @@ describe("LiveControlPage", () => {
     );
   });
 
-  it("drops the previous work's editions when another liturgy is picked", async () => {
+  it("drops the previous work's editions when another text is picked", async () => {
     const user = userEvent.setup();
     localStorage.setItem("recitation_emit_token", "tok-123");
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
     await screen.findByText(/2 more editions following/);
 
-    await user.click(screen.getByRole("button", { name: "Refuge" }));
+    await user.click(screen.getByRole("button", { name: "Open Refuge" }));
     expect(await screen.findByText("other line 1")).toBeInTheDocument();
     expect(
       screen.queryByRole("checkbox", { name: "Follow Praise (en)" }),
@@ -884,6 +1136,8 @@ describe("LiveControlPage", () => {
           segmentId: "root-en-s2",
           index: 0,
           roundNumber: 1,
+          // The second move, so it reports how long the first line was held.
+          elapsedMs: expect.any(Number),
         },
         expect.any(String),
       ),
@@ -896,7 +1150,7 @@ describe("LiveControlPage", () => {
     );
   });
 
-  it("publishes nothing for the liturgy just left while the next one loads", async () => {
+  it("publishes nothing for the text just left while the next one loads", async () => {
     const user = userEvent.setup();
     localStorage.setItem("recitation_emit_token", "tok-123");
     // The second liturgy's editions never arrive, which is any moment before
@@ -916,7 +1170,7 @@ describe("LiveControlPage", () => {
     await pressKey("Space");
     await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(1));
 
-    await user.click(screen.getByText("Refuge"));
+    await user.click(screen.getByRole("button", { name: "Open Refuge" }));
     await pressKey("Space");
     await pressKey("ArrowRight");
 
@@ -1142,9 +1396,7 @@ describe("LiveControlPage", () => {
 
   it("closes an error message", async () => {
     const user = userEvent.setup();
-    fetchLiveControlEvent.mockRejectedValue(
-      new Error("Invalid or no token found"),
-    );
+    fetchTextEditions.mockRejectedValue(new Error("offline"));
     renderPage();
 
     const alert = await screen.findByRole("alert");
@@ -1558,6 +1810,7 @@ describe("LiveControlPage", () => {
             segmentId: "root-middle",
             index: 1,
             roundNumber: 2,
+            elapsedMs: expect.any(Number),
           },
           expect.any(String),
         ),
@@ -1837,6 +2090,7 @@ describe("LiveControlPage", () => {
             segmentId: "BsajlElFFNFLoHcUjICwB",
             index: 0,
             roundNumber: 3,
+            elapsedMs: expect.any(Number),
           },
           expect.any(String),
         ),
@@ -1963,7 +2217,7 @@ describe("LiveControlPage", () => {
 
       expect(await screen.findByText("root line 1")).toBeInTheDocument();
       await user.click(screen.getByRole("button", { name: "Show titles" }));
-      await user.click(screen.getByRole("button", { name: "Refuge" }));
+      await user.click(screen.getByRole("button", { name: "Open Refuge" }));
 
       expect(titlesPanel()).toHaveAttribute("data-titles", "unfolded");
     });
@@ -2102,11 +2356,9 @@ describe("LiveControlPage", () => {
       ).toHaveAttribute("aria-valuenow", "60");
     });
 
-    it("opens the text box on a phone when the event has no liturgies", async () => {
-      fetchLiveControlEvent.mockResolvedValue({
-        title: "Tara Puja",
-        collectionId: null,
-      });
+    it("opens the text box on a phone when no text is open", async () => {
+      localStorage.removeItem("live-control-recent-texts");
+      noEventLiturgies();
       const user = userEvent.setup();
       renderPage();
 
@@ -2154,6 +2406,26 @@ describe("LiveControlPage", () => {
     });
   });
 
+  it("links to the autoplay dry run for the text open here", async () => {
+    renderPage();
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+    const link = screen.getByRole("link", {
+      name: /Test autoplay without the room/,
+    });
+    expect(link).toHaveAttribute("href", "/live/e1/autoplay-test?text=root");
+    expect(link).toHaveAttribute("target", "_blank");
+
+    // Reading a translation, the dry run opens that edition, as it is driven.
+    await userEvent.click(
+      screen.getByRole("button", { name: /Praise \(en\)/ }),
+    );
+    expect(await screen.findByText("root-en line 1")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /Test autoplay without the room/ }),
+    ).toHaveAttribute("href", "/live/e1/autoplay-test?text=root-en");
+  });
+
   describe("autoplay", () => {
     /** Opens the first liturgy with a token, driving the Tibetan alone. */
     const openForAutoplay = async () => {
@@ -2163,224 +2435,784 @@ describe("LiveControlPage", () => {
       expect(await screen.findByText("root line 1")).toBeInTheDocument();
       await followNone(user);
       await waitFor(() =>
-        expect(fetchSegmentPlayTimes).toHaveBeenCalledWith("root", "tok-123"),
+        expect(fetchSegmentPlayTimes).toHaveBeenCalledWith("root"),
       );
       publishPosition.mockClear();
       return user;
     };
 
-    it("moves the room on by itself at the pace each line was recited", async () => {
-      fetchSegmentPlayTimes.mockResolvedValue({
-        "root-s1": 20,
-        "root-s2": 20,
-        "root-s3": 20,
-      });
-      const user = await openForAutoplay();
+    it("shows each line's play time, and a dash where there is none", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue({ "root-s1": 4200 });
+      await openForAutoplay();
 
-      await user.click(screen.getByRole("button", { name: "▶ Auto" }));
-
-      await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(3));
-      // The first line is the operator's own start; the rest autoplay made,
-      // and say so, so they are not timed back into the play times.
-      expect(publishPosition.mock.calls.map((call) => call[2])).toEqual([
-        { textId: "root", segmentId: "root-s1", index: 0, roundNumber: 1 },
-        {
-          textId: "root",
-          segmentId: "root-s2",
-          index: 1,
-          roundNumber: 1,
-          autoplay: true,
-        },
-        {
-          textId: "root",
-          segmentId: "root-s3",
-          index: 2,
-          roundNumber: 1,
-          autoplay: true,
-        },
-      ]);
-      // Nothing after the last line: autoplay lets go.
-      expect(
-        await screen.findByRole("button", { name: "▶ Auto" }),
-      ).toBeInTheDocument();
+      const first = screen.getByText("root line 1").closest("[data-line]");
+      const second = screen.getByText("root line 2").closest("[data-line]");
+      await waitFor(() =>
+        expect(first?.querySelector("[data-play-time]")?.textContent).toBe(
+          "4.2s",
+        ),
+      );
+      expect(second?.querySelector("[data-play-time]")?.textContent).toBe("—");
     });
 
-    it("stops, and says why, at a line with no recorded time", async () => {
-      fetchSegmentPlayTimes.mockResolvedValue({ "root-s1": 20 });
+    const times = { "root-s1": 1200, "root-s2": 900, "root-s3": 700 };
+    const autoButton = () => screen.getByRole("button", { name: "▶ Auto" });
+    const pauseButton = () => screen.getByRole("button", { name: "❚❚ Pause" });
+    /** The plan the backend was handed, `nth` start of this test. */
+    const planSent = (nth = 0) => startAutoplay.mock.calls[nth][2];
+
+    it("hands the backend the whole plan: each line with its recorded time", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue(times);
       const user = await openForAutoplay();
 
-      await user.click(screen.getByRole("button", { name: "▶ Auto" }));
+      await user.click(autoButton());
+
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+      const [event, token, steps, keepFirst] = startAutoplay.mock.calls[0];
+      expect([event, token, keepFirst]).toEqual(["e1", "tok-123", undefined]);
+      expect(steps.map((step) => step.durationMs)).toEqual([1200, 900, 700]);
+      expect(
+        steps.map((step) => step.positions.map((p) => p.segmentId)),
+      ).toEqual([["root-s1"], ["root-s2"], ["root-s3"]]);
+      // The backend sends every line from here on: nothing goes from the page.
+      expect(publishPosition).not.toHaveBeenCalled();
+      expect(pauseButton()).toBeInTheDocument();
+    });
+
+    it("puts the edition on screen last in every step, so the room is left on it", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue(times);
+      const user = userEvent.setup();
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+      await screen.findByText(/2 more editions following/);
+      await waitFor(() => expect(autoButton()).toBeEnabled());
+
+      await user.click(autoButton());
+
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+      expect(planSent()[1].positions.map((p) => p.segmentId)).toEqual([
+        "root-en-s2",
+        "root-zh-s2",
+        "root-s2",
+      ]);
+    });
+
+    it("follows the backend as it moves the room on, and lets go at the end", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue(times);
+      const user = await openForAutoplay();
+      await user.click(autoButton());
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+      expect(await screen.findByText(/line 1\/3/)).toBeInTheDocument();
+
+      hearAutoplay({ planId: "plan-1", step: 1 });
+      expect(await screen.findByText(/line 2\/3/)).toBeInTheDocument();
+      hearAutoplay({ planId: "plan-1", step: 2 });
+      expect(await screen.findByText(/line 3\/3/)).toBeInTheDocument();
+
+      hearAutoplay({
+        planId: "plan-1",
+        step: 2,
+        status: "stopped",
+        reason: "finished",
+      });
+      expect(
+        await screen.findByRole("button", { name: "▶ Auto" }),
+      ).toBeEnabled();
+      expect(screen.queryByText(/Autoplay stopped/)).not.toBeInTheDocument();
+    });
+
+    it("ignores word of a plan it did not hand over", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue(times);
+      const user = await openForAutoplay();
+      await user.click(autoButton());
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+
+      hearAutoplay({ planId: "someone-elses", step: 2 });
+
+      expect(screen.getByText(/line 1\/3/)).toBeInTheDocument();
+    });
+
+    it("does not step back when the start's answer arrives after the next step", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue(times);
+      let answer: (
+        value: Awaited<ReturnType<typeof startAutoplay>>,
+      ) => void = () => {};
+      startAutoplay.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            answer = resolve;
+          }),
+      );
+      const user = await openForAutoplay();
+      await user.click(autoButton());
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+
+      // The socket is quicker than the start's own answer.
+      await act(async () =>
+        answer({
+          ok: true,
+          state: autoplayState({ planId: "plan-1", step: 0 }),
+        }),
+      );
+      hearAutoplay({ planId: "plan-1", step: 1 });
+      expect(await screen.findByText(/line 2\/3/)).toBeInTheDocument();
+      hearAutoplay({ planId: "plan-1", step: 0 });
+
+      expect(screen.getByText(/line 2\/3/)).toBeInTheDocument();
+    });
+
+    it("stops where a line has no recorded time, and says why", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue({ "root-s1": 1200 });
+      const user = await openForAutoplay();
+      await user.click(autoButton());
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+
+      // The line with no time is still sent - the plan ends on it.
+      expect(planSent().map((step) => step.positions[0].segmentId)).toEqual([
+        "root-s1",
+        "root-s2",
+      ]);
+      hearAutoplay({ planId: "plan-1", step: 1 });
+      hearAutoplay({
+        planId: "plan-1",
+        step: 1,
+        status: "stopped",
+        reason: "finished",
+      });
 
       expect(
         await screen.findByText(/Autoplay stopped at line 2/),
       ).toBeInTheDocument();
-      expect(publishPosition).toHaveBeenCalledTimes(2);
-      expect(
-        screen.getByRole("button", { name: "▶ Auto" }),
-      ).toBeInTheDocument();
+      expect(autoButton()).toBeInTheDocument();
     });
 
-    it("moves nothing once paused", async () => {
-      fetchSegmentPlayTimes.mockResolvedValue({
-        "root-s1": 400,
-        "root-s2": 400,
-        "root-s3": 400,
-      });
+    it("will not start on a line with no recorded time", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue({});
       const user = await openForAutoplay();
 
-      await user.click(screen.getByRole("button", { name: "▶ Auto" }));
-      await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(1));
-      await user.click(screen.getByRole("button", { name: "❚❚ Pause" }));
-      await new Promise((resolve) => setTimeout(resolve, 600));
-
-      expect(publishPosition).toHaveBeenCalledTimes(1);
-    });
-
-    it("holds each line from when the room takes it, never ahead of the room", async () => {
-      fetchSegmentPlayTimes.mockResolvedValue({
-        "root-s1": 20,
-        "root-s2": 20,
-        "root-s3": 20,
-      });
-      const user = await openForAutoplay();
-      let release = () => {};
-      const gate = new Promise<void>((resolve) => {
-        release = resolve;
-      });
-      publishPosition.mockImplementation(async (_event, _token, cue) => {
-        if (cue.segmentId === "root-s2") await gate;
-        return { ok: true };
-      });
-
-      await user.click(screen.getByRole("button", { name: "▶ Auto" }));
-      await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(2));
-      // Line 2 is still on its way: autoplay does not move past it.
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      expect(screen.getByText(/line 2\/3/)).toBeInTheDocument();
-      expect(publishPosition).toHaveBeenCalledTimes(2);
-
-      await act(async () => release());
-      await waitFor(() =>
-        expect(publishPosition).toHaveBeenLastCalledWith(
-          "e1",
-          "tok-123",
-          expect.objectContaining({ segmentId: "root-s3", autoplay: true }),
-          expect.any(String),
-        ),
-      );
-    });
-
-    it("hands back to the operator when the room refuses a line", async () => {
-      fetchSegmentPlayTimes.mockResolvedValue({
-        "root-s1": 20,
-        "root-s2": 20,
-        "root-s3": 20,
-      });
-      const user = await openForAutoplay();
-      publishPosition.mockImplementation(async (_event, _token, cue) =>
-        cue.segmentId === "root-s2"
-          ? { ok: false, message: "Could not reach the room." }
-          : { ok: true },
-      );
-
-      await user.click(screen.getByRole("button", { name: "▶ Auto" }));
+      await user.click(autoButton());
 
       expect(
-        await screen.findByRole("button", { name: "▶ Auto" }),
+        await screen.findByText(/Autoplay cannot start at line 1/),
       ).toBeInTheDocument();
-      await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(2));
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      expect(publishPosition).toHaveBeenCalledTimes(2);
+      expect(startAutoplay).not.toHaveBeenCalled();
+      expect(autoButton()).toBeInTheDocument();
     });
 
     it("waits for fresh play times before judging a line has none", async () => {
       let fresh = false;
       fetchSegmentPlayTimes.mockImplementation(async () =>
-        fresh ? { "root-s1": 20, "root-s2": 20, "root-s3": 20 } : {},
+        fresh ? times : {},
       );
       const user = await openForAutoplay();
 
       fresh = true;
-      await user.click(screen.getByRole("button", { name: "▶ Auto" }));
+      await user.click(autoButton());
 
-      await waitFor(() =>
-        expect(publishPosition).toHaveBeenLastCalledWith(
-          "e1",
-          "tok-123",
-          expect.objectContaining({ segmentId: "root-s3", autoplay: true }),
-          expect.any(String),
-        ),
-      );
-      expect(screen.queryByText(/Autoplay stopped/)).not.toBeInTheDocument();
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+      expect(planSent()).toHaveLength(3);
+      expect(
+        screen.queryByText(/Autoplay cannot start/),
+      ).not.toBeInTheDocument();
     });
 
-    it("does not take a line the room held before as taken by a move still on its way", async () => {
-      fetchSegmentPlayTimes.mockResolvedValue({
-        "root-s1": 20,
-        "root-s2": 20,
-        "root-s3": 20,
+    it("pauses the backend where it is", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue(times);
+      const user = await openForAutoplay();
+      await user.click(autoButton());
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+
+      await user.click(pauseButton());
+
+      await waitFor(() =>
+        expect(stopAutoplay).toHaveBeenCalledWith("e1", "tok-123"),
+      );
+      expect(autoButton()).toBeInTheDocument();
+      // Late word of the plan just paused does not bring it back.
+      hearAutoplay({ planId: "plan-1", step: 2 });
+      expect(screen.getByText(/line 1\/3/)).toBeInTheDocument();
+    });
+
+    it("says so when a pause did not reach the backend, which is still moving the room", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue(times);
+      stopAutoplay.mockResolvedValueOnce({
+        ok: false,
+        message: "Could not reach the room.",
       });
       const user = await openForAutoplay();
-      await user.click(screen.getByRole("button", { name: /root line 2/ }));
+      await user.click(autoButton());
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+      hearAutoplay({ planId: "plan-1", step: 0 });
+
+      await user.click(pauseButton());
+
+      expect(
+        await screen.findByText(/Autoplay could not be paused/),
+      ).toBeInTheDocument();
+      // Still running on the server: Pause stays, to be pressed again.
+      expect(pauseButton()).toBeInTheDocument();
+      await user.click(pauseButton());
+      await waitFor(() => expect(stopAutoplay).toHaveBeenCalledTimes(2));
+    });
+
+    it("says why when the backend would not start", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue(times);
+      startAutoplay.mockResolvedValueOnce({
+        ok: false,
+        message: "The server could not run autoplay just now. Try again.",
+      });
+      const user = await openForAutoplay();
+
+      await user.click(autoButton());
+
+      expect(
+        await screen.findByText(
+          /Autoplay could not start: The server could not run autoplay/,
+        ),
+      ).toBeInTheDocument();
+      expect(autoButton()).toBeInTheDocument();
+    });
+
+    it("says so when the backend could not send a line", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue(times);
+      const user = await openForAutoplay();
+      await user.click(autoButton());
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+
+      hearAutoplay({ planId: "plan-1", status: "stopped", reason: "failed" });
+
+      expect(
+        await screen.findByText(/the server could not send a line/),
+      ).toBeInTheDocument();
+      expect(autoButton()).toBeInTheDocument();
+    });
+
+    it("hands over a new plan from a line the operator picks mid-autoplay", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue(times);
+      const user = await openForAutoplay();
+      await user.click(autoButton());
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+
+      await user.click(screen.getByRole("button", { name: /root line 3/ }));
+
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(2));
+      expect(planSent(1).map((step) => step.positions[0].segmentId)).toEqual([
+        "root-s3",
+      ]);
+      // Sent by the backend, as the plan's first step - not from here.
+      expect(publishPosition).not.toHaveBeenCalled();
+      expect(pauseButton()).toBeInTheDocument();
+    });
+
+    it("sends a replacement plan only after the one already out, so the newest arrives last", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue(times);
+      let answerFirst: (
+        value: Awaited<ReturnType<typeof startAutoplay>>,
+      ) => void = () => {};
+      startAutoplay.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            answerFirst = resolve;
+          }),
+      );
+      startAutoplay.mockImplementationOnce(async () => ({
+        ok: true,
+        state: autoplayState({ planId: "plan-2", step: 0 }),
+      }));
+      const user = await openForAutoplay();
+      await user.click(autoButton());
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+      await user.click(screen.getByRole("button", { name: /root line 3/ }));
+
+      // The second plan waits: it must not pass the first on the way.
+      expect(await screen.findByText(/line 3\/3/)).toBeInTheDocument();
+      expect(startAutoplay).toHaveBeenCalledTimes(1);
+
+      await act(async () =>
+        answerFirst({
+          ok: true,
+          state: autoplayState({ planId: "plan-1", step: 1 }),
+        }),
+      );
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(2));
+      expect(startAutoplay.mock.calls[1][4]).toBe("plan-1");
+
+      // The first plan's word does not move the page off the plan it follows.
+      expect(screen.getByText(/line 3\/3/)).toBeInTheDocument();
+      hearAutoplay({ planId: "plan-1", step: 1 });
+      expect(screen.getByText(/line 3\/3/)).toBeInTheDocument();
+    });
+
+    it("keeps Pause until a stop sent before the start answers is confirmed", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue(times);
+      let answerStart: (
+        value: Awaited<ReturnType<typeof startAutoplay>>,
+      ) => void = () => {};
+      startAutoplay.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            answerStart = resolve;
+          }),
+      );
+      stopAutoplay.mockResolvedValueOnce({
+        ok: false,
+        message: "Could not reach the room.",
+      });
+      const user = await openForAutoplay();
+      await user.click(autoButton());
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+
+      await user.click(pauseButton());
+      expect(pauseButton()).toBeInTheDocument();
+      expect(stopAutoplay).not.toHaveBeenCalled();
+
+      await act(async () =>
+        answerStart({
+          ok: true,
+          state: autoplayState({ planId: "plan-1", step: 0 }),
+        }),
+      );
+
+      expect(
+        await screen.findByText(/Autoplay could not be paused/),
+      ).toBeInTheDocument();
+      expect(pauseButton()).toBeInTheDocument();
+      // The late start is remembered, and its later word does not resume it.
+      hearAutoplay({ planId: "plan-1", step: 2 });
+      expect(screen.getByText(/line 1\/3/)).toBeInTheDocument();
+    });
+
+    it("runs a time bar under the live line for the backend's hold", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue({
+        "root-s1": 60_000,
+        "root-s2": 60_000,
+      });
+      const user = await openForAutoplay();
+      expect(
+        screen.queryByRole("progressbar", { name: /Autoplay/ }),
+      ).not.toBeInTheDocument();
+
+      await user.click(autoButton());
+
+      const bar = await screen.findByRole("progressbar", { name: /Autoplay/ });
+      expect(bar).toHaveAttribute("aria-valuemax", "60000");
+      expect(
+        screen.getByText("root line 1").closest("[data-line]"),
+      ).toContainElement(bar);
+      expect(bar.parentElement?.textContent).toMatch(/ \/ 1:00$/);
+
+      await user.click(pauseButton());
+      await waitFor(() =>
+        expect(
+          screen.queryByRole("progressbar", { name: /Autoplay/ }),
+        ).not.toBeInTheDocument(),
+      );
+    });
+
+    it("shows autoplay running on the server that it did not start, and can pause it", async () => {
+      fetchAutoplayState.mockResolvedValue(
+        autoplayState({ planId: "from-another-screen", step: 4 }),
+      );
+      const user = await openForAutoplay();
+
+      expect(await screen.findByText(/autoplay running/)).toBeInTheDocument();
+      await user.click(pauseButton());
+
+      await waitFor(() =>
+        expect(stopAutoplay).toHaveBeenCalledWith("e1", "tok-123"),
+      );
+    });
+
+    it("asks the backend where autoplay is while the socket is down", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue(times);
+      const user = await openForAutoplay();
+      await user.click(autoButton());
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+      fetchAutoplayState.mockResolvedValue(
+        autoplayState({ planId: "plan-1", step: 1 }),
+      );
+
+      expect(
+        await screen.findByText(/line 2\/3/, undefined, { timeout: 3000 }),
+      ).toBeInTheDocument();
+    });
+
+    it("keeps the screen on while autoplay runs", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue(times);
+      const release = vi.fn(async () => {});
+      const request = vi.fn(async () => ({
+        release,
+        addEventListener: vi.fn(),
+      }));
+      Object.defineProperty(navigator, "wakeLock", {
+        value: { request },
+        configurable: true,
+      });
+      onTestFinished(() => {
+        Reflect.deleteProperty(navigator, "wakeLock");
+      });
+      const user = await openForAutoplay();
+
+      await user.click(autoButton());
+      await waitFor(() => expect(request).toHaveBeenCalledWith("screen"));
+
+      await user.click(pauseButton());
+      await waitFor(() => expect(release).toHaveBeenCalled());
+    });
+
+    it("shows the line the room is on, and how many are following", async () => {
+      socketStore.set({
+        status: "open",
+        room: {
+          textId: "root",
+          segmentId: "root-s2",
+          index: 1,
+          roundNumber: 1,
+          revision: 5,
+        },
+        people: 12,
+      });
+      await openForAutoplay();
+
+      const room = document.querySelector("[data-room]");
+      expect(room).toHaveTextContent(/line 2 · root line 2/);
+      expect(room).toHaveTextContent(/12 following/);
+      // Not the line on screen, so it is marked where it sits.
+      expect(
+        screen.getByText("root line 2").closest("[data-line]"),
+      ).toHaveAttribute("data-room-here");
+    });
+
+    it("finds the room's line when the room holds a followed edition's position", async () => {
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      socketStore.set({
+        status: "open",
+        room: {
+          textId: "root-en",
+          segmentId: "root-en-s3",
+          index: 2,
+          roundNumber: 1,
+          revision: 9,
+        },
+        people: 3,
+      });
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+      await waitFor(() =>
+        expect(document.querySelector("[data-room]")).toHaveTextContent(
+          /line 3 · root line 3/,
+        ),
+      );
+    });
+
+    it("says why when the server turns the controller's socket away", async () => {
+      socketStore.set({
+        status: "refused",
+        refusal: "Invalid or no token found",
+      });
+      await openForAutoplay();
+
+      expect(document.querySelector("[data-room]")).toHaveTextContent(
+        /turned the controller away \(Invalid or no token found\) · moves go by HTTP/,
+      );
+    });
+
+    it("says moves go by HTTP while the socket is down", async () => {
+      await openForAutoplay();
+
+      expect(document.querySelector("[data-room]")).toHaveTextContent(
+        /Room offline · moves go by HTTP/,
+      );
+    });
+
+    describe("planned rounds", () => {
+      const label = "↺ Return to start · 1st Praises to the 21 Tārās";
+      /** A praise of two lines, whose ending carries a Return. */
+      const openPraiseForAutoplay = async () => {
+        const user = userEvent.setup();
+        localStorage.setItem("recitation_emit_token", "tok-123");
+        fetchRecitationDetails.mockImplementation(
+          async (textId: string, language: string) =>
+            textId !== "root"
+              ? linesFor(textId, language, 3)
+              : {
+                  text_id: "root",
+                  title: "root",
+                  segments: [
+                    {
+                      recitation: {
+                        bo: { id: "BsajlElFFNFLoHcUjICwB", content: "homage" },
+                      },
+                    },
+                    {
+                      recitation: {
+                        bo: { id: "kYNR7EmC5apQWrkYl5fiO", content: "mantra" },
+                      },
+                    },
+                  ],
+                },
+        );
+        fetchSegmentPlayTimes.mockResolvedValue({
+          BsajlElFFNFLoHcUjICwB: 20,
+          kYNR7EmC5apQWrkYl5fiO: 20,
+        });
+        renderPage();
+        expect(await screen.findByText("homage")).toBeInTheDocument();
+        await followNone(user);
+        publishPosition.mockClear();
+        return user;
+      };
+      const planOf = () =>
+        screen.getByRole("group", { name: `Autoplay rounds: ${label}` });
+
+      it("sets the rounds from 1, without taking the return", async () => {
+        const user = await openPraiseForAutoplay();
+        const more = () =>
+          within(planOf()).getByRole("button", { name: "One round more" });
+        const fewer = () =>
+          within(planOf()).getByRole("button", { name: "One round fewer" });
+
+        // Counted as the Return's badge counts: once through is round 1.
+        expect(
+          planOf().querySelector("[data-planned-rounds]"),
+        ).toHaveTextContent("1");
+        expect(fewer()).toBeDisabled();
+        expect(planOf().querySelector("[data-returns-left]")).toBeNull();
+
+        await user.click(more());
+        await user.click(more());
+
+        expect(
+          planOf().querySelector("[data-planned-rounds]"),
+        ).toHaveTextContent("3");
+        expect(planOf().querySelector("[data-returns-left]")).toHaveTextContent(
+          "2 returns left",
+        );
+        // Nothing went to the room, and the round did not move.
+        expect(publishPosition).not.toHaveBeenCalled();
+        expect(
+          screen.getByRole("button", { name: `${label}, round 1` }),
+        ).toBeInTheDocument();
+        // Kept for a reload mid-puja.
+        expect(
+          JSON.parse(
+            localStorage.getItem("live-control-planned-rounds:e1") ?? "{}",
+          ),
+        ).toEqual({ "1-85": 3 });
+
+        await user.click(fewer());
+        await user.click(fewer());
+        expect(planOf().querySelector("[data-returns-left]")).toBeNull();
+        expect(fewer()).toBeDisabled();
+        expect(localStorage.getItem("live-control-planned-rounds:e1")).toBe(
+          "{}",
+        );
+      });
+
+      it("carries a saved return count over as one more round", async () => {
+        localStorage.setItem(
+          "live-control-planned-returns:e1",
+          JSON.stringify({ "1-85": 2 }),
+        );
+        await openPraiseForAutoplay();
+
+        expect(
+          planOf().querySelector("[data-planned-rounds]"),
+        ).toHaveTextContent("3");
+        expect(planOf().querySelector("[data-returns-left]")).toHaveTextContent(
+          "2 returns left",
+        );
+        expect(
+          JSON.parse(
+            localStorage.getItem("live-control-planned-rounds:e1") ?? "{}",
+          ),
+        ).toEqual({ "1-85": 3 });
+        expect(localStorage.getItem("live-control-planned-returns:e1")).toBe(
+          null,
+        );
+      });
+
+      it("lays every planned round out in the plan, the Return taken each time", async () => {
+        const user = await openPraiseForAutoplay();
+        await user.click(
+          within(planOf()).getByRole("button", { name: "One round more" }),
+        );
+        await user.click(
+          within(planOf()).getByRole("button", { name: "One round more" }),
+        );
+
+        await user.click(screen.getByRole("button", { name: "▶ Auto" }));
+
+        // Three rounds of the praise, then the end of the text.
+        await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+        expect(
+          startAutoplay.mock.calls[0][2].map((step) => [
+            step.positions[0].segmentId,
+            step.positions[0].roundNumber,
+          ]),
+        ).toEqual([
+          ["BsajlElFFNFLoHcUjICwB", 1],
+          ["kYNR7EmC5apQWrkYl5fiO", 1],
+          ["BsajlElFFNFLoHcUjICwB", 2],
+          ["kYNR7EmC5apQWrkYl5fiO", 2],
+          ["BsajlElFFNFLoHcUjICwB", 3],
+          ["kYNR7EmC5apQWrkYl5fiO", 3],
+        ]);
+      });
+
+      it("moves the round badge as the backend takes the room into each round", async () => {
+        const user = await openPraiseForAutoplay();
+        await user.click(
+          within(planOf()).getByRole("button", { name: "One round more" }),
+        );
+        await user.click(screen.getByRole("button", { name: "▶ Auto" }));
+        await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+
+        // Step 2 is the praise's start again, in round 2.
+        hearAutoplay({ planId: "plan-1", step: 2, totalSteps: 4 });
+
+        expect(
+          await screen.findByRole("button", { name: `${label}, round 2` }),
+        ).toBeInTheDocument();
+        expect(planOf().querySelector("[data-returns-left]")).toHaveTextContent(
+          "done",
+        );
+      });
+
+      it("rebuilds the plan when the rounds change mid-line, without sending the line again", async () => {
+        const user = await openPraiseForAutoplay();
+        await user.click(screen.getByRole("button", { name: "▶ Auto" }));
+        await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+        expect(startAutoplay.mock.calls[0][2]).toHaveLength(2);
+
+        await user.click(
+          within(planOf()).getByRole("button", { name: "One round more" }),
+        );
+
+        await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(2));
+        const [, , steps, keepFirst] = startAutoplay.mock.calls[1];
+        // The line on screen keeps what is left of its time.
+        expect(typeof keepFirst).toBe("number");
+        expect(steps.map((step) => step.positions[0].roundNumber)).toEqual([
+          1, 1, 2, 2,
+        ]);
+        expect(publishPosition).not.toHaveBeenCalled();
+      });
+
+      it("counts rounds begun by hand toward the plan", async () => {
+        const user = await openPraiseForAutoplay();
+        await user.click(
+          within(planOf()).getByRole("button", { name: "One round more" }),
+        );
+        await user.click(
+          await screen.findByRole("button", { name: `${label}, round 1` }),
+        );
+
+        expect(
+          await screen.findByRole("button", { name: `${label}, round 2` }),
+        ).toBeInTheDocument();
+        expect(planOf().querySelector("[data-returns-left]")).toHaveTextContent(
+          "done",
+        );
+      });
+      it("tells the backend a Return from the passage end follows on from it", async () => {
+        const user = await openPraiseForAutoplay();
+        await user.click(screen.getByRole("button", { name: /homage/ }));
+        await user.click(screen.getByRole("button", { name: "Next →" }));
+        await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(2));
+
+        await user.click(
+          screen.getByRole("button", { name: `${label}, round 1` }),
+        );
+
+        // Back to line 1 in round 2, having recited line 2 through: line 2 is
+        // the one the room's last move was on, so its hold is its play time.
+        await waitFor(() =>
+          expect(publishPosition).toHaveBeenLastCalledWith(
+            "e1",
+            "tok-123",
+            {
+              textId: "root",
+              segmentId: "BsajlElFFNFLoHcUjICwB",
+              index: 0,
+              roundNumber: 2,
+              elapsedMs: expect.any(Number),
+              fromIndex: 1,
+            },
+            expect.any(String),
+          ),
+        );
+      });
+    });
+
+    it("tells the backend Next over yigchung follows on, and a jump does not", async () => {
+      fetchEditionYigchungs.mockImplementation(async (textId: string) =>
+        textId === "root"
+          ? {
+              "root-s2": {
+                full: true,
+                ranges: [{ start: 0, end: 11 }],
+                length: 11,
+              },
+            }
+          : {},
+      );
+      const user = await openForAutoplay();
+      await user.click(screen.getByRole("button", { name: /root line 1/ }));
       await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(1));
 
-      // Back a line, held on the wire, then forward again to the line the room
-      // took before - and autoplay started there.
-      let release = () => {};
-      const gate = new Promise<void>((resolve) => {
-        release = resolve;
-      });
-      publishPosition.mockImplementation(async (_event, _token, cue) => {
-        if (cue.segmentId === "root-s1") await gate;
-        return { ok: true };
-      });
-      await user.click(screen.getByRole("button", { name: "← Previous" }));
-      await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(2));
+      // Line 2 is instruction: Next lands on line 3, the next line recited.
       await user.click(screen.getByRole("button", { name: "Next →" }));
-      await user.click(screen.getByRole("button", { name: "▶ Auto" }));
-
-      await new Promise((resolve) => setTimeout(resolve, 150));
-      expect(screen.getByText(/line 2\/3/)).toBeInTheDocument();
-      expect(publishPosition).not.toHaveBeenCalledWith(
-        "e1",
-        "tok-123",
-        expect.objectContaining({ segmentId: "root-s3" }),
-        expect.any(String),
-      );
-
-      await act(async () => release());
       await waitFor(() =>
         expect(publishPosition).toHaveBeenLastCalledWith(
           "e1",
           "tok-123",
-          expect.objectContaining({ segmentId: "root-s3", autoplay: true }),
+          expect.objectContaining({
+            segmentId: "root-s3",
+            index: 2,
+            fromIndex: 0,
+          }),
           expect.any(String),
         ),
       );
+
+      // Back up to line 1 by tapping it: nothing was recited through.
+      await user.click(screen.getByRole("button", { name: /root line 1/ }));
+      await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(3));
+      expect(publishPosition.mock.calls[2][2]).not.toHaveProperty("fromIndex");
     });
 
-    it("starts from a line the room already holds without waiting on it", async () => {
-      fetchSegmentPlayTimes.mockResolvedValue({
-        "root-s1": 20,
-        "root-s2": 20,
-        "root-s3": 20,
-      });
+    it("reads the times again once the room takes a timed move by hand", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue({ "root-s1": 4200 });
       const user = await openForAutoplay();
-      await user.click(screen.getByRole("button", { name: /root line 2/ }));
-      await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(1));
-
-      // The room is on line 2 already, so starting sends nothing for it.
-      await user.click(screen.getByRole("button", { name: "▶ Auto" }));
-
+      const first = screen.getByText("root line 1").closest("[data-line]");
       await waitFor(() =>
-        expect(publishPosition).toHaveBeenLastCalledWith(
-          "e1",
-          "tok-123",
-          expect.objectContaining({ segmentId: "root-s3", autoplay: true }),
-          expect.any(String),
+        expect(first?.querySelector("[data-play-time]")?.textContent).toBe(
+          "4.2s",
         ),
       );
-      expect(publishPosition).toHaveBeenCalledTimes(2);
+      fetchSegmentPlayTimes.mockClear();
+      fetchSegmentPlayTimes.mockResolvedValue({ "root-s1": 3100 });
+
+      // The first move onto the text carries no time, so teaches nothing.
+      await user.click(screen.getByRole("button", { name: "Next →" }));
+      await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(1));
+      await new Promise((resolve) => setTimeout(resolve, 1700));
+      expect(fetchSegmentPlayTimes).not.toHaveBeenCalled();
+
+      // The second reports how long line 1 was held: its new time shows.
+      await user.click(screen.getByRole("button", { name: "Next →" }));
+      await waitFor(
+        () =>
+          expect(first?.querySelector("[data-play-time]")?.textContent).toBe(
+            "3.1s",
+          ),
+        { timeout: 3000 },
+      );
+      expect(fetchSegmentPlayTimes).toHaveBeenCalledTimes(1);
+      expect(fetchSegmentPlayTimes).toHaveBeenCalledWith("root");
     });
 
     it("cannot be started without the emit token", async () => {
@@ -2388,7 +3220,10 @@ describe("LiveControlPage", () => {
       expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
       expect(screen.getByRole("button", { name: "▶ Auto" })).toBeDisabled();
-      expect(fetchSegmentPlayTimes).not.toHaveBeenCalled();
+      // The times are public, so they still load and show on the lines.
+      await waitFor(() =>
+        expect(fetchSegmentPlayTimes).toHaveBeenCalledWith("root"),
+      );
     });
   });
 });
