@@ -131,7 +131,10 @@ const CropContainer = ({
   onCropChange: (crop: { x: number; y: number }) => void;
   onCropComplete: (_: any, croppedAreaPixels: any) => void;
   onZoomChange: (zoom: number) => void;
-  onMediaLoaded: (size: { naturalWidth: number; naturalHeight: number }) => void;
+  onMediaLoaded: (size: {
+    naturalWidth: number;
+    naturalHeight: number;
+  }) => void;
   isProfilePage?: boolean;
 }) => (
   <div className="relative w-full h-96 bg-[#b23434] dark:bg-[#c44848]">
