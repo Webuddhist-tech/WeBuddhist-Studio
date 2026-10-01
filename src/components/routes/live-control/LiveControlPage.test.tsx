@@ -2810,6 +2810,36 @@ describe("LiveControlPage", () => {
       );
     });
 
+    it("runs a time bar by hand too, its end coloured by the offsets set from the page", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue({ "root-s1": 60_000 });
+      const user = await openForAutoplay();
+      await user.click(screen.getByText("root line 1"));
+
+      const bar = await screen.findByRole("progressbar", {
+        name: /Line time/,
+      });
+      expect(
+        screen.getByText("root line 1").closest("[data-line]"),
+      ).toContainElement(bar);
+      const zone = (kind: string) =>
+        bar.querySelector<HTMLElement>(`[data-cue-zone="${kind}"]`)?.style
+          .width;
+      // 1500 ms and 1000 ms of a minute.
+      expect(zone("next")).toBe("2.5%");
+      expect(zone("autoplay")).toMatch(/^1\.66/);
+      // Not yet near the end, so no cue.
+      expect(bar.parentElement).not.toHaveAttribute("data-cued");
+
+      await user.click(screen.getByRole("button", { name: "Cue" }));
+      const next = screen.getByRole("spinbutton", { name: /Next click/ });
+      await user.clear(next);
+      await user.type(next, "6000");
+      expect(zone("next")).toBe("10%");
+      expect(
+        JSON.parse(localStorage.getItem("live-control-cue") ?? "{}"),
+      ).toMatchObject({ nextClickOffsetMs: 6000 });
+    });
+
     it("shows autoplay running on the server that it did not start, and can pause it", async () => {
       fetchAutoplayState.mockResolvedValue(
         autoplayState({ planId: "from-another-screen", step: 4 }),

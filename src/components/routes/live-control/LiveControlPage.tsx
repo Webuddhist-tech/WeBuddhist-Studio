@@ -44,6 +44,14 @@ import {
   MAX_PLANNED_ROUNDS,
   plannedRoundsStorageKey,
 } from "./plannedRounds";
+import {
+  CUE_OFFSET_MAX_MS,
+  cueAt,
+  normalizeCue,
+  readStoredCue,
+  storeCue,
+  type CueSettings,
+} from "./cueConfig";
 import { passageAt, returnButtonForLine, returnPassages } from "./returnJumps";
 import { usePositionPublisher, type SendMove } from "./usePositionPublisher";
 import { useRecitationSocket } from "./useRecitationSocket";
@@ -343,19 +351,29 @@ const formatPlayTime = (ms: number) => {
 };
 
 /**
- * The live line's hold under autoplay, running down as a bar beneath it, as
- * the autoplay test shows it. It reads the same start and time the autoplay
+ * The live line's time, running down as a bar beneath it, as the autoplay
+ * test shows it. Under autoplay it reads the same start and time the autoplay
  * clock does, so the bar fills the moment the room is moved on. While the
- * clock waits (fresh play times, the yigchung) the bar waits too.
+ * clock waits (fresh play times, the yigchung) the bar waits too. By hand it
+ * runs on the line's learned play time from when the line went out.
+ *
+ * The bar is white, its last stretches coloured by the cue offsets: red for
+ * when to press Next by hand, yellow for when autoplay is about to move the
+ * room on. What is still to come is dimmed, so the bright part is the time
+ * spent. Once this mode's stretch is reached, a badge says so.
  */
 const AutoplayProgress = ({
   startedAt,
   duration,
   running,
+  autoplay,
+  cue,
 }: {
   startedAt: number;
   duration: number;
   running: boolean;
+  autoplay: boolean;
+  cue: CueSettings;
 }) => {
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
@@ -372,22 +390,65 @@ const AutoplayProgress = ({
     return () => cancelAnimationFrame(frame);
   }, [startedAt, duration, running]);
   const progress = duration > 0 ? Math.max(0, elapsed) / duration : 0;
+  const cued =
+    running && duration > 0 && elapsed >= cueAt(duration, cue, autoplay);
+  const share = (ms: number) =>
+    duration > 0 ? Math.min(1, Math.max(0, ms / duration)) : 0;
+  // The wider stretch first, so the narrower one shows on top of it.
+  const zones = [
+    {
+      kind: "next",
+      color: "bg-[#ff453a]",
+      width: share(cue.nextClickOffsetMs),
+    },
+    {
+      kind: "autoplay",
+      color: "bg-[#ffd60a]",
+      width: share(cue.autoplayOffsetMs),
+    },
+  ].sort((a, b) => b.width - a.width);
   return (
     <span
       data-autoplay-progress=""
+      data-cued={cued ? "" : undefined}
       className="mt-1.5 flex items-center gap-2 font-sans"
     >
+      {cued ? (
+        <span
+          data-cue=""
+          className={`shrink-0 animate-pulse rounded-full px-2 py-0.5 text-[11px] leading-none font-bold tracking-wide uppercase ${
+            autoplay ? "bg-[#ffd60a] text-black" : "bg-[#ff453a] text-white"
+          }`}
+        >
+          {autoplay ? "Moving on" : "Next"}
+        </span>
+      ) : null}
       <span
         role="progressbar"
-        aria-label="Autoplay: time spent on this line"
+        aria-label={
+          autoplay
+            ? "Autoplay: time spent on this line"
+            : "Line time: time spent on this line"
+        }
         aria-valuemin={0}
         aria-valuemax={Math.round(duration)}
         aria-valuenow={Math.round(Math.max(0, elapsed))}
-        className="block h-1 flex-1 overflow-hidden rounded-full bg-[#2c2c2e]"
+        className="relative block h-2 flex-1 overflow-hidden rounded-full bg-white"
       >
+        {zones.map((zone) =>
+          zone.width > 0 ? (
+            <span
+              key={zone.kind}
+              data-cue-zone={zone.kind}
+              className={`absolute inset-y-0 right-0 block ${zone.color}`}
+              style={{ width: `${zone.width * 100}%` }}
+            />
+          ) : null,
+        )}
+        {/* The time still to come, dimmed. */}
         <span
-          className="block h-full rounded-full bg-[#30d158]"
-          style={{ width: `${Math.min(1, progress) * 100}%` }}
+          className="absolute inset-y-0 right-0 block bg-black/45"
+          style={{ width: `${(1 - Math.min(1, progress)) * 100}%` }}
         />
       </span>
       <span className="shrink-0 text-[11px] text-[#aeaeb2] tabular-nums">
@@ -577,6 +638,15 @@ const LiveControlPage = () => {
   const [titlesScale, setTitlesScale] = useState(() =>
     readStoredScale(TITLES_SCALE_STORAGE_KEY, LEGACY_TITLES_SCALE_STORAGE_KEY),
   );
+  /** When the time bar cues a move; it suits the operator, so it is kept per
+   * browser like the sizes. Defaults come from cueConfig. */
+  const [cue, setCue] = useState(() => readStoredCue());
+  const [cueOpen, setCueOpen] = useState(false);
+  const changeCue = (change: Partial<CueSettings>) => {
+    const next = normalizeCue({ ...cue, ...change });
+    setCue(next);
+    storeCue(next);
+  };
   const [returnCounts, updateReturnCounts] = useStoredCounts(
     returnCountsStorageKey(eventId),
   );
@@ -2433,6 +2503,15 @@ const LiveControlPage = () => {
                 <span className="max-lg:hidden">Text size</span>
                 {sizePicker("Text size", textScale, changeTextScale)}
               </label>
+              <button
+                type="button"
+                aria-expanded={cueOpen}
+                aria-controls="cue-settings"
+                onClick={() => setCueOpen((open) => !open)}
+                className="shrink-0 rounded-md bg-[#2c2c2e] px-3 py-1.5 text-sm font-semibold whitespace-nowrap hover:bg-[#3a3a3c] max-lg:px-2.5 max-lg:text-[13px]"
+              >
+                Cue
+              </button>
               {/* A phone has little room for this, so the button says less. */}
               <button
                 type="button"
@@ -2449,6 +2528,62 @@ const LiveControlPage = () => {
               </button>
             </div>
           </div>
+
+          {cueOpen ? (
+            <div
+              id="cue-settings"
+              role="group"
+              aria-label="Cue settings"
+              className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border border-[#2c2c2e] bg-[#1c1c1e] p-3 text-sm text-[#8e8e93] max-lg:mt-2"
+            >
+              <label className="flex items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  className="size-2.5 rounded-full bg-[#ff453a]"
+                />
+                Next click
+                <input
+                  type="number"
+                  min={0}
+                  max={CUE_OFFSET_MAX_MS}
+                  step={100}
+                  value={cue.nextClickOffsetMs}
+                  onChange={(e) =>
+                    changeCue({
+                      nextClickOffsetMs: Math.round(Number(e.target.value)),
+                    })
+                  }
+                  className="w-20 rounded-md border border-[#2c2c2e] bg-black px-2 py-1 text-[#f2f2f7] tabular-nums max-lg:text-base"
+                />
+                ms early
+              </label>
+              <label className="flex items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  className="size-2.5 rounded-full bg-[#ffd60a]"
+                />
+                Autoplay
+                <input
+                  type="number"
+                  min={0}
+                  max={CUE_OFFSET_MAX_MS}
+                  step={100}
+                  value={cue.autoplayOffsetMs}
+                  onChange={(e) =>
+                    changeCue({
+                      autoplayOffsetMs: Math.round(Number(e.target.value)),
+                    })
+                  }
+                  className="w-20 rounded-md border border-[#2c2c2e] bg-black px-2 py-1 text-[#f2f2f7] tabular-nums max-lg:text-base"
+                />
+                ms early
+              </label>
+              <p className="w-full text-[12px]">
+                The end of the line's bar is red for the Next-click offset and
+                yellow for the autoplay offset. Kept in this browser.
+              </p>
+            </div>
+          ) : null}
 
           {showTokenBox ? (
             <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-[#2c2c2e] bg-[#1c1c1e] p-3 max-lg:mt-2">
@@ -2648,6 +2783,19 @@ const LiveControlPage = () => {
                             startedAt={lineStartedAt}
                             duration={autoplayStepDuration ?? playTime ?? 0}
                             running={!autoplayBusy}
+                            autoplay
+                            cue={cue}
+                          />
+                        ) : !autoplay &&
+                          index === currentIndex &&
+                          !isYigchung &&
+                          playTime !== undefined ? (
+                          <AutoplayProgress
+                            startedAt={lineStartedAt}
+                            duration={playTime}
+                            running
+                            autoplay={false}
+                            cue={cue}
                           />
                         ) : null}
                       </button>
