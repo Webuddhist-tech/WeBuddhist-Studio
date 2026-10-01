@@ -194,8 +194,9 @@ const GroupEventFormPage = () => {
       eventData.intentions,
       prayerIntentionsQuery.data.intentions,
     );
-    const hydratedValues = { ...form.getValues(), intention_ids: ids };
-    form.reset(hydratedValues);
+    // Update this field's default only — a full reset would treat in-flight edits
+    // as the new baseline and clear isDirty on other fields.
+    form.resetField("intention_ids", { defaultValue: ids });
     if (originalRef.current) {
       originalRef.current = { ...originalRef.current, intention_ids: ids };
     }
