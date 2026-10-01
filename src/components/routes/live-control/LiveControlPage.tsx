@@ -2047,7 +2047,9 @@ const LiveControlPage = () => {
     // same one, is told from one that never landed.
     const heard = serverAutoplayRef.current;
     const atStartedAt =
-      heard?.status === "running" && heard.planId === planId && heard.step === at
+      heard?.status === "running" &&
+      heard.planId === planId &&
+      heard.step === at
         ? heard.stepStartedAtMs
         : undefined;
     plan.pendingSeek = target;

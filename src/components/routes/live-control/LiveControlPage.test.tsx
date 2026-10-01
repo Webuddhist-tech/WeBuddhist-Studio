@@ -1869,10 +1869,9 @@ describe("LiveControlPage", () => {
           screen.getByRole("button", { name: "Instructions" }),
         ).toBeDisabled(),
       );
-      expect(screen.getByRole("button", { name: "Instructions" })).toHaveAttribute(
-        "title",
-        "Nothing in this section is recited",
-      );
+      expect(
+        screen.getByRole("button", { name: "Instructions" }),
+      ).toHaveAttribute("title", "Nothing in this section is recited");
       expect(screen.getByRole("button", { name: "Praises" })).toBeEnabled();
     });
 
