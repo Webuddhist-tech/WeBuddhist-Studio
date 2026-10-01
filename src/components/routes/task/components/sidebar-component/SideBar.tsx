@@ -5,6 +5,7 @@ import { BsThreeDots } from "react-icons/bs";
 import { FiTrash } from "react-icons/fi";
 import { Pecha } from "@/components/ui/shadimport";
 import TaskDeleteDialog from "@/components/ui/molecules/modals/task-delete/TaskDeleteDialog";
+import TaskSettingsDialog from "@/components/ui/molecules/modals/task-settings/TaskSettingsDialog";
 import DayDeleteDialog from "@/components/ui/molecules/modals/day-delete/DayDeleteDialog";
 import DayAudioDialog from "@/components/ui/molecules/modals/day-audio/DayAudioDialog";
 import DayVideosDialog from "@/components/ui/molecules/modals/day-videos/DayVideosDialog";
@@ -420,6 +421,11 @@ const SideBar = ({
                                         }}
                                       >
                                         {task.title}
+                                        {task.settings?.is_live && (
+                                          <span className="ml-2 rounded-sm bg-[#A51C21] px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-white">
+                                            Live
+                                          </span>
+                                        )}
                                       </span>
                                       {isEditable && (
                                         <Pecha.DropdownMenu>
@@ -432,6 +438,19 @@ const SideBar = ({
                                             />
                                           </Pecha.DropdownMenuTrigger>
                                           <Pecha.DropdownMenuContent side="right">
+                                            <Pecha.DropdownMenuItem
+                                              className="gap-2 cursor-pointer"
+                                              onSelect={(e) =>
+                                                e.preventDefault()
+                                              }
+                                            >
+                                              <TaskSettingsDialog
+                                                planId={planId!}
+                                                taskId={task.id}
+                                                settings={task.settings}
+                                                dayTasks={day.tasks}
+                                              />
+                                            </Pecha.DropdownMenuItem>
                                             <Pecha.DropdownMenuItem className="gap-2 cursor-pointer">
                                               <TaskDeleteDialog
                                                 taskId={task.id}
