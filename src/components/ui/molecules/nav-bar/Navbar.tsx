@@ -10,6 +10,7 @@ import {
   IoBook,
   IoBookOutline,
   IoDocumentTextOutline,
+  IoHeartOutline,
   IoChevronBack,
   IoChevronForward,
   IoChevronDown,
@@ -135,6 +136,12 @@ const administrationItems: NavItem[] = [
     label: "Chat Reports",
     path: ROUTES.adminChatReports,
     tooltip: "Chat moderation reports",
+  },
+  {
+    icon: <IoHeartOutline className="w-4 h-4" />,
+    label: "Prayer intentions",
+    path: ROUTES.prayerIntentions,
+    tooltip: "Prayer intentions catalog",
   },
 ];
 

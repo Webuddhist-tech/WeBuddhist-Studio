@@ -41,7 +41,7 @@ export const EVENT_TAB_FIELDS = {
     "group_accumulator_id",
     "group_recitation_collection_id",
   ],
-  settings: ["chat_enabled", "notifications_enabled"],
+  settings: ["chat_enabled", "notifications_enabled", "intention_ids"],
 } as const satisfies Record<EventTabId, readonly (keyof EventFormData)[]>;
 
 export const EVENT_TABS: readonly { id: EventTabId; label: string }[] = [
