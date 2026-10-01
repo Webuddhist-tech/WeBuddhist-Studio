@@ -375,7 +375,16 @@ export interface AutoplayState {
   totalSteps: number;
   /** When the current step went out, on the server's clock. */
   stepStartedAtMs: number | null;
+  /** How long the current step is held, the room's pace already applied. */
   stepDurationMs: number | null;
+  /** The plan is held on its line until it is resumed. */
+  held: boolean;
+  /** When the hold began, on the server's clock. */
+  heldAtMs: number | null;
+  /** The room's pace: every recorded time is scaled by it. Below 1 is faster. */
+  tempo: number;
+  /** How far ahead of its time each line goes to the phones. */
+  leadMs: number;
   /** The server's clock when this was sent, to line it up with this page's. */
   serverTimeMs: number;
 }
@@ -388,6 +397,10 @@ interface AutoplayStateWire {
   total_steps: number;
   step_started_at_ms: number | null;
   step_duration_ms: number | null;
+  held: boolean;
+  held_at_ms: number | null;
+  tempo: number;
+  lead_ms: number;
   server_time_ms: number;
 }
 
@@ -404,23 +417,115 @@ export const toAutoplayState = (data: unknown): AutoplayState | null => {
     totalSteps: wire.total_steps ?? 0,
     stepStartedAtMs: wire.step_started_at_ms ?? null,
     stepDurationMs: wire.step_duration_ms ?? null,
+    held: wire.held === true,
+    heldAtMs: wire.held_at_ms ?? null,
+    tempo: typeof wire.tempo === "number" ? wire.tempo : 1,
+    leadMs: typeof wire.lead_ms === "number" ? wire.lead_ms : 0,
     serverTimeMs: wire.server_time_ms ?? Date.now(),
   };
 };
 
+/**
+ * A command to the plan the backend is running. A hand move is a `seek` to one
+ * of the plan's own steps - nothing is rebuilt or resent - so it reaches the
+ * room as fast as a line does. `expected_step` is the step the operator was
+ * looking at: a press that races the plan's own move on is not applied twice,
+ * and a seek to the step after it teaches the backend the room's pace.
+ */
+export type AutoplayCommand =
+  | { type: "seek"; planId: string; step: number; expectedStep?: number }
+  | { type: "hold"; planId?: string | null }
+  | { type: "resume"; planId?: string | null }
+  | { type: "settings"; leadMs?: number; tempo?: number };
+
+/** The command's fields as the backend reads them, socket and HTTP alike. */
+export const toWireCommand = (command: AutoplayCommand) => {
+  switch (command.type) {
+    case "seek":
+      return {
+        plan_id: command.planId,
+        step: command.step,
+        ...(command.expectedStep === undefined
+          ? {}
+          : { expected_step: command.expectedStep }),
+      };
+    case "hold":
+    case "resume":
+      return command.planId ? { plan_id: command.planId } : {};
+    case "settings":
+      return {
+        ...(command.leadMs === undefined ? {} : { lead_ms: command.leadMs }),
+        ...(command.tempo === undefined ? {} : { tempo: command.tempo }),
+      };
+  }
+};
+
+/** The reasons a command is turned down, in the operator's words. */
+export const commandRefused = (
+  code: unknown,
+  message: unknown,
+  status?: number,
+): string => {
+  if (code === "THROTTLED" || status === 429) {
+    return "The room is taking lines as fast as it can; slow down a little.";
+  }
+  if (code === "NOT_RUNNING" || status === 409) {
+    return "Autoplay is no longer running that plan.";
+  }
+  if (typeof message === "string" && message) return message;
+  return "The server could not do that just now. Try again.";
+};
+
+/** A command by HTTP, for when the socket is not open. */
+export const sendAutoplayCommand = async (
+  eventId: string,
+  token: string,
+  command: AutoplayCommand,
+): Promise<AutoplayResult> => {
+  try {
+    const { data } = await emitClient.post(
+      `/api/v1/events/${encodeURIComponent(eventId)}/recitation/autoplay/${command.type}`,
+      toWireCommand(command),
+      { headers: { "X-Recitation-Token": token } },
+    );
+    const state = toAutoplayState(data);
+    return state
+      ? { ok: true, state }
+      : { ok: false, message: "The server's answer could not be read." };
+  } catch (error) {
+    const status = axios.isAxiosError(error)
+      ? error.response?.status
+      : undefined;
+    if (status === 409 || status === 429) {
+      return { ok: false, message: commandRefused(null, null, status) };
+    }
+    return autoplayFailure(error);
+  }
+};
+
+/**
+ * A command's answer. `lost` marks one that never got an answer - the request
+ * went quiet, or its connection closed - as against one the server turned
+ * down: a lost command may have been carried out.
+ */
 export type AutoplayResult =
   | { ok: true; state: AutoplayState }
-  | { ok: false; message: string };
+  | { ok: false; message: string; lost?: boolean };
 
 const autoplayFailure = (error: unknown): AutoplayResult => {
   const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+  const lost = axios.isAxiosError(error) && !error.response;
   if (status === 503) {
     return {
       ok: false,
       message: "The server could not run autoplay just now. Try again.",
     };
   }
-  return { ok: false, message: emitFailure(status) };
+  return {
+    ok: false,
+    message: emitFailure(status),
+    ...(lost ? { lost: true } : {}),
+  };
 };
 
 /**
