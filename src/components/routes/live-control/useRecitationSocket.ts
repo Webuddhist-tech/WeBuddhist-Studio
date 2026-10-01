@@ -132,6 +132,7 @@ export function useRecitationSocket(
         window.clearTimeout(timer);
         resolve({
           ok: false,
+          lost: true,
           message: result.ok
             ? "Lost the connection to the server."
             : result.message,
@@ -386,6 +387,7 @@ export function useRecitationSocket(
           commandsRef.current.delete(commandId);
           resolve({
             ok: false,
+            lost: true,
             message: "The server did not answer in time. Try again.",
           });
         }, MOVE_ACK_TIMEOUT_MS);

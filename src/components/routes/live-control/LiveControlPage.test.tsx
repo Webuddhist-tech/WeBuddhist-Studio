@@ -3019,6 +3019,110 @@ describe("LiveControlPage", () => {
       expect(sendAutoplayCommand).not.toHaveBeenCalled();
     });
 
+    it("builds a hand move's plan on a time the room has just taught, not the ones on hand", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue({
+        "root-s1": 1200,
+        "root-s2": 900,
+      });
+      const user = await openForAutoplay();
+      // Line 1 recited through: the move off it teaches the backend a time.
+      await user.click(screen.getByRole("button", { name: "Next →" }));
+      await user.click(screen.getByRole("button", { name: "Next →" }));
+      await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(2));
+      await act(async () => {});
+      let answer: (read: Record<string, number>) => void = () => {};
+      fetchSegmentPlayTimes.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            answer = resolve;
+          }),
+      );
+
+      // A line picked while the times are still being read.
+      await user.click(autoButton());
+      await user.click(screen.getByRole("button", { name: /root line 1/ }));
+      await act(async () => answer(times));
+
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+      // Line 3 is timed now: the plan runs through it rather than stopping.
+      expect(planSent().map((step) => step.durationMs)).toEqual([
+        1200, 900, 700,
+      ]);
+    });
+
+    /** A socket on which every command's answer is lost. */
+    const loseAnswers = () => {
+      const viaSocket = vi.fn<RecitationSocket["sendCommand"]>(async () => ({
+        ok: false,
+        lost: true,
+        message: "The server did not answer in time. Try again.",
+      }));
+      act(() => socketStore.set({ status: "open", sendCommand: viaSocket }));
+      return viaSocket;
+    };
+
+    it("follows a seek the backend made though its answer was lost, with no plan of its own", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue(times);
+      const viaSocket = loseAnswers();
+      const user = await openForAutoplay();
+      await user.click(autoButton());
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+      fetchAutoplayState.mockClear();
+      fetchAutoplayState.mockResolvedValue(
+        autoplayState({ planId: "plan-1", step: 2, stepStartedAtMs: 5_000 }),
+      );
+
+      await user.click(screen.getByRole("button", { name: /root line 3/ }));
+
+      await waitFor(() => expect(fetchAutoplayState).toHaveBeenCalledTimes(1));
+      await act(async () => {});
+      expect(viaSocket).toHaveBeenCalledTimes(1);
+      expect(startAutoplay).toHaveBeenCalledTimes(1);
+      expect(screen.getByText(/line 3\/3/)).toBeInTheDocument();
+    });
+
+    it("does not send the room's own line again once the backend shows it went out", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue(times);
+      const viaSocket = loseAnswers();
+      const user = await openForAutoplay();
+      await user.click(autoButton());
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+      fetchAutoplayState.mockClear();
+      // The same step, gone out again: only its start tells the seek landed.
+      fetchAutoplayState.mockResolvedValue(
+        autoplayState({ planId: "plan-1", step: 0, stepStartedAtMs: 5_000 }),
+      );
+
+      await user.click(screen.getByRole("button", { name: /root line 1/ }));
+
+      await waitFor(() => expect(fetchAutoplayState).toHaveBeenCalledTimes(1));
+      await act(async () => {});
+      expect(viaSocket).toHaveBeenCalledTimes(1);
+      expect(viaSocket).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "seek", step: 0, expectedStep: 0 }),
+      );
+      expect(startAutoplay).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps the running plan when a lost seek's outcome cannot be read", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue(times);
+      const viaSocket = loseAnswers();
+      const user = await openForAutoplay();
+      await user.click(autoButton());
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+
+      await user.click(screen.getByRole("button", { name: /root line 3/ }));
+
+      // Sent once more - the backend makes a seek forward only once - and then
+      // left to the backend's next word, not replaced by a plan of its own.
+      expect(
+        await screen.findByText(/The server did not answer in time/),
+      ).toBeInTheDocument();
+      expect(viaSocket).toHaveBeenCalledTimes(2);
+      expect(startAutoplay).toHaveBeenCalledTimes(1);
+      expect(pauseButton()).toBeInTheDocument();
+    });
+
     it("holds the room on its line, and lets it go on", async () => {
       fetchSegmentPlayTimes.mockResolvedValue(times);
       const user = await openForAutoplay();

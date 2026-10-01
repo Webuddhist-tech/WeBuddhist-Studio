@@ -332,7 +332,26 @@ describe("useRecitationSocket", () => {
     const answer = result.current.sendCommand({ type: "resume" });
     act(() => latest().drop());
 
-    await expect(answer).resolves.toMatchObject({ ok: false });
+    await expect(answer).resolves.toMatchObject({ ok: false, lost: true });
+  });
+
+  it("gives an autoplay command up as lost when the server does not answer in time", async () => {
+    vi.useFakeTimers();
+    const { result } = renderHook(() => useRecitationSocket("e1", "tok"));
+    act(() => latest().accept());
+
+    const answer = result.current.sendCommand({
+      type: "seek",
+      planId: "p1",
+      step: 2,
+      expectedStep: 1,
+    });
+    act(() => {
+      vi.advanceTimersByTime(MOVE_ACK_TIMEOUT_MS + 1);
+    });
+
+    // It may still have been carried out: not the same as one turned down.
+    await expect(answer).resolves.toMatchObject({ ok: false, lost: true });
   });
 
   it("does not send a command over a socket that is not open", () => {

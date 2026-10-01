@@ -1092,15 +1092,42 @@ const LiveControlPage = () => {
     retry: false,
     staleTime: 1000 * 60 * 20,
   });
+  /**
+   * Timed moves the room has taken, and how many of them the play times last
+   * read set out after: fewer, and the backend has a time this page lacks.
+   */
+  const timedMovesRef = useRef(0);
+  const timedMovesReadRef = useRef(0);
   // How long each line of the edition on screen takes to recite, learned by the
   // backend from earlier pujas: what autoplay paces the room by.
   const { data: playTimes, refetch: refetchPlayTimes } = useQuery({
     queryKey: ["live-control-play-times", driverTextId],
-    queryFn: () => fetchSegmentPlayTimes(driverTextId),
+    queryFn: async () => {
+      const timedMoves = timedMovesRef.current;
+      const times = await fetchSegmentPlayTimes(driverTextId);
+      timedMovesReadRef.current = Math.max(
+        timedMovesReadRef.current,
+        timedMoves,
+      );
+      return times;
+    },
     enabled: Boolean(driverTextId),
     refetchOnWindowFocus: false,
     retry: false,
   });
+  /**
+   * The play times as the backend has them now. A read already on its way is
+   * joined, and made once more if it set out before the room's last timed
+   * move: the time that move taught would not be in it.
+   */
+  const readPlayTimes = async () => {
+    const timedMoves = timedMovesRef.current;
+    const read = await refetchPlayTimes({ cancelRefetch: false }).catch(
+      () => null,
+    );
+    if (timedMovesReadRef.current >= timedMoves) return read;
+    return refetchPlayTimes({ cancelRefetch: false }).catch(() => null);
+  };
   /**
    * A timed move the room took has taught the backend how long the line before
    * it was held, so the times are read again - once the operator pauses, not on
@@ -1308,7 +1335,10 @@ const LiveControlPage = () => {
     const taken = cueMoveRef.current.get(cue);
     // Only a move carrying how long the last line was held teaches the backend
     // anything; autoplay's own moves never carry it.
-    if (cue.elapsedMs !== undefined && !cue.autoplay) refreshPlayTimesSoon();
+    if (cue.elapsedMs !== undefined && !cue.autoplay) {
+      timedMovesRef.current += 1;
+      refreshPlayTimesSoon();
+    }
     const passage = passageAt(passages, cue.index);
     if (!passage) return;
     // Sent before the count was reset: the reset stands.
@@ -1839,13 +1869,16 @@ const LiveControlPage = () => {
     autoplayRef.current = true;
     setAutoplayBusy(true);
     setAutoplayNote(null);
-    // Times learned since the page opened count too. A hand move does not wait
-    // for them: the room is waiting on it. Its plan goes out on the times on
-    // hand and is rebuilt below if the fresh ones turn out different.
-    const refreshed = refetchPlayTimes({ cancelRefetch: false }).catch(
-      () => null,
-    );
-    const fresh = byHand ? null : await refreshed;
+    // Times learned since the page opened count too. A hand move goes out at
+    // once on the times on hand while they are the backend's: the room is
+    // waiting on it. They are read first when the room has timed a line since
+    // they were read, or the move takes over a plan made elsewhere: built
+    // without the newer times, the plan would run at the wrong pace, or stop
+    // at a line that has one - before any later fix could reach it.
+    const timesOnHandCurrent =
+      timedMovesReadRef.current >= timedMovesRef.current &&
+      !remoteAutoplayRef.current;
+    const fresh = byHand && timesOnHandCurrent ? null : await readPlayTimes();
     if (handOverId !== autoplayStartRef.current) return;
     const plan = buildPlan(from, round, fresh?.data ?? playTimes ?? {});
     if (plan.noTimeAt === from && keepFirstFor === undefined && !byHand) {
@@ -1938,22 +1971,6 @@ const LiveControlPage = () => {
     planRef.current = { ...plan, planId: started.state.planId };
     // Followed by the newest render's hand: this one's counts may be stale.
     followAutoplayRef.current(started.state);
-    if (!byHand) return;
-    // The hand move went out on the times on hand. Once the fresh ones are in,
-    // a line they time differently - or time at all, where the plan stopped -
-    // is the plan rebuilt from where the room is, at the pace now known.
-    const latest = (await refreshed)?.data;
-    if (!latest || handOverId !== autoplayStartRef.current) return;
-    if (planRef.current?.planId !== started.state.planId) return;
-    const outdated = plan.steps.some((step) => {
-      const time = latest[driverLines[step.lineIndex]?.id ?? ""];
-      const durationMs =
-        time === undefined
-          ? MIN_PLAN_STEP_MS
-          : Math.min(MAX_PLAN_STEP_MS, Math.max(MIN_PLAN_STEP_MS, time));
-      return durationMs !== step.durationMs;
-    });
-    if (outdated) replanRef.current();
   };
   /**
    * A command to the backend's autoplay: over the socket when it is open, by
@@ -2003,6 +2020,14 @@ const LiveControlPage = () => {
     const step = plan.steps[target];
     const planId = plan.planId;
     if (!step || !planId) return;
+    // When the room's step went out, as last heard. A seek that lands sends its
+    // line out again, so this is how one back to an earlier step, or to the
+    // same one, is told from one that never landed.
+    const heard = serverAutoplayRef.current;
+    const atStartedAt =
+      heard?.status === "running" && heard.planId === planId && heard.step === at
+        ? heard.stepStartedAtMs
+        : undefined;
     plan.pendingSeek = target;
     plan.lastStep = target;
     const now = performance.now();
@@ -2036,20 +2061,42 @@ const LiveControlPage = () => {
         eventId && token ? await fetchAutoplayState(eventId, token) : null;
       if (planRef.current !== plan || plan.pendingSeek !== target) return;
       plan.pendingSeek = undefined;
+      if (!now && result.lost) {
+        // No answer, and no word of where the room is: the seek may have
+        // landed, so the plan is not replaced. A seek forward is sent once
+        // more - the backend makes it only if the room has not reached that
+        // step - and otherwise the backend's next word says where the room is.
+        if (target > at && !retried) {
+          seekTo(plan, at, target, true);
+          return;
+        }
+        plan.lastStep = undefined;
+        setAutoplayNote(result.message);
+        return;
+      }
       const stillRunning = now?.status === "running" && now.planId === planId;
       // Still where it was: the seek never landed, and is sent once more.
-      if (stillRunning && now.step === at && !retried) {
+      const unmoved =
+        stillRunning &&
+        now.step === at &&
+        (target > at ||
+          atStartedAt === undefined ||
+          now.stepStartedAtMs === atStartedAt);
+      if (unmoved && !retried) {
         seekTo(plan, at, target, true);
         return;
       }
-      // Landed, or the plan has moved on by itself: it is followed as is.
-      if (stillRunning && now.step !== at) {
+      // Landed, or the plan has moved on by itself: it is followed as is, even
+      // where that is short of the step the screen went to.
+      if (stillRunning && !unmoved) {
+        plan.lastStep = undefined;
         followAutoplayRef.current(now);
         if (now.step !== target) setAutoplayNote(result.message);
         return;
       }
-      // Turned down: the plan is not the one running any more. The line the
-      // operator chose still goes to the room, in a plan of its own.
+      // Turned down: the plan is not the one running any more, or would not
+      // take the seek twice. The line the operator chose still goes to the
+      // room, in a plan of its own.
       setAutoplayNote(result.message);
       void handOver(step.lineIndex, step.round, undefined, true);
     });

@@ -503,19 +503,29 @@ export const sendAutoplayCommand = async (
   }
 };
 
+/**
+ * A command's answer. `lost` marks one that never got an answer - the request
+ * went quiet, or its connection closed - as against one the server turned
+ * down: a lost command may have been carried out.
+ */
 export type AutoplayResult =
   | { ok: true; state: AutoplayState }
-  | { ok: false; message: string };
+  | { ok: false; message: string; lost?: boolean };
 
 const autoplayFailure = (error: unknown): AutoplayResult => {
   const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+  const lost = axios.isAxiosError(error) && !error.response;
   if (status === 503) {
     return {
       ok: false,
       message: "The server could not run autoplay just now. Try again.",
     };
   }
-  return { ok: false, message: emitFailure(status) };
+  return {
+    ok: false,
+    message: emitFailure(status),
+    ...(lost ? { lost: true } : {}),
+  };
 };
 
 /**
