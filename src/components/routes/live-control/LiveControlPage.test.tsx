@@ -1876,6 +1876,35 @@ describe("LiveControlPage", () => {
       expect(screen.getByRole("button", { name: "Praises" })).toBeEnabled();
     });
 
+    it("does not send the next section's line when both begin on the same instruction", async () => {
+      const user = userEvent.setup();
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      // Praises begins partway through line 2, so both are anchored to it.
+      fetchEditionSections.mockResolvedValue([
+        { id: "s1", title: "Going for Refuge", depth: 0, segmentId: "root-s1" },
+        { id: "s2", title: "Instructions", depth: 0, segmentId: "root-s2" },
+        { id: "s3", title: "Praises", depth: 0, segmentId: "root-s2" },
+      ]);
+      fetchEditionYigchungs.mockImplementation(secondLineYigchung);
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+      await waitFor(() =>
+        expect(
+          screen.getByRole("button", { name: "Instructions" }),
+        ).toBeDisabled(),
+      );
+      await user.click(screen.getByRole("button", { name: "Praises" }));
+      await waitFor(() =>
+        expect(publishPosition).toHaveBeenCalledWith(
+          "e1",
+          "tok-123",
+          expect.objectContaining({ segmentId: "root-s3", index: 2 }),
+          expect.any(String),
+        ),
+      );
+    });
+
     it("goes on to the first subsection of a section that opens on instruction", async () => {
       const user = userEvent.setup();
       localStorage.setItem("recitation_emit_token", "tok-123");

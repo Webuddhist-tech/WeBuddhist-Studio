@@ -1254,6 +1254,8 @@ const LiveControlPage = () => {
   /**
    * The last line each section covers, its subsections included: the line
    * before the next section that is not nested in it, or the last of the text.
+   * One that begins on this section's own first line leaves it no line after
+   * that one: sections do not overlap, so the rest of the line is the next one's.
    */
   const sectionReach = useMemo(() => {
     const ends = new Map<string, number>();
@@ -1263,7 +1265,8 @@ const LiveControlPage = () => {
         .slice(position + 1)
         .find(
           (later) =>
-            later.depth <= section.depth && later.lineIndex > section.lineIndex,
+            later.depth <= section.depth &&
+            later.lineIndex >= section.lineIndex,
         );
       ends.set(section.id, (after?.lineIndex ?? driverLines.length) - 1);
     });
