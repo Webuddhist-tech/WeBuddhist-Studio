@@ -13,9 +13,15 @@ export function useImageUploadDraft({
   onCropComplete,
   isExternallyBusy = false,
 }: UseImageUploadDraftOptions = {}) {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFile, setSelectedFileState] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isCropOpen, setIsCropOpen] = useState(false);
+
+  // Picking a new file opens the cropper right away.
+  const setSelectedFile = (file: File | null) => {
+    setSelectedFileState(file);
+    setIsCropOpen(!!file);
+  };
   const [isUploading, setIsUploading] = useState(false);
   const uploadLockRef = useRef(false);
 
@@ -37,7 +43,7 @@ export function useImageUploadDraft({
       selectedFile?.name || "cropped.jpg",
       { type: "image/jpeg" },
     );
-    setSelectedFile(croppedFile);
+    setSelectedFileState(croppedFile);
     setIsCropOpen(false);
     onCropComplete?.(croppedFile);
   };

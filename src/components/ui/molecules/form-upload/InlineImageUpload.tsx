@@ -21,7 +21,7 @@ const InlineImageUpload = ({ onUpload }: InlineImageUploadProps) => {
   } = useImageUploadDraft({ onUpload });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 min-w-0 w-full">
       {isCropOpen && selectedFile ? (
         <ImageCropContent
           imageSrc={previewUrl!}
@@ -53,13 +53,13 @@ const InlineImageUpload = ({ onUpload }: InlineImageUploadProps) => {
               )}
             </Dropzone>
           ) : (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 min-w-0">
               {/* Preview */}
               <div className="rounded-lg border border-gray-200 overflow-hidden bg-gray-50">
                 <img
                   src={previewUrl!}
                   alt="preview"
-                  className="w-full h-48 object-cover"
+                  className="w-full max-h-72 object-contain"
                 />
               </div>
 
@@ -70,14 +70,6 @@ const InlineImageUpload = ({ onUpload }: InlineImageUploadProps) => {
                 </p>
 
                 <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={() => setIsCropOpen(true)}
-                    className="bg-[#A51C21] text-white hover:bg-[#A51C21]/90 transition-colors"
-                    disabled={uploadUiBusy}
-                  >
-                    Crop
-                  </Button>
 
                   <Button
                     size="sm"
