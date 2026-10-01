@@ -1838,9 +1838,28 @@ const LiveControlPage = () => {
       void pauseAutoplay();
       return;
     }
-    const from = currentIndex < 0 ? landingFrom(-1, 1) : currentIndex;
-    if (from < 0 || from >= driverLines.length) return;
-    void handOver(from, undefined);
+    if (currentIndex < 0) {
+      const first = landingFrom(-1, 1);
+      if (first < 0 || first >= driverLines.length) return;
+      void handOver(first, undefined);
+      return;
+    }
+    // The line on screen has been recited already: autoplay takes the room on
+    // from the line after it, the way the plan itself would - a Return under
+    // it taken while rounds are left, else the next line said aloud.
+    const returnTo = returnsReachedFrom(currentIndex).find(
+      (button) => plannedRoundsOf(button.key) - roundOf(button.key) > 0,
+    );
+    if (returnTo) {
+      void handOver(returnTo.index, roundOf(returnTo.key) + 1);
+      return;
+    }
+    const next = landingFrom(currentIndex, 1);
+    if (next === currentIndex) {
+      setAutoplayNote("Autoplay has nothing to play: this is the last line.");
+      return;
+    }
+    void handOver(next, undefined);
   };
 
   // Space / right / down advance, left / up go back: the operator drives without
@@ -2545,17 +2564,17 @@ const LiveControlPage = () => {
                 <input
                   type="number"
                   min={0}
-                  max={CUE_OFFSET_MAX_MS}
-                  step={100}
-                  value={cue.nextClickOffsetMs}
+                  max={CUE_OFFSET_MAX_MS / 1000}
+                  step={0.1}
+                  value={cue.nextClickOffsetMs / 1000}
                   onChange={(e) =>
                     changeCue({
-                      nextClickOffsetMs: Math.round(Number(e.target.value)),
+                      nextClickOffsetMs: Math.round(Number(e.target.value) * 1000),
                     })
                   }
                   className="w-20 rounded-md border border-[#2c2c2e] bg-black px-2 py-1 text-[#f2f2f7] tabular-nums max-lg:text-base"
                 />
-                ms early
+                s early
               </label>
               <label className="flex items-center gap-2">
                 <span
@@ -2566,17 +2585,17 @@ const LiveControlPage = () => {
                 <input
                   type="number"
                   min={0}
-                  max={CUE_OFFSET_MAX_MS}
-                  step={100}
-                  value={cue.autoplayOffsetMs}
+                  max={CUE_OFFSET_MAX_MS / 1000}
+                  step={0.1}
+                  value={cue.autoplayOffsetMs / 1000}
                   onChange={(e) =>
                     changeCue({
-                      autoplayOffsetMs: Math.round(Number(e.target.value)),
+                      autoplayOffsetMs: Math.round(Number(e.target.value) * 1000),
                     })
                   }
                   className="w-20 rounded-md border border-[#2c2c2e] bg-black px-2 py-1 text-[#f2f2f7] tabular-nums max-lg:text-base"
                 />
-                ms early
+                s early
               </label>
               <p className="w-full text-[12px]">
                 The end of the line's bar is red for the Next-click offset and

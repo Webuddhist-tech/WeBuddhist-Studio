@@ -2587,6 +2587,20 @@ describe("LiveControlPage", () => {
       expect(autoButton()).toBeInTheDocument();
     });
 
+    it("starts from the line after the one on screen, not that line again", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue(times);
+      const user = await openForAutoplay();
+      await user.click(screen.getByText("root line 1"));
+      await waitFor(() => expect(publishPosition).toHaveBeenCalled());
+
+      await user.click(autoButton());
+
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+      expect(
+        planSent().map((step) => step.positions.map((p) => p.segmentId)),
+      ).toEqual([["root-s2"], ["root-s3"]]);
+    });
+
     it("will not start on a line with no recorded time", async () => {
       fetchSegmentPlayTimes.mockResolvedValue({});
       const user = await openForAutoplay();
@@ -2833,7 +2847,7 @@ describe("LiveControlPage", () => {
       await user.click(screen.getByRole("button", { name: "Cue" }));
       const next = screen.getByRole("spinbutton", { name: /Next click/ });
       await user.clear(next);
-      await user.type(next, "6000");
+      await user.type(next, "6");
       expect(zone("next")).toBe("10%");
       expect(
         JSON.parse(localStorage.getItem("live-control-cue") ?? "{}"),
