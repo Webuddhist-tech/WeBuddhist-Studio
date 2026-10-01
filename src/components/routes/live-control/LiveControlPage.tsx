@@ -1251,13 +1251,35 @@ const LiveControlPage = () => {
     return last;
   };
 
+  /**
+   * The last line each section covers, its subsections included: the line
+   * before the next section that is not nested in it, or the last of the text.
+   */
+  const sectionReach = useMemo(() => {
+    const ends = new Map<string, number>();
+    sections.forEach((section, position) => {
+      if (section.lineIndex < 0) return;
+      const after = sections
+        .slice(position + 1)
+        .find(
+          (later) =>
+            later.depth <= section.depth && later.lineIndex > section.lineIndex,
+        );
+      ends.set(section.id, (after?.lineIndex ?? driverLines.length) - 1);
+    });
+    return ends;
+  }, [sections, driverLines.length]);
+
   /** Where a section's title takes the room: its first line, or the first line
-   * after it that is recited when it opens on yigchung. -1 when nothing from
-   * there on is recited: the instruction is never sent to the room. */
-  const sectionLandingLine = (lineIndex: number) => {
+   * after it that is recited when it opens on yigchung - never past the section
+   * itself. -1 when nothing in it is recited: neither the instruction nor the
+   * next section's opening line is sent to the room. */
+  const sectionLandingLine = (section: TocEntry & { lineIndex: number }) => {
+    const { lineIndex } = section;
     if (lineIndex < 0 || !isYigchungLine(lineIndex)) return lineIndex;
     const next = landingFrom(lineIndex - 1, 1);
-    return next === lineIndex - 1 ? -1 : next;
+    const end = sectionReach.get(section.id) ?? lineIndex;
+    return next > lineIndex && next <= end ? next : -1;
   };
 
   // Keep the live section in view, as the line list does: a long outline scrolls
@@ -1869,16 +1891,13 @@ const LiveControlPage = () => {
     autoplayRef.current = true;
     setAutoplayBusy(true);
     setAutoplayNote(null);
-    // Times learned since the page opened count too. A hand move goes out at
-    // once on the times on hand while they are the backend's: the room is
-    // waiting on it. They are read first when the room has timed a line since
-    // they were read, or the move takes over a plan made elsewhere: built
-    // without the newer times, the plan would run at the wrong pace, or stop
-    // at a line that has one - before any later fix could reach it.
-    const timesOnHandCurrent =
-      timedMovesReadRef.current >= timedMovesRef.current &&
-      !remoteAutoplayRef.current;
-    const fresh = byHand && timesOnHandCurrent ? null : await readPlayTimes();
+    // The times are read before every plan, a hand move's too. Other
+    // controllers, here and at other pujas of this text, teach the backend
+    // times this page never hears of: built on the ones on hand, the plan
+    // could run at the wrong pace, or stop at a line that now has one - before
+    // any later fix could reach it. A hand move the running plan holds is a
+    // seek, and does not come here.
+    const fresh = await readPlayTimes();
     if (handOverId !== autoplayStartRef.current) return;
     const plan = buildPlan(from, round, fresh?.data ?? playTimes ?? {});
     if (plan.noTimeAt === from && keepFirstFor === undefined && !byHand) {
@@ -2693,7 +2712,7 @@ const LiveControlPage = () => {
               <div ref={sectionListRef}>
                 {sections.map((section) => {
                   const isActive = section.id === activeSectionId;
-                  const landing = sectionLandingLine(section.lineIndex);
+                  const landing = sectionLandingLine(section);
                   const reachable = landing >= 0;
                   const resumeAt = resumeLineFor(section);
                   return (

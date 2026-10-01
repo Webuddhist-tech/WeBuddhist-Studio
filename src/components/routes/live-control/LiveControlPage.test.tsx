@@ -1840,6 +1840,72 @@ describe("LiveControlPage", () => {
       );
     });
 
+    /** Line 2 of the text is instruction from end to end. */
+    const secondLineYigchung = async (textId: string) =>
+      textId === "root"
+        ? {
+            "root-s2": {
+              full: true,
+              ranges: [{ start: 0, end: 11 }],
+              length: 11,
+            },
+          }
+        : {};
+
+    it("does not send the next section's line for a section of instruction alone", async () => {
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      fetchEditionSections.mockResolvedValue([
+        { id: "s1", title: "Going for Refuge", depth: 0, segmentId: "root-s1" },
+        { id: "s2", title: "Instructions", depth: 0, segmentId: "root-s2" },
+        { id: "s3", title: "Praises", depth: 0, segmentId: "root-s3" },
+      ]);
+      fetchEditionYigchungs.mockImplementation(secondLineYigchung);
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+      // Line 3 is recited, but it is Praises', not this section's.
+      await waitFor(() =>
+        expect(
+          screen.getByRole("button", { name: "Instructions" }),
+        ).toBeDisabled(),
+      );
+      expect(screen.getByRole("button", { name: "Instructions" })).toHaveAttribute(
+        "title",
+        "Nothing in this section is recited",
+      );
+      expect(screen.getByRole("button", { name: "Praises" })).toBeEnabled();
+    });
+
+    it("goes on to the first subsection of a section that opens on instruction", async () => {
+      const user = userEvent.setup();
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      fetchEditionSections.mockResolvedValue([
+        { id: "s1", title: "Going for Refuge", depth: 0, segmentId: "root-s1" },
+        { id: "s2", title: "Praises", depth: 0, segmentId: "root-s2" },
+        { id: "s3", title: "First praise", depth: 1, segmentId: "root-s3" },
+      ]);
+      fetchEditionYigchungs.mockImplementation(secondLineYigchung);
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+      await waitFor(() =>
+        expect(
+          document.querySelector('[data-line="1"][data-yigchung]'),
+        ).not.toBeNull(),
+      );
+
+      // Its subsection is part of it: there is something to recite after all.
+      await user.click(screen.getByRole("button", { name: "Praises" }));
+
+      await waitFor(() =>
+        expect(publishPosition).toHaveBeenCalledWith(
+          "e1",
+          "tok-123",
+          expect.objectContaining({ segmentId: "root-s3", index: 2 }),
+          expect.any(String),
+        ),
+      );
+    });
+
     it("marks the section the recitation has reached", async () => {
       const user = userEvent.setup();
       fetchEditionSections.mockResolvedValue(outline);
@@ -3017,6 +3083,29 @@ describe("LiveControlPage", () => {
       await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(2));
       expect(planSent(1)[0].positions[0].segmentId).toBe("root-s1");
       expect(sendAutoplayCommand).not.toHaveBeenCalled();
+    });
+
+    it("reads the times again for a hand move's plan, though this page timed nothing", async () => {
+      fetchSegmentPlayTimes.mockResolvedValue({
+        "root-s1": 1200,
+        "root-s2": 900,
+      });
+      const user = await openForAutoplay();
+      // Started from line 1: the plan runs from line 2, and line 1 is not in it.
+      await user.click(screen.getByText("root line 1"));
+      await waitFor(() => expect(publishPosition).toHaveBeenCalled());
+      await user.click(autoButton());
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+      // Another controller has since taught the backend line 3's time.
+      fetchSegmentPlayTimes.mockResolvedValue(times);
+
+      await user.click(screen.getByRole("button", { name: /root line 1/ }));
+
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(2));
+      // Line 3 is timed now: the plan runs through it rather than stopping.
+      expect(planSent(1).map((step) => step.durationMs)).toEqual([
+        1200, 900, 700,
+      ]);
     });
 
     it("builds a hand move's plan on a time the room has just taught, not the ones on hand", async () => {
