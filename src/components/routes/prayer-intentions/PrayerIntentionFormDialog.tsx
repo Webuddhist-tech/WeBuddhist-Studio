@@ -47,7 +47,7 @@ const PrayerIntentionFormDialog = ({
     const trimmedLabel = label.trim();
     const trimmedDescription = description.trim();
     const trimmedColor = color.trim();
-    const parsedOrder = Number(displayOrder.trim());
+    const trimmedOrder = displayOrder.trim();
 
     if (!trimmedLabel) {
       toast.error("Label is required");
@@ -61,6 +61,11 @@ const PrayerIntentionFormDialog = ({
       toast.error("Color is required");
       return;
     }
+    if (!trimmedOrder) {
+      toast.error("Display order is required");
+      return;
+    }
+    const parsedOrder = Number(trimmedOrder);
     if (!Number.isFinite(parsedOrder)) {
       toast.error("Display order must be a number");
       return;

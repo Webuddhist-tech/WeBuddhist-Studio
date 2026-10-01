@@ -85,4 +85,17 @@ describe("PrayerIntentionFormDialog", () => {
     expect(onSubmit).not.toHaveBeenCalled();
     expect(toast.error).toHaveBeenCalledWith("Label is required");
   });
+
+  it("does not submit when display order is cleared", async () => {
+    const onSubmit = renderDialog(null);
+
+    await userEvent.type(screen.getByLabelText("Slug"), "healing");
+    await userEvent.type(screen.getByLabelText("Label"), "Healing");
+    await userEvent.type(screen.getByLabelText("Description"), "Recovery");
+    await userEvent.clear(screen.getByLabelText("Display order"));
+    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledWith("Display order is required");
+  });
 });

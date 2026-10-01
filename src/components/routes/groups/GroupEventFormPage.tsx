@@ -194,7 +194,8 @@ const GroupEventFormPage = () => {
       eventData.intentions,
       prayerIntentionsQuery.data.intentions,
     );
-    form.setValue("intention_ids", ids);
+    const hydratedValues = { ...form.getValues(), intention_ids: ids };
+    form.reset(hydratedValues);
     if (originalRef.current) {
       originalRef.current = { ...originalRef.current, intention_ids: ids };
     }
