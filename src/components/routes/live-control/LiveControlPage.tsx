@@ -1094,6 +1094,14 @@ const LiveControlPage = () => {
     return last;
   };
 
+  /** Where a section's title takes the room: its first line, or the first line
+   * after it that is recited when it opens on yigchung. */
+  const sectionLandingLine = (lineIndex: number) => {
+    if (!isYigchungLine(lineIndex)) return lineIndex;
+    const next = landingFrom(lineIndex - 1, 1);
+    return next === lineIndex - 1 ? lineIndex : next;
+  };
+
   // Keep the live section in view, as the line list does: a long outline scrolls
   // past the operator's place otherwise. An element in a folded panel has no box
   // to scroll, so every move made while the titles were away was a no-op:
@@ -1317,8 +1325,12 @@ const LiveControlPage = () => {
       }
       const now = performance.now();
       const held = heldLineRef.current;
+      // Sent only while the operator has play times recorded: without it the
+      // backend leaves the line's stored time as it is.
       const elapsedMs =
-        held && !held.byAutoplay ? Math.round(now - held.enteredAt) : undefined;
+        cue.recordPlayTimes && held && !held.byAutoplay
+          ? Math.round(now - held.enteredAt)
+          : undefined;
       // The line left, row for row in each edition, when this move follows on
       // from it: the backend then times it even though the move is not a step
       // to the very next line.
@@ -1350,7 +1362,15 @@ const LiveControlPage = () => {
           : cues,
       );
     },
-    [driverLines, driverTextId, linesByRow, followsOn, publish, cuesForLine],
+    [
+      driverLines,
+      driverTextId,
+      linesByRow,
+      followsOn,
+      publish,
+      cuesForLine,
+      cue.recordPlayTimes,
+    ],
   );
 
   // An edition followed from the start, or ticked mid-liturgy, is fetched in
@@ -2253,7 +2273,7 @@ const LiveControlPage = () => {
                         disabled={!reachable}
                         title={reachable ? undefined : "No segment to go to"}
                         onClick={() => {
-                          goTo(section.lineIndex);
+                          goTo(sectionLandingLine(section.lineIndex));
                         }}
                         // Outlines nest deeply - six levels is ordinary - so the
                         // indent stops after three and the titles keep their width.
@@ -2597,8 +2617,20 @@ const LiveControlPage = () => {
                 />
                 s early
               </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={cue.recordPlayTimes}
+                  onChange={(e) =>
+                    changeCue({ recordPlayTimes: e.target.checked })
+                  }
+                  className="size-4 accent-[#e5231c]"
+                />
+                Record play times
+              </label>
               <p className="w-full text-[12px]">
-                The end of the line's bar is red for the Next-click offset and
+                With Record play times off, moves by hand send no time and the
+                stored play times are left as they are. The end of the line's bar is red for the Next-click offset and
                 yellow for the autoplay offset. Kept in this browser.
               </p>
             </div>
@@ -2791,6 +2823,14 @@ const LiveControlPage = () => {
                               : formatPlayTime(playTime)}
                           </span>
                         ) : null}
+                        {/* The line's ref, as autoplay's notes name it. */}
+                        <span
+                          data-line-ref={index + 1}
+                          aria-hidden="true"
+                          className="mr-2 align-[0.15em] font-sans text-[11px] text-[#636366] tabular-nums select-none"
+                        >
+                          {index + 1}
+                        </span>
                         <LineContent
                           content={segment.content}
                           yigchung={yigchung}

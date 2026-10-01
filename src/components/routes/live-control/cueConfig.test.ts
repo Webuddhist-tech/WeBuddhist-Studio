@@ -32,7 +32,11 @@ describe("cueConfig", () => {
     ).toEqual({
       nextClickOffsetMs: 0,
       autoplayOffsetMs: CUE_DEFAULTS.autoplayOffsetMs,
+      recordPlayTimes: true,
     });
+    expect(normalizeCue({ recordPlayTimes: false }).recordPlayTimes).toBe(
+      false,
+    );
   });
 
   it("reads back what was stored, and the defaults when nothing was", () => {

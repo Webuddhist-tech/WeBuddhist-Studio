@@ -826,6 +826,34 @@ describe("LiveControlPage", () => {
     });
   });
 
+  it("sends no hold while Record play times is off, so stored times are left alone", async () => {
+    localStorage.setItem("recitation_emit_token", "tok-123");
+    localStorage.setItem(
+      "live-control-cue",
+      JSON.stringify({ recordPlayTimes: false }),
+    );
+    let clock = 1_000;
+    const now = vi.spyOn(performance, "now").mockImplementation(() => clock);
+    onTestFinished(() => now.mockRestore());
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText("root line 1")).toBeInTheDocument();
+    await followNone(user);
+    publishPosition.mockClear();
+
+    await pressKey("Space");
+    await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(1));
+    clock += 2_500;
+    await pressKey("Space");
+    await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(2));
+    expect(publishPosition.mock.calls[1][2]).toEqual({
+      textId: "root",
+      segmentId: "root-s2",
+      index: 1,
+      roundNumber: 1,
+    });
+  });
+
   it("reports one hold to every edition of the move", async () => {
     // A move lands on all the followed editions at once, so each is told the
     // same hold: the backend keeps its own marks per text and decides for each
@@ -1705,6 +1733,50 @@ describe("LiveControlPage", () => {
         ),
       );
       expect(screen.getByText(/line 3\/3/)).toBeInTheDocument();
+    });
+
+    it("passes over yigchung a picked section opens on", async () => {
+      const user = userEvent.setup();
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      fetchEditionSections.mockResolvedValue([
+        { id: "s1", title: "Going for Refuge", depth: 0, segmentId: "root-s1" },
+        { id: "s2", title: "Praises", depth: 0, segmentId: "root-s2" },
+      ]);
+      fetchEditionYigchungs.mockImplementation(async (textId: string) =>
+        textId === "root"
+          ? {
+              "root-s2": {
+                full: true,
+                ranges: [{ start: 0, end: 11 }],
+                length: 11,
+              },
+            }
+          : {},
+      );
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+      await waitFor(() =>
+        expect(
+          document.querySelector('[data-line="1"][data-yigchung]'),
+        ).not.toBeNull(),
+      );
+
+      await user.click(await screen.findByRole("button", { name: "Praises" }));
+
+      await waitFor(() =>
+        expect(publishPosition).toHaveBeenCalledWith(
+          "e1",
+          "tok-123",
+          expect.objectContaining({ segmentId: "root-s3", index: 2 }),
+          expect.any(String),
+        ),
+      );
+      expect(publishPosition).not.toHaveBeenCalledWith(
+        "e1",
+        "tok-123",
+        expect.objectContaining({ segmentId: "root-s2" }),
+        expect.any(String),
+      );
     });
 
     it("marks the section the recitation has reached", async () => {

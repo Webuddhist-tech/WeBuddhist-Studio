@@ -13,11 +13,16 @@ export interface CueSettings {
    * is about to - a heads-up, it does not change when autoplay moves. Drawn
    * yellow. */
   autoplayOffsetMs: number;
+  /** Whether a move by hand sends how long the line it leaves was held. The
+   * backend stores or updates a line's play time only from that figure, so
+   * with this off the stored times are left as they are. */
+  recordPlayTimes: boolean;
 }
 
 export const CUE_DEFAULTS: CueSettings = {
   nextClickOffsetMs: 1500,
   autoplayOffsetMs: 1000,
+  recordPlayTimes: true,
 };
 
 /** The bounds the page holds each setting to. */
@@ -48,6 +53,10 @@ export const normalizeCue = (raw: Partial<CueSettings>): CueSettings => {
       0,
       CUE_OFFSET_MAX_MS,
     ),
+    recordPlayTimes:
+      typeof raw.recordPlayTimes === "boolean"
+        ? raw.recordPlayTimes
+        : CUE_DEFAULTS.recordPlayTimes,
   };
 };
 
