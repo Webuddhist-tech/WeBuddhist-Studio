@@ -263,6 +263,84 @@ describe("useRecitationSocket", () => {
     await expect(answer).resolves.toMatchObject({ ok: false, lost: true });
   });
 
+  it("sends an autoplay command and resolves with the backend's new state", async () => {
+    const { result } = renderHook(() => useRecitationSocket("e1", "tok"));
+    act(() => latest().accept());
+
+    const answer = result.current.sendCommand({
+      type: "seek",
+      planId: "p1",
+      step: 4,
+      expectedStep: 3,
+    });
+    const sent = latest().sent[0];
+    expect(sent).toMatchObject({
+      type: "autoplay_seek",
+      plan_id: "p1",
+      step: 4,
+      expected_step: 3,
+    });
+    act(() =>
+      latest().say({
+        type: "autoplay_ack",
+        command_id: sent.command_id,
+        command: "seek",
+        ok: true,
+        state: {
+          type: "autoplay",
+          plan_id: "p1",
+          status: "running",
+          step: 4,
+          total_steps: 9,
+          server_time_ms: 1,
+        },
+      }),
+    );
+
+    await expect(answer).resolves.toMatchObject({
+      ok: true,
+      state: { planId: "p1", step: 4 },
+    });
+    // What the command answered is where autoplay is now.
+    expect(result.current.autoplay).toMatchObject({ step: 4 });
+  });
+
+  it("says why an autoplay command was turned down", async () => {
+    const { result } = renderHook(() => useRecitationSocket("e1", "tok"));
+    act(() => latest().accept());
+
+    const answer = result.current.sendCommand({ type: "hold" });
+    act(() =>
+      latest().say({
+        type: "autoplay_ack",
+        command_id: latest().sent[0].command_id,
+        ok: false,
+        code: "NOT_RUNNING",
+      }),
+    );
+
+    await expect(answer).resolves.toEqual({
+      ok: false,
+      message: "Autoplay is no longer running that plan.",
+    });
+  });
+
+  it("gives an autoplay command up when the socket goes", async () => {
+    const { result } = renderHook(() => useRecitationSocket("e1", "tok"));
+    act(() => latest().accept());
+
+    const answer = result.current.sendCommand({ type: "resume" });
+    act(() => latest().drop());
+
+    await expect(answer).resolves.toMatchObject({ ok: false });
+  });
+
+  it("does not send a command over a socket that is not open", () => {
+    const { result } = renderHook(() => useRecitationSocket("e1", "tok"));
+
+    expect(result.current.sendCommand({ type: "hold" })).toBeNull();
+  });
+
   it("does not send over a socket that is not open", () => {
     const { result } = renderHook(() => useRecitationSocket("e1", "tok"));
 

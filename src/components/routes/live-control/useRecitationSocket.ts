@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  commandRefused,
   recitationSocketUrl,
   toAutoplayState,
+  toWireCommand,
   toWirePosition,
+  type AutoplayCommand,
+  type AutoplayResult,
   type AutoplayState,
   type MovePosition,
   type PublishResult,
@@ -40,6 +44,12 @@ export interface RecitationSocket {
    * other way.
    */
   sendMove: (positions: MovePosition[]) => Promise<SocketMoveResult> | null;
+  /**
+   * Sends a command to the backend's autoplay over the socket and resolves
+   * with its answer - or null at once when the socket is not open, so the
+   * caller sends it by HTTP instead.
+   */
+  sendCommand: (command: AutoplayCommand) => Promise<AutoplayResult> | null;
 }
 
 /**
@@ -92,6 +102,12 @@ export function useRecitationSocket(
       { resolve: (result: SocketMoveResult) => void; timer: number }
     >(),
   );
+  const commandsRef = useRef(
+    new Map<
+      string,
+      { resolve: (result: AutoplayResult) => void; timer: number }
+    >(),
+  );
 
   useEffect(() => {
     if (!eventId || !token || typeof WebSocket === "undefined") {
@@ -103,6 +119,7 @@ export function useRecitationSocket(
     let retryTimer: number | undefined;
     let pingTimer: number | undefined;
     const pending = pendingRef.current;
+    const commands = commandsRef.current;
     let lastRevision: number | null = null;
 
     const settleAll = (result: SocketMoveResult) => {
@@ -111,6 +128,16 @@ export function useRecitationSocket(
         resolve(result);
       });
       pending.clear();
+      commands.forEach(({ resolve, timer }) => {
+        window.clearTimeout(timer);
+        resolve({
+          ok: false,
+          message: result.ok
+            ? "Lost the connection to the server."
+            : result.message,
+        });
+      });
+      commands.clear();
     };
 
     const connect = () => {
@@ -201,6 +228,26 @@ export function useRecitationSocket(
           case "autoplay": {
             const state = toAutoplayState(frame);
             if (state) setAutoplay(state);
+            return;
+          }
+          case "autoplay_ack": {
+            const id =
+              typeof frame.command_id === "string" ? frame.command_id : "";
+            const waiting = commands.get(id);
+            if (!waiting) return;
+            commands.delete(id);
+            window.clearTimeout(waiting.timer);
+            const state =
+              frame.ok === true ? toAutoplayState(frame.state) : null;
+            if (state) setAutoplay(state);
+            waiting.resolve(
+              state
+                ? { ok: true, state }
+                : {
+                    ok: false,
+                    message: commandRefused(frame.code, frame.message),
+                  },
+            );
             return;
           }
           case "move_ack": {
@@ -323,5 +370,43 @@ export function useRecitationSocket(
     [],
   );
 
-  return { status, room, people, autoplay, refusal, sendMove };
+  const sendCommand = useCallback(
+    (command: AutoplayCommand): Promise<AutoplayResult> | null => {
+      const socket = socketRef.current;
+      if (
+        !socket ||
+        socket.readyState !== WebSocket.OPEN ||
+        !helloRef.current
+      ) {
+        return null;
+      }
+      const commandId = newMoveId();
+      return new Promise<AutoplayResult>((resolve) => {
+        const timer = window.setTimeout(() => {
+          commandsRef.current.delete(commandId);
+          resolve({
+            ok: false,
+            message: "The server did not answer in time. Try again.",
+          });
+        }, MOVE_ACK_TIMEOUT_MS);
+        commandsRef.current.set(commandId, { resolve, timer });
+        try {
+          socket.send(
+            JSON.stringify({
+              type: `autoplay_${command.type}`,
+              command_id: commandId,
+              ...toWireCommand(command),
+            }),
+          );
+        } catch {
+          window.clearTimeout(timer);
+          commandsRef.current.delete(commandId);
+          resolve({ ok: false, message: "Could not reach the server." });
+        }
+      });
+    },
+    [],
+  );
+
+  return { status, room, people, autoplay, refusal, sendMove, sendCommand };
 }

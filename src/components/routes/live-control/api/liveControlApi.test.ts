@@ -9,6 +9,7 @@ import {
   publishMove,
   publishPosition,
   recitationSocketUrl,
+  sendAutoplayCommand,
   startAutoplay,
   stopAutoplay,
   toAutoplayState,
@@ -210,8 +211,72 @@ describe("autoplay", () => {
         totalSteps: 9,
         stepStartedAtMs: 5_000,
         stepDurationMs: 1_200,
+        // A backend that does not report them yet reads as plain autoplay.
+        held: false,
+        heldAtMs: null,
+        tempo: 1,
+        leadMs: 0,
         serverTimeMs: 5_400,
       },
+    });
+  });
+
+  it("reads the hold, the room's pace and the phone lead", () => {
+    expect(
+      toAutoplayState({
+        ...wireState,
+        held: true,
+        held_at_ms: 5_200,
+        tempo: 0.9,
+        lead_ms: 300,
+      }),
+    ).toMatchObject({ held: true, heldAtMs: 5_200, tempo: 0.9, leadMs: 300 });
+  });
+
+  it("sends a command to the running plan, each in the backend's own words", async () => {
+    emitPost.mockResolvedValue({ data: wireState });
+
+    const result = await sendAutoplayCommand("e1", "tok", {
+      type: "seek",
+      planId: "p1",
+      step: 3,
+      expectedStep: 2,
+    });
+    await sendAutoplayCommand("e1", "tok", { type: "hold", planId: "p1" });
+    await sendAutoplayCommand("e1", "tok", { type: "resume" });
+    await sendAutoplayCommand("e1", "tok", { type: "settings", leadMs: 450 });
+
+    expect(result).toMatchObject({ ok: true, state: { planId: "p1" } });
+    expect(emitPost.mock.calls.map(([url, body]) => [url, body])).toEqual([
+      [
+        "/api/v1/events/e1/recitation/autoplay/seek",
+        { plan_id: "p1", step: 3, expected_step: 2 },
+      ],
+      ["/api/v1/events/e1/recitation/autoplay/hold", { plan_id: "p1" }],
+      ["/api/v1/events/e1/recitation/autoplay/resume", {}],
+      ["/api/v1/events/e1/recitation/autoplay/settings", { lead_ms: 450 }],
+    ]);
+    expect(emitPost.mock.calls[0][2]).toEqual(auth);
+  });
+
+  it("says why a command was turned down", async () => {
+    emitPost.mockRejectedValueOnce(httpError(409));
+    emitPost.mockRejectedValueOnce(httpError(429));
+
+    const gone = await sendAutoplayCommand("e1", "tok", { type: "hold" });
+    const fast = await sendAutoplayCommand("e1", "tok", {
+      type: "seek",
+      planId: "p1",
+      step: 1,
+    });
+
+    expect(gone).toEqual({
+      ok: false,
+      message: "Autoplay is no longer running that plan.",
+    });
+    expect(fast).toMatchObject({
+      ok: false,
+      message: expect.stringMatching(/slow down/),
     });
   });
 

@@ -22,10 +22,12 @@ import {
   fetchTextEditions,
   publishMove,
   searchTextsByTitle,
+  sendAutoplayCommand,
   startAutoplay,
   stopAutoplay,
   SUGGESTED_TEXT_IDS,
   toOperatorSegments,
+  type AutoplayCommand,
   type AutoplayPlanStep,
   type AutoplayResult,
   type AutoplayState,
@@ -53,6 +55,7 @@ import {
   type CueSettings,
 } from "./cueConfig";
 import { passageAt, returnButtonForLine, returnPassages } from "./returnJumps";
+import { seekTarget } from "./seekTarget";
 import { usePositionPublisher, type SendMove } from "./usePositionPublisher";
 import { useRecitationSocket } from "./useRecitationSocket";
 import { useWakeLock } from "./useWakeLock";
@@ -74,6 +77,9 @@ interface RunningPlan {
   /** The furthest step heard of: the start's own answer can arrive after the
    * socket has already told of the next step, and must not undo it. */
   lastStep?: number;
+  /** A hand move sent as a seek and not yet answered: the backend's word on
+   * any other step is older than it, and is not followed meanwhile. */
+  pendingSeek?: number;
 }
 
 /** The backend refuses longer plans; a whole puja is far shorter. */
@@ -368,17 +374,24 @@ const AutoplayProgress = ({
   running,
   autoplay,
   cue,
+  heldAt = null,
 }: {
   startedAt: number;
   duration: number;
   running: boolean;
   autoplay: boolean;
   cue: CueSettings;
+  /** When autoplay's hold on the line began: the bar stands still there. */
+  heldAt?: number | null;
 }) => {
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
     if (!running) {
       setElapsed(0);
+      return;
+    }
+    if (heldAt !== null) {
+      setElapsed(Math.min(duration, heldAt - startedAt));
       return;
     }
     let frame = 0;
@@ -388,10 +401,14 @@ const AutoplayProgress = ({
     };
     tick();
     return () => cancelAnimationFrame(frame);
-  }, [startedAt, duration, running]);
+  }, [startedAt, duration, running, heldAt]);
   const progress = duration > 0 ? Math.max(0, elapsed) / duration : 0;
+  const held = heldAt !== null;
   const cued =
-    running && duration > 0 && elapsed >= cueAt(duration, cue, autoplay);
+    running &&
+    !held &&
+    duration > 0 &&
+    elapsed >= cueAt(duration, cue, autoplay);
   const share = (ms: number) =>
     duration > 0 ? Math.min(1, Math.max(0, ms / duration)) : 0;
   // The wider stretch first, so the narrower one shows on top of it.
@@ -413,6 +430,14 @@ const AutoplayProgress = ({
       data-cued={cued ? "" : undefined}
       className="mt-1.5 flex items-center gap-2 font-sans"
     >
+      {held ? (
+        <span
+          data-held=""
+          className="shrink-0 rounded-full bg-[#64d2ff] px-2 py-0.5 text-[11px] leading-none font-bold tracking-wide text-black uppercase"
+        >
+          Held
+        </span>
+      ) : null}
       {cued ? (
         <span
           data-cue=""
@@ -455,6 +480,96 @@ const AutoplayProgress = ({
         {formatPlayTime(Math.max(0, elapsed))} / {formatPlayTime(duration)}
       </span>
     </span>
+  );
+};
+
+/** The phones' lead is set in seconds, to the nearest 50 ms, up to 2 s. */
+const LEAD_STEP_MS = 50;
+const LEAD_MAX_MS = 2000;
+
+/** The room's pace in words: how much faster or slower than recorded. */
+const paceLabel = (tempo: number | null): string => {
+  if (tempo === null) return "—";
+  if (tempo < 0.995) return `${Math.round((1 / tempo - 1) * 100)}% faster`;
+  if (tempo > 1.005) return `${Math.round((1 - 1 / tempo) * 100)}% slower`;
+  return "as recorded";
+};
+
+/**
+ * The event's autoplay settings, as the backend keeps them: the phone lead,
+ * edited here and saved when the field is left, and the room's pace, which
+ * autoplay learns by itself and can be put back to the recorded times.
+ */
+const AutoplaySettingsFields = ({
+  leadMs,
+  tempo,
+  disabled,
+  onChange,
+}: {
+  leadMs: number | null;
+  tempo: number | null;
+  disabled: boolean;
+  onChange: (change: { leadMs?: number; tempo?: number }) => void;
+}) => {
+  const [draft, setDraft] = useState<string | null>(null);
+  const shown = draft ?? (leadMs === null ? "" : String(leadMs / 1000));
+  const commit = () => {
+    if (draft === null) return;
+    setDraft(null);
+    const seconds = Number(draft);
+    if (!Number.isFinite(seconds)) return;
+    const ms =
+      Math.round(
+        Math.min(LEAD_MAX_MS, Math.max(0, seconds * 1000)) / LEAD_STEP_MS,
+      ) * LEAD_STEP_MS;
+    if (ms !== leadMs) onChange({ leadMs: ms });
+  };
+  const pace = paceLabel(tempo);
+  return (
+    <>
+      <label className="flex items-center gap-2">
+        Phone lead
+        <input
+          type="number"
+          min={0}
+          max={LEAD_MAX_MS / 1000}
+          step={LEAD_STEP_MS / 1000}
+          value={shown}
+          disabled={disabled}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+          }}
+          className="w-20 rounded-md border border-[#2c2c2e] bg-black px-2 py-1 text-[#f2f2f7] tabular-nums disabled:opacity-40 max-lg:text-base"
+        />
+        s
+      </label>
+      <span className="flex items-center gap-2">
+        Room pace
+        <span
+          data-room-pace=""
+          className="text-[#f2f2f7] tabular-nums"
+          title={
+            tempo === null
+              ? undefined
+              : `×${tempo.toFixed(2)} the recorded times`
+          }
+        >
+          {pace}
+        </span>
+        {tempo !== null && Math.abs(tempo - 1) >= 0.005 ? (
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => onChange({ tempo: 1 })}
+            className="cursor-pointer rounded-md bg-[#2c2c2e] px-2 py-1 text-[12px] font-semibold text-[#f2f2f7] hover:bg-[#3a3a3c] disabled:opacity-40"
+          >
+            Reset
+          </button>
+        ) : null}
+      </span>
+    </>
   );
 };
 
@@ -735,6 +850,21 @@ const LiveControlPage = () => {
       delete next[key];
       return next;
     });
+  };
+
+  /**
+   * Every passage back to its first round: the counts taken and begun are all
+   * dropped, from this browser too. Moves already on the wire cannot put any of
+   * them back.
+   */
+  const resetAllReturns = () => {
+    [...Object.keys(returnCounts), ...Object.keys(requestedRounds)].forEach(
+      (key) => {
+        resetAfterMoveRef.current[key] = moveSequenceRef.current;
+      },
+    );
+    updateReturnCounts(() => ({}));
+    setRequestedRounds({});
   };
 
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -1249,6 +1379,9 @@ const LiveControlPage = () => {
   /** Hands the backend the same plan again, rebuilt, without sending the line
    * the room is on anew: for a change of rounds or editions mid-line. */
   const replanRef = useRef<() => void>(() => {});
+  /** Moves a running plan a step on or back; false when there is no plan
+   * here to move, or no step that way. Set with the autoplay code below. */
+  const stepPlanRef = useRef<(delta: number) => boolean>(() => false);
 
   // Yigchung is not recited, so a move passes over it to the next line the room
   // says aloud. Tapping it still goes there: that is the operator's own choice.
@@ -1428,6 +1561,28 @@ const LiveControlPage = () => {
    * its way to the room counts too - a second return made before the first is
    * taken is the round after it, not the same round sent again.
    */
+  /**
+   * In a text with several Returns, the last one ends the puja rather than
+   * repeating a passage: it clears every count and takes the room back to its
+   * passage's start, in the first round, ready for the next puja. A text with
+   * a single Return keeps counting its rounds on it.
+   */
+  const lastReturnKey = useMemo(() => {
+    const keys = new Set<string>();
+    let last: string | null = null;
+    for (const line of driverLines) {
+      const button = returnButtonForLine(line.id, driverLines);
+      if (!button) continue;
+      keys.add(button.key);
+      last = button.key;
+    }
+    return keys.size > 1 ? last : null;
+  }, [driverLines]);
+  const finishWithLastReturn = (index: number) => {
+    resetAllReturns();
+    goTo(index, FIRST_ROUND);
+  };
+
   const beginNextRound = (key: string, index: number) => {
     const round = roundOf(key) + 1;
     // With no token nothing goes to the room, so no round is begun there.
@@ -1439,6 +1594,7 @@ const LiveControlPage = () => {
 
   const step = useCallback(
     (delta: number) => {
+      if (autoplayRef.current && stepPlanRef.current(delta)) return;
       if (awaitingYigchungs) {
         setHeldMoves((current) => [...current, delta]);
         return;
@@ -1474,6 +1630,11 @@ const LiveControlPage = () => {
   );
   const serverAutoplayRef = useRef(serverAutoplay);
   serverAutoplayRef.current = serverAutoplay;
+  /** When the backend's hold on the line began, on this page's clock; null
+   * while the plan is moving. */
+  const [heldAt, setHeldAt] = useState<number | null>(null);
+  /** Set while a hold or resume is on its way, so it is not pressed twice. */
+  const [holdBusy, setHoldBusy] = useState(false);
   /** Counts plan hand-overs, so only the newest one's answer is acted on. */
   const autoplayStartRef = useRef(0);
   /** A plan hand-over still waiting on the backend's answer. A stop waits for
@@ -1545,8 +1706,24 @@ const LiveControlPage = () => {
   /** Lines the page up with what the backend's autoplay says. */
   const followAutoplay = (next: AutoplayState) => {
     setServerAutoplay(next);
+    serverAutoplayRef.current = next;
+    // When the hold began, on this page's clock, so the bar stands still.
+    setHeldAt(
+      next.status === "running" && next.held && next.heldAtMs !== null
+        ? performance.now() - Math.max(0, next.serverTimeMs - next.heldAtMs)
+        : null,
+    );
     const plan = planRef.current;
     if (!plan || next.planId !== plan.planId) return;
+    // A seek is on its way: until it is answered, word of any other step is
+    // older than it and would pull the screen back.
+    if (
+      plan.pendingSeek !== undefined &&
+      next.status === "running" &&
+      next.step !== plan.pendingSeek
+    ) {
+      return;
+    }
     if (next.status === "stopped") {
       planRef.current = null;
       setAutoplay(false);
@@ -1651,10 +1828,13 @@ const LiveControlPage = () => {
     autoplayRef.current = true;
     setAutoplayBusy(true);
     setAutoplayNote(null);
-    // Times learned since the page opened count too.
-    const fresh = await refetchPlayTimes({ cancelRefetch: false }).catch(
+    // Times learned since the page opened count too. A hand move does not wait
+    // for them: the room is waiting on it, and the times on hand are close
+    // enough for the lines after it; they are refreshed for the next plan.
+    const refreshed = refetchPlayTimes({ cancelRefetch: false }).catch(
       () => null,
     );
+    const fresh = byHand ? null : await refreshed;
     if (handOverId !== autoplayStartRef.current) return;
     const plan = buildPlan(from, round, fresh?.data ?? playTimes ?? {});
     if (plan.noTimeAt === from && keepFirstFor === undefined && !byHand) {
@@ -1748,9 +1928,147 @@ const LiveControlPage = () => {
     // Followed by the newest render's hand: this one's counts may be stale.
     followAutoplayRef.current(started.state);
   };
+  /**
+   * A command to the backend's autoplay: over the socket when it is open, by
+   * HTTP when it is not. What it answers is followed like any other word from
+   * the backend.
+   */
+  const commandAutoplay = async (
+    command: AutoplayCommand,
+  ): Promise<AutoplayResult> => {
+    if (!eventId || !token) {
+      return { ok: false, message: "Add the emit token to use autoplay." };
+    }
+    const viaSocket = socketRef.current.sendCommand(command);
+    return (await viaSocket) ?? sendAutoplayCommand(eventId, token, command);
+  };
+
+  /**
+   * A hand move while this page's plan runs: a step of that plan, sent as a
+   * seek, so the room gets it in the time one line takes - no plan is rebuilt
+   * or sent. The screen moves at once. A move to a line the plan does not
+   * hold, or one the backend turns down, is made the old way: a plan of its
+   * own from that line.
+   */
+  /** This page's plan, when the backend is running it and can take a seek,
+   * with the step the room is on - or about to be, a seek still on its way. */
+  const seekablePlan = (): { plan: RunningPlan; at: number } | null => {
+    const plan = planRef.current;
+    const server = serverAutoplayRef.current;
+    if (
+      !plan?.planId ||
+      server?.status !== "running" ||
+      server.planId !== plan.planId ||
+      pendingStartRef.current
+    ) {
+      return null;
+    }
+    return { plan, at: plan.pendingSeek ?? plan.lastStep ?? server.step };
+  };
+
+  /** Moves the screen to step `target` of `plan` at once and sends the seek. */
+  const seekTo = (plan: RunningPlan, at: number, target: number) => {
+    const step = plan.steps[target];
+    const planId = plan.planId;
+    if (!step || !planId) return;
+    plan.pendingSeek = target;
+    plan.lastStep = target;
+    const now = performance.now();
+    heldLineRef.current = {
+      index: step.lineIndex,
+      enteredAt: now,
+      byAutoplay: true,
+    };
+    setCurrentIndex(step.lineIndex);
+    setLineStartedAt(now);
+    setHeldAt(null);
+    scrollLineIntoBand(step.lineIndex);
+    // The passage's round is settled once the backend says the room is on it.
+
+    void commandAutoplay({
+      type: "seek",
+      planId,
+      step: target,
+      expectedStep: at,
+    }).then((result) => {
+      if (planRef.current !== plan || plan.pendingSeek !== target) return;
+      plan.pendingSeek = undefined;
+      if (result.ok) {
+        followAutoplayRef.current(result.state);
+        return;
+      }
+      // Turned down: the plan is not the one running any more. The line the
+      // operator chose still goes to the room, in a plan of its own.
+      setAutoplayNote(result.message);
+      void handOver(step.lineIndex, step.round, undefined, true);
+    });
+  };
+
+  /** A line picked by hand mid-autoplay: the plan's nearest step on it. */
+  const seekByHand = (index: number, round?: number): boolean => {
+    const seekable = seekablePlan();
+    if (!seekable) return false;
+    const target = seekTarget(seekable.plan.steps, seekable.at, index, round);
+    if (target === null) return false;
+    seekTo(seekable.plan, seekable.at, target);
+    return true;
+  };
+
   autoplayFromRef.current = (index, round) => {
     setHeldMoves((current) => (current.length > 0 ? [] : current));
+    if (seekByHand(index, round)) return;
     void handOver(index, round, undefined, true);
+  };
+
+  /**
+   * Next or Previous mid-autoplay: the plan's own next or previous step - a
+   * Return it takes included - so the press never has to guess which round of
+   * a line was meant. Next is the operator ending the line, which is what the
+   * backend learns the room's pace from. False past either end of the plan.
+   */
+  stepPlanRef.current = (delta) => {
+    const seekable = seekablePlan();
+    if (!seekable) return false;
+    const target = seekable.at + delta;
+    if (target < 0 || target >= seekable.plan.steps.length) return false;
+    setHeldMoves((current) => (current.length > 0 ? [] : current));
+    seekTo(seekable.plan, seekable.at, target);
+    return true;
+  };
+
+  /** Holds the room on its line past its time, or lets it go on. */
+  const toggleHold = async () => {
+    const server = serverAutoplayRef.current;
+    if (holdBusy || server?.status !== "running") return;
+    setHoldBusy(true);
+    const result = await commandAutoplay({
+      type: server.held ? "resume" : "hold",
+      planId: server.planId,
+    });
+    setHoldBusy(false);
+    if (result.ok) {
+      followAutoplayRef.current(result.state);
+    } else {
+      setAutoplayNote(
+        `Autoplay could not be ${server.held ? "resumed" : "held"}: ${result.message}`,
+      );
+    }
+  };
+  const toggleHoldRef = useRef(toggleHold);
+  toggleHoldRef.current = toggleHold;
+
+  /** The event's autoplay settings: how early lines go to the phones, and the
+   * room's pace. Kept by the backend, for every controller. */
+  const changeAutoplaySettings = async (change: {
+    leadMs?: number;
+    tempo?: number;
+  }) => {
+    const result = await commandAutoplay({ type: "settings", ...change });
+    if (result.ok) {
+      setServerAutoplay(result.state);
+    } else {
+      setAutoplayNote(`Autoplay settings not saved: ${result.message}`);
+    }
   };
   replanRef.current = () => {
     if (!autoplayRef.current || currentIndex < 0) return;
@@ -1894,6 +2212,9 @@ const LiveControlPage = () => {
       } else if (code === "ArrowLeft" || code === "ArrowUp") {
         keyEvent.preventDefault();
         step(-1);
+      } else if (code === "KeyH") {
+        keyEvent.preventDefault();
+        void toggleHoldRef.current();
       }
     };
     document.addEventListener("keydown", onKeyDown);
@@ -2065,12 +2386,15 @@ const LiveControlPage = () => {
     return driverLines.findIndex((segment) => segment.row === row);
   })();
 
-  /** The backend's current step, when it is this page's plan it is running. */
+  /** The backend's current step, when it is this page's plan it is running:
+   * as long as the backend holds it, the room's pace applied. */
   const autoplayStepDuration =
     autoplay &&
     serverAutoplay?.status === "running" &&
     serverAutoplay.planId === planRef.current?.planId
-      ? (planRef.current?.steps[serverAutoplay.step]?.durationMs ?? null)
+      ? (serverAutoplay.stepDurationMs ??
+        planRef.current?.steps[serverAutoplay.step]?.durationMs ??
+        null)
       : null;
 
   /** A change to the plan while autoplay runs - rounds, a reset - is handed
@@ -2589,7 +2913,9 @@ const LiveControlPage = () => {
                   value={cue.nextClickOffsetMs / 1000}
                   onChange={(e) =>
                     changeCue({
-                      nextClickOffsetMs: Math.round(Number(e.target.value) * 1000),
+                      nextClickOffsetMs: Math.round(
+                        Number(e.target.value) * 1000,
+                      ),
                     })
                   }
                   className="w-20 rounded-md border border-[#2c2c2e] bg-black px-2 py-1 text-[#f2f2f7] tabular-nums max-lg:text-base"
@@ -2610,7 +2936,9 @@ const LiveControlPage = () => {
                   value={cue.autoplayOffsetMs / 1000}
                   onChange={(e) =>
                     changeCue({
-                      autoplayOffsetMs: Math.round(Number(e.target.value) * 1000),
+                      autoplayOffsetMs: Math.round(
+                        Number(e.target.value) * 1000,
+                      ),
                     })
                   }
                   className="w-20 rounded-md border border-[#2c2c2e] bg-black px-2 py-1 text-[#f2f2f7] tabular-nums max-lg:text-base"
@@ -2628,10 +2956,24 @@ const LiveControlPage = () => {
                 />
                 Record play times
               </label>
+              <AutoplaySettingsFields
+                leadMs={serverAutoplay?.leadMs ?? null}
+                tempo={serverAutoplay?.tempo ?? null}
+                disabled={!token}
+                onChange={(change) => void changeAutoplaySettings(change)}
+              />
               <p className="w-full text-[12px]">
                 With Record play times off, moves by hand send no time and the
-                stored play times are left as they are. The end of the line's bar is red for the Next-click offset and
-                yellow for the autoplay offset. Kept in this browser.
+                stored play times are left as they are. The end of the line's
+                bar is red for the Next-click offset and yellow for the autoplay
+                offset. Kept in this browser.
+              </p>
+              <p className="w-full text-[12px]">
+                Phone lead sends each autoplay line to the app that much before
+                its time, so it lands on phones with the stage; raise it if
+                phones trail the room, lower it if they run ahead. Room pace is
+                learned from Next and Hold while autoplay runs. Both are kept by
+                the server for this event.
               </p>
             </div>
           ) : null}
@@ -2844,6 +3186,7 @@ const LiveControlPage = () => {
                             running={!autoplayBusy}
                             autoplay
                             cue={cue}
+                            heldAt={heldAt}
                           />
                         ) : !autoplay &&
                           index === currentIndex &&
@@ -2863,8 +3206,15 @@ const LiveControlPage = () => {
                           <button
                             type="button"
                             aria-label={`${returnTo.label}, round ${acceptedRound(returnTo.key)}`}
+                            title={
+                              returnTo.key === lastReturnKey
+                                ? "Last return: clears every return count and starts over from round 1"
+                                : undefined
+                            }
                             onClick={() =>
-                              beginNextRound(returnTo.key, returnTo.index)
+                              returnTo.key === lastReturnKey
+                                ? finishWithLastReturn(returnTo.index)
+                                : beginNextRound(returnTo.key, returnTo.index)
                             }
                             className="flex cursor-pointer items-center gap-3 rounded-[9px] border border-[#e5231c] bg-[#2c2c2e] py-2.5 pr-2.5 pl-5 text-left text-base font-semibold text-[#f2f2f7] hover:bg-[#3a3a3c]"
                           >
@@ -2962,6 +3312,26 @@ const LiveControlPage = () => {
                 >
                   {autoplay || remoteAutoplay ? "❚❚ Pause" : "▶ Auto"}
                 </button>
+                {serverAutoplay?.status === "running" ? (
+                  <button
+                    type="button"
+                    onClick={() => void toggleHold()}
+                    aria-pressed={serverAutoplay.held}
+                    disabled={holdBusy}
+                    title={
+                      serverAutoplay.held
+                        ? "Let autoplay go on: the line keeps what was left of its time (H)"
+                        : "Keep the room on this line until you let it go on - the line is running long (H)"
+                    }
+                    className={`w-[18%] max-w-[140px] touch-manipulation cursor-pointer rounded-[9px] py-4 text-base font-semibold select-none disabled:cursor-wait disabled:opacity-60 max-lg:py-3 max-lg:text-[15px] max-lg:landscape:w-full max-lg:landscape:max-w-none ${
+                      serverAutoplay.held
+                        ? "bg-[#0a3a4a] text-[#64d2ff] hover:bg-[#0f4a5e]"
+                        : "bg-[#2c2c2e] hover:bg-[#3a3a3c] active:bg-[#48484a]"
+                    }`}
+                  >
+                    {serverAutoplay.held ? "▶ Go on" : "✋ Hold"}
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => step(1)}
