@@ -396,7 +396,7 @@ const Createplan = () => {
     }
   };
   return (
-    <div className="flex flex-col sm:flex-row border h-[calc(100vh-40px)] overflow-auto bg-[#F5F5F5] dark:bg-[#181818] my-4 rounded-l-2xl font-dynamic">
+    <div className="flex flex-col sm:flex-row border h-[calc(100vh-40px)] overflow-auto bg-[#F5F5F5] dark:bg-[#181818] my-4 rounded-l-2xl font-dynamic max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
       <div className="flex-1 p-4 sm:p-10">
         <h1 className="text-xl font-bold my-4">{pageHeading}</h1>
 

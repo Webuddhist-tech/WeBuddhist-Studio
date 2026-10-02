@@ -116,11 +116,11 @@ export const ContentTypeSelector = ({
 
   return (
     <>
-      <div className="flex h-12 px-4 items-center gap-4">
+      <div className="flex h-12 px-4 items-center gap-4 max-md:h-auto max-md:items-start max-md:gap-2">
         <Pecha.Button
           type="button"
           variant="outline"
-          className="h-full transition-transform active:scale-95"
+          className="h-full transition-transform active:scale-95 max-md:h-12"
           onClick={() => setShowContentTypes(!showContentTypes)}
         >
           <IoMdAdd
@@ -129,7 +129,7 @@ export const ContentTypeSelector = ({
         </Pecha.Button>
 
         {showContentTypes && (
-          <div className="flex border h-full bg-white dark:bg-[#161616] items-center px-1 border-gray-300 dark:border-input rounded-sm overflow-visible animate-in zoom-in-90 slide-in-from-left-3 duration-300 ease-out">
+          <div className="flex border h-full bg-white dark:bg-[#161616] items-center px-1 border-gray-300 dark:border-input rounded-sm overflow-visible max-md:h-auto max-md:min-w-0 max-md:flex-1 max-md:flex-wrap max-md:py-1 animate-in zoom-in-90 slide-in-from-left-3 duration-300 ease-out">
             {contentTypes.map(({ key, icon }, index) => (
               <Pecha.Button
                 key={key}
