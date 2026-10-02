@@ -233,7 +233,7 @@ const GroupEventDetailPage = () => {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between max-md:flex-wrap max-md:gap-3">
         <button
           type="button"
           onClick={() => navigate(eventsListPath)}
@@ -242,7 +242,7 @@ const GroupEventDetailPage = () => {
           ← Events
         </button>
         {canWrite ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 max-md:flex-wrap">
             <Pecha.Button
               variant="outline"
               size="sm"

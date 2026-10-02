@@ -56,7 +56,7 @@ export type GroupOutletContext = {
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
-    "px-3 py-2 text-sm border-b-2 -mb-px transition-colors",
+    "px-3 py-2 text-sm border-b-2 -mb-px transition-colors max-md:shrink-0 max-md:whitespace-nowrap",
     isActive
       ? "border-[#A51C21] text-foreground font-medium"
       : "border-transparent text-muted-foreground hover:text-foreground",
@@ -122,7 +122,7 @@ const GroupLayout = () => {
 
   if (isLoading) {
     return (
-      <div className="flex h-[calc(100vh-40px)] items-center justify-center text-muted-foreground">
+      <div className="flex h-[calc(100vh-40px)] items-center justify-center text-muted-foreground max-md:h-full">
         Loading…
       </div>
     );
@@ -130,7 +130,7 @@ const GroupLayout = () => {
 
   if (isError || !group) {
     return (
-      <div className="flex h-[calc(100vh-40px)] flex-col items-center justify-center gap-4">
+      <div className="flex h-[calc(100vh-40px)] flex-col items-center justify-center gap-4 max-md:h-full">
         <p className="text-destructive">
           {getApiErrorMessage(error, "Could not load this group")}
         </p>
@@ -224,7 +224,7 @@ const GroupLayout = () => {
           </>
         }
         nav={
-          <nav className="flex flex-wrap gap-1 px-4 sm:px-8 border-b border-dashed border-gray-300 dark:border-input">
+          <nav className="flex flex-wrap gap-1 px-4 sm:px-8 border-b border-dashed border-gray-300 dark:border-input max-md:flex-nowrap max-md:overflow-x-auto">
             <NavLink
               to={ROUTES.group(group.id)}
               end
@@ -293,7 +293,7 @@ const GroupLayout = () => {
           </nav>
         }
       >
-        <div className="px-4 sm:px-8 py-6 pb-12">
+        <div className="px-4 sm:px-8 py-6 pb-12 max-md:py-4">
           <div className={cn("mx-auto w-full", contentMaxWidth)}>
             <Outlet context={outletContext} />
           </div>

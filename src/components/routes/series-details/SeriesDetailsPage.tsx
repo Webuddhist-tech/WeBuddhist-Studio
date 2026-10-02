@@ -178,7 +178,7 @@ const SeriesDetailsPage = () => {
 
   if (isLoading) {
     return (
-      <div className="flex h-[calc(100vh-40px)] items-center justify-center">
+      <div className="flex h-[calc(100vh-40px)] items-center justify-center max-md:h-full">
         <p className="text-muted-foreground">Loading…</p>
       </div>
     );
@@ -186,7 +186,7 @@ const SeriesDetailsPage = () => {
 
   if (isError) {
     return (
-      <div className="flex h-[calc(100vh-40px)] flex-col items-center justify-center gap-4">
+      <div className="flex h-[calc(100vh-40px)] flex-col items-center justify-center gap-4 max-md:h-full">
         <p className="text-destructive">{String(error?.message ?? "Error")}</p>
         <Pecha.Button
           variant="outline"
@@ -199,7 +199,7 @@ const SeriesDetailsPage = () => {
   }
 
   return (
-    <div className="flex flex-col border h-[calc(100vh-40px)] overflow-auto bg-[#F5F5F5] dark:bg-[#181818] my-4 rounded-l-2xl font-dynamic">
+    <div className="flex flex-col border h-[calc(100vh-40px)] overflow-auto bg-[#F5F5F5] dark:bg-[#181818] my-4 rounded-l-2xl font-dynamic max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
       <div className="flex flex-wrap items-center gap-3 border-b border-dashed border-gray-300 px-4 py-4 dark:border-input">
         <Pecha.Button
           type="button"

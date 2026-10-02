@@ -2,6 +2,7 @@ import { useEffect, useState, Activity } from "react";
 import { IoCalendarClearOutline } from "react-icons/io5";
 import { MdExpandMore } from "react-icons/md";
 import { BsThreeDots } from "react-icons/bs";
+import { IoMdAdd } from "react-icons/io";
 import { FiTrash } from "react-icons/fi";
 import { Pecha } from "@/components/ui/shadimport";
 import TaskDeleteDialog from "@/components/ui/molecules/modals/task-delete/TaskDeleteDialog";
@@ -29,6 +30,8 @@ interface SideBarProps {
   onDaySelect: (dayNumber: number) => void;
   onTaskClick?: (taskId: string) => void;
   onTaskDelete?: (taskId: string) => void;
+  /** Given on a phone, where there is no editor beside the list to add from. */
+  onAddTask?: (dayNumber: number) => void;
   isEditable?: boolean;
 }
 
@@ -37,6 +40,7 @@ const SideBar = ({
   onDaySelect,
   onTaskClick,
   onTaskDelete,
+  onAddTask,
   isEditable,
 }: SideBarProps) => {
   const [expandedDay, setExpandedDay] = useState<number>(selectedDay);
@@ -176,7 +180,7 @@ const SideBar = ({
   })();
 
   return (
-    <div className="w-full sm:w-80 lg:w-96 dark:bg-[#161616] border-r border-gray-200 dark:border-border h-screen flex flex-col">
+    <div className="w-full md:w-80 lg:w-96 dark:bg-[#161616] border-r border-gray-200 dark:border-border h-screen flex flex-col max-md:h-full max-md:border-r-0">
       <div className="p-4 shrink-0">
         <div className="dark:text-[#bebebe] text-[#4d4d4d] text-md font-bold">
           Current Plan
@@ -239,7 +243,7 @@ const SideBar = ({
                   {({ listeners }: any) => (
                     <div className="group space-y-2">
                       <div
-                        className={`flex items-center justify-between px-4 py-2 border-b border-dashed transition-colors cursor-pointer hover:bg-[#f6f6f6] dark:hover:bg-[#000000]/10 ${
+                        className={`flex items-center justify-between px-4 py-2 max-md:min-h-12 border-b border-dashed transition-colors cursor-pointer hover:bg-[#f6f6f6] dark:hover:bg-[#000000]/10 ${
                           isSelectMode && selectedDayIds.has(day.id)
                             ? "bg-[#fdf2f2] dark:bg-[#AD1B21]/10"
                             : ""
@@ -263,7 +267,7 @@ const SideBar = ({
                           ) : (
                             isEditable && (
                               <PiDotsSixVertical
-                                className="w-4 h-4 text-gray-400 dark:text-muted-foreground cursor-grab active:cursor-grabbing"
+                                className="w-4 h-4 max-md:w-5 max-md:h-5 touch-none text-gray-400 dark:text-muted-foreground cursor-grab active:cursor-grabbing"
                                 {...listeners}
                                 onClick={(e) => e.stopPropagation()}
                               />
@@ -302,7 +306,7 @@ const SideBar = ({
                                 }
                               >
                                 <MdExpandMore
-                                  className={`w-4 h-4 text-gray-400 dark:text-muted-foreground cursor-pointer transition-transform ${
+                                  className={`w-4 h-4 max-md:w-6 max-md:h-6 text-gray-400 dark:text-muted-foreground cursor-pointer transition-transform ${
                                     expandedDay === day.day_number
                                       ? "rotate-180"
                                       : ""
@@ -320,7 +324,7 @@ const SideBar = ({
                               {isEditable && currentPlan?.days.length > 1 && (
                                 <Pecha.DropdownMenu>
                                   <Pecha.DropdownMenuTrigger asChild>
-                                    <BsThreeDots className="w-3 h-3 text-gray-400 dark:text-muted-foreground cursor-pointer" />
+                                    <BsThreeDots className="w-3 h-3 max-md:w-8 max-md:h-8 max-md:p-2 text-gray-400 dark:text-muted-foreground cursor-pointer" />
                                   </Pecha.DropdownMenuTrigger>
                                   <Pecha.DropdownMenuContent side="right">
                                     <Pecha.DropdownMenuItem
@@ -388,7 +392,7 @@ const SideBar = ({
                               : "hidden"
                           }
                         >
-                          <div className="mx-2 border h-44 overflow-y-auto dark:bg-accent/30 bg-[#F5F5F5]">
+                          <div className="mx-2 border h-44 max-md:h-auto overflow-y-auto dark:bg-accent/30 bg-[#F5F5F5]">
                             <SortableList
                               items={getDisplayTasks(day).map((task: any) => ({
                                 id: task.id,
@@ -403,13 +407,13 @@ const SideBar = ({
                                 <SortableItem
                                   key={task.id}
                                   id={task.id}
-                                  className="flex items-center gap-x-2 bg-white dark:bg-[#161616] border-b border-gray-200 dark:border-input/40 justify-between py-2 pr-3 pl-1 text-sm text-foreground"
+                                  className="flex items-center gap-x-2 bg-white dark:bg-[#161616] border-b border-gray-200 dark:border-input/40 justify-between py-2 max-md:min-h-12 pr-3 pl-1 text-sm text-foreground"
                                 >
                                   {({ listeners }: any) => (
                                     <>
                                       {isEditable && (
                                         <PiDotsSixVertical
-                                          className="w-4 h-4 text-gray-400 dark:text-muted-foreground cursor-grab active:cursor-grabbing"
+                                          className="w-4 h-4 max-md:w-5 max-md:h-5 shrink-0 touch-none text-gray-400 dark:text-muted-foreground cursor-grab active:cursor-grabbing"
                                           {...listeners}
                                         />
                                       )}
@@ -431,7 +435,7 @@ const SideBar = ({
                                         <Pecha.DropdownMenu>
                                           <Pecha.DropdownMenuTrigger asChild>
                                             <BsThreeDots
-                                              className="w-3 h-3 text-gray-400 dark:text-muted-foreground cursor-pointer"
+                                              className="w-3 h-3 max-md:w-8 max-md:h-8 max-md:p-2 shrink-0 text-gray-400 dark:text-muted-foreground cursor-pointer"
                                               onClick={(e) =>
                                                 e.stopPropagation()
                                               }
@@ -468,6 +472,18 @@ const SideBar = ({
                           </div>
                         </Activity>
                       )}
+                      {!isSelectMode &&
+                        onAddTask &&
+                        selectedDay === day.day_number && (
+                          <button
+                            type="button"
+                            onClick={() => onAddTask(day.day_number)}
+                            className="mx-2 mb-2 flex min-h-11 w-[calc(100%-1rem)] items-center justify-center gap-2 rounded-md border border-dashed text-sm text-muted-foreground active:bg-accent"
+                          >
+                            <IoMdAdd className="h-4 w-4" />
+                            Add task to Day {day.day_number}
+                          </button>
+                        )}
                     </div>
                   )}
                 </SortableItem>

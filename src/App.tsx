@@ -4,11 +4,17 @@ import { setFontVariables } from "./config/font-config";
 import { useEffect } from "react";
 import { LANGUAGE } from "./lib/constant";
 import { AUTH_ROUTE_PATHS } from "./routes/paths";
+import { useIsMobile } from "./hooks/useIsMobile";
+import {
+  MobileTabBar,
+  MobileTopBar,
+} from "./components/ui/molecules/nav-bar/MobileNav";
 
 function App() {
   const location = useLocation();
 
   const hideNavbar = AUTH_ROUTE_PATHS.includes(location.pathname);
+  const isMobile = useIsMobile();
 
   // Token bootstrap and renewal live in PlanAuthProvider - they have to settle
   // before the route guards read `isLoggedIn`, which a layout-level effect
@@ -18,11 +24,13 @@ function App() {
   }, []);
 
   return (
-    <div className="flex h-screen w-full">
-      {!hideNavbar && <Navbar />}
-      <div className="flex-1 overflow-auto">
+    // A phone stacks a top bar, the page and a tab bar; desktop keeps the sidebar.
+    <div className="flex h-screen w-full max-md:h-dvh max-md:flex-col">
+      {!hideNavbar && (isMobile ? <MobileTopBar /> : <Navbar />)}
+      <div className="min-h-0 flex-1 overflow-auto max-md:relative">
         <Outlet />
       </div>
+      {!hideNavbar && isMobile && <MobileTabBar />}
     </div>
   );
 }

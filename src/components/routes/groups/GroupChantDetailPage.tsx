@@ -291,14 +291,16 @@ const GroupChantDetailPage = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between max-md:gap-2">
+        <div className="flex items-center gap-3 max-md:min-w-0">
           <Button variant="ghost" size="sm" asChild>
             <Link to={chantsListPath}>
               <IoMdArrowBack className="h-4 w-4" />
             </Link>
           </Button>
-          <h1 className="text-xl font-bold">{data.name}</h1>
+          <h1 className="text-xl font-bold max-md:truncate max-md:text-lg">
+            {data.name}
+          </h1>
         </div>
         {canWrite && !isEditMode && (
           <Button
