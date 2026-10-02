@@ -2519,6 +2519,24 @@ const LiveControlPage = () => {
     return driverLines.findIndex((segment) => segment.row === row);
   })();
 
+  /**
+   * Live: back to the line the room is on - the green one - when this screen
+   * has been left on another, and into view either way. Nothing is sent, as
+   * the room is already there. This screen never saw it arrive, so the line's
+   * time is not measured from here.
+   */
+  const goLive = () => {
+    if (roomLineIndex < 0) return;
+    if (roomLineIndex !== currentIndex) {
+      setHeldMoves((current) => (current.length > 0 ? [] : current));
+      heldLineRef.current = null;
+      setCurrentIndex(roomLineIndex);
+      setLineStartedAt(performance.now());
+    }
+    scrollLineIntoBand(roomLineIndex);
+  };
+  const offLive = roomLineIndex >= 0 && roomLineIndex !== currentIndex;
+
   /** The backend's current step, when it is this page's plan it is running:
    * as long as the backend holds it, the room's pace applied. */
   const autoplayStepDuration =
@@ -3416,16 +3434,32 @@ const LiveControlPage = () => {
               </p>
 
               {/* Next takes the room left over and stands tall enough to take a
-               * fresh finger each time; Previous stays smaller beside it - or
-               * below it, on a phone held sideways - so it is not the one hit by
-               * mistake. */}
+               * fresh finger each time; Live stays smaller beside it - or below
+               * it, on a phone held sideways - so it is not the one hit by
+               * mistake. Going back a line is left to ← and ↑. */}
               <div className="mt-2 flex items-stretch gap-3 max-lg:gap-2 max-lg:landscape:mt-0 max-lg:landscape:min-h-0 max-lg:landscape:flex-1 max-lg:landscape:flex-col-reverse">
                 <button
                   type="button"
-                  onClick={() => step(-1)}
-                  className="w-[28%] max-w-[200px] touch-manipulation cursor-pointer rounded-[9px] bg-[#2c2c2e] py-4 text-base font-semibold select-none hover:bg-[#3a3a3c] active:bg-[#48484a] max-lg:py-3 max-lg:text-[15px] max-lg:landscape:w-full max-lg:landscape:max-w-none"
+                  onClick={goLive}
+                  disabled={roomLineIndex < 0}
+                  title={
+                    roomLineIndex < 0
+                      ? "The room's line is not known yet"
+                      : "Go to the line the room is on"
+                  }
+                  className={`w-[28%] max-w-[200px] touch-manipulation cursor-pointer rounded-[9px] py-4 text-base font-semibold select-none disabled:cursor-not-allowed disabled:opacity-40 max-lg:py-3 max-lg:text-[15px] max-lg:landscape:w-full max-lg:landscape:max-w-none ${
+                    offLive
+                      ? // Green as the room's line is, so it is found the moment
+                        // this screen is somewhere else.
+                        "bg-[#0f2a17] text-[#30d158] outline-1 outline-dashed outline-[#30d158]/70 hover:bg-[#143820]"
+                      : "bg-[#2c2c2e] hover:bg-[#3a3a3c] active:bg-[#48484a]"
+                  }`}
                 >
-                  ← Previous
+                  <span
+                    aria-hidden="true"
+                    className="mr-1.5 inline-block h-2 w-2 rounded-full bg-[#30d158] align-[0.1em]"
+                  />
+                  Live
                 </button>
                 <button
                   type="button"
