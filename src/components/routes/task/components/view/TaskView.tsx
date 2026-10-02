@@ -196,7 +196,7 @@ const SubtaskCard = ({
           </div>
           {listeners && isEditable && (
             <PiDotsSixVertical
-              className="w-5 h-5 text-gray-400 dark:text-muted-foreground cursor-grab active:cursor-grabbing"
+              className="w-5 h-5 shrink-0 touch-none text-gray-400 dark:text-muted-foreground cursor-grab active:cursor-grabbing"
               {...listeners}
             />
           )}
@@ -277,9 +277,9 @@ const TaskView = ({
   const displaySubtasks = getDisplaySubtasks();
 
   return (
-    <div className="w-full my-4 h-[calc(100vh-40px)] bg-[#F5F5F5] border-dashed dark:bg-[#181818]  rounded-l-2xl border overflow-y-auto">
+    <div className="w-full my-4 h-[calc(100vh-40px)] bg-[#F5F5F5] border-dashed dark:bg-[#181818]  rounded-l-2xl border overflow-y-auto max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
       <div className=" space-y-4  overflow-y-auto">
-        <div className="flex p-4 items-center justify-between w-3/4">
+        <div className="flex p-4 items-center justify-between w-3/4 max-md:w-full">
           <h2 className="text-xl font-semibold">Task</h2>
           {isEditable && (
             <Pecha.Button
@@ -293,7 +293,7 @@ const TaskView = ({
           )}
         </div>
         <div className="p-4">
-          <div className="h-12 p-4 bg-white dark:bg-input/30 rounded-md lg:w-2/3 w-full text-base flex items-center border">
+          <div className="h-12 p-4 bg-white dark:bg-input/30 rounded-md lg:w-2/3 w-full text-base flex items-center border max-md:h-auto max-md:min-h-12 max-md:py-3">
             {isLoading ? (
               <Pecha.Skeleton className="h-6  w-1/2 rounded" />
             ) : (

@@ -25,23 +25,6 @@ export function isGroupVisibleInApp(status?: AuthorGroupStatus): boolean {
   return status === "PUBLISHED";
 }
 
-export const GROUP_TYPE_OPTIONS: {
-  value: AuthorGroupType;
-  label: string;
-  description: string;
-}[] = [
-  {
-    value: "PAGE",
-    label: "Page",
-    description: "Users follow this group to stay updated.",
-  },
-  {
-    value: "COMMUNITY",
-    label: "Community",
-    description: "Users join this group as members.",
-  },
-];
-
 export interface GroupMetadataDTO {
   id?: string;
   title: string;
@@ -261,14 +244,6 @@ export interface FetchGroupsParams {
 }
 
 export const TRANSFER_GROUPS_PAGE_LIMIT = 100;
-
-export function groupTypeLabel(groupType?: AuthorGroupType): string {
-  if (!groupType) return "—";
-  return (
-    GROUP_TYPE_OPTIONS.find((option) => option.value === groupType)?.label ??
-    groupType
-  );
-}
 
 export const fetchGroups = async ({
   page,

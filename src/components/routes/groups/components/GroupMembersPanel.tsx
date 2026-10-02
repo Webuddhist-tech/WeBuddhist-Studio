@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/atoms/button";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import { useUserInfo } from "@/hooks/useUserInfo";
 import { isReviewer, shouldShowCmsActionsColumn } from "@/lib/platformAccess";
-import { ROUTES } from "@/routes/paths";
 import {
   removeGroupMember,
   updateGroupMemberRole,
   type AuthorGroupMemberDTO,
   type AuthorGroupMemberRole,
+  type AuthorGroupType,
 } from "../api/groupsApi";
+import { groupKindOf } from "../lib/groupKind";
 import {
   canManageGroupInvites,
   canShowMemberRemovalAction,
@@ -30,10 +31,15 @@ import GroupTransferOwnershipDialog from "./GroupTransferOwnershipDialog";
 
 type GroupMembersPanelProps = {
   groupId: string;
+  groupType?: AuthorGroupType;
   members: AuthorGroupMemberDTO[];
 };
 
-const GroupMembersPanel = ({ groupId, members }: GroupMembersPanelProps) => {
+const GroupMembersPanel = ({
+  groupId,
+  groupType,
+  members,
+}: GroupMembersPanelProps) => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { data: userInfo } = useUserInfo();
@@ -87,7 +93,7 @@ const GroupMembersPanel = ({ groupId, members }: GroupMembersPanelProps) => {
       if (isSelf) {
         toast.success("You left the group");
         queryClient.invalidateQueries({ queryKey: ["cms-groups"] });
-        navigate(ROUTES.groups);
+        navigate(groupKindOf(groupType).listPath);
         return;
       }
       toast.success("Member removed");

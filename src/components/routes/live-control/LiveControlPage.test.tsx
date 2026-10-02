@@ -1311,7 +1311,7 @@ describe("LiveControlPage", () => {
     );
   });
 
-  it("steps over yigchung lines with Next and Previous, and sets them apart", async () => {
+  it("steps over yigchung lines with Next and back, and sets them apart", async () => {
     const user = userEvent.setup();
     localStorage.setItem("recitation_emit_token", "tok-123");
     fetchRecitationDetails.mockImplementation(
@@ -1363,7 +1363,7 @@ describe("LiveControlPage", () => {
       expect.any(String),
     );
 
-    await user.click(screen.getByRole("button", { name: "← Previous" }));
+    await pressKey("ArrowLeft");
     await waitFor(() =>
       expect(publishPosition).toHaveBeenLastCalledWith(
         "e1",
@@ -3036,7 +3036,7 @@ describe("LiveControlPage", () => {
       expect(screen.getByText(/line 2\/3/)).toBeInTheDocument();
     });
 
-    it("sends Previous mid-autoplay as the plan's step before", async () => {
+    it("sends a step back mid-autoplay as the plan's step before", async () => {
       fetchSegmentPlayTimes.mockResolvedValue(times);
       const user = await openForAutoplay();
       await user.click(autoButton());
@@ -3044,7 +3044,7 @@ describe("LiveControlPage", () => {
       await user.click(screen.getByRole("button", { name: "Next →" }));
       await waitFor(() => expect(sendAutoplayCommand).toHaveBeenCalledTimes(1));
 
-      await user.click(screen.getByRole("button", { name: "← Previous" }));
+      await pressKey("ArrowLeft");
 
       await waitFor(() =>
         expect(sendAutoplayCommand).toHaveBeenLastCalledWith(
@@ -3560,6 +3560,47 @@ describe("LiveControlPage", () => {
           /line 3 · root line 3/,
         ),
       );
+    });
+
+    it("takes the screen to the room's line with Live, sending nothing", async () => {
+      socketStore.set({
+        status: "open",
+        room: {
+          textId: "root",
+          segmentId: "root-s2",
+          index: 1,
+          roundNumber: 1,
+          revision: 5,
+        },
+        people: 1,
+      });
+      const user = await openForAutoplay();
+      const roomLine = () =>
+        screen.getByText("root line 2").closest("[data-line]");
+      expect(roomLine()).toHaveAttribute("data-room-here");
+
+      await user.click(screen.getByRole("button", { name: "Live" }));
+
+      expect(screen.getByText(/line 2\/3/)).toBeInTheDocument();
+      expect(roomLine()).not.toHaveAttribute("data-room-here");
+      expect(publishPosition).not.toHaveBeenCalled();
+
+      // Next goes on from the room's line, not from where the screen was.
+      await user.click(screen.getByRole("button", { name: "Next →" }));
+      await waitFor(() =>
+        expect(publishPosition).toHaveBeenLastCalledWith(
+          "e1",
+          "tok-123",
+          expect.objectContaining({ segmentId: "root-s3", index: 2 }),
+          expect.any(String),
+        ),
+      );
+    });
+
+    it("leaves Live off until the room's line is known", async () => {
+      await openForAutoplay();
+
+      expect(screen.getByRole("button", { name: "Live" })).toBeDisabled();
     });
 
     it("says why when the server turns the controller's socket away", async () => {

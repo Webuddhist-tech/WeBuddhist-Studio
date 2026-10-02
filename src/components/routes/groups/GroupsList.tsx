@@ -6,7 +6,6 @@ import {
 } from "@/components/ui/atoms/avatar";
 import { ROUTES } from "@/routes/paths";
 import {
-  groupTypeLabel,
   pickGroupTitle,
   resolveGroupAvatarUrl,
   type AuthorGroupListItem,
@@ -16,6 +15,7 @@ import GroupStatusBadge from "./components/GroupStatusBadge";
 interface GroupsListProps {
   groups: AuthorGroupListItem[];
   isLoading?: boolean;
+  loadingLabel: string;
 }
 
 const Stat = ({ label, value }: { label: string; value: string | number }) => (
@@ -25,13 +25,13 @@ const Stat = ({ label, value }: { label: string; value: string | number }) => (
   </div>
 );
 
-const GroupsList = ({ groups, isLoading }: GroupsListProps) => {
+const GroupsList = ({ groups, isLoading, loadingLabel }: GroupsListProps) => {
   const navigate = useNavigate();
 
   if (isLoading) {
     return (
       <p className="text-sm text-muted-foreground py-8 text-center">
-        Loading groups…
+        {loadingLabel}
       </p>
     );
   }
@@ -63,10 +63,6 @@ const GroupsList = ({ groups, isLoading }: GroupsListProps) => {
                   />
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-sm">
-                  <span className="text-muted-foreground">
-                    {groupTypeLabel(group.group_type)}
-                  </span>
-                  <span className="text-muted-foreground/50">·</span>
                   {group.is_public ? (
                     <span className="text-green-600 dark:text-green-400">
                       Public

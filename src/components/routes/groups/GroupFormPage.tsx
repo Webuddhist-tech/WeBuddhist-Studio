@@ -18,15 +18,22 @@ import { groupCoreSchema, type GroupCoreFormData } from "@/schema/GroupSchema";
 import {
   buildGroupMetadata,
   createGroup,
-  GROUP_TYPE_OPTIONS,
   languageLabelForCode,
   type AuthorGroupType,
 } from "./api/groupsApi";
 import GroupImageField from "./components/GroupImageField";
 import { GroupPageShell } from "./components/GroupPageShell";
+import { GROUP_KINDS } from "./lib/groupKind";
 
-/** Create-only group form. Editing lives on each group section page. */
-const GroupFormPage = () => {
+/**
+ * Create-only form for a practice space or a page; the route decides which.
+ * Editing lives on each group section page.
+ */
+const GroupFormPage = ({
+  groupType,
+}: Readonly<{ groupType: AuthorGroupType }>) => {
+  const kind = GROUP_KINDS[groupType];
+  const noun = kind.singular.toLowerCase();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -45,7 +52,7 @@ const GroupFormPage = () => {
     resolver: zodResolver(groupCoreSchema),
     defaultValues: {
       slug: "",
-      group_type: "PAGE" as AuthorGroupType,
+      group_type: groupType,
       is_public: true,
       languages: {
         EN: { title: "", sub_title: "", description: "", description_long: "" },
@@ -81,7 +88,7 @@ const GroupFormPage = () => {
   const createMutation = useMutation({
     mutationFn: createGroup,
     onSuccess: (data) => {
-      toast.success("Group created", {
+      toast.success(`${kind.singular} created`, {
         description:
           "It's a draft and isn't visible in the app yet — publish it when you're ready.",
       });
@@ -128,9 +135,12 @@ const GroupFormPage = () => {
 
   return (
     <GroupPageShell
-      backLabel="← Groups"
-      onBack={() => navigate(ROUTES.groups)}
-      title="Create group"
+      backLabel={`← ${kind.plural}`}
+      onBack={() => navigate(kind.listPath)}
+      title={`Create ${noun}`}
+      subtitle={
+        <p className="mt-2 text-sm text-muted-foreground">{kind.description}</p>
+      }
     >
       <div className="max-w-2xl mx-auto w-full p-4 sm:p-8 pb-12">
         <section className="space-y-6">
@@ -159,46 +169,6 @@ const GroupFormPage = () => {
               />
               <Pecha.FormField
                 control={form.control}
-                name="group_type"
-                render={({ field }) => (
-                  <Pecha.FormItem>
-                    <Pecha.FormLabel className="text-sm font-bold">
-                      Group type
-                      <span className="text-destructive"> *</span>
-                    </Pecha.FormLabel>
-                    <Pecha.Select
-                      value={field.value}
-                      onValueChange={field.onChange}
-                    >
-                      <Pecha.FormControl>
-                        <Pecha.SelectTrigger className="h-12 bg-white dark:bg-[#262626]">
-                          <Pecha.SelectValue placeholder="Select group type" />
-                        </Pecha.SelectTrigger>
-                      </Pecha.FormControl>
-                      <Pecha.SelectContent>
-                        {GROUP_TYPE_OPTIONS.map((option) => (
-                          <Pecha.SelectItem
-                            key={option.value}
-                            value={option.value}
-                          >
-                            {option.label}
-                          </Pecha.SelectItem>
-                        ))}
-                      </Pecha.SelectContent>
-                    </Pecha.Select>
-                    <p className="text-sm text-muted-foreground">
-                      {
-                        GROUP_TYPE_OPTIONS.find(
-                          (option) => option.value === field.value,
-                        )?.description
-                      }
-                    </p>
-                    <Pecha.FormMessage />
-                  </Pecha.FormItem>
-                )}
-              />
-              <Pecha.FormField
-                control={form.control}
                 name="is_public"
                 render={({ field }) => (
                   <Pecha.FormItem className="flex items-center gap-3">
@@ -211,7 +181,7 @@ const GroupFormPage = () => {
                       />
                     </Pecha.FormControl>
                     <Pecha.FormLabel className="text-sm font-bold !mt-0">
-                      Public group
+                      Public {noun}
                     </Pecha.FormLabel>
                   </Pecha.FormItem>
                 )}
@@ -351,7 +321,7 @@ const GroupFormPage = () => {
                   className="bg-[#A51C21] text-white hover:bg-[#A51C21]/90"
                   disabled={createMutation.isPending}
                 >
-                  {createMutation.isPending ? "Creating…" : "Create group"}
+                  {createMutation.isPending ? "Creating…" : `Create ${noun}`}
                 </Button>
               </div>
             </form>

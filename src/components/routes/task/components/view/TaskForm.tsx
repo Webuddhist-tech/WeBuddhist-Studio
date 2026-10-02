@@ -413,7 +413,7 @@ const TaskForm = ({
   };
 
   return (
-    <div className="w-full my-4 h-[calc(100vh-40px)] bg-[#F5F5F5] dark:bg-[#181818] rounded-l-2xl border border-dashed overflow-hidden flex flex-col">
+    <div className="w-full my-4 h-[calc(100vh-40px)] bg-[#F5F5F5] dark:bg-[#181818] rounded-l-2xl border border-dashed overflow-hidden flex flex-col max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
       <EditorTabSwitcher activeTab={activeTab} onTabChange={setActiveTab} />
 
       {activeTab === "notification" ? (
@@ -431,7 +431,7 @@ const TaskForm = ({
 
           <Pecha.Form {...form}>
             <form className="space-y-6" onSubmit={form.handleSubmit(onSubmit)}>
-              <div className="flex w-full p-4 lg:w-2/3 justify-between items-center gap-4">
+              <div className="flex w-full p-4 lg:w-2/3 justify-between items-center gap-4 max-md:flex-col max-md:items-stretch">
                 <TaskTitleField
                   isEditMode={isEditMode}
                   isTitleEditing={isTitleEditing}

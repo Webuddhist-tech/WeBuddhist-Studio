@@ -29,7 +29,7 @@ const EventUrlLinkRow = ({
   const renderRow = ({ listeners }: { listeners: Record<string, unknown> }) => (
     <>
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-2">
+        <div className="flex items-start gap-2 max-md:min-w-0 max-md:flex-1">
           {!readOnly ? (
             <button
               type="button"
@@ -46,7 +46,7 @@ const EventUrlLinkRow = ({
             control={form.control}
             name={`links.${index}.type`}
             render={({ field: typeField }) => (
-              <Pecha.FormItem className="w-48">
+              <Pecha.FormItem className="w-48 max-md:min-w-0 max-md:flex-1">
                 <Pecha.FormLabel>Type</Pecha.FormLabel>
                 <Pecha.Select
                   value={typeField.value}
@@ -75,7 +75,7 @@ const EventUrlLinkRow = ({
             control={form.control}
             name={`links.${index}.language`}
             render={({ field: langField }) => (
-              <Pecha.FormItem className="w-40">
+              <Pecha.FormItem className="w-40 max-md:min-w-0 max-md:flex-1">
                 <Pecha.FormLabel>Language</Pecha.FormLabel>
                 <Pecha.Select
                   value={langField.value}

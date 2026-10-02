@@ -287,11 +287,14 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
+      // Practice spaces and pages are both groups; the list and create routes
+      // fix the type, and the key keeps one list's search from carrying into the
+      // other.
       {
         path: ROUTES.groups,
         element: (
           <ProtectedRoute>
-            <Groups />
+            <Groups key="COMMUNITY" groupType="COMMUNITY" />
           </ProtectedRoute>
         ),
       },
@@ -299,7 +302,23 @@ const router = createBrowserRouter([
         path: ROUTES.groupNew,
         element: (
           <ProtectedRoute>
-            <GroupFormPage />
+            <GroupFormPage key="COMMUNITY" groupType="COMMUNITY" />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: ROUTES.pages,
+        element: (
+          <ProtectedRoute>
+            <Groups key="PAGE" groupType="PAGE" />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: ROUTES.pageNew,
+        element: (
+          <ProtectedRoute>
+            <GroupFormPage key="PAGE" groupType="PAGE" />
           </ProtectedRoute>
         ),
       },

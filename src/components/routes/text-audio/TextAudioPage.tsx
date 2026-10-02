@@ -212,7 +212,7 @@ const TextAudioPage = () => {
   const isUploading = uploadMutation.isPending;
 
   return (
-    <div className="flex flex-col border h-[calc(100vh-40px)] overflow-auto bg-[#F5F5F5] dark:bg-[#181818] my-4 rounded-l-2xl font-dynamic">
+    <div className="flex flex-col border h-[calc(100vh-40px)] overflow-auto bg-[#F5F5F5] dark:bg-[#181818] my-4 rounded-l-2xl font-dynamic max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
       <div className="px-4 pt-10 pb-4 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">Text audio</h1>

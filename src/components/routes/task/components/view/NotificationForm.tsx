@@ -190,14 +190,14 @@ export const NotificationForm = ({
 
   if (isLoading) {
     return (
-      <div className="w-full my-4 h-[calc(100vh-40px)] bg-[#F5F5F5] dark:bg-[#181818] rounded-l-2xl border border-dashed flex items-center justify-center">
+      <div className="w-full my-4 h-[calc(100vh-40px)] bg-[#F5F5F5] dark:bg-[#181818] rounded-l-2xl border border-dashed flex items-center justify-center max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
         <p className="text-gray-500">Loading...</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full my-4 h-[calc(100vh-40px)] bg-[#F5F5F5] dark:bg-[#181818] rounded-l-2xl border border-dashed overflow-y-auto">
+    <div className="w-full my-4 h-[calc(100vh-40px)] bg-[#F5F5F5] dark:bg-[#181818] rounded-l-2xl border border-dashed overflow-y-auto max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
       <div className="p-4">
         <Pecha.Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">

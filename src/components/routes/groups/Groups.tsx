@@ -8,15 +8,11 @@ import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import AuthButton from "@/components/ui/molecules/auth-button/AuthButton";
 import { getApiErrorMessage } from "@/lib/apiErrors";
-import { ROUTES } from "@/routes/paths";
-import {
-  fetchGroups,
-  GROUP_TYPE_OPTIONS,
-  type AuthorGroupType,
-} from "./api/groupsApi";
+import { fetchGroups, type AuthorGroupType } from "./api/groupsApi";
 import { GroupListShell } from "./components/GroupPageShell";
 import GroupsList from "./GroupsList";
 import PendingGroupInvitationsBlock from "./components/PendingGroupInvitationsBlock";
+import { GROUP_KINDS } from "./lib/groupKind";
 
 const PAGE_SIZE = 10;
 
@@ -24,10 +20,12 @@ function GroupsLoadMoreStatus({
   isFetchingNextPage,
   hasNextPage,
   hasGroups,
+  plural,
 }: Readonly<{
   isFetchingNextPage: boolean;
   hasNextPage: boolean;
   hasGroups: boolean;
+  plural: string;
 }>) {
   if (isFetchingNextPage) {
     return <p className="text-sm text-muted-foreground">Loading more…</p>;
@@ -36,14 +34,19 @@ function GroupsLoadMoreStatus({
     return <span className="h-4" aria-hidden />;
   }
   if (hasGroups) {
-    return <p className="text-sm text-muted-foreground">All groups loaded</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        All {plural.toLowerCase()} loaded
+      </p>
+    );
   }
   return null;
 }
 
-const Groups = () => {
+/** Lists one type of group: practice spaces (communities) or pages. */
+const Groups = ({ groupType }: Readonly<{ groupType: AuthorGroupType }>) => {
+  const kind = GROUP_KINDS[groupType];
   const [search, setSearch] = useState("");
-  const [groupType, setGroupType] = useState<AuthorGroupType | "">("COMMUNITY");
   const [debouncedSearch] = useDebounce(search, 500);
 
   const {
@@ -60,7 +63,7 @@ const Groups = () => {
         page: pageParam,
         limit: PAGE_SIZE,
         search: debouncedSearch,
-        group_type: groupType || undefined,
+        group_type: groupType,
       }),
     getNextPageParam: (lastPage, allPages) => {
       const totalFetched = allPages.reduce(
@@ -92,16 +95,18 @@ const Groups = () => {
   if (error) {
     listContent = (
       <p className="text-sm text-red-500 py-8">
-        Failed to load groups. {getApiErrorMessage(error)}
+        Failed to load {kind.plural.toLowerCase()}. {getApiErrorMessage(error)}
       </p>
     );
   } else if (isEmpty) {
     listContent = (
       <div className="flex flex-col h-full items-center justify-center">
-        <p className="text-base text-muted-foreground">No groups found</p>
+        <p className="text-base text-muted-foreground">
+          No {kind.plural.toLowerCase()} found
+        </p>
         <Button variant="outline" className="mt-2" asChild>
-          <Link to={ROUTES.groupNew}>
-            <IoMdAdd /> Create group
+          <Link to={kind.newPath}>
+            <IoMdAdd /> Create {kind.singular.toLowerCase()}
           </Link>
         </Button>
       </div>
@@ -109,12 +114,17 @@ const Groups = () => {
   } else {
     listContent = (
       <>
-        <GroupsList groups={groups} isLoading={isLoading} />
+        <GroupsList
+          groups={groups}
+          isLoading={isLoading}
+          loadingLabel={`Loading ${kind.plural.toLowerCase()}…`}
+        />
         <div ref={sentinelRef} className="w-full py-4 flex justify-center">
           <GroupsLoadMoreStatus
             isFetchingNextPage={isFetchingNextPage}
             hasNextPage={Boolean(hasNextPage)}
             hasGroups={groups.length > 0}
+            plural={kind.plural}
           />
         </div>
       </>
@@ -129,39 +139,20 @@ const Groups = () => {
             <div className="border w-fit px-2 bg-white dark:bg-input/30 rounded-md border-gray-200 dark:border-[#313132] flex items-center">
               <IoMdSearch className="w-4 h-4" />
               <Pecha.Input
-                placeholder="Search groups…"
+                placeholder={`Search ${kind.plural.toLowerCase()}…`}
                 className="rounded-md border-none dark:bg-transparent px-4 shadow-none py-2"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
               />
             </div>
 
-            <Pecha.Select
-              value={groupType || "all"}
-              onValueChange={(v) =>
-                setGroupType(v === "all" ? "" : (v as AuthorGroupType))
-              }
-            >
-              <Pecha.SelectTrigger className="w-36 bg-white dark:bg-input/30">
-                <Pecha.SelectValue placeholder="Type" />
-              </Pecha.SelectTrigger>
-              <Pecha.SelectContent>
-                <Pecha.SelectItem value="all">All types</Pecha.SelectItem>
-                {GROUP_TYPE_OPTIONS.map((option) => (
-                  <Pecha.SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </Pecha.SelectItem>
-                ))}
-              </Pecha.SelectContent>
-            </Pecha.Select>
-
             <Button
               variant="outline"
               className="bg-gray-100 hover:bg-gray-200"
               asChild
             >
-              <Link to={ROUTES.groupNew}>
-                <IoMdAdd /> New group
+              <Link to={kind.newPath}>
+                <IoMdAdd /> New {kind.singular.toLowerCase()}
               </Link>
             </Button>
           </div>

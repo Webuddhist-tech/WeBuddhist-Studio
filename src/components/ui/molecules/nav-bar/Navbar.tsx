@@ -1,29 +1,12 @@
 import { useEffect, useState, type ReactNode } from "react";
 import pechaIcon from "../../../../assets/icon/pecha_icon.png";
-import { Link, useLocation } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { ModeToggle } from "../mode-toggle/modetoggle";
 import {
-  IoAnalytics,
-  IoPricetags,
-  IoPeople,
-  IoPulse,
-  IoBook,
-  IoBookOutline,
-  IoDocumentTextOutline,
-  IoHeartOutline,
   IoChevronBack,
   IoChevronForward,
   IoChevronDown,
 } from "react-icons/io5";
-import {
-  MdAudioFile,
-  MdDashboard,
-  MdAdminPanelSettings,
-  MdOutlineReportProblem,
-  MdPublicOff,
-  MdMusicNote,
-} from "react-icons/md";
-import { ROUTES } from "@/routes/paths";
 import { SIDEBAR_EXPANDED, SIDEBAR_OPEN_SECTIONS } from "@/lib/constant";
 import { LanguageToggle } from "../language-toggle/languageToggle";
 import AuthLogout from "../auth-logout/AuthLogout";
@@ -34,124 +17,7 @@ import {
   TooltipTrigger,
 } from "../../atoms/tooltip";
 import AuthAvatar from "@/components/ui/molecules/auth-avatar/AuthAvatar";
-import { useUserInfo } from "@/hooks/useUserInfo";
-import {
-  canAccessAdminAuthors,
-  canManageAmbientSounds,
-  isStaffRole,
-} from "@/lib/platformAccess";
-
-type NavItem = {
-  icon: ReactNode;
-  label: string;
-  path: string;
-  tooltip: string;
-};
-
-type NavSection = {
-  id: string;
-  label: string;
-  items: NavItem[];
-};
-
-/** Everyday destinations, left out of the sections so they stay one click away. */
-const pinnedItems: NavItem[] = [
-  {
-    icon: <MdDashboard className="w-4 h-4" />,
-    label: "Dashboard",
-    path: ROUTES.dashboard,
-    tooltip: "Go to dashboard",
-  },
-  {
-    icon: <IoAnalytics className="w-4 h-4" />,
-    label: "Analytics",
-    path: ROUTES.analytics,
-    tooltip: "View analytics",
-  },
-  {
-    icon: <IoPeople className="w-4 h-4" />,
-    label: "Groups",
-    path: ROUTES.groups,
-    tooltip: "Manage author groups",
-  },
-];
-
-const contentItems: NavItem[] = [
-  {
-    icon: <IoBookOutline className="w-4 h-4" />,
-    label: "Verse of Day",
-    path: ROUTES.verseOfDay,
-    tooltip: "Verse of Day",
-  },
-  {
-    icon: <IoDocumentTextOutline className="w-4 h-4" />,
-    label: "Poems",
-    path: ROUTES.poems,
-    tooltip: "Poems",
-  },
-  {
-    icon: <MdAudioFile className="w-4 h-4" />,
-    label: "Text audio",
-    path: ROUTES.textAudio,
-    tooltip: "Manage text audio",
-  },
-];
-
-const configurationItems: NavItem[] = [
-  {
-    icon: <IoPricetags className="w-4 h-4" />,
-    label: "Tags",
-    path: ROUTES.tags,
-    tooltip: "Manage tags",
-  },
-  {
-    icon: <IoBook className="w-4 h-4" />,
-    label: "Traditions",
-    path: ROUTES.traditions,
-    tooltip: "Manage traditions",
-  },
-  {
-    icon: <IoPulse className="w-4 h-4" />,
-    label: "Presets",
-    path: ROUTES.accumulatorPresets,
-    tooltip: "Manage accumulator presets",
-  },
-];
-
-const administrationItems: NavItem[] = [
-  {
-    icon: <MdAdminPanelSettings className="w-4 h-4" />,
-    label: "Authors",
-    path: ROUTES.adminAuthors,
-    tooltip: "Author administration",
-  },
-  {
-    icon: <MdPublicOff className="w-4 h-4" />,
-    label: "China",
-    path: ROUTES.adminChinaRestrictions,
-    tooltip: "China content restrictions",
-  },
-  {
-    icon: <MdOutlineReportProblem className="w-4 h-4" />,
-    label: "Chat Reports",
-    path: ROUTES.adminChatReports,
-    tooltip: "Chat moderation reports",
-  },
-  {
-    icon: <IoHeartOutline className="w-4 h-4" />,
-    label: "Prayer intentions",
-    path: ROUTES.prayerIntentions,
-    tooltip: "Prayer intentions catalog",
-  },
-];
-
-/** Super Admin only, but it reads as one of the media catalogues. */
-const ambientSoundsItem: NavItem = {
-  icon: <MdMusicNote className="w-4 h-4" />,
-  label: "Ambient Sounds",
-  path: ROUTES.ambientSounds,
-  tooltip: "Manage ambient sound catalog",
-};
+import { useNavModel, type NavItem } from "./useNavModel";
 
 const tooltipItems = [
   {
@@ -177,20 +43,6 @@ const tooltipItems = [
     label: "Logout",
   },
 ];
-
-/** Section landing pages own every route beneath them, so match on the prefix. */
-const SECTION_PATHS: string[] = [
-  ROUTES.groups,
-  ROUTES.adminAuthors,
-  ROUTES.adminChinaRestrictions,
-  ROUTES.adminChatReports,
-];
-
-const isActivePath = (itemPath: string, currentPath: string) => {
-  if (currentPath === itemPath) return true;
-  if (itemPath === ROUTES.dashboard && currentPath === "/") return true;
-  return SECTION_PATHS.includes(itemPath) && currentPath.startsWith(itemPath);
-};
 
 /** Tailwind's `md`. Narrower than this, a 224px sidebar crowds out the page. */
 const WIDE_VIEWPORT_MIN_WIDTH = 768;
@@ -226,51 +78,16 @@ const readStoredOpenSections = (): string[] => {
 };
 
 const Navbar = () => {
-  const location = useLocation();
-  const { data: userInfo, isLoading: isUserInfoLoading } = useUserInfo();
+  const {
+    pathname,
+    homePath,
+    isActive,
+    visiblePinnedItems,
+    sections,
+    activeSectionId,
+  } = useNavModel();
   const [expanded, setExpanded] = useState(readStoredExpanded);
   const [openSections, setOpenSections] = useState(readStoredOpenSections);
-  const showAdminAuthors = canAccessAdminAuthors(userInfo?.platform_role);
-  /** Reviewers reach the admin section, but this catalogue is Super Admin only. */
-  const showAmbientSounds = canManageAmbientSounds(userInfo?.platform_role);
-  /** Plain CREATOR accounts only manage their author groups — no other CMS pages. */
-  const isGroupsOnly =
-    !isUserInfoLoading && !isStaffRole(userInfo?.platform_role);
-
-  const visiblePinnedItems = isGroupsOnly
-    ? pinnedItems.filter((item) => item.path === ROUTES.groups)
-    : pinnedItems;
-
-  /** A CREATOR sees a single link, so grouping it under a header would be noise. */
-  const sections: NavSection[] = isGroupsOnly
-    ? []
-    : [
-        {
-          id: "content",
-          label: "Content",
-          items: showAmbientSounds
-            ? [...contentItems, ambientSoundsItem]
-            : contentItems,
-        },
-        {
-          id: "configuration",
-          label: "Configuration",
-          items: configurationItems,
-        },
-        ...(showAdminAuthors
-          ? [
-              {
-                id: "administration",
-                label: "Administration",
-                items: administrationItems,
-              },
-            ]
-          : []),
-      ];
-
-  const activeSectionId = sections.find((section) =>
-    section.items.some((item) => isActivePath(item.path, location.pathname)),
-  )?.id;
 
   /**
    * The section you are working in opens itself, so the current page is never
@@ -284,7 +101,7 @@ const Navbar = () => {
         ? previous
         : [...previous, activeSectionId],
     );
-  }, [activeSectionId, location.pathname]);
+  }, [activeSectionId, pathname]);
 
   const toggleSection = (id: string) => {
     setOpenSections((previous) => {
@@ -329,10 +146,11 @@ const Navbar = () => {
       <Link
         to={item.path}
         aria-label={item.tooltip}
+        aria-current={isActive(item.path) ? "page" : undefined}
         className={`flex items-center rounded-md border p-2 transition-all duration-300 hover:cursor-pointer hover:text-black dark:hover:text-white ${
           expanded ? "w-full gap-3" : "justify-center"
         } ${expanded && nested ? "ml-2" : ""} ${
-          isActivePath(item.path, location.pathname)
+          isActive(item.path)
             ? "text-zinc-900 dark:text-zinc-100"
             : "text-zinc-400 dark:text-zinc-600"
         }`}
@@ -361,7 +179,7 @@ const Navbar = () => {
             }`}
           >
             <Link
-              to={isGroupsOnly ? ROUTES.groups : ROUTES.dashboard}
+              to={homePath}
               className="group flex items-center gap-2 overflow-hidden"
             >
               <img

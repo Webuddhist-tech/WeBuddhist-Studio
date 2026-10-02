@@ -138,6 +138,41 @@ export const reorderTasks = async (
   return data;
 };
 
+/**
+ * How the reader opens a task by default. A panel can be open with no text
+ * id: the reader then shows the list of commentaries/translations without
+ * opening one. The ids are OpenPecha text ids. Only one task per day is live.
+ */
+export interface TaskSettings {
+  is_commentary_open: boolean;
+  commentary_text_id: string | null;
+  is_translation_open: boolean;
+  translation_text_id: string | null;
+  is_live: boolean;
+}
+
+export const DEFAULT_TASK_SETTINGS: TaskSettings = {
+  is_commentary_open: false,
+  commentary_text_id: null,
+  is_translation_open: false,
+  translation_text_id: null,
+  is_live: false,
+};
+
+export const updateTaskSettings = async (
+  task_id: string,
+  settings: TaskSettings,
+) => {
+  const { data } = await axiosInstance.put<TaskSettings>(
+    `/api/v1/cms/tasks/${task_id}/settings`,
+    settings,
+    {
+      headers: getAuthHeaders(),
+    },
+  );
+  return data;
+};
+
 export interface GenerateDayAudioOptions {
   language: string;
   type?: string;
