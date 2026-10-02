@@ -5,9 +5,9 @@ import { groupKindOf } from "@/components/routes/groups/lib/groupKind";
 import { ROUTES } from "@/routes/paths";
 
 /**
- * Temples and pages share the `/groups/:groupId` routes, so only the open group
- * knows which list it belongs to. Reuses GroupLayout's query, so it adds no
- * request. `listPath` stays undefined while that group is still loading.
+ * Practice spaces and pages share the `/groups/:groupId` routes, so only the
+ * open group knows which list it belongs to. Reuses GroupLayout's query, so it
+ * adds no request. `listPath` stays undefined while that group is still loading.
  */
 export function useOpenGroupListPath(pathname: string): {
   isGroupRoute: boolean;

@@ -287,8 +287,9 @@ const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-      // Temples and pages are both groups; the list and create routes fix the
-      // type, and the key keeps one list's search from carrying into the other.
+      // Practice spaces and pages are both groups; the list and create routes
+      // fix the type, and the key keeps one list's search from carrying into the
+      // other.
       {
         path: ROUTES.groups,
         element: (

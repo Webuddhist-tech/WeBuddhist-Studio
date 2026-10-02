@@ -38,6 +38,7 @@ import {
 } from "./api/eventsApi";
 import { formatCoordinates, hasCoordinates } from "./api/locationsApi";
 import LocationMap from "./components/locations/LocationMap";
+import PrayerPdfActions from "./components/prayer-pdf/PrayerPdfActions";
 
 const languageLabel = (code: string) => getLanguageLabel(code);
 
@@ -259,6 +260,7 @@ const GroupEventDetailPage = () => {
               <LuRadio className="h-4 w-4" />
               Live control
             </Pecha.Button>
+            <PrayerPdfActions scope={{ kind: "event", eventId: data.id }} />
             <Pecha.Button
               variant="outline"
               size="sm"

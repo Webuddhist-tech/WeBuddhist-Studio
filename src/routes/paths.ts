@@ -21,7 +21,7 @@ export const ROUTES = {
   verseOfDay: "/verse-of-day",
   poems: "/poems",
   prayerIntentions: "/prayer-intentions",
-  /** Lists the COMMUNITY groups, which the CMS calls temples. */
+  /** Lists the COMMUNITY groups, which the CMS calls practice spaces. */
   groups: "/groups",
   groupNew: "/groups/new",
   /** Lists the PAGE groups. Opening one still lands on its `/groups/:id` routes. */

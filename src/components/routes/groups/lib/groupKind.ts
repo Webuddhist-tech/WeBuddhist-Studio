@@ -12,15 +12,16 @@ export type GroupKind = {
 };
 
 /**
- * A COMMUNITY group is presented as a temple and a PAGE group as a page. Each
- * has its own list and create route, so the type is fixed by where you start.
+ * A COMMUNITY group is presented as a practice space and a PAGE group as a
+ * page. Each has its own list and create route, so the type is fixed by where
+ * you start.
  */
 export const GROUP_KINDS: Record<AuthorGroupType, GroupKind> = {
   COMMUNITY: {
     type: "COMMUNITY",
-    singular: "Temple",
-    plural: "Temples",
-    description: "Users join a temple as members.",
+    singular: "Practice space",
+    plural: "Practice spaces",
+    description: "Users join a practice space as members.",
     listPath: ROUTES.groups,
     newPath: ROUTES.groupNew,
   },

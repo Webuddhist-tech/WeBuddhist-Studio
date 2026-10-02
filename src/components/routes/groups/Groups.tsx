@@ -43,7 +43,7 @@ function GroupsLoadMoreStatus({
   return null;
 }
 
-/** Lists one type of group: temples (communities) or pages. */
+/** Lists one type of group: practice spaces (communities) or pages. */
 const Groups = ({ groupType }: Readonly<{ groupType: AuthorGroupType }>) => {
   const kind = GROUP_KINDS[groupType];
   const [search, setSearch] = useState("");

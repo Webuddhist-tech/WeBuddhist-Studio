@@ -40,6 +40,8 @@ import { GroupPageShell } from "./components/GroupPageShell";
 import GroupStatusBadge from "./components/GroupStatusBadge";
 import GroupPublishControl from "./components/GroupPublishControl";
 import { groupKindOf } from "./lib/groupKind";
+import { canWriteEvents } from "./lib/eventPermissions";
+import PrayerPdfActions from "./components/prayer-pdf/PrayerPdfActions";
 import type { UserInfo } from "@/hooks/useUserInfo";
 
 export type GroupOutletContext = {
@@ -133,7 +135,7 @@ const GroupLayout = () => {
           {getApiErrorMessage(error, "Could not load this group")}
         </p>
         <Button variant="outline" onClick={() => navigate(ROUTES.groups)}>
-          Back to temples
+          Back to practice spaces
         </Button>
       </div>
     );
@@ -153,6 +155,9 @@ const GroupLayout = () => {
   const pendingCount = pendingJoinRequests?.total ?? 0;
   const showDelete = !readOnlyPlatform && canDelete;
   const canPublishGroup = !readOnlyPlatform && canChangeGroupStatus(myRole);
+  // Same roles the server lets export prayer requests; reviewers are excluded there too.
+  const canExportPrayers =
+    !readOnlyPlatform && canWriteEvents(myRole, userInfo?.platform_role);
   const nameMatches =
     confirmName.trim().toLowerCase() === groupTitle.trim().toLowerCase();
   const isAboutSection =
@@ -202,6 +207,9 @@ const GroupLayout = () => {
         }
         headerActions={
           <>
+            {canExportPrayers ? (
+              <PrayerPdfActions scope={{ kind: "group", groupId: group.id }} />
+            ) : null}
             {canPublishGroup ? <GroupPublishControl group={group} /> : null}
             {showDelete ? (
               <Button

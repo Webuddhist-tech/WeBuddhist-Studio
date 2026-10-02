@@ -26,8 +26,8 @@ import { GroupPageShell } from "./components/GroupPageShell";
 import { GROUP_KINDS } from "./lib/groupKind";
 
 /**
- * Create-only form for a temple or a page; the route decides which. Editing
- * lives on each group section page.
+ * Create-only form for a practice space or a page; the route decides which.
+ * Editing lives on each group section page.
  */
 const GroupFormPage = ({
   groupType,

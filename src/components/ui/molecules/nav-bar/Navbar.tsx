@@ -22,7 +22,7 @@ import {
   MdOutlineReportProblem,
   MdPublicOff,
   MdMusicNote,
-  MdTempleBuddhist,
+  MdSelfImprovement,
 } from "react-icons/md";
 import { ROUTES } from "@/routes/paths";
 import { SIDEBAR_EXPANDED, SIDEBAR_OPEN_SECTIONS } from "@/lib/constant";
@@ -71,10 +71,10 @@ const pinnedItems: NavItem[] = [
     tooltip: "View analytics",
   },
   {
-    icon: <MdTempleBuddhist className="w-4 h-4" />,
-    label: "Temples",
+    icon: <MdSelfImprovement className="w-4 h-4" />,
+    label: "Practice spaces",
     path: ROUTES.groups,
-    tooltip: "Manage temples",
+    tooltip: "Manage practice spaces",
   },
   {
     icon: <IoNewspaperOutline className="w-4 h-4" />,
@@ -245,14 +245,15 @@ const Navbar = () => {
   const showAdminAuthors = canAccessAdminAuthors(userInfo?.platform_role);
   /** Reviewers reach the admin section, but this catalogue is Super Admin only. */
   const showAmbientSounds = canManageAmbientSounds(userInfo?.platform_role);
-  /** Plain CREATOR accounts only manage their temples and pages — no other CMS pages. */
+  /** Plain CREATOR accounts only manage their practice spaces and pages — no
+   * other CMS pages. */
   const isGroupsOnly =
     !isUserInfoLoading && !isStaffRole(userInfo?.platform_role);
   const openGroup = useOpenGroupListPath(location.pathname);
 
   /**
-   * Inside a temple or page the URL alone can't say which list it came from,
-   * so neither lights up until the group's type is known.
+   * Inside a practice space or page the URL alone can't say which list it came
+   * from, so neither lights up until the group's type is known.
    */
   const isActive = (itemPath: string) =>
     openGroup.isGroupRoute && GROUP_LIST_PATHS.includes(itemPath)
