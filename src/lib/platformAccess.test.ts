@@ -68,6 +68,8 @@ describe("platformAccess", () => {
   it("gates routes without group for creators only", () => {
     expect(isPathAllowedWithoutGroup("/groups")).toBe(true);
     expect(isPathAllowedWithoutGroup("/groups/abc")).toBe(true);
+    expect(isPathAllowedWithoutGroup("/pages")).toBe(true);
+    expect(isPathAllowedWithoutGroup("/pages/new")).toBe(true);
     expect(isPathAllowedWithoutGroup("/admin/authors")).toBe(true);
     expect(isPathAllowedWithoutGroup("/dashboard")).toBe(false);
     expect(

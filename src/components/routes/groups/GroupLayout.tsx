@@ -39,6 +39,7 @@ import { fetchGroupJoinRequests } from "./api/groupJoinRequestsApi";
 import { GroupPageShell } from "./components/GroupPageShell";
 import GroupStatusBadge from "./components/GroupStatusBadge";
 import GroupPublishControl from "./components/GroupPublishControl";
+import { groupKindOf } from "./lib/groupKind";
 import type { UserInfo } from "@/hooks/useUserInfo";
 
 export type GroupOutletContext = {
@@ -96,14 +97,17 @@ const GroupLayout = () => {
     refetchOnWindowFocus: true,
   });
 
+  const kind = groupKindOf(group?.group_type);
+  const noun = kind.singular.toLowerCase();
+
   const deleteMutation = useMutation({
     mutationFn: () => deleteGroup(groupId!),
     onSuccess: () => {
-      toast.success("Group deleted");
+      toast.success(`${kind.singular} deleted`);
       setDeleteOpen(false);
       setConfirmName("");
       queryClient.invalidateQueries({ queryKey: ["cms-groups"] });
-      navigate(ROUTES.groups);
+      navigate(kind.listPath);
     },
     onError: (err) => toast.error(getApiErrorMessage(err)),
   });
@@ -117,7 +121,7 @@ const GroupLayout = () => {
   if (isLoading) {
     return (
       <div className="flex h-[calc(100vh-40px)] items-center justify-center text-muted-foreground">
-        Loading group…
+        Loading…
       </div>
     );
   }
@@ -129,7 +133,7 @@ const GroupLayout = () => {
           {getApiErrorMessage(error, "Could not load this group")}
         </p>
         <Button variant="outline" onClick={() => navigate(ROUTES.groups)}>
-          Back to groups
+          Back to temples
         </Button>
       </div>
     );
@@ -184,8 +188,8 @@ const GroupLayout = () => {
   return (
     <>
       <GroupPageShell
-        backLabel="← Groups"
-        onBack={() => navigate(ROUTES.groups)}
+        backLabel={`← ${kind.plural}`}
+        onBack={() => navigate(kind.listPath)}
         title={groupTitle}
         avatarUrl={avatarUrl}
         subtitle={
@@ -294,10 +298,10 @@ const GroupLayout = () => {
       >
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
-            <Pecha.AlertDialogTitle>Delete group?</Pecha.AlertDialogTitle>
+            <Pecha.AlertDialogTitle>Delete {noun}?</Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
               This will permanently remove &ldquo;{groupTitle}&rdquo;. This
-              action cannot be undone. Type the group name to confirm.
+              action cannot be undone. Type the {noun} name to confirm.
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <div className="space-y-2 py-2">
@@ -305,7 +309,7 @@ const GroupLayout = () => {
               htmlFor="delete-group-confirm-name"
               className="text-sm font-medium"
             >
-              Group name
+              {kind.singular} name
             </label>
             <Pecha.Input
               id="delete-group-confirm-name"

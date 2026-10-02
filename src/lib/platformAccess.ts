@@ -67,6 +67,7 @@ export function isAuthorNotActiveError(error: unknown): boolean {
 /** Routes allowed when a CREATOR has no group yet. */
 export const NO_GROUP_ALLOWED_PREFIXES = [
   "/groups",
+  "/pages",
   "/profile",
   "/admin/authors",
   "/admin/china-restrictions",

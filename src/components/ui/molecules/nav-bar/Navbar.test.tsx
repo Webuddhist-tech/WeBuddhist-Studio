@@ -1,5 +1,7 @@
+import type { ReactNode } from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, MemoryRouter, useNavigate } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SIDEBAR_EXPANDED, SIDEBAR_OPEN_SECTIONS } from "@/lib/constant";
@@ -9,13 +11,40 @@ vi.mock("@/hooks/useUserInfo", () => ({
   useUserInfo: vi.fn(),
 }));
 
+vi.mock("@/components/routes/groups/api/groupsApi", () => ({
+  fetchGroup: vi.fn(),
+}));
+
 import { useUserInfo } from "@/hooks/useUserInfo";
+import {
+  fetchGroup,
+  type AuthorGroupDetailDTO,
+} from "@/components/routes/groups/api/groupsApi";
+
+const withQueryClient = (children: ReactNode) => (
+  <QueryClientProvider
+    client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+  >
+    {children}
+  </QueryClientProvider>
+);
 
 const renderNavbar = () =>
   render(
-    <BrowserRouter>
-      <Navbar />
-    </BrowserRouter>,
+    withQueryClient(
+      <BrowserRouter>
+        <Navbar />
+      </BrowserRouter>,
+    ),
+  );
+
+const renderNavbarAt = (path: string) =>
+  render(
+    withQueryClient(
+      <MemoryRouter initialEntries={[path]}>
+        <Navbar />
+      </MemoryRouter>,
+    ),
   );
 
 /**
@@ -45,7 +74,7 @@ describe("Navbar", () => {
     window.innerWidth = 1024;
   });
 
-  it("shows only the Groups link for a CREATOR account", () => {
+  it("shows only the Temples and Pages links for a CREATOR account", () => {
     vi.mocked(useUserInfo).mockReturnValue({
       data: { id: "1", platform_role: "CREATOR" },
       isLoading: false,
@@ -55,8 +84,12 @@ describe("Navbar", () => {
     renderNavbar();
 
     expect(
-      screen.getByRole("link", { name: /manage author groups/i }),
-    ).toBeInTheDocument();
+      screen.getByRole("link", { name: /manage temples/i }),
+    ).toHaveAttribute("href", "/groups");
+    expect(screen.getByRole("link", { name: /manage pages/i })).toHaveAttribute(
+      "href",
+      "/pages",
+    );
     expect(
       screen.queryByRole("link", { name: /go to dashboard/i }),
     ).not.toBeInTheDocument();
@@ -77,7 +110,7 @@ describe("Navbar", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("points the logo link to Groups for a CREATOR account", () => {
+  it("points the logo link to Temples for a CREATOR account", () => {
     vi.mocked(useUserInfo).mockReturnValue({
       data: { id: "1", platform_role: "CREATOR" },
       isLoading: false,
@@ -109,7 +142,7 @@ describe("Navbar", () => {
       screen.getByRole("link", { name: /manage tags/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /manage author groups/i }),
+      screen.getByRole("link", { name: /manage temples/i }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: /author administration/i }),
@@ -150,7 +183,7 @@ describe("Navbar", () => {
       screen.getByRole("link", { name: /go to dashboard/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /manage author groups/i }),
+      screen.getByRole("link", { name: /manage temples/i }),
     ).toBeInTheDocument();
   });
 
@@ -271,7 +304,8 @@ describe("Navbar", () => {
     renderNavbar();
 
     // Pinned items stand alone; the rest wait behind a header.
-    expect(screen.getByText("Groups")).toBeInTheDocument();
+    expect(screen.getByText("Temples")).toBeInTheDocument();
+    expect(screen.getByText("Pages")).toBeInTheDocument();
     expect(screen.queryByText("Verse of Day")).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /^content$/i }));
@@ -323,10 +357,12 @@ describe("Navbar", () => {
     } as ReturnType<typeof useUserInfo>);
 
     render(
-      <MemoryRouter initialEntries={["/tags"]}>
-        <Navbar />
-        <GoTo to="/traditions" />
-      </MemoryRouter>,
+      withQueryClient(
+        <MemoryRouter initialEntries={["/tags"]}>
+          <Navbar />
+          <GoTo to="/traditions" />
+        </MemoryRouter>,
+      ),
     );
 
     // The section holding the current page opens itself.
@@ -365,5 +401,69 @@ describe("Navbar", () => {
     expect(
       screen.getByRole("link", { name: /author administration/i }),
     ).toBeInTheDocument();
+  });
+
+  it("marks Pages current on the pages list and its create form", () => {
+    vi.mocked(useUserInfo).mockReturnValue({
+      data: { id: "1", platform_role: "CREATOR" },
+      isLoading: false,
+    } as ReturnType<typeof useUserInfo>);
+
+    renderNavbarAt("/pages/new");
+
+    expect(screen.getByRole("link", { name: /manage pages/i })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(
+      screen.getByRole("link", { name: /manage temples/i }),
+    ).not.toHaveAttribute("aria-current");
+  });
+
+  it("marks Pages, not Temples, current inside a page group", async () => {
+    // Both share /groups/:groupId, so only the group's type can tell them apart.
+    vi.mocked(useUserInfo).mockReturnValue({
+      data: { id: "1", platform_role: "CREATOR" },
+      isLoading: false,
+    } as ReturnType<typeof useUserInfo>);
+    vi.mocked(fetchGroup).mockResolvedValue({
+      id: "g1",
+      group_type: "PAGE",
+    } as AuthorGroupDetailDTO);
+
+    renderNavbarAt("/groups/g1/content");
+
+    expect(
+      await screen.findByRole("link", {
+        name: /manage pages/i,
+        current: "page",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /manage temples/i }),
+    ).not.toHaveAttribute("aria-current");
+  });
+
+  it("marks Temples current inside a community group", async () => {
+    vi.mocked(useUserInfo).mockReturnValue({
+      data: { id: "1", platform_role: "CREATOR" },
+      isLoading: false,
+    } as ReturnType<typeof useUserInfo>);
+    vi.mocked(fetchGroup).mockResolvedValue({
+      id: "g2",
+      group_type: "COMMUNITY",
+    } as AuthorGroupDetailDTO);
+
+    renderNavbarAt("/groups/g2");
+
+    expect(
+      await screen.findByRole("link", {
+        name: /manage temples/i,
+        current: "page",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /manage pages/i }),
+    ).not.toHaveAttribute("aria-current");
   });
 });

@@ -5,12 +5,12 @@ import { ModeToggle } from "../mode-toggle/modetoggle";
 import {
   IoAnalytics,
   IoPricetags,
-  IoPeople,
   IoPulse,
   IoBook,
   IoBookOutline,
   IoDocumentTextOutline,
   IoHeartOutline,
+  IoNewspaperOutline,
   IoChevronBack,
   IoChevronForward,
   IoChevronDown,
@@ -22,6 +22,7 @@ import {
   MdOutlineReportProblem,
   MdPublicOff,
   MdMusicNote,
+  MdTempleBuddhist,
 } from "react-icons/md";
 import { ROUTES } from "@/routes/paths";
 import { SIDEBAR_EXPANDED, SIDEBAR_OPEN_SECTIONS } from "@/lib/constant";
@@ -35,6 +36,7 @@ import {
 } from "../../atoms/tooltip";
 import AuthAvatar from "@/components/ui/molecules/auth-avatar/AuthAvatar";
 import { useUserInfo } from "@/hooks/useUserInfo";
+import { useOpenGroupListPath } from "@/hooks/useOpenGroupListPath";
 import {
   canAccessAdminAuthors,
   canManageAmbientSounds,
@@ -69,12 +71,21 @@ const pinnedItems: NavItem[] = [
     tooltip: "View analytics",
   },
   {
-    icon: <IoPeople className="w-4 h-4" />,
-    label: "Groups",
+    icon: <MdTempleBuddhist className="w-4 h-4" />,
+    label: "Temples",
     path: ROUTES.groups,
-    tooltip: "Manage author groups",
+    tooltip: "Manage temples",
+  },
+  {
+    icon: <IoNewspaperOutline className="w-4 h-4" />,
+    label: "Pages",
+    path: ROUTES.pages,
+    tooltip: "Manage pages",
   },
 ];
+
+/** The two group lists, which are all a CREATOR account manages. */
+const GROUP_LIST_PATHS: string[] = [ROUTES.groups, ROUTES.pages];
 
 const contentItems: NavItem[] = [
   {
@@ -181,6 +192,7 @@ const tooltipItems = [
 /** Section landing pages own every route beneath them, so match on the prefix. */
 const SECTION_PATHS: string[] = [
   ROUTES.groups,
+  ROUTES.pages,
   ROUTES.adminAuthors,
   ROUTES.adminChinaRestrictions,
   ROUTES.adminChatReports,
@@ -233,15 +245,25 @@ const Navbar = () => {
   const showAdminAuthors = canAccessAdminAuthors(userInfo?.platform_role);
   /** Reviewers reach the admin section, but this catalogue is Super Admin only. */
   const showAmbientSounds = canManageAmbientSounds(userInfo?.platform_role);
-  /** Plain CREATOR accounts only manage their author groups — no other CMS pages. */
+  /** Plain CREATOR accounts only manage their temples and pages — no other CMS pages. */
   const isGroupsOnly =
     !isUserInfoLoading && !isStaffRole(userInfo?.platform_role);
+  const openGroup = useOpenGroupListPath(location.pathname);
+
+  /**
+   * Inside a temple or page the URL alone can't say which list it came from,
+   * so neither lights up until the group's type is known.
+   */
+  const isActive = (itemPath: string) =>
+    openGroup.isGroupRoute && GROUP_LIST_PATHS.includes(itemPath)
+      ? openGroup.listPath === itemPath
+      : isActivePath(itemPath, location.pathname);
 
   const visiblePinnedItems = isGroupsOnly
-    ? pinnedItems.filter((item) => item.path === ROUTES.groups)
+    ? pinnedItems.filter((item) => GROUP_LIST_PATHS.includes(item.path))
     : pinnedItems;
 
-  /** A CREATOR sees a single link, so grouping it under a header would be noise. */
+  /** A CREATOR sees only the group lists, so a header over them would be noise. */
   const sections: NavSection[] = isGroupsOnly
     ? []
     : [
@@ -329,10 +351,11 @@ const Navbar = () => {
       <Link
         to={item.path}
         aria-label={item.tooltip}
+        aria-current={isActive(item.path) ? "page" : undefined}
         className={`flex items-center rounded-md border p-2 transition-all duration-300 hover:cursor-pointer hover:text-black dark:hover:text-white ${
           expanded ? "w-full gap-3" : "justify-center"
         } ${expanded && nested ? "ml-2" : ""} ${
-          isActivePath(item.path, location.pathname)
+          isActive(item.path)
             ? "text-zinc-900 dark:text-zinc-100"
             : "text-zinc-400 dark:text-zinc-600"
         }`}
