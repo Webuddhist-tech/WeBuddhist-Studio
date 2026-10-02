@@ -64,10 +64,9 @@ describe("fetchTextRelations", () => {
   });
 
   it("resolves an edition id to its text first", async () => {
-    serve(
-      [text("root", { commentaries: ["c1"] }), text("c1")],
-      { "ed-1": "root" },
-    );
+    serve([text("root", { commentaries: ["c1"] }), text("c1")], {
+      "ed-1": "root",
+    });
 
     const relations = await fetchTextRelations("ed-1");
 
