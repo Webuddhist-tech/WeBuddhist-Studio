@@ -1,9 +1,6 @@
 import axiosInstance from "@/config/axios-config";
 
-const getAuthHeaders = () => ({
-  Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
-});
-
+import { getAuthHeaders } from "@/lib/auth-storage";
 export interface NotificationResponse {
   id: string;
   day_id: string;

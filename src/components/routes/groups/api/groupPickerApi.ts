@@ -61,6 +61,11 @@ export const makeLinkedContentSearchFn =
       search: params.search,
       page,
       pageSize: limit,
+      // The event editor should only offer content an author can actually
+      // publish an event against: the group's own published plans/series,
+      // plus published series the group is partnered with (and their plans).
+      status: "PUBLISHED",
+      includePartnerGroups: true,
     });
 
     return {

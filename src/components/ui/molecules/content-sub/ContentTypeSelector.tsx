@@ -2,9 +2,18 @@ import { Pecha } from "@/components/ui/shadimport";
 import { IoMdAdd, IoMdVideocam } from "react-icons/io";
 import { IoMusicalNotesSharp, IoTextOutline } from "react-icons/io5";
 import { MdOutlineImage } from "react-icons/md";
+import { LuCalendarDays, LuLayers, LuNewspaper } from "react-icons/lu";
+import { GiPrayerBeads } from "react-icons/gi";
 import pechaIcon from "@/assets/icon/pecha_icon.png";
 import { useState } from "react";
 import { SourceSelectorSheet } from "../webuddhist-source/SourceSelectorSheet";
+import { LinkedContentSelectorSheet } from "../linked-content/LinkedContentSelectorSheet";
+import {
+  LINKED_CONTENT_LABELS,
+  isLinkedContentType,
+  type LinkedContentOption,
+  type LinkedContentType,
+} from "../linked-content/linkedContent";
 
 interface SourceData {
   content: string;
@@ -16,9 +25,18 @@ interface SourceData {
 
 interface ContentTypeSelectorProps {
   onSelectType: (
-    type: "IMAGE" | "VIDEO" | "AUDIO" | "TEXT" | "SOURCE_REFERENCE",
+    type:
+      | "IMAGE"
+      | "VIDEO"
+      | "AUDIO"
+      | "TEXT"
+      | "SOURCE_REFERENCE"
+      | LinkedContentType,
     sourceData?: SourceData,
+    linkedContent?: LinkedContentOption,
   ) => void;
+  /** The plan's group; linked content may only come from it. */
+  groupId?: string | null;
 }
 
 const iconClassName = "w-4 h-4 text-gray-400";
@@ -44,17 +62,39 @@ const contentTypes = [
     key: "SOURCE_REFERENCE",
     icon: <img src={pechaIcon} alt="Pecha Icon" className="w-4 h-4" />,
   },
+  {
+    key: "GROUP_ACCUMULATION",
+    icon: <GiPrayerBeads className={iconClassName} />,
+  },
+  {
+    key: "GROUP_COLLECTION",
+    icon: <LuLayers className={iconClassName} />,
+  },
+  {
+    key: "EVENT",
+    icon: <LuCalendarDays className={iconClassName} />,
+  },
+  {
+    key: "POST",
+    icon: <LuNewspaper className={iconClassName} />,
+  },
 ];
 
 export const ContentTypeSelector = ({
   onSelectType,
+  groupId,
 }: ContentTypeSelectorProps) => {
   const [showContentTypes, setShowContentTypes] = useState(false);
   const [isSourceSheetOpen, setIsSourceSheetOpen] = useState(false);
+  const [linkedContentType, setLinkedContentType] =
+    useState<LinkedContentType | null>(null);
 
   const handleContentTypeClick = (type: string) => {
     if (type === "SOURCE_REFERENCE") {
       setIsSourceSheetOpen(true);
+      setShowContentTypes(false);
+    } else if (isLinkedContentType(type)) {
+      setLinkedContentType(type);
       setShowContentTypes(false);
     } else {
       onSelectType(type as any);
@@ -66,13 +106,21 @@ export const ContentTypeSelector = ({
     setIsSourceSheetOpen(false);
   };
 
+  const handleAddLinkedContent = (
+    type: LinkedContentType,
+    option: LinkedContentOption,
+  ) => {
+    onSelectType(type, undefined, option);
+    setLinkedContentType(null);
+  };
+
   return (
     <>
-      <div className="flex h-12 px-4 items-center gap-4">
+      <div className="flex h-12 px-4 items-center gap-4 max-md:h-auto max-md:items-start max-md:gap-2">
         <Pecha.Button
           type="button"
           variant="outline"
-          className="h-full transition-transform active:scale-95"
+          className="h-full transition-transform active:scale-95 max-md:h-12"
           onClick={() => setShowContentTypes(!showContentTypes)}
         >
           <IoMdAdd
@@ -81,7 +129,7 @@ export const ContentTypeSelector = ({
         </Pecha.Button>
 
         {showContentTypes && (
-          <div className="flex border h-full bg-white dark:bg-[#161616] items-center px-1 border-gray-300 dark:border-input rounded-sm overflow-visible animate-in zoom-in-90 slide-in-from-left-3 duration-300 ease-out">
+          <div className="flex border h-full bg-white dark:bg-[#161616] items-center px-1 border-gray-300 dark:border-input rounded-sm overflow-visible max-md:h-auto max-md:min-w-0 max-md:flex-1 max-md:flex-wrap max-md:py-1 animate-in zoom-in-90 slide-in-from-left-3 duration-300 ease-out">
             {contentTypes.map(({ key, icon }, index) => (
               <Pecha.Button
                 key={key}
@@ -95,6 +143,9 @@ export const ContentTypeSelector = ({
                 }}
               >
                 {icon}
+                <span className="sr-only">
+                  {isLinkedContentType(key) ? LINKED_CONTENT_LABELS[key] : key}
+                </span>
               </Pecha.Button>
             ))}
           </div>
@@ -105,6 +156,14 @@ export const ContentTypeSelector = ({
         isOpen={isSourceSheetOpen}
         onOpenChange={setIsSourceSheetOpen}
         onAddSource={handleAddSource}
+      />
+
+      <LinkedContentSelectorSheet
+        type={linkedContentType}
+        groupId={groupId}
+        isOpen={linkedContentType !== null}
+        onOpenChange={(open) => !open && setLinkedContentType(null)}
+        onSelect={handleAddLinkedContent}
       />
     </>
   );

@@ -13,6 +13,7 @@ import {
 } from "../../api/notificationApi";
 import { uploadImageToS3 } from "../../api/taskApi";
 import { MdOutlineImage } from "react-icons/md";
+import ImageCropDialog from "@/components/ui/molecules/modals/image-upload/image-crop/ImageCropDialog";
 
 const notificationSchema = z.object({
   title: z.string().max(40, "Title must be 40 characters or less"),
@@ -41,6 +42,7 @@ export const NotificationForm = ({
     null,
   );
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [cropFile, setCropFile] = useState<File | null>(null);
 
   const form = useForm<NotificationFormData>({
     resolver: zodResolver(notificationSchema),
@@ -126,6 +128,7 @@ export const NotificationForm = ({
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = event.target.files?.[0];
+    event.target.value = "";
     if (!file) return;
 
     const fileSizeMB = file.size / (1024 * 1024);
@@ -142,6 +145,17 @@ export const NotificationForm = ({
       return;
     }
 
+    setCropFile(file);
+  };
+
+  const uploadCroppedImage = async (file: File) => {
+    setCropFile(null);
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error(
+        "File size exceeds 5MB limit. Please select a smaller image.",
+      );
+      return;
+    }
     try {
       setUploadingImage(true);
       const { image, key } = await uploadImageToS3(file, planId);
@@ -149,7 +163,7 @@ export const NotificationForm = ({
       setCustomImagePreview(image.original);
       setImageType("CUSTOM");
       toast.success("Image uploaded successfully!");
-    } catch (error) {
+    } catch {
       toast.error("Failed to upload image");
     } finally {
       setUploadingImage(false);
@@ -176,14 +190,14 @@ export const NotificationForm = ({
 
   if (isLoading) {
     return (
-      <div className="w-full my-4 h-[calc(100vh-40px)] bg-[#F5F5F5] dark:bg-[#181818] rounded-l-2xl border border-dashed flex items-center justify-center">
+      <div className="w-full my-4 h-[calc(100vh-40px)] bg-[#F5F5F5] dark:bg-[#181818] rounded-l-2xl border border-dashed flex items-center justify-center max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
         <p className="text-gray-500">Loading...</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full my-4 h-[calc(100vh-40px)] bg-[#F5F5F5] dark:bg-[#181818] rounded-l-2xl border border-dashed overflow-y-auto">
+    <div className="w-full my-4 h-[calc(100vh-40px)] bg-[#F5F5F5] dark:bg-[#181818] rounded-l-2xl border border-dashed overflow-y-auto max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
       <div className="p-4">
         <Pecha.Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -234,6 +248,11 @@ export const NotificationForm = ({
 
             <div className="space-y-3">
               <Pecha.FormLabel>Image</Pecha.FormLabel>
+              <ImageCropDialog
+                file={cropFile}
+                onCancel={() => setCropFile(null)}
+                onDone={uploadCroppedImage}
+              />
 
               <Pecha.RadioGroup
                 value={imageType || ""}

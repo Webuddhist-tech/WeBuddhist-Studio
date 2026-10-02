@@ -14,7 +14,7 @@ const PlanRouteGuard = ({ children }: PlanRouteGuardProps) => {
 
   if (isLoading) {
     return (
-      <div className="flex h-[calc(100vh-40px)] items-center justify-center text-muted-foreground">
+      <div className="flex h-[calc(100vh-40px)] items-center justify-center text-muted-foreground max-md:h-full">
         Loading…
       </div>
     );

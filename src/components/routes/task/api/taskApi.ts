@@ -5,10 +5,7 @@ import {
   planLanguageToTtsApiLanguage,
 } from "@/lib/ttsConstants";
 
-const getAuthHeaders = () => ({
-  Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
-});
-
+import { getAuthHeaders } from "@/lib/auth-storage";
 interface CreateTaskPayload {
   plan_id: string;
   day_id: string;
@@ -51,6 +48,8 @@ export interface SubTaskPayload {
   pecha_segment_id?: string | null;
   segment_ids?: string[] | null;
   segment_numbers?: number[] | null;
+  /** Set for linked content types (GROUP_ACCUMULATION, GROUP_COLLECTION, EVENT, POST). */
+  reference_id?: string | null;
   start_ms?: number | null;
   end_ms?: number | null;
 }
@@ -132,6 +131,41 @@ export const reorderTasks = async (
     {
       tasks,
     },
+    {
+      headers: getAuthHeaders(),
+    },
+  );
+  return data;
+};
+
+/**
+ * How the reader opens a task by default. A panel can be open with no text
+ * id: the reader then shows the list of commentaries/translations without
+ * opening one. The ids are OpenPecha text ids. Only one task per day is live.
+ */
+export interface TaskSettings {
+  is_commentary_open: boolean;
+  commentary_text_id: string | null;
+  is_translation_open: boolean;
+  translation_text_id: string | null;
+  is_live: boolean;
+}
+
+export const DEFAULT_TASK_SETTINGS: TaskSettings = {
+  is_commentary_open: false,
+  commentary_text_id: null,
+  is_translation_open: false,
+  translation_text_id: null,
+  is_live: false,
+};
+
+export const updateTaskSettings = async (
+  task_id: string,
+  settings: TaskSettings,
+) => {
+  const { data } = await axiosInstance.put<TaskSettings>(
+    `/api/v1/cms/tasks/${task_id}/settings`,
+    settings,
     {
       headers: getAuthHeaders(),
     },

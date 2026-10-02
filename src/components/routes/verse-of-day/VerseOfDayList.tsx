@@ -79,6 +79,11 @@ const VerseOfDayList = ({
                     <span className="text-muted-foreground">—</span>
                   )}
                 </p>
+                {verse.source ? (
+                  <p className="mt-1 text-xs text-muted-foreground line-clamp-1">
+                    {verse.source}
+                  </p>
+                ) : null}
               </Pecha.TableCell>
               <Pecha.TableCell>
                 {verse.image_url ? (

@@ -15,15 +15,24 @@ import {
   updateSubTasks,
   fetchTaskDetails,
   updateTaskTitle,
+  type SubTaskPayload,
+  type SubTaskUpdatePayload,
 } from "../../api/taskApi";
 import { ContentTypeSelector } from "@/components/ui/molecules/content-sub/ContentTypeSelector";
+import {
+  isLinkedContentType,
+  type LinkedContentOption,
+} from "@/components/ui/molecules/linked-content/linkedContent";
 import {
   SubTaskCard,
   type SubTask,
 } from "@/components/ui/molecules/subtask-card/SubTaskCard";
+import {
+  buildSubTaskPayload,
+  buildSubTaskUpdatePayload,
+} from "@/components/ui/molecules/subtask-card/subtaskPayload";
 import DaySelector from "@/components/ui/molecules/day-selector/DaySelector";
 import {
-  buildSubTaskTimestampFields,
   mapApiSubtaskTimestamps,
   validateSubTaskTimestamps,
 } from "@/components/ui/molecules/subtask-card/subtaskTimestamps";
@@ -83,20 +92,8 @@ const TaskForm = ({
       const taskResponse = await createTask(taskData);
 
       if (subTasksData.length > 0) {
-        const subTasksPayload = subTasksData.map((subTask, index) => ({
-          content: subTask.content,
-          content_type: subTask.content_type,
-          display_order: index + 1,
-          ...(subTask.content_type === "VIDEO" &&
-            subTask.duration && { duration: subTask.duration }),
-          ...(subTask.content_type === "SOURCE_REFERENCE" && {
-            source_text_id: subTask.source_text_id || null,
-            pecha_segment_id: subTask.pecha_segment_id || null,
-            segment_ids: subTask.segment_ids || null,
-            segment_numbers: subTask.segment_numbers || null,
-          }),
-          ...buildSubTaskTimestampFields(subTask, false),
-        }));
+        const subTasksPayload: SubTaskPayload[] =
+          subTasksData.map(buildSubTaskPayload);
         await createSubTasks(taskResponse.id, subTasksPayload);
       }
       return taskResponse;
@@ -117,21 +114,9 @@ const TaskForm = ({
 
   const updateTaskMutation = useMutation({
     mutationFn: async () => {
-      const subTasksPayload = subTasks.map((subTask, index) => ({
-        id: subTask.id || null,
-        content: subTask.content,
-        content_type: subTask.content_type,
-        display_order: index + 1,
-        ...(subTask.content_type === "VIDEO" &&
-          subTask.duration && { duration: subTask.duration }),
-        ...(subTask.content_type === "SOURCE_REFERENCE" && {
-          source_text_id: subTask.source_text_id || null,
-          pecha_segment_id: subTask.pecha_segment_id || null,
-          segment_ids: subTask.segment_ids || null,
-          segment_numbers: subTask.segment_numbers || null,
-        }),
-        ...buildSubTaskTimestampFields(subTask, true),
-      }));
+      const subTasksPayload: SubTaskUpdatePayload[] = subTasks.map(
+        buildSubTaskUpdatePayload,
+      );
       await updateSubTasks(editingTask.id, subTasksPayload);
     },
     onSuccess: () => {
@@ -233,9 +218,20 @@ const TaskForm = ({
               pecha_segment_id: data.pecha_segment_id || null,
               segment_ids: data.segment_ids || null,
               segment_numbers: data.segment_numbers || null,
+              segment_refs: data.segment_refs || null,
               ...timestamps(data),
             };
           default:
+            if (isLinkedContentType(data.content_type)) {
+              return {
+                id: data.id,
+                content_type: data.content_type,
+                content: data.content ?? "",
+                reference_id: data.reference_id ?? null,
+                reference: data.reference ?? null,
+                ...timestamps(data),
+              };
+            }
             return {
               id: data.id,
               content_type: "TEXT" as const,
@@ -256,8 +252,33 @@ const TaskForm = ({
     segment_numbers?: number[];
   }
 
-  const handleAddSubTask = (content_type: any, sourceData?: SourceData) => {
+  const handleAddSubTask = (
+    content_type: any,
+    sourceData?: SourceData,
+    linkedContent?: LinkedContentOption,
+  ) => {
     let newSubTask: SubTask;
+
+    if (isLinkedContentType(content_type)) {
+      if (!linkedContent) return;
+      setSubTasks([
+        ...subTasks,
+        {
+          id: null,
+          content_type,
+          content: "",
+          reference_id: linkedContent.id,
+          reference: {
+            id: linkedContent.id,
+            content_type,
+            title: linkedContent.title,
+            subtitle: linkedContent.subtitle,
+            image_url: linkedContent.imageUrl,
+          },
+        },
+      ]);
+      return;
+    }
 
     switch (content_type) {
       case "VIDEO":
@@ -360,6 +381,15 @@ const TaskForm = ({
   };
 
   const onSubmit = async (data: TaskFormData) => {
+    // A task hangs off a day. Without one there is nothing to save against, so
+    // say so instead of letting the request go out with an undefined day.
+    if (!isEditMode && !currentDayData?.id) {
+      toast.error("Create a day first", {
+        description: "Add a day to this plan before adding a task.",
+      });
+      return;
+    }
+
     const timestampError = validateSubTaskTimestamps(
       subTasks,
       currentDayData?.audio_duration_ms,
@@ -371,7 +401,7 @@ const TaskForm = ({
 
     const taskData: any = {
       plan_id: planId!,
-      day_id: currentDayData!.id,
+      day_id: currentDayData?.id,
       title: data.title,
       estimated_time: 30,
     };
@@ -383,7 +413,7 @@ const TaskForm = ({
   };
 
   return (
-    <div className="w-full my-4 h-[calc(100vh-40px)] bg-[#F5F5F5] dark:bg-[#181818] rounded-l-2xl border border-dashed overflow-hidden flex flex-col">
+    <div className="w-full my-4 h-[calc(100vh-40px)] bg-[#F5F5F5] dark:bg-[#181818] rounded-l-2xl border border-dashed overflow-hidden flex flex-col max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
       <EditorTabSwitcher activeTab={activeTab} onTabChange={setActiveTab} />
 
       {activeTab === "notification" ? (
@@ -401,7 +431,7 @@ const TaskForm = ({
 
           <Pecha.Form {...form}>
             <form className="space-y-6" onSubmit={form.handleSubmit(onSubmit)}>
-              <div className="flex w-full p-4 lg:w-2/3 justify-between items-center gap-4">
+              <div className="flex w-full p-4 lg:w-2/3 justify-between items-center gap-4 max-md:flex-col max-md:items-stretch">
                 <TaskTitleField
                   isEditMode={isEditMode}
                   isTitleEditing={isTitleEditing}
@@ -450,7 +480,10 @@ const TaskForm = ({
                 </div>
               )}
               {isEditable && (
-                <ContentTypeSelector onSelectType={handleAddSubTask} />
+                <ContentTypeSelector
+                  onSelectType={handleAddSubTask}
+                  groupId={currentPlan?.group_id}
+                />
               )}
 
               <div className="p-4 flex gap-3">
@@ -472,7 +505,8 @@ const TaskForm = ({
                     !isEditable ||
                     createTaskMutation.isPending ||
                     updateTaskMutation.isPending ||
-                    subTasks.length === 0
+                    subTasks.length === 0 ||
+                    (!isEditMode && !currentDayData?.id)
                   }
                 >
                   {createTaskMutation.isPending || updateTaskMutation.isPending

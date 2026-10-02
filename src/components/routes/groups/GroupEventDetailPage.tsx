@@ -1,25 +1,27 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { format } from "date-fns";
 import { IoCalendarClearOutline } from "react-icons/io5";
 import { MdLocationOn } from "react-icons/md";
 import {
   LuBookOpen,
   LuCircleDot,
   LuLibrary,
+  LuRadio,
   LuScrollText,
 } from "react-icons/lu";
 import { Pecha } from "@/components/ui/shadimport";
 import { MarkdownPreview } from "@/components/ui/molecules/markdown-editor/MarkdownPreview";
 import { getApiErrorMessage } from "@/lib/apiErrors";
-import { cn, fromBackendISO } from "@/lib/utils";
-import { DEFAULT_TIMEZONE } from "@/schema/EventSchema";
+import { cn } from "@/lib/utils";
+import { eventFormatLabel, eventRecurrenceLabel } from "@/schema/EventSchema";
+import { formatEventScheduleRange } from "./lib/eventSchedule";
 import { getLanguageLabel } from "@/components/api/languagesApi";
 import { ROUTES } from "@/routes/paths";
 import type { GroupOutletContext } from "./GroupLayout";
 import { canWriteEvents } from "./lib/eventPermissions";
 import {
+  EVENT_YOUTUBE_ICON,
   eventLinkIcon,
   eventLinkTypeLabel,
   isSafeLinkUrl,
@@ -36,24 +38,9 @@ import {
 } from "./api/eventsApi";
 import { formatCoordinates, hasCoordinates } from "./api/locationsApi";
 import LocationMap from "./components/locations/LocationMap";
+import PrayerPdfActions from "./components/prayer-pdf/PrayerPdfActions";
 
 const languageLabel = (code: string) => getLanguageLabel(code);
-
-const formatDate = (iso: string, timezone: string) => {
-  if (!iso) return "—";
-  try {
-    return format(fromBackendISO(iso, timezone).date, "EEE, MMM d, yyyy");
-  } catch {
-    return iso.slice(0, 10);
-  }
-};
-
-const formatDateRange = (event: EventDTO): string => {
-  const timezone = event.timezone?.trim() || DEFAULT_TIMEZONE;
-  const start = formatDate(event.start_date, timezone);
-  if (event.is_one_day || event.start_date === event.end_date) return start;
-  return `${start} – ${formatDate(event.end_date, timezone)}`;
-};
 
 const resolveHeroImage = (event: EventDTO): string | null => {
   const image = event.image as ImageUrlModel | undefined;
@@ -66,7 +53,53 @@ const resolveHeroImage = (event: EventDTO): string | null => {
 };
 
 const pickDefault = (rows: EventMetadataDTO[]): EventMetadataDTO | undefined =>
-  rows.find((r) => r.language.toUpperCase() === "EN") ?? rows[0];
+  rows.find((r) => (r.language?.trim() || "EN").toUpperCase() === "EN") ??
+  rows[0];
+
+/**
+ * Filters links/youtube items to the active language tab, falling back to EN
+ * when nothing matches - mirrors the metadata tab's own EN-fallback so the
+ * two sections don't disagree about what "no content for this tab" means.
+ * Unlike metadata (one row per language), this never collapses to a single
+ * item - many links/videos can share a language.
+ */
+function pickLangFiltered<T extends { language: string }>(
+  rows: T[],
+  activeLang: string | null,
+): T[] {
+  if (!activeLang) return rows;
+  const matched = rows.filter((r) => r.language === activeLang);
+  if (matched.length > 0) return matched;
+  return rows.filter(
+    (r) => (r.language?.trim() || "EN").toUpperCase() === "EN",
+  );
+}
+
+function getYoutubeVideoId(url: string): string | null {
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    if (host === "youtu.be") {
+      return parsed.pathname.split("/").filter(Boolean)[0] ?? null;
+    }
+    if (host === "youtube.com" || host.endsWith(".youtube.com")) {
+      if (parsed.pathname === "/watch") {
+        return parsed.searchParams.get("v");
+      }
+      const segments = parsed.pathname.split("/").filter(Boolean);
+      if (
+        segments[0] === "embed" ||
+        segments[0] === "shorts" ||
+        segments[0] === "live"
+      ) {
+        return segments[1] ?? null;
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 const GroupEventDetailPage = () => {
   const { groupId, eventId } = useParams<{
@@ -186,13 +219,21 @@ const GroupEventDetailPage = () => {
     },
   ].filter((link) => Boolean(link.id));
 
-  const urlLinks = [...(data.links ?? [])]
+  const urlLinks = pickLangFiltered([...(data.links ?? [])], activeLang)
     .filter((link) => isSafeLinkUrl(link.url))
     .sort((a, b) => a.display_order - b.display_order);
 
+  const youtubeLinks = pickLangFiltered(
+    [...(data.youtube ?? [])].filter((item) => isSafeLinkUrl(item.url)),
+    activeLang,
+  ).sort((a, b) => a.display_order - b.display_order);
+
+  const formatLabel = eventFormatLabel(data.event_format);
+  const schedule = formatEventScheduleRange(data);
+
   return (
     <div className="mx-auto max-w-2xl space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between max-md:flex-wrap max-md:gap-3">
         <button
           type="button"
           onClick={() => navigate(eventsListPath)}
@@ -201,15 +242,35 @@ const GroupEventDetailPage = () => {
           ← Events
         </button>
         {canWrite ? (
-          <Pecha.Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              navigate(ROUTES.groupEventEdit(groupId ?? "", data.id))
-            }
-          >
-            Edit
-          </Pecha.Button>
+          <div className="flex items-center gap-2 max-md:flex-wrap">
+            <Pecha.Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              // Its own tab: the control needs no session, and the operator
+              // keeps Studio open beside it.
+              onClick={() =>
+                window.open(
+                  ROUTES.liveControl(data.id),
+                  "_blank",
+                  "noopener,noreferrer",
+                )
+              }
+            >
+              <LuRadio className="h-4 w-4" />
+              Live control
+            </Pecha.Button>
+            <PrayerPdfActions scope={{ kind: "event", eventId: data.id }} />
+            <Pecha.Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                navigate(ROUTES.groupEventEdit(groupId ?? "", data.id))
+              }
+            >
+              Edit
+            </Pecha.Button>
+          </div>
         ) : null}
       </div>
 
@@ -235,14 +296,44 @@ const GroupEventDetailPage = () => {
         )}
 
         <div className="space-y-3 px-5 py-4">
-          <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-            <IoCalendarClearOutline className="h-4 w-4" />
-            <span className="text-foreground">{formatDateRange(data)}</span>
-            {data.is_one_day ? (
+          <div className="flex flex-wrap items-start gap-2 text-sm text-muted-foreground">
+            <IoCalendarClearOutline className="mt-0.5 h-4 w-4 shrink-0" />
+            <div className="flex flex-col gap-0.5 text-foreground">
+              <span>
+                <span className="text-muted-foreground">Start </span>
+                {schedule.start}
+              </span>
+              <span>
+                <span className="text-muted-foreground">End </span>
+                {schedule.end}
+              </span>
+            </div>
+            <Pecha.Badge
+              variant={data.is_recurring ? "default" : "secondary"}
+              className="ml-1"
+            >
+              {eventRecurrenceLabel(
+                data.is_recurring,
+                data.recurrence?.frequency,
+              )}
+            </Pecha.Badge>
+            {formatLabel ? (
               <Pecha.Badge variant="secondary" className="ml-1">
-                One-day event
+                {formatLabel}
               </Pecha.Badge>
             ) : null}
+            {/* An event's chat room is created on first use, so "on, unused"
+                and "on, in use" are different states worth telling apart. */}
+            <Pecha.Badge
+              variant={data.chat_enabled === false ? "outline" : "secondary"}
+              className="ml-1"
+            >
+              {data.chat_enabled === false
+                ? "Chat off"
+                : data.chat_room_id
+                  ? "Chat active"
+                  : "Chat on"}
+            </Pecha.Badge>
           </div>
 
           {urlLinks.length > 0 ? (
@@ -293,9 +384,53 @@ const GroupEventDetailPage = () => {
                   : "border-input text-muted-foreground hover:text-foreground",
               )}
             >
-              {languageLabel(row.language)}
+              {languageLabel(row.language ?? "EN")}
             </button>
           ))}
+        </div>
+      ) : null}
+
+      {youtubeLinks.length > 0 ? (
+        <div className="space-y-4">
+          <h2 className="text-sm font-semibold text-muted-foreground">
+            Videos
+          </h2>
+          {youtubeLinks.map((item) => {
+            const videoId = getYoutubeVideoId(item.url);
+            const label = item.label?.trim();
+            if (!videoId) {
+              return (
+                <a
+                  key={item.id}
+                  href={item.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-full border bg-background px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:border-[#A51C21] hover:text-[#A51C21]"
+                >
+                  <EVENT_YOUTUBE_ICON className="h-4 w-4 shrink-0" />
+                  <span className="max-w-[16rem] truncate">
+                    {label || "YouTube video"}
+                  </span>
+                </a>
+              );
+            }
+            return (
+              <div key={item.id} className="space-y-1.5">
+                <div className="relative aspect-video w-full overflow-hidden rounded-lg border bg-black">
+                  <iframe
+                    src={`https://www.youtube.com/embed/${videoId}`}
+                    title={label || "YouTube video"}
+                    className="absolute inset-0 h-full w-full"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen
+                  />
+                </div>
+                {label ? (
+                  <p className="text-sm text-muted-foreground">{label}</p>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       ) : null}
 

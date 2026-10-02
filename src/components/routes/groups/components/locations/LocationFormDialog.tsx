@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { IoMdAdd, IoMdClose } from "react-icons/io";
 import { Pecha } from "@/components/ui/shadimport";
+import { useLanguages } from "@/hooks/useLanguages";
 import {
   locationSchema,
   defaultLocationFormValues,
   coordinateToInput,
   type LocationFormData,
 } from "@/schema/LocationSchema";
-import type { LocationDetail } from "../../api/locationsApi";
+import type { EventLocation, LocationDetail } from "../../api/locationsApi";
 import {
   isPlaceSearchEnabled,
   reverseGeocode,
@@ -20,7 +22,7 @@ import PlaceSearch from "./PlaceSearch";
 type LocationFormDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  location: LocationDetail | null;
+  location: LocationDetail | EventLocation | null;
   isSubmitting: boolean;
   onSubmit: (data: LocationFormData) => void;
   initialName?: string;
@@ -51,11 +53,30 @@ const LocationFormDialog = ({
         name: location.name,
         latitude: coordinateToInput(location.latitude),
         longitude: coordinateToInput(location.longitude),
+        translations: ((location as LocationDetail).translations ?? []).map(
+          (entry) => ({ language: entry.language, name: entry.name }),
+        ),
       });
     } else {
       form.reset({ ...defaultLocationFormValues(), name: initialName });
     }
   }, [open, location, initialName, form]);
+
+  const translationRows = useFieldArray({
+    control: form.control,
+    name: "translations",
+  });
+  const { languageOptions } = useLanguages();
+  const translations = form.watch("translations") ?? [];
+  const usedLanguages = translations.map((entry) => entry.language);
+  const nextUnusedLanguage = languageOptions.find(
+    (option) => !usedLanguages.includes(option.value),
+  );
+
+  const addTranslationRow = () => {
+    if (!nextUnusedLanguage) return;
+    translationRows.append({ language: nextUnusedLanguage.value, name: "" });
+  };
 
   const [suggestedName, setSuggestedName] = useState<string | null>(null);
   const reverseAbortRef = useRef<AbortController | null>(null);
@@ -149,7 +170,7 @@ const LocationFormDialog = ({
 
   const handleSubmit = form.handleSubmit((data) => onSubmit(data));
 
-  const eventCount = location?.event_count ?? 0;
+  const eventCount = (location as LocationDetail | null)?.event_count ?? 0;
   const showSharedWarning = isEdit && eventCount > 0;
 
   const getSubmitLabel = () => {
@@ -209,6 +230,92 @@ const LocationFormDialog = ({
                 </Pecha.FormItem>
               )}
             />
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Localized names</p>
+                {nextUnusedLanguage ? (
+                  <Pecha.Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addTranslationRow}
+                    className="gap-1"
+                  >
+                    <IoMdAdd className="h-4 w-4" /> Add language
+                  </Pecha.Button>
+                ) : null}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Readers see the name in their own language. Where a language has
+                no name here, they get the English one, or the name above.
+              </p>
+
+              {translationRows.fields.map((field, index) => {
+                const currentLanguage = translations[index]?.language;
+                return (
+                  <div key={field.id} className="flex items-start gap-2">
+                    <Pecha.FormField
+                      control={form.control}
+                      name={`translations.${index}.language`}
+                      render={({ field: languageField }) => (
+                        <Pecha.FormItem className="w-32 shrink-0">
+                          <Pecha.Select
+                            value={languageField.value}
+                            onValueChange={languageField.onChange}
+                          >
+                            <Pecha.FormControl>
+                              <Pecha.SelectTrigger className="w-full">
+                                <Pecha.SelectValue placeholder="Language" />
+                              </Pecha.SelectTrigger>
+                            </Pecha.FormControl>
+                            <Pecha.SelectContent>
+                              {languageOptions.map((option) => (
+                                <Pecha.SelectItem
+                                  key={option.value}
+                                  value={option.value}
+                                  disabled={
+                                    usedLanguages.includes(option.value) &&
+                                    option.value !== currentLanguage
+                                  }
+                                >
+                                  {option.label}
+                                </Pecha.SelectItem>
+                              ))}
+                            </Pecha.SelectContent>
+                          </Pecha.Select>
+                          <Pecha.FormMessage />
+                        </Pecha.FormItem>
+                      )}
+                    />
+                    <Pecha.FormField
+                      control={form.control}
+                      name={`translations.${index}.name`}
+                      render={({ field: nameField }) => (
+                        <Pecha.FormItem className="flex-1">
+                          <Pecha.FormControl>
+                            <Pecha.Input
+                              {...nameField}
+                              placeholder="Name in this language"
+                              maxLength={255}
+                            />
+                          </Pecha.FormControl>
+                          <Pecha.FormMessage />
+                        </Pecha.FormItem>
+                      )}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => translationRows.remove(index)}
+                      aria-label="Remove localized name"
+                      className="mt-2 cursor-pointer p-1 text-muted-foreground hover:text-foreground"
+                    >
+                      <IoMdClose className="h-4 w-4" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">

@@ -11,6 +11,10 @@
   --font-monlam: "MonlamUniOuChan2", sans-serif;
   --font-inter: "InterRegular", sans-serif;
   --font-dutsa: "dutsa-regular", sans-serif;
+  /* Tibetan in Monlam, everything else in the system UI font. */
+  --font-tibetan-ui:
+    "MonlamTibetanOnly", ui-sans-serif, system-ui, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji";
 }
 
 @font-face {
@@ -54,6 +58,16 @@
   src: url("./assets/fonts/MonlamUniOuChan2.woff") format("woff");
   font-weight: normal;
   font-style: normal;
+}
+/* Monlam for the Tibetan block only, so a page can set it first in its stack
+ * and keep Latin text in the UI font. */
+@font-face {
+  font-family: "MonlamTibetanOnly";
+  src: url("./assets/fonts/MonlamUniOuChan2.woff") format("woff");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+  unicode-range: U+0F00-0FFF;
 }
 @font-face {
   font-family: "InterRegular";
@@ -103,6 +117,10 @@
 }
 
 :root {
+  /* Tells the browser to render native widgets (audio players, scrollbars,
+     form controls) with light chrome. Without it they stay light in dark
+     mode, which is why an <audio> element looks washed out there. */
+  color-scheme: light;
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
@@ -139,6 +157,9 @@
 }
 
 .dark {
+  /* Flips native widgets to dark chrome: the <audio> player, scrollbars and
+     form controls all repaint themselves from this one line. */
+  color-scheme: dark;
   --background: #161616;
   --foreground: hsl(0 0% 93%);
   --card: oklch(0.205 0 0);
@@ -262,4 +283,33 @@ div::-webkit-scrollbar {
 * {
   scrollbar-width: none;
   -ms-overflow-style: none;
+}
+
+/*
+ * Opt back in to a visible scrollbar. The rules above hide scrollbars app-wide,
+ * which leaves horizontally scrollable regions (wide tables) with no hint that
+ * there is more content off-screen. Add `show-scrollbar` to such a container.
+ */
+.show-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.show-scrollbar::-webkit-scrollbar {
+  display: block;
+  width: 8px;
+  height: 8px;
+}
+
+.show-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.show-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 9999px;
+}
+
+.show-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--muted-foreground);
 }

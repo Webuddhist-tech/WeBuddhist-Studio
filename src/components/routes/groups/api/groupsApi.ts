@@ -13,6 +13,7 @@ import { usesStaffWideDashboardGroupList } from "@/lib/platformAccess";
 import type { UserInfo } from "@/hooks/useUserInfo";
 import { capitalizeFirstLetter } from "@/lib/textUtils";
 
+import { getAuthHeaders } from "@/lib/auth-storage";
 export type AuthorGroupMemberRole = "OWNER" | "ADMIN" | "AUTHOR" | "VIEWER";
 
 export type AuthorGroupType = "PAGE" | "COMMUNITY";
@@ -23,23 +24,6 @@ export type AuthorGroupStatus = "DRAFT" | "PUBLISHED" | "UNPUBLISHED";
 export function isGroupVisibleInApp(status?: AuthorGroupStatus): boolean {
   return status === "PUBLISHED";
 }
-
-export const GROUP_TYPE_OPTIONS: {
-  value: AuthorGroupType;
-  label: string;
-  description: string;
-}[] = [
-  {
-    value: "PAGE",
-    label: "Page",
-    description: "Users follow this group to stay updated.",
-  },
-  {
-    value: "COMMUNITY",
-    label: "Community",
-    description: "Users join this group as members.",
-  },
-];
 
 export interface GroupMetadataDTO {
   id?: string;
@@ -260,18 +244,6 @@ export interface FetchGroupsParams {
 }
 
 export const TRANSFER_GROUPS_PAGE_LIMIT = 100;
-
-const getAuthHeaders = () => ({
-  Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
-});
-
-export function groupTypeLabel(groupType?: AuthorGroupType): string {
-  if (!groupType) return "—";
-  return (
-    GROUP_TYPE_OPTIONS.find((option) => option.value === groupType)?.label ??
-    groupType
-  );
-}
 
 export const fetchGroups = async ({
   page,

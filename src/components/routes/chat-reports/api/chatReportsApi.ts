@@ -27,8 +27,12 @@ export type ChatMessageReportDTO = {
   description?: string | null;
   message_id?: string | null;
   message_text?: string | null;
+  /** TEXT or PRAYER. Absent when the message was never stored. */
+  message_type?: string | null;
   room_id?: string | null;
   room_name?: string | null;
+  /** GROUP, EVENT or PRIVATE. */
+  room_kind?: string | null;
   /** Null for AUTOMATIC reports — the system filed them, not a person. */
   reporter?: ChatReportUserDTO | null;
   reported_user?: ChatReportUserDTO | null;

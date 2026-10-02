@@ -3,6 +3,7 @@ import { IoMdClose } from "react-icons/io";
 import { PiDotsSixVertical } from "react-icons/pi";
 import { Pecha } from "@/components/ui/shadimport";
 import { SortableItem } from "@/components/ui/atoms/sortable";
+import { useLanguages } from "@/hooks/useLanguages";
 import type { EventFormData } from "@/schema/EventSchema";
 import { EVENT_LINK_TYPES } from "../../lib/eventLinkTypes";
 
@@ -23,10 +24,12 @@ const EventUrlLinkRow = ({
   canReorder,
   onRemove,
 }: EventUrlLinkRowProps) => {
+  const { languageOptions } = useLanguages();
+
   const renderRow = ({ listeners }: { listeners: Record<string, unknown> }) => (
     <>
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-2">
+        <div className="flex items-start gap-2 max-md:min-w-0 max-md:flex-1">
           {!readOnly ? (
             <button
               type="button"
@@ -43,7 +46,7 @@ const EventUrlLinkRow = ({
             control={form.control}
             name={`links.${index}.type`}
             render={({ field: typeField }) => (
-              <Pecha.FormItem className="w-48">
+              <Pecha.FormItem className="w-48 max-md:min-w-0 max-md:flex-1">
                 <Pecha.FormLabel>Type</Pecha.FormLabel>
                 <Pecha.Select
                   value={typeField.value}
@@ -59,6 +62,35 @@ const EventUrlLinkRow = ({
                     {EVENT_LINK_TYPES.map((option) => (
                       <Pecha.SelectItem key={option.value} value={option.value}>
                         {option.label}
+                      </Pecha.SelectItem>
+                    ))}
+                  </Pecha.SelectContent>
+                </Pecha.Select>
+                <Pecha.FormMessage />
+              </Pecha.FormItem>
+            )}
+          />
+
+          <Pecha.FormField
+            control={form.control}
+            name={`links.${index}.language`}
+            render={({ field: langField }) => (
+              <Pecha.FormItem className="w-40 max-md:min-w-0 max-md:flex-1">
+                <Pecha.FormLabel>Language</Pecha.FormLabel>
+                <Pecha.Select
+                  value={langField.value}
+                  onValueChange={langField.onChange}
+                  disabled={readOnly}
+                >
+                  <Pecha.FormControl>
+                    <Pecha.SelectTrigger className="w-full bg-white dark:bg-[#181818]">
+                      <Pecha.SelectValue placeholder="Language" />
+                    </Pecha.SelectTrigger>
+                  </Pecha.FormControl>
+                  <Pecha.SelectContent>
+                    {languageOptions.map((lang) => (
+                      <Pecha.SelectItem key={lang.value} value={lang.value}>
+                        {lang.label}
                       </Pecha.SelectItem>
                     ))}
                   </Pecha.SelectContent>

@@ -24,6 +24,7 @@ import {
   canDeleteGroup,
   canManageGroupInvites,
   canManageJoinRequests,
+  canModerateGroupUsers,
   getEffectiveGroupRole,
 } from "./lib/groupPermissions";
 import {
@@ -38,6 +39,9 @@ import { fetchGroupJoinRequests } from "./api/groupJoinRequestsApi";
 import { GroupPageShell } from "./components/GroupPageShell";
 import GroupStatusBadge from "./components/GroupStatusBadge";
 import GroupPublishControl from "./components/GroupPublishControl";
+import { groupKindOf } from "./lib/groupKind";
+import { canWriteEvents } from "./lib/eventPermissions";
+import PrayerPdfActions from "./components/prayer-pdf/PrayerPdfActions";
 import type { UserInfo } from "@/hooks/useUserInfo";
 
 export type GroupOutletContext = {
@@ -52,7 +56,7 @@ export type GroupOutletContext = {
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
-    "px-3 py-2 text-sm border-b-2 -mb-px transition-colors",
+    "px-3 py-2 text-sm border-b-2 -mb-px transition-colors max-md:shrink-0 max-md:whitespace-nowrap",
     isActive
       ? "border-[#A51C21] text-foreground font-medium"
       : "border-transparent text-muted-foreground hover:text-foreground",
@@ -95,14 +99,17 @@ const GroupLayout = () => {
     refetchOnWindowFocus: true,
   });
 
+  const kind = groupKindOf(group?.group_type);
+  const noun = kind.singular.toLowerCase();
+
   const deleteMutation = useMutation({
     mutationFn: () => deleteGroup(groupId!),
     onSuccess: () => {
-      toast.success("Group deleted");
+      toast.success(`${kind.singular} deleted`);
       setDeleteOpen(false);
       setConfirmName("");
       queryClient.invalidateQueries({ queryKey: ["cms-groups"] });
-      navigate(ROUTES.groups);
+      navigate(kind.listPath);
     },
     onError: (err) => toast.error(getApiErrorMessage(err)),
   });
@@ -115,20 +122,20 @@ const GroupLayout = () => {
 
   if (isLoading) {
     return (
-      <div className="flex h-[calc(100vh-40px)] items-center justify-center text-muted-foreground">
-        Loading group…
+      <div className="flex h-[calc(100vh-40px)] items-center justify-center text-muted-foreground max-md:h-full">
+        Loading…
       </div>
     );
   }
 
   if (isError || !group) {
     return (
-      <div className="flex h-[calc(100vh-40px)] flex-col items-center justify-center gap-4">
+      <div className="flex h-[calc(100vh-40px)] flex-col items-center justify-center gap-4 max-md:h-full">
         <p className="text-destructive">
           {getApiErrorMessage(error, "Could not load this group")}
         </p>
         <Button variant="outline" onClick={() => navigate(ROUTES.groups)}>
-          Back to groups
+          Back to practice spaces
         </Button>
       </div>
     );
@@ -144,9 +151,13 @@ const GroupLayout = () => {
   const showTransfersNav = !readOnlyPlatform;
   const showJoinRequestsNav =
     !readOnlyPlatform && canManageJoinRequests(myRole);
+  const showCommunityNav = !readOnlyPlatform && canModerateGroupUsers(myRole);
   const pendingCount = pendingJoinRequests?.total ?? 0;
   const showDelete = !readOnlyPlatform && canDelete;
   const canPublishGroup = !readOnlyPlatform && canChangeGroupStatus(myRole);
+  // Same roles the server lets export prayer requests; reviewers are excluded there too.
+  const canExportPrayers =
+    !readOnlyPlatform && canWriteEvents(myRole, userInfo?.platform_role);
   const nameMatches =
     confirmName.trim().toLowerCase() === groupTitle.trim().toLowerCase();
   const isAboutSection =
@@ -182,8 +193,8 @@ const GroupLayout = () => {
   return (
     <>
       <GroupPageShell
-        backLabel="← Groups"
-        onBack={() => navigate(ROUTES.groups)}
+        backLabel={`← ${kind.plural}`}
+        onBack={() => navigate(kind.listPath)}
         title={groupTitle}
         avatarUrl={avatarUrl}
         subtitle={
@@ -196,6 +207,9 @@ const GroupLayout = () => {
         }
         headerActions={
           <>
+            {canExportPrayers ? (
+              <PrayerPdfActions scope={{ kind: "group", groupId: group.id }} />
+            ) : null}
             {canPublishGroup ? <GroupPublishControl group={group} /> : null}
             {showDelete ? (
               <Button
@@ -210,7 +224,7 @@ const GroupLayout = () => {
           </>
         }
         nav={
-          <nav className="flex flex-wrap gap-1 px-4 sm:px-8 border-b border-dashed border-gray-300 dark:border-input">
+          <nav className="flex flex-wrap gap-1 px-4 sm:px-8 border-b border-dashed border-gray-300 dark:border-input max-md:flex-nowrap max-md:overflow-x-auto">
             <NavLink
               to={ROUTES.group(group.id)}
               end
@@ -238,6 +252,14 @@ const GroupLayout = () => {
             >
               Members
             </NavLink>
+            {showCommunityNav ? (
+              <NavLink
+                to={ROUTES.groupCommunity(group.id)}
+                className={navLinkClass}
+              >
+                Community
+              </NavLink>
+            ) : null}
             {showJoinRequestsNav ? (
               <NavLink
                 to={ROUTES.groupJoinRequests(group.id)}
@@ -265,10 +287,13 @@ const GroupLayout = () => {
             <NavLink to={ROUTES.groupChants(group.id)} className={navLinkClass}>
               Chants
             </NavLink>
+            <NavLink to={ROUTES.groupAssets(group.id)} className={navLinkClass}>
+              Assets
+            </NavLink>
           </nav>
         }
       >
-        <div className="px-4 sm:px-8 py-6 pb-12">
+        <div className="px-4 sm:px-8 py-6 pb-12 max-md:py-4">
           <div className={cn("mx-auto w-full", contentMaxWidth)}>
             <Outlet context={outletContext} />
           </div>
@@ -281,10 +306,10 @@ const GroupLayout = () => {
       >
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
-            <Pecha.AlertDialogTitle>Delete group?</Pecha.AlertDialogTitle>
+            <Pecha.AlertDialogTitle>Delete {noun}?</Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
               This will permanently remove &ldquo;{groupTitle}&rdquo;. This
-              action cannot be undone. Type the group name to confirm.
+              action cannot be undone. Type the {noun} name to confirm.
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <div className="space-y-2 py-2">
@@ -292,7 +317,7 @@ const GroupLayout = () => {
               htmlFor="delete-group-confirm-name"
               className="text-sm font-medium"
             >
-              Group name
+              {kind.singular} name
             </label>
             <Pecha.Input
               id="delete-group-confirm-name"

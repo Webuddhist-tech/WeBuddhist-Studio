@@ -80,9 +80,6 @@ describe("Login Component", () => {
     auth0State.isLoading = false;
     mockGetAccessTokenSilently.mockResolvedValue("auth0-access-token");
     mockLoginWithRedirect.mockResolvedValue(undefined);
-    vi.mocked(axiosInstance.get).mockResolvedValue({
-      data: { platform_role: "CREATOR" },
-    });
   });
 
   it("renders login form with email and password fields", () => {
@@ -171,8 +168,8 @@ describe("Login Component", () => {
     });
   });
 
-  describe("Role gating", () => {
-    it("logs in a CREATOR account through the regular login", async () => {
+  describe("Sign-in (any account type)", () => {
+    it("logs in a CREATOR account", async () => {
       const user = userEvent.setup();
       renderWithProviders(<Login />);
       vi.mocked(axiosInstance.post).mockResolvedValue({
@@ -203,7 +200,7 @@ describe("Login Component", () => {
       });
     });
 
-    it("rejects a staff account signing in through the regular login", async () => {
+    it("logs in a staff (SUPER_ADMIN) account through the same page", async () => {
       const user = userEvent.setup();
       renderWithProviders(<Login />);
       vi.mocked(axiosInstance.post).mockResolvedValue({
@@ -213,9 +210,6 @@ describe("Login Component", () => {
             refresh_token: "staff-refresh-token",
           },
         },
-      });
-      vi.mocked(axiosInstance.get).mockResolvedValue({
-        data: { platform_role: "SUPER_ADMIN" },
       });
 
       await user.type(
@@ -229,25 +223,12 @@ describe("Login Component", () => {
       await user.click(screen.getByText("common.button.submit"));
 
       await waitFor(() => {
-        expect(
-          screen.getByText(
-            "This account is a staff account. Please use the staff login.",
-          ),
-        ).toBeInTheDocument();
-        expect(mockLogin).not.toHaveBeenCalled();
-        expect(mockNavigate).not.toHaveBeenCalledWith("/dashboard");
+        expect(mockLogin).toHaveBeenCalledWith(
+          "staff-token",
+          "staff-refresh-token",
+        );
+        expect(mockNavigate).toHaveBeenCalledWith("/dashboard");
       });
-    });
-
-    it("shows a tab to the staff login page", () => {
-      renderWithProviders(<Login />);
-      const staffTab = screen.getByRole("tab", { name: "Staff sign in" });
-      expect(staffTab).toBeInTheDocument();
-      expect(staffTab).toHaveAttribute("aria-selected", "false");
-      expect(screen.getByRole("tab", { name: "Sign in" })).toHaveAttribute(
-        "aria-selected",
-        "true",
-      );
     });
   });
 

@@ -8,7 +8,7 @@ export interface GroupPostCommentDTO {
   post_id: string;
   user_id: string;
   parent_comment_id?: string | null;
-  user_email: string;
+  user_email: string | null;
   text: string;
   created_at: string;
   updated_at?: string | null;

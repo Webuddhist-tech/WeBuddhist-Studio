@@ -33,10 +33,10 @@ const relativeTime = (value: string): string => {
   }
 };
 
-const displayNameFromEmail = (email: string): string =>
-  email.split("@")[0] || "User";
+const displayNameFromEmail = (email: string | null | undefined): string =>
+  email?.split("@")[0] || "User";
 
-const commentInitial = (email: string): string =>
+const commentInitial = (email: string | null | undefined): string =>
   displayNameFromEmail(email).charAt(0).toUpperCase() || "U";
 
 const PostComments = ({
@@ -198,8 +198,8 @@ const PostComments = ({
   const renderComment = (comment: GroupPostCommentDTO, depth = 0) => {
     const replies = repliesByParent.get(comment.id) ?? [];
     const isOwnComment =
-      Boolean(currentUser?.email) &&
-      currentUser?.email?.toLowerCase() === comment.user_email.toLowerCase();
+      Boolean(currentUser?.email && comment.user_email) &&
+      currentUser?.email?.toLowerCase() === comment.user_email?.toLowerCase();
 
     return (
       <div key={comment.id} className={depth > 0 ? "ml-9 mt-3" : "mt-4"}>

@@ -13,6 +13,7 @@ export type { LanguageCode };
 export const RecurrenceFrequency = {
   YEARLY: "YEARLY",
   MONTHLY: "MONTHLY",
+  WEEKLY: "WEEKLY",
 } as const;
 
 export type RecurrenceFrequency =
@@ -25,6 +26,43 @@ export const RecurrenceDateSystem = {
 
 export type RecurrenceDateSystem =
   (typeof RecurrenceDateSystem)[keyof typeof RecurrenceDateSystem];
+
+export const EVENT_FORMAT_OPTIONS = [
+  { value: "offline", label: "In person" },
+  { value: "online", label: "Live" },
+  { value: "hybrid", label: "Hybrid" },
+] as const;
+
+export type EventFormat = (typeof EVENT_FORMAT_OPTIONS)[number]["value"];
+
+const eventFormatValues = EVENT_FORMAT_OPTIONS.map(
+  (option) => option.value,
+) as [EventFormat, ...EventFormat[]];
+
+export function eventFormatLabel(
+  value: string | null | undefined,
+): string | null {
+  return (
+    EVENT_FORMAT_OPTIONS.find((option) => option.value === value)?.label ?? null
+  );
+}
+
+export function eventRecurrenceLabel(
+  isRecurring?: boolean,
+  frequency?: string | null,
+): string {
+  if (!isRecurring) return "One-time";
+  switch (frequency) {
+    case RecurrenceFrequency.WEEKLY:
+      return "Weekly";
+    case RecurrenceFrequency.MONTHLY:
+      return "Monthly";
+    case RecurrenceFrequency.YEARLY:
+      return "Yearly";
+    default:
+      return "Recurring";
+  }
+}
 
 export const eventMetadataRowSchema = z.object({
   language: z.string().trim().min(1, "Language is required"),
@@ -50,20 +88,90 @@ export const eventLinkRowSchema = z.object({
       "URL must start with http:// or https://",
     ),
   label: z.string().trim().max(255, "Label must be at most 255 characters"),
+  language: z.string().trim().min(1, "Language is required"),
 });
 
 export type EventLinkRow = z.infer<typeof eventLinkRowSchema>;
 
+function isYoutubeUrl(url: string): boolean {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    const host = hostname.startsWith("www.") ? hostname.slice(4) : hostname;
+    return (
+      host === "youtube.com" ||
+      host.endsWith(".youtube.com") ||
+      host === "youtu.be"
+    );
+  } catch {
+    return false;
+  }
+}
+
+export const eventYoutubeRowSchema = z.object({
+  url: z
+    .string()
+    .trim()
+    .min(1, "URL is required")
+    .max(2000, "URL must be at most 2000 characters")
+    .refine(
+      (value) => /^https?:\/\/.+/i.test(value),
+      "URL must start with http:// or https://",
+    )
+    .refine(isYoutubeUrl, "URL must be a youtube.com or youtu.be link"),
+  label: z.string().trim().max(255, "Label must be at most 255 characters"),
+  language: z.string().trim().min(1, "Language is required"),
+});
+
+export type EventYoutubeRow = z.infer<typeof eventYoutubeRowSchema>;
+
+export const DAYS_OF_WEEK = [
+  { value: 0, label: "Monday" },
+  { value: 1, label: "Tuesday" },
+  { value: 2, label: "Wednesday" },
+  { value: 3, label: "Thursday" },
+  { value: 4, label: "Friday" },
+  { value: 5, label: "Saturday" },
+  { value: 6, label: "Sunday" },
+] as const;
+
 export const recurrenceSchema = z
   .object({
-    frequency: z.enum(["YEARLY", "MONTHLY"]),
+    frequency: z.enum(["YEARLY", "MONTHLY", "WEEKLY"]),
     date_system: z.enum(["GREGORIAN", "TIBETAN_LUNAR"]),
     calendar_type: z.string().trim().max(10),
     month: z.number().int().min(1).max(12).nullable(),
-    day: z.number().int().min(1).max(31),
+    day: z.number().int().min(1).max(31).nullable(),
+    day_of_week: z.number().int().min(0).max(6).nullable(),
     duration_days: z.number().int().min(1),
   })
   .superRefine((data, ctx) => {
+    if (data.frequency === "WEEKLY") {
+      if (data.day_of_week === null) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Day of week is required for weekly recurrence",
+          path: ["day_of_week"],
+        });
+      }
+      if (data.date_system !== "GREGORIAN") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Weekly recurrence only supports the Gregorian calendar",
+          path: ["date_system"],
+        });
+      }
+      return;
+    }
+
+    if (data.day === null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Day is required",
+        path: ["day"],
+      });
+      return;
+    }
+
     if (data.date_system === "TIBETAN_LUNAR") {
       if (!data.calendar_type || data.calendar_type.trim() === "") {
         ctx.addIssue({
@@ -111,12 +219,18 @@ const baseEventSchema = z.object({
   recurrence: recurrenceSchema.nullable(),
   metadata: z.array(eventMetadataRowSchema).min(1, "Add at least one language"),
   links: z.array(eventLinkRowSchema),
+  youtube: z.array(eventYoutubeRowSchema),
   image_url: z.string().trim(),
   plan_id: z.string().trim(),
   series_id: z.string().trim(),
   accumulator_id: z.string().trim(),
+  group_accumulator_id: z.string().trim(),
   group_recitation_collection_id: z.string().trim(),
   location_id: z.string().trim(),
+  event_format: z.enum(eventFormatValues),
+  chat_enabled: z.boolean(),
+  notifications_enabled: z.boolean(),
+  intention_ids: z.array(z.string()),
 });
 
 const commonValidation = (
@@ -151,6 +265,19 @@ const commonValidation = (
         code: z.ZodIssueCode.custom,
         message:
           "End date and time must be on or after the start date and time",
+        path: ["end_time"],
+      });
+    }
+  } else if (data.recurrence && data.recurrence.duration_days === 1) {
+    // Single-day occurrences: the same start/end time applies to every one,
+    // so it must make sense as a same-day range like the one-time case does.
+    if (
+      (data.end_time || DEFAULT_END_TIME) <
+      (data.start_time || DEFAULT_START_TIME)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "End time must be on or after the start time",
         path: ["end_time"],
       });
     }
@@ -196,10 +323,17 @@ export const emptyMetadataRow = (language: LanguageCode): EventMetadataRow => ({
   description: "",
 });
 
-export const emptyLinkRow = (): EventLinkRow => ({
+export const emptyLinkRow = (language: LanguageCode): EventLinkRow => ({
   type: "",
   url: "",
   label: "",
+  language,
+});
+
+export const emptyYoutubeRow = (language: LanguageCode): EventYoutubeRow => ({
+  url: "",
+  label: "",
+  language,
 });
 
 export const emptyRecurrence = (): RecurrenceFormData => ({
@@ -208,6 +342,7 @@ export const emptyRecurrence = (): RecurrenceFormData => ({
   calendar_type: "",
   month: 1,
   day: 1,
+  day_of_week: null,
   duration_days: 1,
 });
 
@@ -222,10 +357,16 @@ export const defaultEventFormValues = (): EventFormData => ({
   recurrence: null,
   metadata: [emptyMetadataRow("EN")],
   links: [],
+  youtube: [],
   image_url: "",
   plan_id: "",
   series_id: "",
   accumulator_id: "",
+  group_accumulator_id: "",
   group_recitation_collection_id: "",
   location_id: "",
+  event_format: "hybrid",
+  chat_enabled: true,
+  notifications_enabled: true,
+  intention_ids: [],
 });

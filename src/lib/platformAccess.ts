@@ -28,19 +28,9 @@ export function isReviewer(role?: PlatformRole | string): boolean {
   return normalizeRoleArg(role) === "REVIEWER";
 }
 
-/** Platform staff (SUPER_ADMIN, REVIEWER) use the admin login; everyone else uses the regular login. */
-export function isAdminLoginRole(role?: PlatformRole | string): boolean {
+/** Platform staff (SUPER_ADMIN, REVIEWER), as opposed to a plain CREATOR account. */
+export function isStaffRole(role?: PlatformRole | string): boolean {
   return isSuperAdmin(role) || isReviewer(role);
-}
-
-export type LoginVariant = "user" | "admin";
-
-export function isRoleAllowedForLoginVariant(
-  role: PlatformRole | undefined,
-  variant: LoginVariant,
-): boolean {
-  const isAdminRole = isAdminLoginRole(role);
-  return variant === "admin" ? isAdminRole : !isAdminRole;
 }
 
 /** Row menus (dashboard, series plans, tags, group members, etc.). */
@@ -77,6 +67,7 @@ export function isAuthorNotActiveError(error: unknown): boolean {
 /** Routes allowed when a CREATOR has no group yet. */
 export const NO_GROUP_ALLOWED_PREFIXES = [
   "/groups",
+  "/pages",
   "/profile",
   "/admin/authors",
   "/admin/china-restrictions",
@@ -116,6 +107,13 @@ export function needsGroupOnboardingRedirect(
 /** Admin authors + auth routes for platform staff. */
 export function canAccessAdminAuthors(role?: PlatformRole | string): boolean {
   return isSuperAdmin(role) || isReviewer(role);
+}
+
+/** The ambient sound catalogue is the one background-sound catalogue: curated
+ * in Studio, chosen per timer in the app. CRUD is Super Admin only (shared,
+ * sitewide media/S3 writes). */
+export function canManageAmbientSounds(role?: PlatformRole | string): boolean {
+  return isSuperAdmin(role);
 }
 
 /** Whether dashboard group filter should load (staff-wide vs membership list). */

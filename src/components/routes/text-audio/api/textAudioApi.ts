@@ -1,138 +1,110 @@
 import axiosInstance from "@/config/axios-config";
 
+/** `id` here is an edition id, not a text id: the title-search endpoint
+ * resolves each matching text to its first critical edition server-side
+ * before returning it, so this can be passed directly to edition-scoped
+ * endpoints (e.g. recordings) without a further text->edition lookup. */
 export interface TextSearchResult {
   id: string;
   title: string;
 }
 
-export interface TextAudio {
+export type ContributorRole =
+  | "translator"
+  | "reviser"
+  | "author"
+  | "scholar"
+  | "narrator";
+
+export interface RecordingContribution {
+  type: "person" | "ai";
+  id?: string | null;
+  bdrc_id?: string | null;
+  role: ContributorRole;
+  name?: Record<string, string> | null;
+}
+
+export interface Person {
   id: string;
+  bdrc_id?: string | null;
+  wiki?: string | null;
+  name: Record<string, string>;
+  alt_names?: Record<string, string>[] | null;
+}
+
+export const personLabel = (person: Person) =>
+  person.name?.en ?? Object.values(person.name)[0] ?? person.id;
+
+export interface Recording {
+  id: string;
+  edition_id: string;
   text_id: string;
-  text_title: string;
-  audio_key: string;
-  audio_url: string;
-  name: string;
-  file_name: string;
-  mime_type: string | null;
-  file_size_bytes: number | null;
+  title?: Record<string, string> | null;
+  language?: string | null;
+  license: string;
+  date?: string | null;
   duration_ms: number | null;
-  updated_at: string;
+  contributions: RecordingContribution[];
+  format: string;
+  size_bytes: number;
+  audio_url: string;
 }
 
-export interface TextAudioOtr {
-  id: string;
-  audio_id: string;
-  name: string;
-  file_name: string;
-  updated_at: string;
-}
+const recordingsPath = (editionId: string) =>
+  `/api/v1/cms/editions/${encodeURIComponent(editionId)}/recordings`;
 
-export type OtrContent = Record<string, unknown>;
+const recordingPath = (recordingId: string) =>
+  `/api/v1/cms/recordings/${encodeURIComponent(recordingId)}`;
 
-export interface OtrSpanRange {
-  start: number;
-  end: number;
-}
-
-export interface OtrSpanEntry {
-  span: OtrSpanRange;
-  timestamp: number;
-}
-
-export interface TextAudioOtrContent {
-  text: string;
-  spans: OtrSpanEntry[];
-}
-
-export interface TextSegmentContent {
-  segment_id: string;
-  content: string;
-}
-
-export interface TextAudioSegments {
-  text_id: string;
-  segments: TextSegmentContent[];
-}
-
-export const INVALID_OTR_MESSAGE = "Please upload a valid OTR/JSON file.";
-
-export class InvalidOtrFileError extends Error {
-  constructor() {
-    super(INVALID_OTR_MESSAGE);
-    this.name = "InvalidOtrFileError";
-  }
-}
-
-const readFileAsText = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ""));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsText(file);
-  });
-
-/**
- * OTR files are JSON documents; reject anything that does not parse
- * to a JSON object so only valid JSON is ever stored.
- */
-export const parseOtrFile = async (file: File): Promise<OtrContent> => {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(await readFileAsText(file));
-  } catch {
-    throw new InvalidOtrFileError();
-  }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new InvalidOtrFileError();
-  }
-  return parsed as OtrContent;
-};
-
-export const otrNameFromFile = (file: File) =>
-  file.name.replace(/\.[^.]+$/, "").trim() || file.name;
-
-const audioPath = (textId: string, audioId?: string) => {
-  const base = `/api/v1/cms/texts/${encodeURIComponent(textId)}/audios`;
-  return audioId ? `${base}/${encodeURIComponent(audioId)}` : base;
-};
-
+/** Search texts by title, or list a default page when the title is blank -
+ * so the picker has something to show before the user has typed anything. */
 export const searchTexts = async (title: string) => {
   const { data } = await axiosInstance.get<TextSearchResult[]>(
     "/api/v1/texts/title-search",
-    { params: { title, limit: 20, offset: 0 } },
+    { params: { title: title || undefined, limit: 20, offset: 0 } },
   );
   return data;
 };
 
-export const fetchTextAudios = async (textId: string) => {
-  const { data } = await axiosInstance.get<TextAudio[]>(audioPath(textId));
+/** Search persons by name, or list a default page when blank - same pattern
+ * as searchTexts, so the contributor picker has something to show upfront. */
+export const searchPersons = async (name: string) => {
+  const { data } = await axiosInstance.get<Person[]>("/api/v1/cms/persons", {
+    params: { name: name || undefined, limit: 20, offset: 0 },
+  });
   return data;
 };
 
-export const fetchTextSegments = async (textId: string) => {
-  const { data } = await axiosInstance.get<TextAudioSegments>(
-    `/api/v1/cms/texts/${encodeURIComponent(textId)}/segments`,
+export const fetchEditionRecordings = async (editionId: string) => {
+  const { data } = await axiosInstance.get<Recording[]>(
+    recordingsPath(editionId),
   );
   return data;
 };
 
-export const uploadTextAudio = async ({
-  text,
+export const uploadRecording = async ({
+  edition,
   file,
   durationMs,
+  contribution,
   onProgress,
 }: {
-  text: TextSearchResult;
+  edition: TextSearchResult;
   file: File;
   durationMs?: number;
+  contribution: RecordingContribution;
   onProgress: (progress: number) => void;
 }) => {
+  const metadata = {
+    duration_ms: durationMs,
+    contributions: [contribution],
+  };
   const body = new FormData();
-  body.append("file", file);
-  if (durationMs != null) body.append("duration_ms", String(durationMs));
+  body.append("metadata", JSON.stringify(metadata));
+  body.append("audio", file);
 
-  const { data } = await axiosInstance.post<TextAudio>(
-    audioPath(text.id),
+  const { data } = await axiosInstance.post<Recording>(
+    recordingsPath(edition.id),
     body,
     {
       onUploadProgress: ({ loaded, total }) => {
@@ -143,73 +115,14 @@ export const uploadTextAudio = async ({
   return data;
 };
 
-export const deleteTextAudio = async (textId: string, audioId: string) => {
-  await axiosInstance.delete(audioPath(textId, audioId));
+export const deleteRecording = async (recordingId: string) => {
+  await axiosInstance.delete(recordingPath(recordingId));
 };
 
-export const updateTextAudioName = async (
-  textId: string,
-  audioId: string,
-  name: string,
-) => {
-  const { data } = await axiosInstance.patch<TextAudio>(
-    audioPath(textId, audioId),
-    { name },
+export const renameRecording = async (recordingId: string, title: string) => {
+  const { data } = await axiosInstance.patch<Recording>(
+    recordingPath(recordingId),
+    { title: { en: title } },
   );
   return data;
-};
-
-export const fetchAudioOtrs = async (textId: string, audioId: string) => {
-  const { data } = await axiosInstance.get<TextAudioOtr[]>(
-    `${audioPath(textId, audioId)}/otr`,
-  );
-  return data;
-};
-
-export const uploadAudioOtr = async ({
-  textId,
-  audioId,
-  name,
-  content,
-}: {
-  textId: string;
-  audioId: string;
-  name: string;
-  content: OtrContent;
-}) => {
-  const body = new FormData();
-  body.append(
-    "file",
-    new File([JSON.stringify(content)], `${name}.json`, {
-      type: "application/json",
-    }),
-  );
-  body.append("name", name);
-
-  const { data } = await axiosInstance.post<TextAudioOtr>(
-    `${audioPath(textId, audioId)}/otr`,
-    body,
-  );
-  return data;
-};
-
-export const fetchOtrContent = async (
-  textId: string,
-  audioId: string,
-  otrId: string,
-) => {
-  const { data } = await axiosInstance.get<TextAudioOtrContent>(
-    `${audioPath(textId, audioId)}/otr/${encodeURIComponent(otrId)}`,
-  );
-  return data;
-};
-
-export const deleteAudioOtr = async (
-  textId: string,
-  audioId: string,
-  otrId: string,
-) => {
-  await axiosInstance.delete(
-    `${audioPath(textId, audioId)}/otr/${encodeURIComponent(otrId)}`,
-  );
 };

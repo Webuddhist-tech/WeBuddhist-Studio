@@ -90,9 +90,9 @@ const VerseOfDay = () => {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-[#F5F5F5] dark:bg-[#181818] font-dynamic">
-      <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200 dark:border-[#313132] bg-white dark:bg-[#1E1E1E]">
-        <div className="flex items-center space-x-2">
+    <div className="flex flex-col h-screen overflow-hidden bg-[#F5F5F5] dark:bg-[#181818] font-dynamic max-md:h-full">
+      <div className="px-6 py-4 flex items-center justify-between border-b border-gray-200 dark:border-[#313132] bg-white dark:bg-[#1E1E1E] max-md:flex-wrap max-md:gap-3 max-md:px-4 max-md:pt-4">
+        <div className="flex items-center space-x-2 max-md:flex-wrap max-md:gap-y-2">
           <div className="border w-fit px-2 bg-white dark:bg-input/30 rounded-md border-gray-200 dark:border-[#313132] flex items-center">
             <IoMdSearch className="w-4 h-4" />
             <Pecha.Input

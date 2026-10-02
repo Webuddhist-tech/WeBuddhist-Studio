@@ -5,7 +5,6 @@ import { useDebounce } from "use-debounce";
 import {
   FiCheck,
   FiEdit2,
-  FiFileText,
   FiLoader,
   FiSearch,
   FiUpload,
@@ -20,30 +19,29 @@ import { getApiErrorMessage } from "@/lib/apiErrors";
 import { formatMs, getAudioDurationMs } from "@/lib/utils";
 
 import {
-  deleteAudioOtr,
-  deleteTextAudio,
-  fetchAudioOtrs,
-  fetchOtrContent,
-  fetchTextAudios,
-  fetchTextSegments,
-  INVALID_OTR_MESSAGE,
-  otrNameFromFile,
-  parseOtrFile,
+  deleteRecording,
+  fetchEditionRecordings,
+  personLabel,
+  renameRecording,
+  searchPersons,
   searchTexts,
-  type OtrContent,
-  type TextAudio,
-  type TextAudioOtr,
+  type ContributorRole,
+  type Person,
+  type Recording,
   type TextSearchResult,
-  updateTextAudioName,
-  uploadAudioOtr,
-  uploadTextAudio,
+  uploadRecording,
 } from "./api/textAudioApi";
-import { OtrSyncPlayer } from "./OtrSyncPlayer";
 
-interface PendingOtr {
-  name: string;
-  content: OtrContent;
-}
+const recordingLabel = (recording: Recording) =>
+  recording.title?.en ?? `Recording (${recording.format})`;
+
+const CONTRIBUTOR_ROLES: ContributorRole[] = [
+  "narrator",
+  "translator",
+  "author",
+  "reviser",
+  "scholar",
+];
 
 const TextAudioPage = () => {
   const queryClient = useQueryClient();
@@ -52,106 +50,91 @@ const TextAudioPage = () => {
   const [selectedText, setSelectedText] = useState<TextSearchResult | null>(
     null,
   );
-  const [selectedAudioId, setSelectedAudioId] = useState<string | null>(null);
-  const [selectedOtrId, setSelectedOtrId] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [pendingOtr, setPendingOtr] = useState<PendingOtr | null>(null);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [audioToDelete, setAudioToDelete] = useState<{
-    textId: string;
-    audio: TextAudio;
-  } | null>(null);
-  const [otrToDelete, setOtrToDelete] = useState<{
-    textId: string;
-    audioId: string;
-    otr: TextAudioOtr;
-  } | null>(null);
-  const [editingAudioId, setEditingAudioId] = useState<string | null>(null);
+  const [recordingToDelete, setRecordingToDelete] = useState<Recording | null>(
+    null,
+  );
+  const [editingRecordingId, setEditingRecordingId] = useState<string | null>(
+    null,
+  );
   const [editingName, setEditingName] = useState("");
+  const [contributorQuery, setContributorQuery] = useState("");
+  const [debouncedContributorQuery] = useDebounce(contributorQuery.trim(), 400);
+  const [isContributorOpen, setIsContributorOpen] = useState(false);
+  const [selectedContributor, setSelectedContributor] = useState<Person | null>(
+    null,
+  );
+  const [contributorRole, setContributorRole] =
+    useState<ContributorRole>("narrator");
 
-  const searchQuery = useQuery({
-    queryKey: ["text-audio-search", debouncedSearch],
+  const textsQuery = useQuery({
+    queryKey: ["text-audio-texts", debouncedSearch],
     queryFn: () => searchTexts(debouncedSearch),
-    enabled: debouncedSearch.length >= 2,
     retry: false,
   });
 
-  const audiosQuery = useQuery({
-    queryKey: ["text-audios", selectedText?.id],
-    queryFn: () => fetchTextAudios(selectedText!.id),
+  const personsQuery = useQuery({
+    queryKey: ["text-audio-persons", debouncedContributorQuery],
+    queryFn: () => searchPersons(debouncedContributorQuery),
+    enabled: isContributorOpen,
+    retry: false,
+  });
+
+  const recordingsQuery = useQuery({
+    queryKey: ["edition-recordings", selectedText?.id],
+    queryFn: () => fetchEditionRecordings(selectedText!.id),
     enabled: Boolean(selectedText),
     retry: false,
   });
 
-  const audios = audiosQuery.data ?? [];
-  const selectedAudio = audios.find((a) => a.id === selectedAudioId) ?? null;
-
-  const otrsQuery = useQuery({
-    queryKey: ["text-audio-otrs", selectedText?.id, selectedAudioId],
-    queryFn: () => fetchAudioOtrs(selectedText!.id, selectedAudioId!),
-    enabled: Boolean(selectedText && selectedAudioId),
-    retry: false,
-  });
-
-  const otrs = otrsQuery.data ?? [];
-  const selectedOtr = otrs.find((o) => o.id === selectedOtrId) ?? null;
-
-  const otrContentQuery = useQuery({
-    queryKey: [
-      "text-audio-otr-content",
-      selectedText?.id,
-      selectedAudioId,
-      selectedOtrId,
-    ],
-    queryFn: () =>
-      fetchOtrContent(selectedText!.id, selectedAudioId!, selectedOtrId!),
-    enabled: Boolean(selectedText && selectedAudioId && selectedOtrId),
-    retry: false,
-  });
-
-  const segmentsQuery = useQuery({
-    queryKey: ["text-segments", selectedText?.id],
-    queryFn: () => fetchTextSegments(selectedText!.id),
-    enabled: Boolean(selectedText && selectedOtrId),
-    retry: false,
-  });
+  const recordings = recordingsQuery.data ?? [];
 
   // Every mutation below can still be in flight when the user selects a
-  // different text/audio/OTR, and TanStack Query re-binds onSuccess/onError
-  // to the component's latest render before invoking them - so reading
-  // selectedText/selectedAudioId/selectedOtrId there would see whatever the
-  // user has navigated to *since*, not the parent the request was actually
-  // made for. Each mutation instead takes its parent ids as variables,
-  // captured synchronously at the moment it's fired, and completions use
-  // those captured ids both for cache invalidation and to decide whether
-  // it's still safe to touch selection state.
+  // different text, and TanStack Query re-binds onSuccess/onError to the
+  // component's latest render before invoking them - so reading
+  // selectedText there would see whatever the user has navigated to *since*,
+  // not the text the request was actually made for. Each mutation instead
+  // takes its edition id as a variable, captured synchronously at the moment
+  // it's fired, and completions use that captured id both for cache
+  // invalidation and to decide whether it's still safe to touch selection
+  // state.
   const uploadMutation = useMutation({
     mutationFn: async ({
       text,
       file,
+      contributor,
+      role,
     }: {
       text: TextSearchResult;
       file: File;
+      contributor: Person;
+      role: ContributorRole;
     }) => {
       // The browser can't decode every valid audio codec (e.g. ALAC m4a
-      // from iOS/Mac Voice Memos), and the server re-probes the converted
-      // MP3 anyway - so never let a failed probe block the upload.
+      // from iOS/Mac Voice Memos), and the upload shouldn't be blocked by a
+      // failed local probe - duration just ends up unset.
       const durationMs = await getAudioDurationMs(file).catch(() => undefined);
-      return uploadTextAudio({
-        text,
+      return uploadRecording({
+        edition: text,
         file,
         durationMs,
+        contribution: {
+          type: "person",
+          id: contributor.id,
+          bdrc_id: contributor.bdrc_id,
+          role,
+        },
         onProgress: setUploadProgress,
       });
     },
-    onSuccess: (audio, { text }) => {
+    onSuccess: (_recording, { text }) => {
       queryClient.invalidateQueries({
-        queryKey: ["text-audios", text.id],
+        queryKey: ["edition-recordings", text.id],
       });
       if (selectedText?.id === text.id) {
         setPendingFile(null);
         setUploadProgress(0);
-        selectAudio(audio.id);
       }
       toast.success("Audio uploaded");
     },
@@ -163,17 +146,14 @@ const TextAudioPage = () => {
     },
   });
 
-  const deleteAudioMutation = useMutation({
-    mutationFn: ({ textId, audio }: { textId: string; audio: TextAudio }) =>
-      deleteTextAudio(textId, audio.id),
-    onSuccess: (_, { textId, audio }) => {
+  const deleteMutation = useMutation({
+    mutationFn: ({ recording }: { editionId: string; recording: Recording }) =>
+      deleteRecording(recording.id),
+    onSuccess: (_, { editionId }) => {
       queryClient.invalidateQueries({
-        queryKey: ["text-audios", textId],
+        queryKey: ["edition-recordings", editionId],
       });
-      if (selectedText?.id === textId && selectedAudioId === audio.id) {
-        selectAudio(null);
-      }
-      setAudioToDelete(null);
+      setRecordingToDelete(null);
       toast.success("Audio deleted");
     },
     onError: (error) =>
@@ -182,21 +162,20 @@ const TextAudioPage = () => {
       }),
   });
 
-  const renameAudioMutation = useMutation({
+  const renameMutation = useMutation({
     mutationFn: ({
-      textId,
-      audio,
+      recording,
       name,
     }: {
-      textId: string;
-      audio: TextAudio;
+      editionId: string;
+      recording: Recording;
       name: string;
-    }) => updateTextAudioName(textId, audio.id, name),
-    onSuccess: (_, { textId }) => {
+    }) => renameRecording(recording.id, name),
+    onSuccess: (_, { editionId }) => {
       queryClient.invalidateQueries({
-        queryKey: ["text-audios", textId],
+        queryKey: ["edition-recordings", editionId],
       });
-      setEditingAudioId(null);
+      setEditingRecordingId(null);
       toast.success("Audio renamed");
     },
     onError: (error) =>
@@ -205,121 +184,40 @@ const TextAudioPage = () => {
       }),
   });
 
-  const uploadOtrMutation = useMutation({
-    mutationFn: ({
-      textId,
-      audioId,
-      otr,
-    }: {
-      textId: string;
-      audioId: string;
-      otr: PendingOtr;
-    }) =>
-      uploadAudioOtr({
-        textId,
-        audioId,
-        name: otr.name,
-        content: otr.content,
-      }),
-    onSuccess: (otr, { textId, audioId }) => {
-      queryClient.invalidateQueries({
-        queryKey: ["text-audio-otrs", textId, audioId],
-      });
-      if (selectedText?.id === textId && selectedAudioId === audioId) {
-        setPendingOtr(null);
-        setSelectedOtrId(otr.id);
-      }
-      toast.success("OTR saved");
-    },
-    onError: (error) =>
-      toast.error("Failed to upload OTR", {
-        description: getApiErrorMessage(error),
-      }),
-  });
-
-  const deleteOtrMutation = useMutation({
-    mutationFn: ({
-      textId,
-      audioId,
-      otr,
-    }: {
-      textId: string;
-      audioId: string;
-      otr: TextAudioOtr;
-    }) => deleteAudioOtr(textId, audioId, otr.id),
-    onSuccess: (_, { textId, audioId, otr }) => {
-      queryClient.invalidateQueries({
-        queryKey: ["text-audio-otrs", textId, audioId],
-      });
-      if (
-        selectedText?.id === textId &&
-        selectedAudioId === audioId &&
-        selectedOtrId === otr.id
-      ) {
-        setSelectedOtrId(null);
-      }
-      setOtrToDelete(null);
-      toast.success("OTR deleted");
-    },
-    onError: (error) =>
-      toast.error("Failed to delete OTR", {
-        description: getApiErrorMessage(error),
-      }),
-  });
-
   const selectText = (text: TextSearchResult) => {
     setSelectedText(text);
     setPendingFile(null);
     setUploadProgress(0);
-    selectAudio(null);
   };
 
-  const selectAudio = (audioId: string | null) => {
-    setSelectedAudioId(audioId);
-    setSelectedOtrId(null);
-    setPendingOtr(null);
+  const startRename = (recording: Recording) => {
+    setEditingRecordingId(recording.id);
+    setEditingName(recordingLabel(recording));
   };
 
-  const startRenameAudio = (audio: TextAudio) => {
-    setEditingAudioId(audio.id);
-    setEditingName(audio.name);
-  };
-
-  const cancelRenameAudio = () => {
-    setEditingAudioId(null);
+  const cancelRename = () => {
+    setEditingRecordingId(null);
     setEditingName("");
   };
 
-  const saveRenameAudio = (audio: TextAudio) => {
+  const saveRename = (recording: Recording) => {
     const name = editingName.trim();
-    if (!name || name === audio.name) {
-      cancelRenameAudio();
+    if (!name || name === recordingLabel(recording)) {
+      cancelRename();
       return;
     }
-    renameAudioMutation.mutate({ textId: selectedText!.id, audio, name });
-  };
-
-  const handleOtrDrop = async (files: File[]) => {
-    const file = files[0];
-    if (!file) return;
-    try {
-      const content = await parseOtrFile(file);
-      setPendingOtr({ name: otrNameFromFile(file), content });
-    } catch {
-      toast.error(INVALID_OTR_MESSAGE);
-    }
+    renameMutation.mutate({ editionId: selectedText!.id, recording, name });
   };
 
   const isUploading = uploadMutation.isPending;
 
   return (
-    <div className="flex flex-col border h-[calc(100vh-40px)] overflow-auto bg-[#F5F5F5] dark:bg-[#181818] my-4 rounded-l-2xl font-dynamic">
+    <div className="flex flex-col border h-[calc(100vh-40px)] overflow-auto bg-[#F5F5F5] dark:bg-[#181818] my-4 rounded-l-2xl font-dynamic max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
       <div className="px-4 pt-10 pb-4 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">Text audio</h1>
           <p className="text-sm text-muted-foreground">
-            Find a text, upload its audios, and attach OTR transcripts to each
-            audio.
+            Pick a text below and upload its audio recordings.
           </p>
         </div>
         <AuthButton />
@@ -343,20 +241,16 @@ const TextAudioPage = () => {
           </div>
 
           <div className="mt-3 max-h-[calc(100vh-230px)] space-y-1 overflow-auto">
-            {searchQuery.isFetching ? (
+            {textsQuery.isFetching ? (
               <p className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
-                <FiLoader className="animate-spin" /> Searching…
+                <FiLoader className="animate-spin" /> Loading…
               </p>
-            ) : debouncedSearch.length < 2 ? (
-              <p className="p-3 text-sm text-muted-foreground">
-                Type at least two characters.
-              </p>
-            ) : searchQuery.isError ? (
+            ) : textsQuery.isError ? (
               <p className="p-3 text-sm text-red-500">
-                {getApiErrorMessage(searchQuery.error)}
+                {getApiErrorMessage(textsQuery.error)}
               </p>
-            ) : searchQuery.data?.length ? (
-              searchQuery.data.map((text) => (
+            ) : textsQuery.data?.length ? (
+              textsQuery.data.map((text) => (
                 <button
                   key={text.id}
                   type="button"
@@ -395,40 +289,26 @@ const TextAudioPage = () => {
                 </p>
               </div>
 
-              {audiosQuery.isLoading ? (
+              {recordingsQuery.isLoading ? (
                 <p className="flex items-center gap-2 text-sm text-muted-foreground">
                   <FiLoader className="animate-spin" /> Loading audios…
                 </p>
-              ) : audiosQuery.isError ? (
+              ) : recordingsQuery.isError ? (
                 <p className="text-sm text-red-500">
-                  {getApiErrorMessage(audiosQuery.error)}
+                  {getApiErrorMessage(recordingsQuery.error)}
                 </p>
-              ) : audios.length ? (
+              ) : recordings.length ? (
                 <div className="space-y-2">
                   <p className="text-sm font-medium">
-                    Audios ({audios.length}) — select one to manage its OTR
-                    files
+                    Audios ({recordings.length})
                   </p>
-                  {audios.map((audio) => (
+                  {recordings.map((recording) => (
                     <div
-                      key={audio.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => selectAudio(audio.id)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") selectAudio(audio.id);
-                      }}
-                      className={`cursor-pointer space-y-2 rounded-lg border p-3 transition-colors ${
-                        selectedAudioId === audio.id
-                          ? "border-[#A51C21] bg-[#A51C21]/5"
-                          : "hover:bg-muted/50"
-                      }`}
+                      key={recording.id}
+                      className="space-y-2 rounded-lg border p-3"
                     >
-                      {editingAudioId === audio.id ? (
-                        <div
-                          className="flex items-center gap-1"
-                          onClick={(event) => event.stopPropagation()}
-                        >
+                      {editingRecordingId === recording.id ? (
+                        <div className="flex items-center gap-1">
                           <Pecha.Input
                             autoFocus
                             value={editingName}
@@ -436,8 +316,8 @@ const TextAudioPage = () => {
                               setEditingName(event.target.value)
                             }
                             onKeyDown={(event) => {
-                              if (event.key === "Enter") saveRenameAudio(audio);
-                              if (event.key === "Escape") cancelRenameAudio();
+                              if (event.key === "Enter") saveRename(recording);
+                              if (event.key === "Escape") cancelRename();
                             }}
                             className="h-8"
                           />
@@ -445,8 +325,8 @@ const TextAudioPage = () => {
                             type="button"
                             variant="outline"
                             size="sm"
-                            disabled={renameAudioMutation.isPending}
-                            onClick={() => saveRenameAudio(audio)}
+                            disabled={renameMutation.isPending}
+                            onClick={() => saveRename(recording)}
                           >
                             <FiCheck />
                           </Pecha.Button>
@@ -454,8 +334,8 @@ const TextAudioPage = () => {
                             type="button"
                             variant="outline"
                             size="sm"
-                            disabled={renameAudioMutation.isPending}
-                            onClick={cancelRenameAudio}
+                            disabled={renameMutation.isPending}
+                            onClick={cancelRename}
                           >
                             <FiX />
                           </Pecha.Button>
@@ -463,49 +343,39 @@ const TextAudioPage = () => {
                       ) : (
                         <div className="flex items-center gap-1">
                           <span className="text-sm font-medium">
-                            {audio.name}
+                            {recordingLabel(recording)}
                           </span>
                           <button
                             type="button"
                             aria-label="Rename audio"
                             className="text-muted-foreground hover:text-foreground"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              startRenameAudio(audio);
-                            }}
+                            onClick={() => startRename(recording)}
                           >
                             <FiEdit2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       )}
                       <audio
-                        key={audio.audio_url}
+                        key={recording.audio_url}
                         controls
                         preload="metadata"
-                        src={audio.audio_url}
+                        src={recording.audio_url}
                         className="w-full"
-                        onClick={(event) => event.stopPropagation()}
                       />
                       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-                        <span>{audio.file_name}</span>
+                        <span>{recording.format.toUpperCase()}</span>
                         <div className="flex items-center gap-3">
                           <span>
-                            {audio.duration_ms != null
-                              ? formatMs(audio.duration_ms)
+                            {recording.duration_ms != null
+                              ? formatMs(recording.duration_ms)
                               : "Duration unavailable"}
                           </span>
                           <Pecha.Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            disabled={deleteAudioMutation.isPending}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              setAudioToDelete({
-                                textId: selectedText.id,
-                                audio,
-                              });
-                            }}
+                            disabled={deleteMutation.isPending}
+                            onClick={() => setRecordingToDelete(recording)}
                           >
                             <FaTrash />
                           </Pecha.Button>
@@ -540,8 +410,7 @@ const TextAudioPage = () => {
                         {pendingFile ? pendingFile.name : "Add an audio file"}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        MP3, M4A, WAV, AAC, or OGG; maximum 50 MB. Files are
-                        converted to MP3 so they play in every browser.
+                        MP3, M4A, WAV, AAC, or OGG; maximum 50 MB.
                       </p>
                     </div>
                   )}
@@ -562,278 +431,164 @@ const TextAudioPage = () => {
                 ) : null}
 
                 {pendingFile ? (
-                  <div className="flex gap-2">
-                    <Pecha.Button
-                      type="button"
-                      className="bg-[#A51C21] hover:bg-[#A51C21]/90"
-                      disabled={isUploading}
-                      onClick={() =>
-                        uploadMutation.mutate({
-                          text: selectedText,
-                          file: pendingFile,
-                        })
-                      }
-                    >
-                      {isUploading ? (
-                        <FiLoader className="animate-spin" />
-                      ) : (
-                        <FiUpload />
-                      )}
-                      Upload audio
-                    </Pecha.Button>
-                    <Pecha.Button
-                      type="button"
-                      variant="outline"
-                      disabled={isUploading}
-                      onClick={() => setPendingFile(null)}
-                    >
-                      Cancel
-                    </Pecha.Button>
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-2">
+                      <div className="min-w-52 flex-1">
+                        <label className="text-xs font-medium text-muted-foreground">
+                          Contributor
+                        </label>
+                        <Pecha.Popover
+                          open={isContributorOpen}
+                          onOpenChange={setIsContributorOpen}
+                        >
+                          <Pecha.PopoverTrigger asChild>
+                            <Pecha.Button
+                              type="button"
+                              variant="outline"
+                              className="mt-1 w-full justify-start font-normal"
+                              disabled={isUploading}
+                            >
+                              {selectedContributor
+                                ? personLabel(selectedContributor)
+                                : "Search a person…"}
+                            </Pecha.Button>
+                          </Pecha.PopoverTrigger>
+                          <Pecha.PopoverContent
+                            className="w-[--radix-popover-trigger-width] p-0"
+                            align="start"
+                          >
+                            <Pecha.Command shouldFilter={false}>
+                              <Pecha.CommandInput
+                                placeholder="Search persons…"
+                                value={contributorQuery}
+                                onValueChange={setContributorQuery}
+                              />
+                              <Pecha.CommandList>
+                                {personsQuery.isFetching ? (
+                                  <p className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
+                                    <FiLoader className="animate-spin" />{" "}
+                                    Loading…
+                                  </p>
+                                ) : (
+                                  <Pecha.CommandGroup>
+                                    {(personsQuery.data ?? []).map((person) => (
+                                      <Pecha.CommandItem
+                                        key={person.id}
+                                        value={person.id}
+                                        onSelect={() => {
+                                          setSelectedContributor(person);
+                                          setIsContributorOpen(false);
+                                        }}
+                                      >
+                                        {personLabel(person)}
+                                      </Pecha.CommandItem>
+                                    ))}
+                                  </Pecha.CommandGroup>
+                                )}
+                                {!personsQuery.isFetching &&
+                                  personsQuery.data?.length === 0 && (
+                                    <Pecha.CommandEmpty>
+                                      No persons found.
+                                    </Pecha.CommandEmpty>
+                                  )}
+                              </Pecha.CommandList>
+                            </Pecha.Command>
+                          </Pecha.PopoverContent>
+                        </Pecha.Popover>
+                      </div>
+                      <div className="w-40">
+                        <label className="text-xs font-medium text-muted-foreground">
+                          Role
+                        </label>
+                        <Pecha.Select
+                          value={contributorRole}
+                          onValueChange={(value) =>
+                            setContributorRole(value as ContributorRole)
+                          }
+                          disabled={isUploading}
+                        >
+                          <Pecha.SelectTrigger className="mt-1">
+                            <Pecha.SelectValue />
+                          </Pecha.SelectTrigger>
+                          <Pecha.SelectContent>
+                            {CONTRIBUTOR_ROLES.map((role) => (
+                              <Pecha.SelectItem key={role} value={role}>
+                                {role}
+                              </Pecha.SelectItem>
+                            ))}
+                          </Pecha.SelectContent>
+                        </Pecha.Select>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Pecha.Button
+                        type="button"
+                        className="bg-[#A51C21] hover:bg-[#A51C21]/90"
+                        disabled={isUploading || !selectedContributor}
+                        onClick={() =>
+                          selectedContributor &&
+                          uploadMutation.mutate({
+                            text: selectedText,
+                            file: pendingFile,
+                            contributor: selectedContributor,
+                            role: contributorRole,
+                          })
+                        }
+                      >
+                        {isUploading ? (
+                          <FiLoader className="animate-spin" />
+                        ) : (
+                          <FiUpload />
+                        )}
+                        Upload audio
+                      </Pecha.Button>
+                      <Pecha.Button
+                        type="button"
+                        variant="outline"
+                        disabled={isUploading}
+                        onClick={() => setPendingFile(null)}
+                      >
+                        Cancel
+                      </Pecha.Button>
+                    </div>
                   </div>
                 ) : null}
               </div>
-
-              {selectedAudio ? (
-                <div className="space-y-3 rounded-lg border p-4">
-                  <div>
-                    <h3 className="text-sm font-semibold">
-                      OTR files — {selectedAudio.name}
-                    </h3>
-                    <p className="text-xs text-muted-foreground">
-                      Upload OTR/JSON transcripts for this audio and select one
-                      by name.
-                    </p>
-                  </div>
-
-                  {otrsQuery.isLoading ? (
-                    <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <FiLoader className="animate-spin" /> Loading OTR files…
-                    </p>
-                  ) : otrsQuery.isError ? (
-                    <p className="text-sm text-red-500">
-                      {getApiErrorMessage(otrsQuery.error)}
-                    </p>
-                  ) : otrs.length ? (
-                    <div className="flex flex-wrap gap-2">
-                      {otrs.map((otr) => (
-                        <div
-                          key={otr.id}
-                          className={`flex items-center gap-1 rounded-md border pl-3 pr-1 py-1 text-sm ${
-                            selectedOtrId === otr.id
-                              ? "border-[#A51C21] bg-[#A51C21]/5"
-                              : "hover:bg-muted"
-                          }`}
-                        >
-                          <button
-                            type="button"
-                            className="flex items-center gap-1"
-                            onClick={() => setSelectedOtrId(otr.id)}
-                          >
-                            <FiFileText className="shrink-0" />
-                            {otr.name}
-                          </button>
-                          <Pecha.Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            disabled={deleteOtrMutation.isPending}
-                            onClick={() =>
-                              setOtrToDelete({
-                                textId: selectedText.id,
-                                audioId: selectedAudioId!,
-                                otr,
-                              })
-                            }
-                          >
-                            <FaTrash className="h-3 w-3" />
-                          </Pecha.Button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="rounded-lg border border-dashed p-3 text-sm text-muted-foreground">
-                      This audio has no OTR file yet.
-                    </p>
-                  )}
-
-                  <Dropzone
-                    accept={{
-                      "application/json": [".json"],
-                      "text/plain": [".otr"],
-                    }}
-                    multiple={false}
-                    disabled={uploadOtrMutation.isPending}
-                    onDrop={handleOtrDrop}
-                  >
-                    {({ getRootProps, getInputProps }) => (
-                      <div
-                        {...getRootProps()}
-                        className="cursor-pointer rounded-lg border border-dashed p-5 text-center hover:bg-muted/50"
-                      >
-                        <input {...getInputProps()} />
-                        <FiUpload className="mx-auto mb-1 h-5 w-5" />
-                        <p className="text-sm font-medium">
-                          {pendingOtr
-                            ? `${pendingOtr.name}.json`
-                            : "Add an OTR or JSON file"}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Must contain valid JSON; stored as JSON.
-                        </p>
-                      </div>
-                    )}
-                  </Dropzone>
-
-                  {pendingOtr ? (
-                    <div className="space-y-2">
-                      <label
-                        className="text-xs font-medium"
-                        htmlFor="otr-name-input"
-                      >
-                        OTR name
-                      </label>
-                      <Pecha.Input
-                        id="otr-name-input"
-                        value={pendingOtr.name}
-                        onChange={(event) =>
-                          setPendingOtr({
-                            ...pendingOtr,
-                            name: event.target.value,
-                          })
-                        }
-                      />
-                      <div className="flex gap-2">
-                        <Pecha.Button
-                          type="button"
-                          className="bg-[#A51C21] hover:bg-[#A51C21]/90"
-                          disabled={
-                            uploadOtrMutation.isPending ||
-                            !pendingOtr.name.trim()
-                          }
-                          onClick={() =>
-                            uploadOtrMutation.mutate({
-                              textId: selectedText.id,
-                              audioId: selectedAudioId!,
-                              otr: {
-                                ...pendingOtr,
-                                name: pendingOtr.name.trim(),
-                              },
-                            })
-                          }
-                        >
-                          {uploadOtrMutation.isPending ? (
-                            <FiLoader className="animate-spin" />
-                          ) : (
-                            <FiUpload />
-                          )}
-                          Upload OTR
-                        </Pecha.Button>
-                        <Pecha.Button
-                          type="button"
-                          variant="outline"
-                          disabled={uploadOtrMutation.isPending}
-                          onClick={() => setPendingOtr(null)}
-                        >
-                          Cancel
-                        </Pecha.Button>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {selectedOtr ? (
-                    <div className="space-y-2 rounded-lg border p-3">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground">
-                          {selectedOtr.name}
-                        </span>
-                        <span>
-                          Updated{" "}
-                          {new Date(selectedOtr.updated_at).toLocaleString()}
-                        </span>
-                      </div>
-                      {otrContentQuery.isLoading || segmentsQuery.isLoading ? (
-                        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <FiLoader className="animate-spin" /> Loading sync
-                          preview…
-                        </p>
-                      ) : otrContentQuery.isError ? (
-                        <p className="text-sm text-red-500">
-                          {getApiErrorMessage(otrContentQuery.error)}
-                        </p>
-                      ) : segmentsQuery.isError ? (
-                        <p className="text-sm text-red-500">
-                          {getApiErrorMessage(segmentsQuery.error)}
-                        </p>
-                      ) : otrContentQuery.data &&
-                        segmentsQuery.data &&
-                        selectedAudio ? (
-                        <OtrSyncPlayer
-                          audioUrl={selectedAudio.audio_url}
-                          spans={otrContentQuery.data.spans}
-                          segments={segmentsQuery.data.segments}
-                        />
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
             </div>
           )}
         </section>
       </div>
 
       <Pecha.AlertDialog
-        open={Boolean(audioToDelete)}
+        open={Boolean(recordingToDelete)}
         onOpenChange={(open) => {
-          if (!open) setAudioToDelete(null);
+          if (!open) setRecordingToDelete(null);
         }}
       >
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
             <Pecha.AlertDialogTitle>Delete this audio?</Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
-              “{audioToDelete?.audio.name}” and all of its OTR files will be
-              permanently deleted.
+              “{recordingToDelete ? recordingLabel(recordingToDelete) : ""}”
+              will be permanently deleted.
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <Pecha.AlertDialogFooter>
             <Pecha.AlertDialogCancel>Cancel</Pecha.AlertDialogCancel>
             <Pecha.AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
-              disabled={deleteAudioMutation.isPending}
+              disabled={deleteMutation.isPending}
               onClick={() =>
-                audioToDelete && deleteAudioMutation.mutate(audioToDelete)
+                recordingToDelete &&
+                selectedText &&
+                deleteMutation.mutate({
+                  editionId: selectedText.id,
+                  recording: recordingToDelete,
+                })
               }
             >
-              {deleteAudioMutation.isPending ? "Deleting…" : "Delete"}
-            </Pecha.AlertDialogAction>
-          </Pecha.AlertDialogFooter>
-        </Pecha.AlertDialogContent>
-      </Pecha.AlertDialog>
-
-      <Pecha.AlertDialog
-        open={Boolean(otrToDelete)}
-        onOpenChange={(open) => {
-          if (!open) setOtrToDelete(null);
-        }}
-      >
-        <Pecha.AlertDialogContent>
-          <Pecha.AlertDialogHeader>
-            <Pecha.AlertDialogTitle>Delete this OTR?</Pecha.AlertDialogTitle>
-            <Pecha.AlertDialogDescription>
-              “{otrToDelete?.otr.name}” will be permanently deleted.
-            </Pecha.AlertDialogDescription>
-          </Pecha.AlertDialogHeader>
-          <Pecha.AlertDialogFooter>
-            <Pecha.AlertDialogCancel>Cancel</Pecha.AlertDialogCancel>
-            <Pecha.AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
-              disabled={deleteOtrMutation.isPending}
-              onClick={() =>
-                otrToDelete && deleteOtrMutation.mutate(otrToDelete)
-              }
-            >
-              {deleteOtrMutation.isPending ? "Deleting…" : "Delete"}
+              {deleteMutation.isPending ? "Deleting…" : "Delete"}
             </Pecha.AlertDialogAction>
           </Pecha.AlertDialogFooter>
         </Pecha.AlertDialogContent>

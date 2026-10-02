@@ -5,7 +5,13 @@ import type { GroupOutletContext } from "./GroupLayout";
 const GroupMembersPage = () => {
   const { group, groupId } = useOutletContext<GroupOutletContext>();
 
-  return <GroupMembersPanel groupId={groupId} members={group.members ?? []} />;
+  return (
+    <GroupMembersPanel
+      groupId={groupId}
+      groupType={group.group_type}
+      members={group.members ?? []}
+    />
+  );
 };
 
 export default GroupMembersPage;

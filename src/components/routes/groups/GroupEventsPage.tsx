@@ -3,17 +3,16 @@ import { Link, useNavigate, useOutletContext } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IoMdAdd, IoMdTrash } from "react-icons/io";
 import { IoPeopleOutline } from "react-icons/io5";
-import { format } from "date-fns";
 import { toast } from "sonner";
 import { Pecha } from "@/components/ui/shadimport";
 import { Pagination } from "@/components/ui/molecules/pagination/Pagination";
 import { getApiErrorMessage } from "@/lib/apiErrors";
-import { fromBackendISO } from "@/lib/utils";
-import { DEFAULT_TIMEZONE } from "@/schema/EventSchema";
+import { eventFormatLabel, eventRecurrenceLabel } from "@/schema/EventSchema";
 import { ROUTES } from "@/routes/paths";
 import { FeaturedStar } from "@/components/routes/dashboard/dashboardTableUi";
 import type { GroupOutletContext } from "./GroupLayout";
 import { canWriteEvents } from "./lib/eventPermissions";
+import { formatEventScheduleRange } from "./lib/eventSchedule";
 import {
   deleteCmsEvent,
   eventName,
@@ -23,22 +22,6 @@ import {
 } from "./api/eventsApi";
 
 const PAGE_SIZE = 20;
-
-const formatEventDate = (iso: string, timezone: string): string => {
-  if (!iso) return "—";
-  try {
-    return format(fromBackendISO(iso, timezone).date, "MMM d, yyyy");
-  } catch {
-    return iso.slice(0, 10);
-  }
-};
-
-const formatEventRange = (event: EventDTO): string => {
-  const timezone = event.timezone?.trim() || DEFAULT_TIMEZONE;
-  const start = formatEventDate(event.start_date, timezone);
-  if (event.is_one_day || event.start_date === event.end_date) return start;
-  return `${start} – ${formatEventDate(event.end_date, timezone)}`;
-};
 
 const eventThumbnail = (event: EventDTO): string | null => {
   if (event.image?.thumbnail) return event.image.thumbnail;
@@ -96,7 +79,7 @@ const GroupEventsPage = () => {
       toast.error(getApiErrorMessage(err, "Could not update featured")),
   });
 
-  const columnCount = canWrite ? 3 : 2;
+  const columnCount = canWrite ? 4 : 3;
 
   const body = useMemo(() => {
     if (isLoading) {
@@ -129,6 +112,8 @@ const GroupEventsPage = () => {
     }
     return events.map((event) => {
       const thumbnail = eventThumbnail(event);
+      const formatLabel = eventFormatLabel(event.event_format);
+      const schedule = formatEventScheduleRange(event);
       return (
         <Pecha.TableRow key={event.id}>
           <Pecha.TableCell className="font-medium">
@@ -148,7 +133,36 @@ const GroupEventsPage = () => {
               <span className="min-w-0 truncate">{eventName(event)}</span>
             </Link>
           </Pecha.TableCell>
-          <Pecha.TableCell>{formatEventRange(event)}</Pecha.TableCell>
+          <Pecha.TableCell>
+            <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-0.5 text-sm">
+                <span>
+                  <span className="text-muted-foreground">Start </span>
+                  {schedule.start}
+                </span>
+                <span>
+                  <span className="text-muted-foreground">End </span>
+                  {schedule.end}
+                </span>
+              </div>
+              <span className="inline-flex flex-wrap items-center gap-1.5">
+                <Pecha.Badge
+                  variant={event.is_recurring ? "default" : "secondary"}
+                  className="text-xs"
+                >
+                  {eventRecurrenceLabel(
+                    event.is_recurring,
+                    event.recurrence?.frequency,
+                  )}
+                </Pecha.Badge>
+                {formatLabel ? (
+                  <Pecha.Badge variant="secondary" className="text-xs">
+                    {formatLabel}
+                  </Pecha.Badge>
+                ) : null}
+              </span>
+            </div>
+          </Pecha.TableCell>
           <Pecha.TableCell>
             <span className="inline-flex items-center gap-1.5 text-muted-foreground">
               <IoPeopleOutline className="h-4 w-4 shrink-0" />

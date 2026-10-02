@@ -2,6 +2,7 @@ import axiosInstance from "@/config/axios-config";
 import type { LanguageCode } from "@/schema/SeriesSchema";
 import type { FkOption } from "@/components/routes/groups/components/FkMultiSearchSelector";
 
+import { getAuthHeaders } from "@/lib/auth-storage";
 export interface MantraMetadataDTO {
   id: string;
   mantra: string;
@@ -10,11 +11,18 @@ export interface MantraMetadataDTO {
   language: string;
 }
 
+export interface ImageUrlModel {
+  thumbnail: string;
+  medium: string;
+  original: string;
+}
+
 export interface MantraDTO {
   id: string;
   audio_url?: string | null;
   mala_image_id?: string | null;
   mala_image_url?: string | null;
+  deity_image?: ImageUrlModel | null;
   metadata: MantraMetadataDTO[];
 }
 
@@ -32,12 +40,20 @@ export interface MantraMetadataInput {
 export interface CreateMantraPayload {
   audio_url?: string | null;
   mala_image_id?: string | null;
+  deity_image_key?: string | null;
   metadata: MantraMetadataInput[];
 }
 
-const getAuthHeaders = () => ({
-  Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
-});
+export interface UpdateMantraPayload {
+  deity_image_key: string | null;
+}
+
+export interface MantraImageUploadResponse {
+  image: ImageUrlModel;
+  key: string;
+  path: string;
+  message: string;
+}
 
 export function mantraDisplayLabel(mantra: MantraDTO): string {
   const meta = mantra.metadata?.[0];
@@ -64,6 +80,35 @@ export const createMantra = async (
     `/api/v1/cms/mantras`,
     payload,
     { headers: getAuthHeaders() },
+  );
+  return data;
+};
+
+export const updateMantra = async (
+  id: string,
+  payload: UpdateMantraPayload,
+): Promise<MantraDTO> => {
+  const { data } = await axiosInstance.patch<MantraDTO>(
+    `/api/v1/cms/mantras/${id}`,
+    payload,
+    { headers: getAuthHeaders() },
+  );
+  return data;
+};
+
+export const uploadMantraDeityImage = async (
+  file: File,
+  mantraId: string,
+): Promise<MantraImageUploadResponse> => {
+  const formData = new FormData();
+  formData.append("file", file);
+  const { data } = await axiosInstance.post<MantraImageUploadResponse>(
+    `/api/v1/cms/mantras/image`,
+    formData,
+    {
+      headers: getAuthHeaders(),
+      params: { mantra_id: mantraId },
+    },
   );
   return data;
 };

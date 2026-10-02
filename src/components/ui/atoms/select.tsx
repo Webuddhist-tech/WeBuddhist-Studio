@@ -5,9 +5,32 @@ import { IoCheckmark, IoChevronDown, IoChevronUp } from "react-icons/io5";
 import { cn } from "@/lib/utils";
 
 function Select({
+  value,
+  onValueChange,
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Root>) {
-  return <SelectPrimitive.Root data-slot="select" {...props} />;
+  // Inside a <form>, Radix renders a hidden native <select> and echoes a
+  // change event back whenever `value` is set programmatically. If the
+  // matching <option> has not been registered yet - which is the case until
+  // the dropdown is first opened - the native element falls back to "" and
+  // that "" is reported as a selection, wiping the value we just set. This
+  // bites every form hydrated after mount (react-hook-form's `reset` on an
+  // edit page), so the field comes up empty even though the value loaded.
+  // No item may carry an empty value, so an empty emission is never a real
+  // choice and is safe to drop while a value is set.
+  const handleValueChange = (next: string) => {
+    if (next === "" && value) return;
+    onValueChange?.(next);
+  };
+
+  return (
+    <SelectPrimitive.Root
+      data-slot="select"
+      value={value}
+      onValueChange={handleValueChange}
+      {...props}
+    />
+  );
 }
 
 function SelectGroup({

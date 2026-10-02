@@ -36,7 +36,7 @@ const AccumulatorPresetsTable = ({
           <Pecha.TableRow>
             <Pecha.TableHead>Name</Pecha.TableHead>
             <Pecha.TableHead>Mantra</Pecha.TableHead>
-            <Pecha.TableHead>Text ID</Pecha.TableHead>
+            <Pecha.TableHead>Text</Pecha.TableHead>
             <Pecha.TableHead className="w-28">Target</Pecha.TableHead>
             {showActionsColumn ? (
               <Pecha.TableHead className="w-28 text-right">
@@ -74,8 +74,8 @@ const AccumulatorPresetsTable = ({
                     "—",
                 )}
               </Pecha.TableCell>
-              <Pecha.TableCell className="max-w-[180px] truncate font-mono text-xs text-muted-foreground">
-                {preset.text_id || "—"}
+              <Pecha.TableCell className="max-w-[180px] truncate text-sm text-muted-foreground">
+                {preset.text_title?.trim() || preset.text_id || "—"}
               </Pecha.TableCell>
               <Pecha.TableCell>
                 {preset.target_count != null
