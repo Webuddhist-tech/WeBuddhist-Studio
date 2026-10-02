@@ -7,6 +7,7 @@ import PrayerPdfSettingsDialog from "./PrayerPdfSettingsDialog";
 import {
   ZABTIK_DROLCHOK_TEMPLATE,
   fetchPrayerPdfSettings,
+  previewPrayerPdf,
   resetPrayerPdfSettings,
   updatePrayerPdfSettings,
   type PrayerPdfScope,
@@ -25,6 +26,7 @@ vi.mock("../../api/prayerPdfApi", async (importOriginal) => {
     fetchPrayerPdfSettings: vi.fn(),
     updatePrayerPdfSettings: vi.fn(),
     resetPrayerPdfSettings: vi.fn(),
+    previewPrayerPdf: vi.fn(),
   };
 });
 
@@ -73,11 +75,40 @@ const renderDialog = (scope: PrayerPdfScope = eventScope) => {
 };
 
 describe("PrayerPdfSettingsDialog", () => {
+  it("shows a live preview of the unsaved settings", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetchPrayerPdfSettings).mockResolvedValue(settings());
+    renderDialog();
+
+    expect(await screen.findByTitle("Prayer PDF preview")).toBeTruthy();
+    expect(screen.getByText("2 prayer requests on this day.")).toBeTruthy();
+
+    const title = screen.getByLabelText("Title");
+    await user.clear(title);
+    await user.type(title, "Live title");
+
+    await waitFor(
+      () => {
+        const calls = vi.mocked(previewPrayerPdf).mock.calls;
+        expect(calls[calls.length - 1][1].title).toBe("Live title");
+      },
+      { timeout: 3000 },
+    );
+    expect(updatePrayerPdfSettings).not.toHaveBeenCalled();
+  });
+
   beforeEach(() => {
     vi.mocked(fetchPrayerPdfSettings).mockReset();
     vi.mocked(updatePrayerPdfSettings).mockReset();
     vi.mocked(resetPrayerPdfSettings).mockReset();
     vi.mocked(toast.error).mockReset();
+    vi.mocked(previewPrayerPdf).mockReset();
+    vi.mocked(previewPrayerPdf).mockResolvedValue({
+      html: "<html><head></head><body>preview</body></html>",
+      day: "2026-10-01",
+      prayer_count: 2,
+      is_sample: false,
+    });
   });
 
   it("shows inherited group settings for an event", async () => {

@@ -221,3 +221,56 @@ export const todayInTimeZone = (timeZone: string, now = new Date()): string => {
     return now.toISOString().slice(0, 10);
   }
 };
+
+export interface PrayerPdfPreview {
+  /** The page laid out by its own script; fonts are relative URLs. */
+  html: string;
+  day: string;
+  /** Requests on that day; 0 when `is_sample`. */
+  prayer_count: number;
+  /** True when the day had no requests and samples are shown instead. */
+  is_sample: boolean;
+}
+
+/** How the PDF would look with these (unsaved) settings, as HTML. */
+export const previewPrayerPdf = async (
+  scope: PrayerPdfScope,
+  payload: PrayerPdfSettingsPayload,
+  day: string,
+): Promise<PrayerPdfPreview> => {
+  const { data } = await axiosInstance.post<PrayerPdfPreview>(
+    `${prayerPdfBasePath(scope)}/preview`,
+    payload,
+    { params: { date: day } },
+  );
+  return data;
+};
+
+export const PREVIEW_SCROLL_MESSAGE = "prayer-pdf-preview-scroll";
+
+/**
+ * Readies the preview HTML for an iframe's srcdoc:
+ * - Its fonts are at `fonts/<name>` beside the prayer-pdf routes, and in a
+ *   srcdoc a relative URL would resolve against Studio itself, so a <base>
+ *   points it at the backend.
+ * - `scrollRatio` (0–1) is where the reader was in the previous render; the
+ *   page scrolls back there once laid out.
+ */
+export const withPreviewBase = (
+  html: string,
+  {
+    scrollRatio = 0,
+    backendBaseUrl = axiosInstance.defaults?.baseURL || window.location.origin,
+  }: { scrollRatio?: number; backendBaseUrl?: string } = {},
+): string => {
+  const base = `${backendBaseUrl.replace(/\/+$/, "")}/api/v1/cms/prayer-pdf/`;
+  const ratio = Number.isFinite(scrollRatio)
+    ? Math.min(1, Math.max(0, scrollRatio))
+    : 0;
+  const tags =
+    `<base href="${base.replace(/"/g, "&quot;")}">` +
+    `<script>window.__previewScroll=${ratio}</script>`;
+  return html.includes("<head>")
+    ? html.replace("<head>", () => `<head>${tags}`)
+    : tags + html;
+};

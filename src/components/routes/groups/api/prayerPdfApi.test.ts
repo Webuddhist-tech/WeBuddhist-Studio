@@ -6,14 +6,22 @@ import {
   filenameFromContentDisposition,
   getPrayerPdfErrorMessage,
   prayerPdfBasePath,
+  previewPrayerPdf,
   resetPrayerPdfSettings,
   todayInTimeZone,
   updatePrayerPdfSettings,
+  withPreviewBase,
   type PrayerPdfSettingsPayload,
 } from "./prayerPdfApi";
 
 vi.mock("@/config/axios-config", () => ({
-  default: { get: vi.fn(), put: vi.fn(), delete: vi.fn() },
+  default: {
+    get: vi.fn(),
+    put: vi.fn(),
+    delete: vi.fn(),
+    post: vi.fn(),
+    defaults: { baseURL: "https://api.example.com" },
+  },
 }));
 
 const payload: PrayerPdfSettingsPayload = {
@@ -183,5 +191,53 @@ describe("todayInTimeZone", () => {
   it("survives an unknown zone", () => {
     const now = new Date("2026-10-01T20:00:00Z");
     expect(todayInTimeZone("Mars/Base", now)).toBe("2026-10-01");
+  });
+});
+
+describe("previewPrayerPdf", () => {
+  it("posts the unsaved settings with the day", async () => {
+    vi.mocked(axiosInstance.post).mockResolvedValue({
+      data: {
+        html: "<html>",
+        day: "2026-10-01",
+        prayer_count: 3,
+        is_sample: false,
+      },
+    });
+
+    const result = await previewPrayerPdf(
+      { kind: "event", eventId: "e1" },
+      payload,
+      "2026-10-01",
+    );
+
+    expect(axiosInstance.post).toHaveBeenCalledWith(
+      "/api/v1/cms/prayer-pdf/events/e1/preview",
+      payload,
+      { params: { date: "2026-10-01" } },
+    );
+    expect(result.prayer_count).toBe(3);
+  });
+});
+
+describe("withPreviewBase", () => {
+  it("points relative URLs at the backend and passes the scroll position", () => {
+    const html = withPreviewBase("<html><head><style></style></head></html>", {
+      scrollRatio: 0.4,
+    });
+    expect(html).toContain(
+      '<head><base href="https://api.example.com/api/v1/cms/prayer-pdf/"><script>window.__previewScroll=0.4</script>',
+    );
+  });
+
+  it("clamps the scroll position and trims a trailing slash", () => {
+    const html = withPreviewBase("<head></head>", {
+      scrollRatio: 7,
+      backendBaseUrl: "http://localhost:8000/",
+    });
+    expect(html).toContain(
+      'href="http://localhost:8000/api/v1/cms/prayer-pdf/"',
+    );
+    expect(html).toContain("window.__previewScroll=1");
   });
 });
