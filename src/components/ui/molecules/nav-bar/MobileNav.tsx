@@ -11,6 +11,8 @@ import {
 import { ModeToggle } from "../mode-toggle/modetoggle";
 import { LanguageToggle } from "../language-toggle/languageToggle";
 import AuthLogout from "../auth-logout/AuthLogout";
+import { InstallAppButton } from "../install-app/InstallAppButton";
+import { useInstallMode } from "@/lib/pwaInstall";
 import AuthButton from "@/components/ui/molecules/auth-button/AuthButton";
 import { useNavModel, type NavItem } from "./useNavModel";
 
@@ -18,6 +20,7 @@ import { useNavModel, type NavItem } from "./useNavModel";
 const MAX_TABS = 4;
 
 const settingsRows = [
+  { id: "install", component: <InstallAppButton />, label: "Install app" },
   { id: "theme", component: <ModeToggle />, label: "Change theme" },
   { id: "language", component: <LanguageToggle />, label: "Change language" },
   { id: "logout", component: <AuthLogout />, label: "Logout" },
@@ -66,6 +69,10 @@ export const MobileTabBar = () => {
     activeSectionId,
   } = useNavModel();
   const [menuOpen, setMenuOpen] = useState(false);
+  const installMode = useInstallMode();
+  const menuSettingsRows = installMode
+    ? settingsRows
+    : settingsRows.filter((row) => row.id !== "install");
 
   // Following a link out of the menu should land on the page, not the menu.
   useEffect(() => {
@@ -169,7 +176,7 @@ export const MobileTabBar = () => {
           </div>
 
           <div className="flex flex-col gap-2 border-t border-gray-200 px-4 pt-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] dark:border-[#313132]">
-            {settingsRows.map((row) => (
+            {menuSettingsRows.map((row) => (
               <div key={row.id} className="flex items-center gap-3">
                 {row.component}
                 <span className="text-sm text-zinc-500 dark:text-zinc-400">

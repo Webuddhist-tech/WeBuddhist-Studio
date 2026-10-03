@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import axiosInstance from "@/config/axios-config";
 import {
+  copyTextFromPromise,
   downloadPrayerPdf,
+  fetchAllPrayerRequests,
   fetchPrayerPdfSettings,
+  fetchPrayerRequests,
   filenameFromContentDisposition,
   getPrayerPdfErrorMessage,
   prayerPdfBasePath,
+  prayerRequestsToCsv,
   previewPrayerPdf,
   resetPrayerPdfSettings,
   todayInTimeZone,
@@ -239,5 +243,85 @@ describe("withPreviewBase", () => {
       'href="http://localhost:8000/api/v1/cms/prayer-pdf/"',
     );
     expect(html).toContain("window.__previewScroll=1");
+  });
+  it("lists prayer requests for every day, or one day", async () => {
+    const body = {
+      items: [],
+      total: 0,
+      skip: 0,
+      limit: 20,
+      day: null,
+      timezone: "Asia/Kolkata",
+    };
+    vi.mocked(axiosInstance.get).mockResolvedValue({ data: body });
+
+    await expect(
+      fetchPrayerRequests(
+        { kind: "group", groupId: "g1" },
+        { day: null, skip: 0, limit: 20 },
+      ),
+    ).resolves.toEqual(body);
+    expect(axiosInstance.get).toHaveBeenLastCalledWith(
+      "/api/v1/cms/prayer-pdf/groups/g1/requests",
+      { params: { skip: 0, limit: 20 } },
+    );
+
+    await fetchPrayerRequests(
+      { kind: "event", eventId: "e1" },
+      { day: "2026-10-01", skip: 40, limit: 20 },
+    );
+    expect(axiosInstance.get).toHaveBeenLastCalledWith(
+      "/api/v1/cms/prayer-pdf/events/e1/requests",
+      { params: { date: "2026-10-01", skip: 40, limit: 20 } },
+    );
+  });
+  it("fetches every page of the filtered list", async () => {
+    vi.mocked(axiosInstance.get).mockReset();
+    const item = (id: string) => ({ id, posted_by: id, message: id });
+    vi.mocked(axiosInstance.get).mockImplementation(async (_url, config) => {
+      const { skip } = (config as { params: { skip: number } }).params;
+      return {
+        data: {
+          items: [item(`m${skip}`)],
+          total: 250,
+          skip,
+          limit: 100,
+          day: "2026-10-01",
+          timezone: "Asia/Kolkata",
+        },
+      };
+    });
+
+    const requests = await fetchAllPrayerRequests(
+      { kind: "group", groupId: "g1" },
+      "2026-10-01",
+    );
+
+    expect(requests.map((r) => r.id)).toEqual(["m0", "m100", "m200"]);
+    expect(axiosInstance.get).toHaveBeenCalledTimes(3);
+    expect(axiosInstance.get).toHaveBeenCalledWith(
+      "/api/v1/cms/prayer-pdf/groups/g1/requests",
+      { params: { date: "2026-10-01", skip: 200, limit: 100 } },
+    );
+  });
+
+  it("writes name and request as CSV, quoting where needed", () => {
+    const csv = prayerRequestsToCsv([
+      { posted_by: "Tenzin Dolma", message: "Peace for all" },
+      { posted_by: "", message: 'Line one\nsaid "please", twice' },
+    ] as never);
+    expect(csv).toBe(
+      'Name,Prayer request\nTenzin Dolma,Peace for all\nWeBuddhist Member,"Line one\nsaid ""please"", twice"',
+    );
+  });
+
+  it("falls back to plain text when the clipboard takes no promise", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    await copyTextFromPromise(Promise.resolve("a,b"));
+    expect(writeText).toHaveBeenCalledWith("a,b");
   });
 });

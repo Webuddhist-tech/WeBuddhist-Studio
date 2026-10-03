@@ -7,10 +7,18 @@
     crossOrigin="anonymous"
     src="//unpkg.com/react-scan/dist/auto.global.js"></script> -->
 
-    <link
-      rel="icon"
-      type="image/svg+xml"
-      href="/src/assets/icon/pecha_icon.png"
+    <link rel="icon" type="image/png" href="/src/assets/icon/pecha_icon.png" />
+    <!-- Installed app (PWA). The manifest link is added at build time. -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Studio" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <!-- Follows the Studio's own light/dark choice (ThemeProvider). -->
+    <meta name="theme-color" content="#161616" />
+    <meta
+      name="description"
+      content="Create and manage WeBuddhist plans, practice spaces, events and community."
     />
     <meta
       name="viewport"

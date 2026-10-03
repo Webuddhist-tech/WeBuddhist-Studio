@@ -19,6 +19,25 @@ server {
       include /etc/nginx/security-headers.conf;
   }
 
+  # The installed app (PWA). The service worker, the manifest and the page
+  # shell must be revalidated on every load, or a deploy never reaches people
+  # who installed the Studio; the hashed files under /assets can be cached.
+  location = /sw.js {
+      add_header Cache-Control "no-cache";
+      include /etc/nginx/security-headers.conf;
+  }
+
+  location = /manifest.webmanifest {
+      types { application/manifest+json webmanifest; }
+      add_header Cache-Control "no-cache";
+      include /etc/nginx/security-headers.conf;
+  }
+
+  location = /index.html {
+      add_header Cache-Control "no-cache";
+      include /etc/nginx/security-headers.conf;
+  }
+
   # Also carries the live-control socket: nginx passes a WebSocket through only
   # when told to carry the upgrade. It lives here rather than in a location of
   # its own, as the route has an id in it and so could only be matched by a
