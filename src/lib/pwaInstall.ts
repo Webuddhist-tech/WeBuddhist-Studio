@@ -85,3 +85,10 @@ export const promptInstall = async (): Promise<boolean> => {
   const { outcome } = await event.userChoice;
   return outcome === "accepted";
 };
+
+/** Forgets a caught prompt and an install. For tests only. */
+export const resetInstallStateForTests = () => {
+  deferredPrompt = null;
+  installed = false;
+  notify();
+};

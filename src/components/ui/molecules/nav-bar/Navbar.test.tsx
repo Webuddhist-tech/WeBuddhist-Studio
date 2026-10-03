@@ -74,7 +74,7 @@ describe("Navbar", () => {
     window.innerWidth = 1024;
   });
 
-  it("shows only the Practice spaces and Pages links for a CREATOR account", () => {
+  it("shows only the Practice spaces link for a CREATOR account", () => {
     vi.mocked(useUserInfo).mockReturnValue({
       data: { id: "1", platform_role: "CREATOR" },
       isLoading: false,
@@ -86,10 +86,9 @@ describe("Navbar", () => {
     expect(
       screen.getByRole("link", { name: /manage practice spaces/i }),
     ).toHaveAttribute("href", "/groups");
-    expect(screen.getByRole("link", { name: /manage pages/i })).toHaveAttribute(
-      "href",
-      "/pages",
-    );
+    expect(
+      screen.queryByRole("link", { name: /manage pages/i }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("link", { name: /go to dashboard/i }),
     ).not.toBeInTheDocument();
@@ -405,7 +404,7 @@ describe("Navbar", () => {
 
   it("marks Pages current on the pages list and its create form", () => {
     vi.mocked(useUserInfo).mockReturnValue({
-      data: { id: "1", platform_role: "CREATOR" },
+      data: { id: "1", platform_role: "SUPER_ADMIN" },
       isLoading: false,
     } as ReturnType<typeof useUserInfo>);
 
@@ -423,7 +422,7 @@ describe("Navbar", () => {
   it("marks Pages, not Practice spaces, current inside a page group", async () => {
     // Both share /groups/:groupId, so only the group's type can tell them apart.
     vi.mocked(useUserInfo).mockReturnValue({
-      data: { id: "1", platform_role: "CREATOR" },
+      data: { id: "1", platform_role: "SUPER_ADMIN" },
       isLoading: false,
     } as ReturnType<typeof useUserInfo>);
     vi.mocked(fetchGroup).mockResolvedValue({
@@ -446,7 +445,7 @@ describe("Navbar", () => {
 
   it("marks Practice spaces current inside a community group", async () => {
     vi.mocked(useUserInfo).mockReturnValue({
-      data: { id: "1", platform_role: "CREATOR" },
+      data: { id: "1", platform_role: "SUPER_ADMIN" },
       isLoading: false,
     } as ReturnType<typeof useUserInfo>);
     vi.mocked(fetchGroup).mockResolvedValue({
