@@ -125,6 +125,105 @@ export const resetPrayerPdfSettings = async (
   return data;
 };
 
+/** One prayer request as posted in the room, before the PDF's clean-up. */
+export interface PrayerRequest {
+  id: string;
+  user_id: string;
+  posted_by: string;
+  avatar_url: string | null;
+  message: string;
+  intention: string | null;
+  is_edited: boolean;
+  created_at: string;
+}
+
+export interface PrayerRequestList {
+  items: PrayerRequest[];
+  total: number;
+  skip: number;
+  limit: number;
+  /** The day listed (YYYY-MM-DD), or null when every day is. */
+  day: string | null;
+  /** The settings' timezone, which days are counted in. */
+  timezone: string;
+}
+
+export const prayerRequestsQueryKey = (
+  scope: PrayerPdfScope,
+  day: string | null,
+  page: number,
+) => ["cms-prayer-requests", ...prayerPdfQueryKey(scope).slice(1), day, page];
+
+/** Newest first; `day` (YYYY-MM-DD, settings' timezone) or null for every day. */
+export const fetchPrayerRequests = async (
+  scope: PrayerPdfScope,
+  { day, skip, limit }: { day: string | null; skip: number; limit: number },
+): Promise<PrayerRequestList> => {
+  const { data } = await axiosInstance.get<PrayerRequestList>(
+    `${prayerPdfBasePath(scope)}/requests`,
+    { params: { ...(day ? { date: day } : {}), skip, limit } },
+  );
+  return data;
+};
+
+/** The server's largest page. */
+const ALL_REQUESTS_PAGE_SIZE = 100;
+
+/**
+ * Every request for `day` (or every day), newest first: the first page tells
+ * how many there are, the rest are fetched together.
+ */
+export const fetchAllPrayerRequests = async (
+  scope: PrayerPdfScope,
+  day: string | null,
+): Promise<PrayerRequest[]> => {
+  const limit = ALL_REQUESTS_PAGE_SIZE;
+  const first = await fetchPrayerRequests(scope, { day, skip: 0, limit });
+  const rest = await Promise.all(
+    Array.from(
+      { length: Math.max(0, Math.ceil(first.total / limit) - 1) },
+      (_, index) =>
+        fetchPrayerRequests(scope, { day, skip: (index + 1) * limit, limit }),
+    ),
+  );
+  return [first, ...rest].flatMap((page) => page.items);
+};
+
+const csvField = (value: string) =>
+  /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+
+/** "Name,Prayer request" rows, one per request, quoted where needed. */
+export const prayerRequestsToCsv = (requests: PrayerRequest[]): string =>
+  [
+    "Name,Prayer request",
+    ...requests.map(
+      (request) =>
+        `${csvField(request.posted_by || "WeBuddhist Member")},${csvField(request.message)}`,
+    ),
+  ].join("\n");
+
+/**
+ * Copies the text a promise resolves to. Handing the clipboard the promise
+ * keeps the click's permission while the text is still being fetched, which
+ * Safari needs; elsewhere the text is written once it arrives.
+ */
+export const copyTextFromPromise = async (text: Promise<string>) => {
+  if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "text/plain": text.then((t) => new Blob([t], { type: "text/plain" })),
+        }),
+      ]);
+      return;
+    } catch {
+      // Rethrows a failed fetch; otherwise this browser wants plain text.
+      await text;
+    }
+  }
+  await navigator.clipboard.writeText(await text);
+};
+
 export const filenameFromContentDisposition = (
   header: string | undefined | null,
 ): string | null => {

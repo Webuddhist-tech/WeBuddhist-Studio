@@ -39,6 +39,7 @@ import {
 import { formatCoordinates, hasCoordinates } from "./api/locationsApi";
 import LocationMap from "./components/locations/LocationMap";
 import PrayerPdfActions from "./components/prayer-pdf/PrayerPdfActions";
+import InPersonCountsActions from "./components/events/InPersonCountsActions";
 
 const languageLabel = (code: string) => getLanguageLabel(code);
 
@@ -261,6 +262,9 @@ const GroupEventDetailPage = () => {
               Live control
             </Pecha.Button>
             <PrayerPdfActions scope={{ kind: "event", eventId: data.id }} />
+            {data.group_accumulator_id ? (
+              <InPersonCountsActions eventId={data.id} />
+            ) : null}
             <Pecha.Button
               variant="outline"
               size="sm"
