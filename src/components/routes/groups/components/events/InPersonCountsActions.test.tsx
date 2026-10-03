@@ -64,7 +64,9 @@ const renderActions = () => {
 
 const renderSection = async () => {
   renderActions();
-  await userEvent.click(screen.getByRole("button", { name: /in-person/i }));
+  await userEvent.click(
+    screen.getByRole("button", { name: /^add in-person count$/i }),
+  );
 };
 
 describe("InPersonCountsActions", () => {
@@ -73,9 +75,11 @@ describe("InPersonCountsActions", () => {
     vi.mocked(fetchInPersonCounts).mockResolvedValue(list());
   });
 
-  it("loads nothing until the In-person button is clicked", () => {
+  it("loads nothing until the Add In-person count button is clicked", () => {
     renderActions();
-    expect(screen.getByRole("button", { name: /in-person/i })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /^add in-person count$/i }),
+    ).toBeTruthy();
     expect(fetchInPersonCounts).not.toHaveBeenCalled();
   });
 
@@ -93,6 +97,7 @@ describe("InPersonCountsActions", () => {
 
   it("names the group accumulation the counts go to", async () => {
     await renderSection();
+    expect(screen.getByText("Add count to")).toBeTruthy();
     expect(
       await screen.findByText("Om Mani Padme Hum for World Peace"),
     ).toBeTruthy();

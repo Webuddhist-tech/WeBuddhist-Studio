@@ -1,12 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {
-  LuCircleDot,
-  LuPencil,
-  LuPlus,
-  LuTrash2,
-  LuUsers,
-} from "react-icons/lu";
+import { LuCircleDot, LuPencil, LuPlus, LuTrash2 } from "react-icons/lu";
 import { toast } from "sonner";
 import { Pecha } from "@/components/ui/shadimport";
 import { Pagination } from "@/components/ui/molecules/pagination/Pagination";
@@ -150,7 +144,6 @@ const LinkedAccumulationCard = ({ list }: { list: InPersonCountList }) => {
           </span>
         )}
         <div className="min-w-0">
-          <p className="text-xs text-muted-foreground">Counts are added to</p>
           <p className="font-medium break-words">
             {list.group_accumulator_title || "Untitled group accumulation"}
           </p>
@@ -212,7 +205,7 @@ const LinkedAccumulationCard = ({ list }: { list: InPersonCountList }) => {
 };
 
 /**
- * "In-person" button for an event: opens a sidebar with the event's in-person
+ * "Add count" button for an event: opens a sidebar with the event's in-person
  * accumulation, the counts made at the event by people not using the app, one
  * per day, added to the linked group accumulation. Group managers add, correct
  * and remove each day's count there.
@@ -395,8 +388,8 @@ const InPersonCountsActions = ({ eventId }: InPersonCountsActionsProps) => {
         className="gap-1.5"
         onClick={() => setOpen(true)}
       >
-        <LuUsers className="h-4 w-4" />
-        In-person
+        <LuPlus className="h-4 w-4" />
+        Add In-person count
       </Pecha.Button>
 
       <Pecha.Sheet open={open} onOpenChange={closeSheet}>
@@ -405,7 +398,7 @@ const InPersonCountsActions = ({ eventId }: InPersonCountsActionsProps) => {
           className="w-full sm:max-w-xl flex flex-col gap-0"
         >
           <Pecha.SheetHeader>
-            <Pecha.SheetTitle>In-person accumulation</Pecha.SheetTitle>
+            <Pecha.SheetTitle>Add count to</Pecha.SheetTitle>
             <Pecha.SheetDescription className="sr-only">
               Daily counts made at this event in person.
             </Pecha.SheetDescription>
