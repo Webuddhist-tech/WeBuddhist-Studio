@@ -8,6 +8,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "./providers/theme-provider.tsx";
 import { PlanAuthProvider } from "./config/auth-context.tsx";
 import { Toaster } from "@/components/ui/atoms/sonner";
+import { PwaUpdatePrompt } from "@/components/ui/molecules/install-app/PwaUpdatePrompt";
+import "./lib/pwaInstall";
 import {
   BackendFetch,
   DevTools,
@@ -401,6 +403,7 @@ createRoot(document.getElementById("root")!).render(
                 <RouterProvider router={router} />
                 <ReactQueryDevtools initialIsOpen={false} />
                 <Toaster />
+                <PwaUpdatePrompt />
               </ThemeProvider>
             </UserbackProvider>
           </PlanAuthProvider>

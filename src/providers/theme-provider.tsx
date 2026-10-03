@@ -18,6 +18,12 @@ const initialState: ThemeProviderState = {
   setTheme: () => null,
 };
 
+/** Each theme's page background (index.css --background). */
+const THEME_COLORS: Record<Theme, string> = {
+  light: "#ffffff",
+  dark: "#161616",
+};
+
 const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
 
 export function ThemeProvider({
@@ -34,6 +40,10 @@ export function ThemeProvider({
     const root = window.document.documentElement;
     root.classList.remove("light", "dark");
     root.classList.add(theme);
+    // The browser bar, and the status bar of the installed app, match the page.
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute("content", THEME_COLORS[theme]);
   }, [theme]);
 
   const value = {

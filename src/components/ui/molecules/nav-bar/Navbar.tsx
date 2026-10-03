@@ -10,6 +10,8 @@ import {
 import { SIDEBAR_EXPANDED, SIDEBAR_OPEN_SECTIONS } from "@/lib/constant";
 import { LanguageToggle } from "../language-toggle/languageToggle";
 import AuthLogout from "../auth-logout/AuthLogout";
+import { InstallAppButton } from "../install-app/InstallAppButton";
+import { useInstallMode } from "@/lib/pwaInstall";
 import {
   Tooltip,
   TooltipContent,
@@ -26,6 +28,11 @@ const tooltipItems = [
     label: "View Profile",
     /** The header already shows the avatar on wider screens. */
     rowClassName: "md:hidden",
+  },
+  {
+    id: "install",
+    component: <InstallAppButton />,
+    label: "Install app",
   },
   {
     id: "theme",
@@ -86,6 +93,10 @@ const Navbar = () => {
     sections,
     activeSectionId,
   } = useNavModel();
+  const installMode = useInstallMode();
+  const bottomItems = installMode
+    ? tooltipItems
+    : tooltipItems.filter((item) => item.id !== "install");
   const [expanded, setExpanded] = useState(readStoredExpanded);
   const [openSections, setOpenSections] = useState(readStoredOpenSections);
 
@@ -253,7 +264,7 @@ const Navbar = () => {
             expanded ? "" : "items-center"
           }`}
         >
-          {tooltipItems.map((item) =>
+          {bottomItems.map((item) =>
             expanded ? (
               <div
                 key={item.id}
