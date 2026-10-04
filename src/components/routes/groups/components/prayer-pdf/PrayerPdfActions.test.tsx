@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import PrayerPdfActions from "./PrayerPdfActions";
 import {
   copyTextFromPromise,
@@ -80,13 +80,29 @@ const openSidebar = async () => {
   await screen.findByText("Prayer requests");
 };
 
+const showAllDays = async () => {
+  await userEvent.click(screen.getByRole("button", { name: /all days/i }));
+};
+
+// 20:00 UTC on the 3rd is already the 4th in India, still the 3rd in New York.
+const NOW = new Date("2026-10-03T20:00:00Z");
+const TODAY_IN_INDIA = "2026-10-04";
+const TODAY_IN_NEW_YORK = "2026-10-03";
+
 describe("PrayerPdfActions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Only the clock: real timers keep userEvent and react-query working.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(NOW);
     vi.mocked(fetchPrayerPdfSettings).mockResolvedValue({
       timezone: "Asia/Kolkata",
     } as never);
     vi.mocked(fetchPrayerRequests).mockResolvedValue(list());
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("shows one Prayers button and loads nothing until it is opened", () => {
@@ -96,18 +112,59 @@ describe("PrayerPdfActions", () => {
     expect(fetchPrayerRequests).not.toHaveBeenCalled();
   });
 
-  it("lists every day's requests when no day is chosen", async () => {
+  it("opens on today in the settings' timezone, ready to download", async () => {
     renderActions();
     await openSidebar();
 
     expect(await screen.findByText("Please pray for my mother.")).toBeTruthy();
-    expect(screen.getByText("Tenzin Dolma")).toBeTruthy();
-    expect(screen.getByText("healing")).toBeTruthy();
+    expect((screen.getByLabelText("Day") as HTMLInputElement).value).toBe(
+      TODAY_IN_INDIA,
+    );
     expect(fetchPrayerRequests).toHaveBeenCalledWith(scope, {
-      day: null,
+      day: TODAY_IN_INDIA,
       skip: 0,
       limit: 20,
     });
+    const download = screen.getByRole("button", { name: /download prayers/i });
+    expect((download as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("moves today to the settings' timezone once they load", async () => {
+    vi.mocked(fetchPrayerPdfSettings).mockResolvedValue({
+      timezone: "America/New_York",
+    } as never);
+    renderActions();
+    await openSidebar();
+
+    await waitFor(() =>
+      expect((screen.getByLabelText("Day") as HTMLInputElement).value).toBe(
+        TODAY_IN_NEW_YORK,
+      ),
+    );
+    await waitFor(() =>
+      expect(fetchPrayerRequests).toHaveBeenLastCalledWith(scope, {
+        day: TODAY_IN_NEW_YORK,
+        skip: 0,
+        limit: 20,
+      }),
+    );
+  });
+
+  it("lists every day's requests after choosing All days", async () => {
+    renderActions();
+    await openSidebar();
+    await showAllDays();
+
+    expect(await screen.findByText("Please pray for my mother.")).toBeTruthy();
+    expect(screen.getByText("Tenzin Dolma")).toBeTruthy();
+    expect(screen.getByText("healing")).toBeTruthy();
+    await waitFor(() =>
+      expect(fetchPrayerRequests).toHaveBeenLastCalledWith(scope, {
+        day: null,
+        skip: 0,
+        limit: 20,
+      }),
+    );
     const download = screen.getByRole("button", { name: /download prayers/i });
     expect((download as HTMLButtonElement).disabled).toBe(true);
   });
@@ -116,6 +173,7 @@ describe("PrayerPdfActions", () => {
     vi.mocked(fetchPrayerRequests).mockResolvedValue(list({ total: 45 }));
     renderActions();
     await openSidebar();
+    await showAllDays();
     await screen.findByText("Please pray for my mother.");
 
     await userEvent.click(screen.getByText(/next/i));
@@ -187,7 +245,7 @@ describe("PrayerPdfActions", () => {
     await userEvent.click(screen.getByRole("button", { name: /copy as csv/i }));
 
     await waitFor(() => expect(copyTextFromPromise).toHaveBeenCalled());
-    expect(fetchAllPrayerRequests).toHaveBeenCalledWith(scope, null);
+    expect(fetchAllPrayerRequests).toHaveBeenCalledWith(scope, TODAY_IN_INDIA);
     await expect(vi.mocked(copyTextFromPromise).mock.calls[0][0]).resolves.toBe(
       'Name,Prayer request\nTenzin Dolma,Please pray for my mother.\nPema,"Long life, health"',
     );

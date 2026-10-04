@@ -23,6 +23,8 @@ import {
 import PrayerPdfSettingsDialog from "./PrayerPdfSettingsDialog";
 
 const PAGE_SIZE = 20;
+// The server's default too, used until the settings say otherwise.
+const DEFAULT_TIME_ZONE = "Asia/Kolkata";
 
 interface PrayerPdfActionsProps {
   scope: PrayerPdfScope;
@@ -96,7 +98,8 @@ const PrayerRequestCard = ({
 /**
  * One "Prayers" button for a group's or an event's chat room. It opens a
  * sidebar listing the room's prayer requests, for a chosen day or every day,
- * with the PDF settings and that day's PDF download. Callers render it only
+ * with the PDF settings and that day's PDF download. The day starts on today
+ * in the settings' timezone each time it opens. Callers render it only
  * for people who may export (OWNER, ADMIN, AUTHOR, super admin), which is what
  * the server enforces too.
  */
@@ -104,6 +107,9 @@ const PrayerPdfActions = ({ scope }: PrayerPdfActionsProps) => {
   const [open, setOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [day, setDay] = useState("");
+  // Set once someone picks a day (or "All days"); until then the day is
+  // today and follows the settings' timezone.
+  const [dayChosen, setDayChosen] = useState(false);
   const [page, setPage] = useState(1);
 
   // A new day starts at its first page.
@@ -115,6 +121,25 @@ const PrayerPdfActions = ({ scope }: PrayerPdfActionsProps) => {
     enabled: open,
     refetchOnWindowFocus: false,
   });
+
+  // The settings arrive after the sheet opens, and "today" in their timezone
+  // can be a different date from the default's.
+  useEffect(() => {
+    if (open && !dayChosen && settings?.timezone) {
+      setDay(todayInTimeZone(settings.timezone));
+    }
+  }, [open, dayChosen, settings?.timezone]);
+
+  const openSidebar = () => {
+    setDay(todayInTimeZone(settings?.timezone ?? DEFAULT_TIME_ZONE));
+    setDayChosen(false);
+    setOpen(true);
+  };
+
+  const chooseDay = (value: string) => {
+    setDay(value);
+    setDayChosen(true);
+  };
 
   const {
     data: list,
@@ -135,7 +160,7 @@ const PrayerPdfActions = ({ scope }: PrayerPdfActionsProps) => {
     refetchOnWindowFocus: false,
   });
 
-  const timeZone = list?.timezone ?? settings?.timezone ?? "Asia/Kolkata";
+  const timeZone = list?.timezone ?? settings?.timezone ?? DEFAULT_TIME_ZONE;
   const total = list?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const items = list?.items ?? [];
@@ -222,7 +247,7 @@ const PrayerPdfActions = ({ scope }: PrayerPdfActionsProps) => {
         variant="outline"
         size="sm"
         className="gap-1.5"
-        onClick={() => setOpen(true)}
+        onClick={openSidebar}
       >
         <LuHandHeart className="h-4 w-4" />
         Prayers
@@ -252,14 +277,14 @@ const PrayerPdfActions = ({ scope }: PrayerPdfActionsProps) => {
                   type="date"
                   value={day}
                   max={todayInTimeZone(timeZone)}
-                  onChange={(e) => setDay(e.target.value)}
+                  onChange={(e) => chooseDay(e.target.value)}
                 />
               </div>
               {day ? (
                 <Pecha.Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => setDay("")}
+                  onClick={() => chooseDay("")}
                 >
                   All days
                 </Pecha.Button>
