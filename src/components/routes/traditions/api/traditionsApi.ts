@@ -61,6 +61,28 @@ export const fetchTraditions = async (
   return data;
 };
 
+/** One entry of the public picker list: the code a group is marked with and its localized name. */
+export interface TraditionOption {
+  code: string;
+  name: string;
+  regions?: string[];
+}
+
+/**
+ * Every tradition a group can be marked with, in one call. Uses the public
+ * list rather than the paged CMS one, so any group owner can load it and the
+ * codes are exactly the ones the group endpoints accept.
+ */
+export const fetchTraditionOptions = async (
+  language = "en",
+): Promise<TraditionOption[]> => {
+  const { data } = await axiosInstance.get<{ traditions: TraditionOption[] }>(
+    `/api/v1/traditions`,
+    { params: { language } },
+  );
+  return data.traditions ?? [];
+};
+
 export const createTradition = async (
   payload: TraditionPayload,
 ): Promise<Tradition> => {

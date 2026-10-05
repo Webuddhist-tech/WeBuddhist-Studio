@@ -30,6 +30,8 @@ import { canEditGroupSettings } from "./lib/groupPermissions";
 import { sameSocialLinks, sameSortedIds } from "./lib/groupFormSectionDirty";
 import GroupFormAssociationsPanel from "./components/GroupFormAssociationsPanel";
 import GroupImageField from "./components/GroupImageField";
+import GroupTraditionField from "./components/GroupTraditionField";
+import { traditionCodeForSave } from "./lib/groupTradition";
 import type { GroupOutletContext } from "./GroupLayout";
 
 type AssociationBaselines = {
@@ -78,6 +80,7 @@ const GroupAboutEditPage = () => {
       },
       avatar_key: "",
       banner_key: "",
+      tradition_code: "",
     },
   });
 
@@ -115,6 +118,7 @@ const GroupAboutEditPage = () => {
             },
       avatar_key: group.avatar_key ?? "",
       banner_key: group.banner_key ?? "",
+      tradition_code: group.tradition?.code ?? "",
     });
 
     setAvatarKey(group.avatar_key ?? null);
@@ -239,6 +243,7 @@ const GroupAboutEditPage = () => {
       metadata,
       avatar_key: avatarKey,
       banner_key: bannerKey,
+      tradition_code: traditionCodeForSave(data.tradition_code),
     });
   });
 
@@ -305,6 +310,10 @@ const GroupAboutEditPage = () => {
                       </Pecha.FormLabel>
                     </Pecha.FormItem>
                   )}
+                />
+                <GroupTraditionField
+                  form={form}
+                  currentTradition={group.tradition}
                 />
                 <div className="space-y-4">
                   {addedLanguages.map((code) => (
