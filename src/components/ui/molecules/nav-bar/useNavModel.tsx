@@ -69,7 +69,7 @@ const pinnedItems: NavItem[] = [
   },
 ];
 
-/** The two group lists, which are all a CREATOR account manages. */
+/** The two group lists, told apart inside a group by its type. */
 const GROUP_LIST_PATHS: string[] = [ROUTES.groups, ROUTES.pages];
 
 const contentItems: NavItem[] = [
@@ -174,8 +174,8 @@ export function useNavModel() {
   const showAdminAuthors = canAccessAdminAuthors(userInfo?.platform_role);
   /** Reviewers reach the admin section, but this catalogue is Super Admin only. */
   const showAmbientSounds = canManageAmbientSounds(userInfo?.platform_role);
-  /** Plain CREATOR accounts only manage their practice spaces and pages — no
-   * other CMS pages. */
+  /** Plain CREATOR accounts only manage their practice spaces — no pages and
+   * no other CMS pages. */
   const isGroupsOnly =
     !isUserInfoLoading && !isStaffRole(userInfo?.platform_role);
   const openGroup = useOpenGroupListPath(location.pathname);
@@ -190,10 +190,10 @@ export function useNavModel() {
       : isActivePath(itemPath, location.pathname);
 
   const visiblePinnedItems = isGroupsOnly
-    ? pinnedItems.filter((item) => GROUP_LIST_PATHS.includes(item.path))
+    ? pinnedItems.filter((item) => item.path === ROUTES.groups)
     : pinnedItems;
 
-  /** A CREATOR sees only the group lists, so a header over them would be noise. */
+  /** A CREATOR sees only Practice spaces, so a header over it would be noise. */
   const sections: NavSection[] = isGroupsOnly
     ? []
     : [

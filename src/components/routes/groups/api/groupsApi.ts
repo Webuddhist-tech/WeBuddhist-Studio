@@ -142,7 +142,8 @@ export interface AuthorGroupListResponse {
 }
 
 export interface CreateAuthorGroupRequest {
-  slug: string;
+  /** Omitted for practice spaces: the backend generates one from the name. */
+  slug?: string;
   group_type?: AuthorGroupType;
   is_public?: boolean;
   avatar_key?: string | null;
