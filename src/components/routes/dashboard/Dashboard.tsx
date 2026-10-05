@@ -136,7 +136,7 @@ const Dashboard = () => {
     showFilter: showGroupFilter,
     isStaffWideList: isStaffWideGroupList,
     allowedGroupIds,
-  } = useDashboardGroupFilterOptions(userInfo);
+  } = useDashboardGroupFilterOptions(userInfo, "COMMUNITY");
 
   const fetchParams = useMemo(
     () => ({
@@ -272,7 +272,7 @@ const Dashboard = () => {
       {showGroupFilter ? (
         <div className="flex min-w-[200px] flex-col gap-1">
           <span className="text-xs font-medium text-muted-foreground">
-            Group
+            Spaces
           </span>
           <Pecha.Select
             value={groupFilterValue}
@@ -287,12 +287,12 @@ const Dashboard = () => {
             <Pecha.SelectTrigger className="h-9 w-[220px] bg-white dark:bg-input/30">
               <Pecha.SelectValue
                 placeholder={
-                  isGroupFilterLoading ? "Loading groups…" : "All groups"
+                  isGroupFilterLoading ? "Loading spaces…" : "All spaces"
                 }
               />
             </Pecha.SelectTrigger>
             <Pecha.SelectContent>
-              <Pecha.SelectItem value="all">All groups</Pecha.SelectItem>
+              <Pecha.SelectItem value="all">All spaces</Pecha.SelectItem>
               {groupFilterOptions.map((group) => (
                 <Pecha.SelectItem key={group.id} value={group.id}>
                   {group.label}
