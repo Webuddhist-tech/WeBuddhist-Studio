@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useOutletContext } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { IoMdAdd, IoMdClose } from "react-icons/io";
 import { toast } from "sonner";
 import { Pecha } from "@/components/ui/shadimport";
@@ -27,18 +27,51 @@ import {
   type TagSummaryDTO,
 } from "./api/groupsApi";
 import { canEditGroupSettings } from "./lib/groupPermissions";
-import { sameSocialLinks, sameSortedIds } from "./lib/groupFormSectionDirty";
 import GroupFormAssociationsPanel from "./components/GroupFormAssociationsPanel";
 import GroupImageField from "./components/GroupImageField";
 import GroupTraditionField from "./components/GroupTraditionField";
+import { hasIncompleteSocialLink } from "./lib/groupSocialLinks";
 import { traditionCodeUpdate } from "./lib/groupTradition";
+import { useAutosave } from "./hooks/useAutosave";
 import type { GroupOutletContext } from "./GroupLayout";
 
-type AssociationBaselines = {
-  tagIds: string[];
-  socialLinks: GroupSocialLinkDTO[];
+const SAVE_TOAST_ID = "group-about-autosave";
+
+type CoreSnapshot = {
+  slug: string;
+  is_public: boolean;
+  tradition_code: string;
+  languages: GroupCoreFormData["languages"];
   avatarKey: string | null;
   bannerKey: string | null;
+};
+
+/** The saved shape of the general fields, with a fixed key order so two
+ * snapshots of the same data serialize identically. */
+const toCoreSnapshot = (
+  values: GroupCoreFormData,
+  languageCodes: LanguageCode[],
+  avatarKey: string | null,
+  bannerKey: string | null,
+): CoreSnapshot => {
+  const languages: GroupCoreFormData["languages"] = {};
+  for (const code of languageCodes) {
+    const lang = values.languages?.[code];
+    languages[code] = {
+      title: lang?.title ?? "",
+      sub_title: lang?.sub_title ?? "",
+      description: lang?.description ?? "",
+      description_long: lang?.description_long ?? "",
+    };
+  }
+  return {
+    slug: values.slug ?? "",
+    is_public: Boolean(values.is_public),
+    tradition_code: values.tradition_code ?? "",
+    languages,
+    avatarKey,
+    bannerKey,
+  };
 };
 
 const GroupAboutEditPage = () => {
@@ -46,6 +79,8 @@ const GroupAboutEditPage = () => {
     useOutletContext<GroupOutletContext>();
   const queryClient = useQueryClient();
   const hydratedRef = useRef<string | null>(null);
+  /** The tradition last saved, so a save only sends it when it changed. */
+  const savedTraditionRef = useRef("");
 
   const canEdit = !readOnlyPlatform && canEditGroupSettings(myRole);
 
@@ -61,12 +96,6 @@ const GroupAboutEditPage = () => {
   const [tagIds, setTagIds] = useState<string[]>([]);
   const [initialTags, setInitialTags] = useState<TagSummaryDTO[]>([]);
   const [socialLinks, setSocialLinks] = useState<GroupSocialLinkDTO[]>([]);
-  const [savedBaselines, setSavedBaselines] = useState<AssociationBaselines>({
-    tagIds: [],
-    socialLinks: [],
-    avatarKey: null,
-    bannerKey: null,
-  });
   const { languageOptions } = useLanguages();
 
   const form = useForm<GroupCoreFormData>({
@@ -84,6 +113,73 @@ const GroupAboutEditPage = () => {
     },
   });
 
+  const invalidateGroup = () => {
+    queryClient.invalidateQueries({ queryKey: ["cms-groups"] });
+    queryClient.invalidateQueries({ queryKey: ["cms-group", groupId] });
+  };
+
+  /** Runs one save, reporting the outcome in a single shared toast. Rethrows
+   * failures so the autosave offers a retry. */
+  const persist = async (request: () => Promise<unknown>) => {
+    try {
+      await request();
+      toast.success("Changes saved", { id: SAVE_TOAST_ID });
+      invalidateGroup();
+      return true;
+    } catch (err) {
+      toast.error(getApiErrorMessage(err), { id: SAVE_TOAST_ID });
+      throw err;
+    }
+  };
+
+  const coreAutosave = useAutosave({
+    value: toCoreSnapshot(form.watch(), addedLanguages, avatarKey, bannerKey),
+    enabled: canEdit,
+    save: async (snapshot) => {
+      // Invalid fields show their messages and wait for the next edit.
+      if (!(await form.trigger())) return false;
+      const saved = await persist(() =>
+        patchGroup(groupId, {
+          slug: snapshot.slug.trim(),
+          is_public: snapshot.is_public,
+          metadata: buildGroupMetadata(snapshot.languages),
+          avatar_key: snapshot.avatarKey,
+          banner_key: snapshot.bannerKey,
+          ...traditionCodeUpdate(
+            snapshot.tradition_code,
+            savedTraditionRef.current,
+          ),
+        }),
+      );
+      savedTraditionRef.current = snapshot.tradition_code;
+      return saved;
+    },
+  });
+
+  const tagsAutosave = useAutosave({
+    value: tagIds,
+    enabled: canEdit,
+    save: (ids) => persist(() => replaceGroupTags(groupId, { tag_ids: ids })),
+  });
+
+  const socialAutosave = useAutosave({
+    value: socialLinks,
+    enabled: canEdit,
+    save: async (links) => {
+      // A link still being typed is flagged inline; save once it is complete.
+      if (hasIncompleteSocialLink(links)) return false;
+      return persist(() =>
+        replaceGroupSocialLinks(groupId, {
+          social_links: links.map((l) => ({ ...l, url: l.url.trim() })),
+        }),
+      );
+    },
+  });
+
+  const { markSaved: markCoreSaved } = coreAutosave;
+  const { markSaved: markTagsSaved } = tagsAutosave;
+  const { markSaved: markSocialSaved } = socialAutosave;
+
   useEffect(() => {
     if (hydratedRef.current === group.id) return;
     hydratedRef.current = group.id;
@@ -100,8 +196,8 @@ const GroupAboutEditPage = () => {
         description_long: meta.description_long ?? "",
       };
     }
-    setAddedLanguages(langs.length ? langs : ["EN"]);
-    form.reset({
+    const languageCodes: LanguageCode[] = langs.length ? langs : ["EN"];
+    const values: GroupCoreFormData = {
       slug: group.slug,
       group_type: group.group_type ?? "PAGE",
       is_public: group.is_public,
@@ -119,70 +215,33 @@ const GroupAboutEditPage = () => {
       avatar_key: group.avatar_key ?? "",
       banner_key: group.banner_key ?? "",
       tradition_code: group.tradition?.code ?? "",
-    });
+    };
+    const groupTagIds = group.tags.map((t) => t.id);
+    const groupSocialLinks = group.social_links ?? [];
 
+    setAddedLanguages(languageCodes);
+    form.reset(values);
+    savedTraditionRef.current = values.tradition_code ?? "";
     setAvatarKey(group.avatar_key ?? null);
     setBannerKey(group.banner_key ?? null);
     setAvatarPreview(resolveGroupAvatarUrl(group));
     setBannerPreview(resolveGroupBannerUrl(group));
-    setTagIds(group.tags.map((t) => t.id));
+    setTagIds(groupTagIds);
     setInitialTags(group.tags);
-    setSocialLinks(group.social_links ?? []);
-    setSavedBaselines({
-      tagIds: group.tags.map((t) => t.id),
-      socialLinks: group.social_links ?? [],
-      avatarKey: group.avatar_key ?? null,
-      bannerKey: group.banner_key ?? null,
-    });
-  }, [group, form]);
+    setSocialLinks(groupSocialLinks);
 
-  const invalidateGroup = () => {
-    queryClient.invalidateQueries({ queryKey: ["cms-groups"] });
-    queryClient.invalidateQueries({ queryKey: ["cms-group", groupId] });
-  };
-
-  const toastOnError = (err: unknown) => toast.error(getApiErrorMessage(err));
-
-  const patchMutation = useMutation({
-    mutationFn: (payload: Parameters<typeof patchGroup>[1]) =>
-      patchGroup(groupId, payload),
-    onSuccess: () => {
-      toast.success("Group updated");
-      invalidateGroup();
-      form.reset(form.getValues());
-      setSavedBaselines((prev) => ({
-        ...prev,
-        avatarKey,
-        bannerKey,
-      }));
-      hydratedRef.current = null;
-    },
-    onError: toastOnError,
-  });
-
-  const tagsMutation = useMutation({
-    mutationFn: () => replaceGroupTags(groupId, { tag_ids: tagIds }),
-    onSuccess: () => {
-      toast.success("Tags saved");
-      invalidateGroup();
-      setSavedBaselines((prev) => ({ ...prev, tagIds: [...tagIds] }));
-    },
-    onError: toastOnError,
-  });
-
-  const socialMutation = useMutation({
-    mutationFn: () =>
-      replaceGroupSocialLinks(groupId, { social_links: socialLinks }),
-    onSuccess: () => {
-      toast.success("Social links saved");
-      invalidateGroup();
-      setSavedBaselines((prev) => ({
-        ...prev,
-        socialLinks: [...socialLinks],
-      }));
-    },
-    onError: toastOnError,
-  });
+    // Loaded values are already on the server, so they must not autosave.
+    markCoreSaved(
+      toCoreSnapshot(
+        values,
+        languageCodes,
+        group.avatar_key ?? null,
+        group.banner_key ?? null,
+      ),
+    );
+    markTagsSaved(groupTagIds);
+    markSocialSaved(groupSocialLinks);
+  }, [group, form, markCoreSaved, markTagsSaved, markSocialSaved]);
 
   if (!canEdit) {
     return <Navigate to={ROUTES.group(groupId)} replace />;
@@ -227,7 +286,6 @@ const GroupAboutEditPage = () => {
       setKey(key);
       form.setValue(field, key, { shouldDirty: true });
       setDialog(false);
-      toast.success("Image uploaded");
     } catch {
       toast.error("Failed to upload image");
     } finally {
@@ -235,36 +293,40 @@ const GroupAboutEditPage = () => {
     }
   };
 
-  const onSaveCore = form.handleSubmit((data) => {
-    const metadata = buildGroupMetadata(data.languages);
-    patchMutation.mutate({
-      slug: data.slug.trim(),
-      is_public: data.is_public,
-      metadata,
-      avatar_key: avatarKey,
-      banner_key: bannerKey,
-      ...traditionCodeUpdate(
-        data.tradition_code,
-        form.formState.defaultValues?.tradition_code,
-      ),
-    });
-  });
+  const autosaves = [coreAutosave, tagsAutosave, socialAutosave];
+  const isSaving = autosaves.some((a) => a.isSaving);
+  const hasError = autosaves.some((a) => a.hasError);
+  const hasUnsaved = autosaves.some((a) => a.isDirty);
 
-  const { isDirty: isFormDirty } = form.formState;
-  const imagesDirty =
-    avatarKey !== savedBaselines.avatarKey ||
-    bannerKey !== savedBaselines.bannerKey;
-  const isCoreDirty = isFormDirty || imagesDirty;
-  const tagsDirty = !sameSortedIds(tagIds, savedBaselines.tagIds);
-  const socialDirty = !sameSocialLinks(socialLinks, savedBaselines.socialLinks);
+  const retryFailedSaves = () => {
+    for (const autosave of autosaves) {
+      if (autosave.hasError) autosave.retry();
+    }
+  };
 
   return (
     <>
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-base font-bold">Edit about</h2>
-        <Button variant="outline" size="sm" asChild>
-          <Link to={ROUTES.group(groupId)}>Done</Link>
-        </Button>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-muted-foreground" aria-live="polite">
+            {isSaving
+              ? "Saving…"
+              : hasError
+                ? "Couldn't save changes"
+                : hasUnsaved
+                  ? "Unsaved changes"
+                  : "All changes saved"}
+          </span>
+          {hasError && !isSaving && (
+            <Button variant="outline" size="sm" onClick={retryFailedSaves}>
+              Retry
+            </Button>
+          )}
+          <Button variant="outline" size="sm" asChild>
+            <Link to={ROUTES.group(groupId)}>Done</Link>
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col xl:flex-row xl:items-start gap-8 xl:gap-0">
@@ -274,7 +336,7 @@ const GroupAboutEditPage = () => {
               General
             </h3>
             <Pecha.Form {...form}>
-              <form onSubmit={onSaveCore} className="space-y-6">
+              <div className="space-y-6">
                 <Pecha.FormField
                   control={form.control}
                   name="slug"
@@ -447,16 +509,7 @@ const GroupAboutEditPage = () => {
                     imageClassName="w-full max-w-xs h-24 rounded object-cover border"
                   />
                 </div>
-                <div className="flex justify-end pt-2">
-                  <Button
-                    type="submit"
-                    className="bg-[#A51C21] text-white hover:bg-[#A51C21]/90"
-                    disabled={patchMutation.isPending || !isCoreDirty}
-                  >
-                    {patchMutation.isPending ? "Saving…" : "Save general"}
-                  </Button>
-                </div>
-              </form>
+              </div>
             </Pecha.Form>
           </section>
         </div>
@@ -467,12 +520,6 @@ const GroupAboutEditPage = () => {
           initialTags={initialTags}
           socialLinks={socialLinks}
           onSocialLinksChange={setSocialLinks}
-          onSaveTags={() => tagsMutation.mutate()}
-          onSaveSocial={() => socialMutation.mutate()}
-          tagsSaving={tagsMutation.isPending}
-          socialSaving={socialMutation.isPending}
-          tagsSaveDisabled={!tagsDirty}
-          socialSaveDisabled={!socialDirty}
         />
       </div>
 

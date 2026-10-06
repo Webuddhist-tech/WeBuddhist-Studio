@@ -1,22 +1,14 @@
 import { IoMdAdd, IoMdClose } from "react-icons/io";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
-import { SOCIAL_PLATFORMS, PLATFORM_PATTERNS } from "@/lib/constant";
+import { SOCIAL_PLATFORMS } from "@/lib/constant";
 import type { GroupSocialLinkDTO } from "../api/groupsApi";
+import { getSocialLinkUrlError } from "../lib/groupSocialLinks";
 
 type GroupSocialLinksEditorProps = {
   value: GroupSocialLinkDTO[];
   onChange: (links: GroupSocialLinkDTO[]) => void;
   hideLabel?: boolean;
-};
-
-const getUrlError = (platform: string, url: string): string | null => {
-  if (!platform || !url || platform === "email") return null;
-  const pattern = PLATFORM_PATTERNS[platform];
-  if (pattern && !pattern.test(url)) {
-    return `URL must be a valid ${platform} link`;
-  }
-  return null;
 };
 
 const GroupSocialLinksEditor = ({
@@ -63,7 +55,7 @@ const GroupSocialLinksEditor = ({
       ) : (
         <div className="space-y-3">
           {value.map((link, index) => {
-            const urlError = getUrlError(link.platform, link.url);
+            const urlError = getSocialLinkUrlError(link.platform, link.url);
             return (
               <div
                 key={index}

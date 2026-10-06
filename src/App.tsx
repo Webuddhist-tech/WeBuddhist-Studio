@@ -27,7 +27,7 @@ function App() {
     // A phone stacks a top bar, the page and a tab bar; desktop keeps the sidebar.
     <div className="flex h-screen w-full max-md:h-dvh max-md:flex-col">
       {!hideNavbar && (isMobile ? <MobileTopBar /> : <Navbar />)}
-      <div className="min-h-0 flex-1 overflow-auto max-md:relative">
+      <div className="relative min-h-0 flex-1 overflow-auto">
         <Outlet />
       </div>
       {!hideNavbar && isMobile && <MobileTabBar />}
