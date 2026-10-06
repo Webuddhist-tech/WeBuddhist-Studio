@@ -119,8 +119,18 @@ export interface AuthorGroupListItem {
   avatar?: string | null;
   avatar_key?: string | null;
   avatar_url?: string | null;
+  /** Null for groups nobody has marked with a tradition yet. */
+  tradition?: GroupTraditionDTO | null;
   /** Current user's membership role when returned by the CMS list API. */
   my_role?: AuthorGroupMemberRole | null;
+}
+
+export interface GroupTraditionDTO {
+  id: string;
+  /** What create/update send back as `tradition_code`. */
+  code: string;
+  /** Localized; null when the tradition has no name in any language. */
+  name?: string | null;
 }
 
 export interface AuthorGroupDetailDTO extends AuthorGroupListItem {
@@ -148,6 +158,8 @@ export interface CreateAuthorGroupRequest {
   is_public?: boolean;
   avatar_key?: string | null;
   banner_key?: string | null;
+  /** A code from GET /traditions; omit to leave the group unmarked. */
+  tradition_code?: string | null;
   metadata: GroupMetadataInput[];
 }
 
@@ -156,6 +168,8 @@ export interface UpdateAuthorGroupRequest {
   is_public?: boolean;
   avatar_key?: string | null;
   banner_key?: string | null;
+  /** null clears the group's tradition; omitting it leaves it unchanged. */
+  tradition_code?: string | null;
   metadata?: GroupMetadataInput[];
 }
 

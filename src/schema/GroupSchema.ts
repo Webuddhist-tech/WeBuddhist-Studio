@@ -28,6 +28,8 @@ const groupCoreFields = z.object({
   languages: z.record(z.string(), groupLanguageBlockSchema),
   avatar_key: z.string().optional(),
   banner_key: z.string().optional(),
+  /** "" means no tradition. */
+  tradition_code: z.string().optional(),
 });
 
 type GroupCoreFields = z.infer<typeof groupCoreFields>;

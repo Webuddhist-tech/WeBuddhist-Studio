@@ -26,7 +26,9 @@ import {
 } from "./api/groupsApi";
 import GroupImageField from "./components/GroupImageField";
 import { GroupPageShell } from "./components/GroupPageShell";
+import GroupTraditionField from "./components/GroupTraditionField";
 import { GROUP_KINDS } from "./lib/groupKind";
+import { traditionCodeForSave } from "./lib/groupTradition";
 
 /**
  * Create-only form for a practice space or a page; the route decides which.
@@ -64,6 +66,7 @@ const GroupFormPage = ({
       },
       avatar_key: "",
       banner_key: "",
+      tradition_code: "",
     },
   });
 
@@ -128,6 +131,7 @@ const GroupFormPage = ({
   };
 
   const onCreate = form.handleSubmit((data) => {
+    const traditionCode = traditionCodeForSave(data.tradition_code);
     createMutation.mutate({
       ...(asksForSlug ? { slug: data.slug.trim() } : {}),
       is_public: data.is_public,
@@ -135,6 +139,7 @@ const GroupFormPage = ({
       metadata: buildGroupMetadata(data.languages),
       avatar_key: avatarKey,
       banner_key: bannerKey,
+      ...(traditionCode ? { tradition_code: traditionCode } : {}),
     });
   });
 
@@ -193,6 +198,7 @@ const GroupFormPage = ({
                   </Pecha.FormItem>
                 )}
               />
+              <GroupTraditionField form={form} />
               <div className="space-y-4">
                 {addedLanguages.map((code) => (
                   <div
