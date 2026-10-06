@@ -4,7 +4,10 @@ export const AUTOSAVE_DELAY_MS = 800;
 
 type UseAutosaveOptions<T> = {
   value: T;
-  /** Persists `value`; resolve `false` when it was not saved (e.g. invalid). */
+  /**
+   * Persists `value`. Resolve `false` when it was deliberately not saved (e.g.
+   * invalid); reject when the request failed and is worth retrying.
+   */
   save: (value: T) => Promise<boolean>;
   delayMs?: number;
   enabled?: boolean;
@@ -12,8 +15,10 @@ type UseAutosaveOptions<T> = {
 
 /**
  * Saves `value` once it has stopped changing for `delayMs`. Values are compared
- * by their JSON, so callers pass plain data. A value that failed to save is not
- * retried until it changes again, and a pending save is flushed on unmount.
+ * by their JSON, so callers pass plain data. Saves run one at a time, in order.
+ * A value that failed to save is not retried until it changes again or
+ * `retry` is called. On unmount the latest value is saved after any running
+ * save, unless it is already on the server.
  */
 export const useAutosave = <T>({
   value,
@@ -23,62 +28,84 @@ export const useAutosave = <T>({
 }: UseAutosaveOptions<T>) => {
   const key = JSON.stringify(value);
   const [savedKey, setSavedKey] = useState(key);
+  const [failed, setFailed] = useState<{ key: string; error: boolean } | null>(
+    null,
+  );
   const [isSaving, setIsSaving] = useState(false);
-  const attemptedKeyRef = useRef<string | null>(null);
-  const pendingRef = useRef<{ key: string; value: T } | null>(null);
+  const savedKeyRef = useRef(key);
+  const inFlightRef = useRef<Promise<void> | null>(null);
   const saveRef = useRef(save);
+  const latestRef = useRef({ key, value, enabled });
 
   useEffect(() => {
     saveRef.current = save;
+    latestRef.current = { key, value, enabled };
   });
 
-  const run = useCallback(async (nextKey: string, nextValue: T) => {
-    attemptedKeyRef.current = nextKey;
+  /** Queues a save of `nextValue` behind any running one. */
+  const run = useCallback((nextKey: string, nextValue: T) => {
+    const attempt = async () => {
+      // An earlier save may already have stored this value.
+      if (nextKey === savedKeyRef.current) return;
+      try {
+        if (await saveRef.current(nextValue)) {
+          savedKeyRef.current = nextKey;
+          setSavedKey(nextKey);
+          setFailed(null);
+        } else {
+          setFailed({ key: nextKey, error: false });
+        }
+      } catch {
+        setFailed({ key: nextKey, error: true });
+      }
+    };
+    const prior = inFlightRef.current;
+    const task = prior ? prior.then(attempt) : attempt();
+    inFlightRef.current = task;
     setIsSaving(true);
-    try {
-      if (await saveRef.current(nextValue)) setSavedKey(nextKey);
-    } finally {
+    void task.finally(() => {
+      if (inFlightRef.current !== task) return;
+      inFlightRef.current = null;
       setIsSaving(false);
-    }
+    });
   }, []);
 
-  // Declared before the timer effect so its cleanup runs first on unmount,
-  // while the unsaved value is still recorded.
   useEffect(
     () => () => {
-      const pending = pendingRef.current;
-      if (pending) void saveRef.current(pending.value);
+      const latest = latestRef.current;
+      if (latest.enabled) run(latest.key, latest.value);
     },
-    [],
+    [run],
   );
 
   useEffect(() => {
-    if (!enabled) return;
-    if (key === savedKey || key === attemptedKeyRef.current) return;
-    pendingRef.current = { key, value };
-    if (isSaving) {
-      return () => {
-        pendingRef.current = null;
-      };
-    }
-    const timer = setTimeout(() => {
-      pendingRef.current = null;
-      void run(key, value);
-    }, delayMs);
-    return () => {
-      clearTimeout(timer);
-      pendingRef.current = null;
-    };
+    if (!enabled || isSaving) return;
+    if (key === savedKey || key === failed?.key) return;
+    const timer = setTimeout(() => run(key, value), delayMs);
+    return () => clearTimeout(timer);
     // `value` is fully described by `key`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, savedKey, isSaving, enabled, delayMs, run]);
+  }, [key, savedKey, failed, isSaving, enabled, delayMs, run]);
 
   /** Records `next` as already saved, e.g. after loading it from the server. */
   const markSaved = useCallback((next: T) => {
     const nextKey = JSON.stringify(next);
-    attemptedKeyRef.current = null;
+    savedKeyRef.current = nextKey;
     setSavedKey(nextKey);
+    setFailed(null);
   }, []);
 
-  return { isSaving, isDirty: key !== savedKey, markSaved };
+  /** Saves the current value again, e.g. after a request failed. */
+  const retry = useCallback(() => {
+    const latest = latestRef.current;
+    if (latest.enabled) run(latest.key, latest.value);
+  }, [run]);
+
+  return {
+    isSaving,
+    isDirty: key !== savedKey,
+    hasError: !isSaving && failed?.error === true && failed.key === key,
+    markSaved,
+    retry,
+  };
 };

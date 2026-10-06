@@ -111,7 +111,8 @@ const GroupAboutEditPage = () => {
     queryClient.invalidateQueries({ queryKey: ["cms-group", groupId] });
   };
 
-  /** Runs one save, reporting the outcome in a single shared toast. */
+  /** Runs one save, reporting the outcome in a single shared toast. Rethrows
+   * failures so the autosave offers a retry. */
   const persist = async (request: () => Promise<unknown>) => {
     try {
       await request();
@@ -120,7 +121,7 @@ const GroupAboutEditPage = () => {
       return true;
     } catch (err) {
       toast.error(getApiErrorMessage(err), { id: SAVE_TOAST_ID });
-      return false;
+      throw err;
     }
   };
 
@@ -277,10 +278,16 @@ const GroupAboutEditPage = () => {
     }
   };
 
-  const isSaving =
-    coreAutosave.isSaving || tagsAutosave.isSaving || socialAutosave.isSaving;
-  const hasUnsaved =
-    coreAutosave.isDirty || tagsAutosave.isDirty || socialAutosave.isDirty;
+  const autosaves = [coreAutosave, tagsAutosave, socialAutosave];
+  const isSaving = autosaves.some((a) => a.isSaving);
+  const hasError = autosaves.some((a) => a.hasError);
+  const hasUnsaved = autosaves.some((a) => a.isDirty);
+
+  const retryFailedSaves = () => {
+    for (const autosave of autosaves) {
+      if (autosave.hasError) autosave.retry();
+    }
+  };
 
   return (
     <>
@@ -290,10 +297,17 @@ const GroupAboutEditPage = () => {
           <span className="text-xs text-muted-foreground" aria-live="polite">
             {isSaving
               ? "Saving…"
-              : hasUnsaved
-                ? "Unsaved changes"
-                : "All changes saved"}
+              : hasError
+                ? "Couldn't save changes"
+                : hasUnsaved
+                  ? "Unsaved changes"
+                  : "All changes saved"}
           </span>
+          {hasError && !isSaving && (
+            <Button variant="outline" size="sm" onClick={retryFailedSaves}>
+              Retry
+            </Button>
+          )}
           <Button variant="outline" size="sm" asChild>
             <Link to={ROUTES.group(groupId)}>Done</Link>
           </Button>

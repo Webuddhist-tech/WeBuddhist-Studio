@@ -69,4 +69,75 @@ describe("useAutosave", () => {
     unmount();
     expect(save).toHaveBeenCalledWith("unsaved");
   });
+
+  it("saves a value reverted mid-save after the running save, on unmount", async () => {
+    let finish!: (ok: boolean) => void;
+    const save = vi
+      .fn()
+      .mockImplementationOnce(
+        () => new Promise<boolean>((resolve) => (finish = resolve)),
+      )
+      .mockResolvedValue(true);
+    const { rerender, unmount } = render(save);
+
+    rerender({ value: "b" });
+    await wait(AUTOSAVE_DELAY_MS);
+    expect(save).toHaveBeenCalledWith("b");
+
+    rerender({ value: "a" });
+    unmount();
+    expect(save).toHaveBeenCalledTimes(1);
+
+    await act(async () => finish(true));
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(save).toHaveBeenLastCalledWith("a");
+  });
+
+  it("saves a value reverted mid-save once the running save finishes", async () => {
+    let finish!: (ok: boolean) => void;
+    const save = vi
+      .fn()
+      .mockImplementationOnce(
+        () => new Promise<boolean>((resolve) => (finish = resolve)),
+      )
+      .mockResolvedValue(true);
+    const { result, rerender } = render(save);
+
+    rerender({ value: "b" });
+    await wait(AUTOSAVE_DELAY_MS);
+    rerender({ value: "a" });
+    await act(async () => finish(true));
+    await wait(AUTOSAVE_DELAY_MS);
+
+    expect(save).toHaveBeenLastCalledWith("a");
+    expect(result.current.isDirty).toBe(false);
+  });
+
+  it("reports a failed request and saves it again on retry", async () => {
+    const save = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValue(true);
+    const { result, rerender } = render(save);
+
+    rerender({ value: "b" });
+    await wait(AUTOSAVE_DELAY_MS * 3);
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(result.current.hasError).toBe(true);
+
+    await act(async () => result.current.retry());
+    expect(save).toHaveBeenCalledTimes(2);
+    expect(result.current.hasError).toBe(false);
+    expect(result.current.isDirty).toBe(false);
+  });
+
+  it("does not report an error for a value it declined to save", async () => {
+    const save = vi.fn().mockResolvedValue(false);
+    const { result, rerender } = render(save);
+
+    rerender({ value: "invalid" });
+    await wait(AUTOSAVE_DELAY_MS);
+    expect(result.current.hasError).toBe(false);
+    expect(result.current.isDirty).toBe(true);
+  });
 });
