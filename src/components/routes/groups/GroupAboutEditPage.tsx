@@ -29,7 +29,9 @@ import {
 import { canEditGroupSettings } from "./lib/groupPermissions";
 import GroupFormAssociationsPanel from "./components/GroupFormAssociationsPanel";
 import GroupImageField from "./components/GroupImageField";
+import GroupTraditionField from "./components/GroupTraditionField";
 import { hasIncompleteSocialLink } from "./lib/groupSocialLinks";
+import { traditionCodeUpdate } from "./lib/groupTradition";
 import { useAutosave } from "./hooks/useAutosave";
 import type { GroupOutletContext } from "./GroupLayout";
 
@@ -38,6 +40,7 @@ const SAVE_TOAST_ID = "group-about-autosave";
 type CoreSnapshot = {
   slug: string;
   is_public: boolean;
+  tradition_code: string;
   languages: GroupCoreFormData["languages"];
   avatarKey: string | null;
   bannerKey: string | null;
@@ -64,6 +67,7 @@ const toCoreSnapshot = (
   return {
     slug: values.slug ?? "",
     is_public: Boolean(values.is_public),
+    tradition_code: values.tradition_code ?? "",
     languages,
     avatarKey,
     bannerKey,
@@ -75,6 +79,8 @@ const GroupAboutEditPage = () => {
     useOutletContext<GroupOutletContext>();
   const queryClient = useQueryClient();
   const hydratedRef = useRef<string | null>(null);
+  /** The tradition last saved, so a save only sends it when it changed. */
+  const savedTraditionRef = useRef("");
 
   const canEdit = !readOnlyPlatform && canEditGroupSettings(myRole);
 
@@ -103,6 +109,7 @@ const GroupAboutEditPage = () => {
       },
       avatar_key: "",
       banner_key: "",
+      tradition_code: "",
     },
   });
 
@@ -131,15 +138,21 @@ const GroupAboutEditPage = () => {
     save: async (snapshot) => {
       // Invalid fields show their messages and wait for the next edit.
       if (!(await form.trigger())) return false;
-      return persist(() =>
+      const saved = await persist(() =>
         patchGroup(groupId, {
           slug: snapshot.slug.trim(),
           is_public: snapshot.is_public,
           metadata: buildGroupMetadata(snapshot.languages),
           avatar_key: snapshot.avatarKey,
           banner_key: snapshot.bannerKey,
+          ...traditionCodeUpdate(
+            snapshot.tradition_code,
+            savedTraditionRef.current,
+          ),
         }),
       );
+      savedTraditionRef.current = snapshot.tradition_code;
+      return saved;
     },
   });
 
@@ -201,12 +214,14 @@ const GroupAboutEditPage = () => {
             },
       avatar_key: group.avatar_key ?? "",
       banner_key: group.banner_key ?? "",
+      tradition_code: group.tradition?.code ?? "",
     };
     const groupTagIds = group.tags.map((t) => t.id);
     const groupSocialLinks = group.social_links ?? [];
 
     setAddedLanguages(languageCodes);
     form.reset(values);
+    savedTraditionRef.current = values.tradition_code ?? "";
     setAvatarKey(group.avatar_key ?? null);
     setBannerKey(group.banner_key ?? null);
     setAvatarPreview(resolveGroupAvatarUrl(group));
@@ -360,6 +375,10 @@ const GroupAboutEditPage = () => {
                       </Pecha.FormLabel>
                     </Pecha.FormItem>
                   )}
+                />
+                <GroupTraditionField
+                  form={form}
+                  currentTradition={group.tradition}
                 />
                 <div className="space-y-4">
                   {addedLanguages.map((code) => (

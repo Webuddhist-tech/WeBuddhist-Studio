@@ -8,6 +8,7 @@ import { languageLabelForCode, resolveGroupBannerUrl } from "./api/groupsApi";
 import { canEditGroupSettings } from "./lib/groupPermissions";
 import { GroupDetailCard } from "./components/GroupSection";
 import GroupDraftBanner from "./components/GroupDraftBanner";
+import { traditionLabel } from "./lib/groupTradition";
 import type { GroupOutletContext } from "./GroupLayout";
 
 const GroupAboutPage = () => {
@@ -42,6 +43,11 @@ const GroupAboutPage = () => {
       <div className="flex flex-wrap gap-4 text-sm">
         <Pecha.Badge variant="outline">
           {group.is_public ? "Public" : "Private"}
+        </Pecha.Badge>
+        <Pecha.Badge variant={group.tradition ? "secondary" : "outline"}>
+          {group.tradition
+            ? traditionLabel(group.tradition)
+            : "No tradition set"}
         </Pecha.Badge>
         <span className="text-muted-foreground">
           {memberCount} member{memberCount === 1 ? "" : "s"}
