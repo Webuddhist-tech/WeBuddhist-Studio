@@ -12,6 +12,7 @@ import { ModeToggle } from "../mode-toggle/modetoggle";
 import { LanguageToggle } from "../language-toggle/languageToggle";
 import AuthLogout from "../auth-logout/AuthLogout";
 import { InstallAppButton } from "../install-app/InstallAppButton";
+import { AppUpdateButton } from "../install-app/AppUpdateButton";
 import { useInstallMode } from "@/lib/pwaInstall";
 import AuthButton from "@/components/ui/molecules/auth-button/AuthButton";
 import { useNavModel, type NavItem } from "./useNavModel";
@@ -54,7 +55,11 @@ export const MobileTopBar = () => {
           {current?.label ?? "Pecha Studio"}
         </span>
       </Link>
-      <AuthButton variant="compact" />
+      {/* Kept in the bar, not the menu: a waiting update should be seen. */}
+      <div className="flex shrink-0 items-center gap-2">
+        <AppUpdateButton showLabel />
+        <AuthButton variant="compact" />
+      </div>
     </header>
   );
 };

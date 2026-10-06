@@ -1,40 +1,46 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { toast } from "sonner";
-import { useRegisterSW } from "virtual:pwa-register/react";
+import { useAppUpdate } from "./appUpdateContext";
+import { defersAppUpdate, type StudioRouter } from "./defersAppUpdate";
 
-/** Authors keep the Studio open for days; look for a new deploy this often. */
-const UPDATE_CHECK_MS = 60 * 60 * 1000;
+const TOAST_ID = "pwa-update";
 
 /**
- * Registers the service worker and, when a new version has been deployed,
- * offers to reload into it. It never reloads by itself, so nobody loses a
- * half-written plan or post.
+ * Announces a new deploy once, at the top of the screen. Closed - or held back
+ * on a live session, where it would cover Next - it leaves the Update button to
+ * carry the update until the author reloads.
  */
-export function PwaUpdatePrompt() {
-  const {
-    needRefresh: [needRefresh],
-    updateServiceWorker,
-  } = useRegisterSW({
-    onRegisteredSW(_url, registration) {
-      if (!registration) return;
-      setInterval(() => {
-        if (navigator.onLine) void registration.update();
-      }, UPDATE_CHECK_MS);
-    },
-  });
+export function PwaUpdatePrompt({
+  router,
+}: Readonly<{ router: StudioRouter }>) {
+  const { ready, promptClosed, closePrompt, reload } = useAppUpdate();
+
+  const subscribe = useCallback(
+    (onChange: () => void) => router.subscribe(onChange),
+    [router],
+  );
+  const deferred = useSyncExternalStore(subscribe, () =>
+    defersAppUpdate(router),
+  );
 
   useEffect(() => {
-    if (!needRefresh) return;
+    if (!ready) return;
+    if (promptClosed || deferred) {
+      toast.dismiss(TOAST_ID);
+      closePrompt();
+      return;
+    }
     toast("A new version of the Studio is ready", {
-      id: "pwa-update",
+      id: TOAST_ID,
       description: "Reload when you have saved your work.",
       duration: Infinity,
-      action: {
-        label: "Reload",
-        onClick: () => void updateServiceWorker(true),
-      },
+      // At the bottom it sits over the page's own controls on a phone.
+      position: "top-center",
+      closeButton: true,
+      onDismiss: closePrompt,
+      action: { label: "Reload", onClick: reload },
     });
-  }, [needRefresh, updateServiceWorker]);
+  }, [ready, promptClosed, deferred, closePrompt, reload]);
 
   return null;
 }

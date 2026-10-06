@@ -12,6 +12,7 @@ import { ROUTES } from "@/routes/paths";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { useDebounce } from "use-debounce";
 import { getApiErrorMessage } from "@/lib/apiErrors";
+import { AppUpdateButton } from "@/components/ui/molecules/install-app/AppUpdateButton";
 import {
   fetchAutoplayState,
   fetchEditionTitle,
@@ -3019,6 +3020,13 @@ const LiveControlPage = () => {
             {/* Size and token travel together: on a phone too narrow for one
              * row they wrap as a pair to the right, never one button alone. */}
             <div className="ml-auto flex shrink-0 items-center gap-1.5">
+              {/* The update toast is held back here, as it would cover Next;
+               * this is where a waiting update shows instead. */}
+              <AppUpdateButton
+                showLabel
+                description="Reloading takes a second. Tap Live afterwards to get back to the room's line."
+                className="h-auto shrink-0 border-0 bg-[#0b2a4a] px-3 py-1.5 text-sm font-semibold text-[#64b5ff] hover:bg-[#123a63] hover:text-[#64b5ff] max-lg:px-2.5 max-lg:text-[13px]"
+              />
               {/* The text size suits the screen, so it is kept per browser. */}
               <label className="flex shrink-0 items-center gap-1.5">
                 <span className="max-lg:hidden">Text size</span>
