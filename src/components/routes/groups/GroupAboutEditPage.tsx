@@ -31,7 +31,7 @@ import { sameSocialLinks, sameSortedIds } from "./lib/groupFormSectionDirty";
 import GroupFormAssociationsPanel from "./components/GroupFormAssociationsPanel";
 import GroupImageField from "./components/GroupImageField";
 import GroupTraditionField from "./components/GroupTraditionField";
-import { traditionCodeForSave } from "./lib/groupTradition";
+import { traditionCodeUpdate } from "./lib/groupTradition";
 import type { GroupOutletContext } from "./GroupLayout";
 
 type AssociationBaselines = {
@@ -243,7 +243,10 @@ const GroupAboutEditPage = () => {
       metadata,
       avatar_key: avatarKey,
       banner_key: bannerKey,
-      tradition_code: traditionCodeForSave(data.tradition_code),
+      ...traditionCodeUpdate(
+        data.tradition_code,
+        form.formState.defaultValues?.tradition_code,
+      ),
     });
   });
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   traditionCodeForSave,
+  traditionCodeUpdate,
   traditionLabel,
   traditionPickerOptions,
 } from "./groupTradition";
@@ -43,5 +44,29 @@ describe("traditionCodeForSave", () => {
   it("sends null for no tradition, which clears it", () => {
     expect(traditionCodeForSave("")).toBeNull();
     expect(traditionCodeForSave(undefined)).toBeNull();
+  });
+});
+
+describe("traditionCodeUpdate", () => {
+  it("leaves the tradition out when the owner didn't change it", () => {
+    expect(traditionCodeUpdate("tibetan", "tibetan")).toEqual({});
+  });
+
+  it("leaves it out when the group loaded without one, so a save can't clear it", () => {
+    expect(traditionCodeUpdate("", "")).toEqual({});
+    expect(traditionCodeUpdate(undefined, "")).toEqual({});
+  });
+
+  it("sends a newly chosen code", () => {
+    expect(traditionCodeUpdate("pali", "tibetan")).toEqual({
+      tradition_code: "pali",
+    });
+    expect(traditionCodeUpdate("pali", "")).toEqual({ tradition_code: "pali" });
+  });
+
+  it("sends null when the owner clears it", () => {
+    expect(traditionCodeUpdate("", "tibetan")).toEqual({
+      tradition_code: null,
+    });
   });
 });

@@ -28,3 +28,15 @@ export function traditionCodeForSave(value?: string): string | null {
   const code = value?.trim();
   return code || null;
 }
+
+/**
+ * The `tradition_code` part of an update: present only when the owner changed
+ * the tradition, so saving other fields never clears one the form didn't load.
+ */
+export function traditionCodeUpdate(
+  value?: string,
+  savedValue?: string,
+): { tradition_code?: string | null } {
+  if ((value?.trim() ?? "") === (savedValue?.trim() ?? "")) return {};
+  return { tradition_code: traditionCodeForSave(value) };
+}

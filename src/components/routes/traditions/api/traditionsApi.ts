@@ -80,7 +80,12 @@ export const fetchTraditionOptions = async (
     `/api/v1/traditions`,
     { params: { language } },
   );
-  return data.traditions ?? [];
+  // A changed response shape fails loudly, so the picker shows its load
+  // error rather than an empty list.
+  if (!Array.isArray(data?.traditions)) {
+    throw new Error("Unexpected traditions response");
+  }
+  return data.traditions;
 };
 
 export const createTradition = async (
