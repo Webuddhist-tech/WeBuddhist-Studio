@@ -46,6 +46,12 @@ export function AppUpdateProvider({
   const [promptClosed, setPromptClosed] = useState(false);
   const closePrompt = useCallback(() => setPromptClosed(true), []);
 
+  const [updateButtons, setUpdateButtons] = useState(0);
+  const hostUpdateButton = useCallback(() => {
+    setUpdateButtons((count) => count + 1);
+    return () => setUpdateButtons((count) => count - 1);
+  }, []);
+
   const reload = useCallback(() => {
     // Promoting the waiting worker reloads every open tab into it. When another
     // tab - the Studio beside live control - has already done that, nothing is
@@ -54,9 +60,24 @@ export function AppUpdateProvider({
     else window.location.reload();
   }, [updateServiceWorker]);
 
+  const hasUpdateButton = updateButtons > 0;
   const value = useMemo(
-    () => ({ ready, promptClosed, closePrompt, reload }),
-    [ready, promptClosed, closePrompt, reload],
+    () => ({
+      ready,
+      promptClosed,
+      closePrompt,
+      reload,
+      hasUpdateButton,
+      hostUpdateButton,
+    }),
+    [
+      ready,
+      promptClosed,
+      closePrompt,
+      reload,
+      hasUpdateButton,
+      hostUpdateButton,
+    ],
   );
 
   return <AppUpdateContext value={value}>{children}</AppUpdateContext>;

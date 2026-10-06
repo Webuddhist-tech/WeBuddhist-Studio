@@ -18,6 +18,8 @@ const renderButton = (
         promptClosed: true,
         closePrompt: vi.fn(),
         reload,
+        hasUpdateButton: true,
+        hostUpdateButton: () => () => {},
         ...update,
       }}
     >

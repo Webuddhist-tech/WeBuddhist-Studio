@@ -105,6 +105,20 @@ describe("AppUpdateProvider", () => {
     expect(seen.promptClosed).toBe(true);
   });
 
+  it("knows while a page shows the Update button", () => {
+    renderProvider();
+    expect(seen.hasUpdateButton).toBe(false);
+
+    let leave = () => {};
+    act(() => {
+      leave = seen.hostUpdateButton();
+    });
+    expect(seen.hasUpdateButton).toBe(true);
+
+    act(() => leave());
+    expect(seen.hasUpdateButton).toBe(false);
+  });
+
   it("looks for a new deploy every hour until it unmounts", () => {
     vi.useFakeTimers();
     const update = vi.fn().mockResolvedValue(undefined);

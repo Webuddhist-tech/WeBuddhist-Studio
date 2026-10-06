@@ -12,7 +12,10 @@ import { LanguageToggle } from "../language-toggle/languageToggle";
 import AuthLogout from "../auth-logout/AuthLogout";
 import { InstallAppButton } from "../install-app/InstallAppButton";
 import { AppUpdateButton } from "../install-app/AppUpdateButton";
-import { useUpdateWaiting } from "../install-app/appUpdateContext";
+import {
+  useHostsUpdateButton,
+  useUpdateWaiting,
+} from "../install-app/appUpdateContext";
 import { useInstallMode } from "@/lib/pwaInstall";
 import {
   Tooltip,
@@ -101,6 +104,7 @@ const Navbar = () => {
     activeSectionId,
   } = useNavModel();
   const installMode = useInstallMode();
+  useHostsUpdateButton();
   const updateWaiting = useUpdateWaiting();
   const bottomItems = tooltipItems.filter(
     (item) =>

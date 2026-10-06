@@ -19,6 +19,8 @@ interface AppUpdateButtonProps {
   showLabel?: boolean;
   side?: "top" | "right" | "bottom" | "left";
   className?: string;
+  /** Hides "Update" where a row runs short of room; it stays readable aloud. */
+  labelClassName?: string;
 }
 
 /**
@@ -30,6 +32,7 @@ interface AppUpdateButtonProps {
 export function AppUpdateButton({
   description = "Save your work first. Changes you haven't saved on this page will be lost.",
   showLabel = false,
+  labelClassName,
   side = "bottom",
   className,
 }: Readonly<AppUpdateButtonProps>) {
@@ -48,7 +51,7 @@ export function AppUpdateButton({
           className={cn("relative", className)}
         >
           <LuRefreshCw className="size-4" />
-          {showLabel ? "Update" : <span className="sr-only">Update</span>}
+          <span className={showLabel ? labelClassName : "sr-only"}>Update</span>
           <span
             aria-hidden="true"
             className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-blue-500"

@@ -13,6 +13,7 @@ import { LanguageToggle } from "../language-toggle/languageToggle";
 import AuthLogout from "../auth-logout/AuthLogout";
 import { InstallAppButton } from "../install-app/InstallAppButton";
 import { AppUpdateButton } from "../install-app/AppUpdateButton";
+import { useHostsUpdateButton } from "../install-app/appUpdateContext";
 import { useInstallMode } from "@/lib/pwaInstall";
 import AuthButton from "@/components/ui/molecules/auth-button/AuthButton";
 import { useNavModel, type NavItem } from "./useNavModel";
@@ -33,6 +34,7 @@ const settingsRows = [
  * everything else. Desktop keeps the sidebar.
  */
 export const MobileTopBar = () => {
+  useHostsUpdateButton();
   const { homePath, isActive, visiblePinnedItems, sections } = useNavModel();
   const current = [
     ...visiblePinnedItems,

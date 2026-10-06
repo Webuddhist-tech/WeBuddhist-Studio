@@ -8,12 +8,14 @@ const TOAST_ID = "pwa-update";
 /**
  * Announces a new deploy once, at the top of the screen. Closed - or held back
  * on a live session, where it would cover Next - it leaves the Update button to
- * carry the update until the author reloads.
+ * carry the update until the author reloads. On a page without that button
+ * (sign-in, the autoplay test) it cannot be closed, so the update stays in reach.
  */
 export function PwaUpdatePrompt({
   router,
 }: Readonly<{ router: StudioRouter }>) {
-  const { ready, promptClosed, closePrompt, reload } = useAppUpdate();
+  const { ready, promptClosed, closePrompt, reload, hasUpdateButton } =
+    useAppUpdate();
 
   const subscribe = useCallback(
     (onChange: () => void) => router.subscribe(onChange),
@@ -25,7 +27,7 @@ export function PwaUpdatePrompt({
 
   useEffect(() => {
     if (!ready) return;
-    if (promptClosed || deferred) {
+    if (deferred || (promptClosed && hasUpdateButton)) {
       toast.dismiss(TOAST_ID);
       closePrompt();
       return;
@@ -36,11 +38,13 @@ export function PwaUpdatePrompt({
       duration: Infinity,
       // At the bottom it sits over the page's own controls on a phone.
       position: "top-center",
-      closeButton: true,
+      // Only where the Update button can take over once it is gone.
+      closeButton: hasUpdateButton,
+      dismissible: hasUpdateButton,
       onDismiss: closePrompt,
       action: { label: "Reload", onClick: reload },
     });
-  }, [ready, promptClosed, deferred, closePrompt, reload]);
+  }, [ready, promptClosed, deferred, hasUpdateButton, closePrompt, reload]);
 
   return null;
 }

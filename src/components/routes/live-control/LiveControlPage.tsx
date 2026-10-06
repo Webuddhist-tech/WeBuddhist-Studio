@@ -13,6 +13,7 @@ import { useQueries, useQuery } from "@tanstack/react-query";
 import { useDebounce } from "use-debounce";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import { AppUpdateButton } from "@/components/ui/molecules/install-app/AppUpdateButton";
+import { useHostsUpdateButton } from "@/components/ui/molecules/install-app/appUpdateContext";
 import {
   fetchAutoplayState,
   fetchEditionTitle,
@@ -685,6 +686,7 @@ const LineContent = ({
 
 const LiveControlPage = () => {
   const { eventId } = useParams<{ eventId: string }>();
+  useHostsUpdateButton();
 
   const [token, setToken] = useState<string | null>(() => readStoredToken());
   const [tokenDraft, setTokenDraft] = useState("");
@@ -3024,6 +3026,8 @@ const LiveControlPage = () => {
                * this is where a waiting update shows instead. */}
               <AppUpdateButton
                 showLabel
+                // Below 360px the row of size, Cue and Token has no room for the word.
+                labelClassName="max-[360px]:sr-only"
                 description="Reloading takes a second. Tap Live afterwards to get back to the room's line."
                 className="h-auto shrink-0 border-0 bg-[#0b2a4a] px-3 py-1.5 text-sm font-semibold text-[#64b5ff] hover:bg-[#123a63] hover:text-[#64b5ff] max-lg:px-2.5 max-lg:text-[13px]"
               />

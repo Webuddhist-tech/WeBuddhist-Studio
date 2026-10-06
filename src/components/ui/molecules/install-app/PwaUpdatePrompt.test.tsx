@@ -48,6 +48,8 @@ const renderPrompt = (
         promptClosed: false,
         closePrompt,
         reload,
+        hasUpdateButton: true,
+        hostUpdateButton: () => () => {},
         ...update,
       }}
     >
@@ -59,6 +61,7 @@ type ToastOptions = {
   id: string;
   position: string;
   closeButton: boolean;
+  dismissible: boolean;
   onDismiss: () => void;
   action: { onClick: () => void };
 };
@@ -98,6 +101,22 @@ describe("PwaUpdatePrompt", () => {
   it("does not come back once closed", () => {
     renderPrompt(makeRouter("dashboard"), { promptClosed: true });
     expect(toast).not.toHaveBeenCalled();
+  });
+
+  it("cannot be closed on a page without the Update button", () => {
+    renderPrompt(makeRouter("dashboard"), { hasUpdateButton: false });
+
+    const options = lastToastOptions();
+    expect(options.closeButton).toBe(false);
+    expect(options.dismissible).toBe(false);
+  });
+
+  it("comes back on a page without the Update button, even once closed", () => {
+    renderPrompt(makeRouter("dashboard"), {
+      promptClosed: true,
+      hasUpdateButton: false,
+    });
+    expect(toast).toHaveBeenCalledTimes(1);
   });
 
   it("holds the toast during a live session and leaves it to the button", () => {
