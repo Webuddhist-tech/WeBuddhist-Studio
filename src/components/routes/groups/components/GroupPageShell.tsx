@@ -8,8 +8,11 @@ import GroupTitleWithAvatar from "./GroupTitleWithAvatar";
 const shellClassName =
   "flex flex-col border h-[calc(100vh-40px)] overflow-hidden bg-[#F3F3F3] dark:bg-[#181818] my-4 rounded-l-2xl font-dynamic max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0 max-md:overflow-y-auto";
 
+/** `relative` keeps absolutely positioned descendants (such as the hidden
+ * native inputs Radix renders for form controls) inside this scroller, so they
+ * cannot stretch the document and make the whole page scroll. */
 const scrollAreaClassName =
-  "flex-1 min-h-0 overflow-auto max-md:flex-none max-md:overflow-visible";
+  "relative flex-1 min-h-0 overflow-auto max-md:flex-none max-md:overflow-visible";
 
 type GroupPageShellProps = {
   backLabel: string;
