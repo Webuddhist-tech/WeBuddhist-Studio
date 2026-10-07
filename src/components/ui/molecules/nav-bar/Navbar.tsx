@@ -209,12 +209,13 @@ const Navbar = () => {
             >
               <img
                 src={pechaIcon}
-                alt="Pecha Studio Logo"
+                alt="Webuddhist Studio Logo"
                 className="h-10 w-10 shrink-0 transition-transform duration-800 group-hover:rotate-180"
               />
               {expanded && (
-                <span className="truncate text-sm font-semibold">
-                  Pecha Studio
+                <span className="flex flex-col text-sm font-semibold leading-tight">
+                  <span className="truncate">Webuddhist</span>
+                  <span className="truncate">Studio</span>
                 </span>
               )}
             </Link>

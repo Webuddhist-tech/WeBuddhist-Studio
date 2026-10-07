@@ -46,15 +46,15 @@ export const MobileTopBar = () => {
       <Link
         to={homePath}
         className="flex min-w-0 items-center gap-2"
-        aria-label="Pecha Studio home"
+        aria-label="Webuddhist Studio home"
       >
         <img
           src={pechaIcon}
-          alt="Pecha Studio Logo"
+          alt="Webuddhist Studio Logo"
           className="h-8 w-8 shrink-0"
         />
         <span className="truncate text-base font-semibold">
-          {current?.label ?? "Pecha Studio"}
+          {current?.label ?? "Webuddhist Studio"}
         </span>
       </Link>
       {/* Kept in the bar, not the menu: a waiting update should be seen. */}
@@ -160,10 +160,10 @@ export const MobileTabBar = () => {
             >
               <img
                 src={pechaIcon}
-                alt="Pecha Studio Logo"
+                alt="Webuddhist Studio Logo"
                 className="h-9 w-9 shrink-0"
               />
-              <SheetTitle className="text-base">Pecha Studio</SheetTitle>
+              <SheetTitle className="text-base">Webuddhist Studio</SheetTitle>
             </Link>
             <SheetDescription className="sr-only">
               Every Studio page, and your settings

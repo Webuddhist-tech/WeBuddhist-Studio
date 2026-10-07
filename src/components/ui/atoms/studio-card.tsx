@@ -20,7 +20,7 @@ const ContainerLayout = ({ children, title }: ContainerLayoutProps) => {
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-200 to-orange-300 shadow-inner transition-transform duration-500 hover:rotate-[8deg] dark:from-amber-500/30 dark:to-orange-500/20">
             <img
               src={pechaIcon}
-              alt="Pecha Studio Logo"
+              alt="Webuddhist Studio Logo"
               className="h-7 w-7 object-contain"
             />
           </div>
