@@ -118,7 +118,7 @@ describe("Navbar", () => {
     renderNavbar();
 
     expect(
-      screen.getByRole("link", { name: /pecha studio logo/i }),
+      screen.getByRole("link", { name: /webuddhist studio logo/i }),
     ).toHaveAttribute("href", "/groups");
   });
 

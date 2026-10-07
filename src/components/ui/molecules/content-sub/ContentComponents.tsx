@@ -35,7 +35,7 @@ export const ContentIcon = ({ type }: { type: ContentType }) => {
     case "IMAGE":
       return <MdOutlineImage className="w-4 h-4 text-gray-600" />;
     case "SOURCE_REFERENCE":
-      return <img src={pechaIcon} alt="Pecha Icon" className="w-4 h-4" />;
+      return <img src={pechaIcon} alt="Webuddhist Icon" className="w-4 h-4" />;
     case "GROUP_ACCUMULATION":
       return <GiPrayerBeads className="w-4 h-4 text-gray-600" />;
     case "GROUP_COLLECTION":

@@ -1,4 +1,4 @@
-# Pecha Studio Frontend
+# Webuddhist Studio Frontend
 
 ## Endpoints
 
@@ -8,7 +8,7 @@
 > Test
 > https://studio-tst-frontend.onrender.com
 
-This is the frontend application for the Pecha Studio platform, designed to manage and interact with Buddhist texts in the OpenPecha format.
+This is the frontend application for the Webuddhist Studio platform, designed to manage and interact with Buddhist texts in the OpenPecha format.
 
 ## Prerequisites
 

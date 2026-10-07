@@ -60,7 +60,7 @@ const contentTypes = [
   },
   {
     key: "SOURCE_REFERENCE",
-    icon: <img src={pechaIcon} alt="Pecha Icon" className="w-4 h-4" />,
+    icon: <img src={pechaIcon} alt="Webuddhist Icon" className="w-4 h-4" />,
   },
   {
     key: "GROUP_ACCUMULATION",
