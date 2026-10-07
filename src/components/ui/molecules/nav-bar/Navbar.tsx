@@ -11,6 +11,11 @@ import { SIDEBAR_EXPANDED, SIDEBAR_OPEN_SECTIONS } from "@/lib/constant";
 import { LanguageToggle } from "../language-toggle/languageToggle";
 import AuthLogout from "../auth-logout/AuthLogout";
 import { InstallAppButton } from "../install-app/InstallAppButton";
+import { AppUpdateButton } from "../install-app/AppUpdateButton";
+import {
+  useHostsUpdateButton,
+  useUpdateWaiting,
+} from "../install-app/appUpdateContext";
 import { useInstallMode } from "@/lib/pwaInstall";
 import {
   Tooltip,
@@ -28,6 +33,11 @@ const tooltipItems = [
     label: "View Profile",
     /** The header already shows the avatar on wider screens. */
     rowClassName: "md:hidden",
+  },
+  {
+    id: "update",
+    component: <AppUpdateButton side="right" />,
+    label: "Update ready",
   },
   {
     id: "install",
@@ -94,9 +104,13 @@ const Navbar = () => {
     activeSectionId,
   } = useNavModel();
   const installMode = useInstallMode();
-  const bottomItems = installMode
-    ? tooltipItems
-    : tooltipItems.filter((item) => item.id !== "install");
+  useHostsUpdateButton();
+  const updateWaiting = useUpdateWaiting();
+  const bottomItems = tooltipItems.filter(
+    (item) =>
+      (item.id !== "install" || installMode) &&
+      (item.id !== "update" || updateWaiting),
+  );
   const [expanded, setExpanded] = useState(readStoredExpanded);
   const [openSections, setOpenSections] = useState(readStoredOpenSections);
 
