@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { IoMdClose, IoMdSearch } from "react-icons/io";
+import { useDebounce } from "use-debounce";
 import { toast } from "sonner";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
@@ -21,12 +23,28 @@ import {
 } from "./api/adminAuthorsApi";
 
 const PAGE_SIZE = 20;
+const SEARCH_DEBOUNCE_MS = 400;
+
+const ROLE_OPTIONS: PlatformRole[] = [
+  "CREATOR",
+  "CONTENT_ADMIN",
+  "REVIEWER",
+  "SUPER_ADMIN",
+];
 
 const AdminAuthorsPage = () => {
   const { data: userInfo } = useUserInfo();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [activationQueue, setActivationQueue] = useState(true);
+  const [search, setSearch] = useState("");
+  const [debouncedSearch] = useDebounce(search.trim(), SEARCH_DEBOUNCE_MS);
+  const [roleFilter, setRoleFilter] = useState<PlatformRole | "">("");
+  // Looking someone up means looking through every author, not just the ones
+  // waiting for activation, so a search or a role filter takes over from the
+  // queue view.
+  const inQueueView =
+    activationQueue && debouncedSearch === "" && roleFilter === "";
 
   const canAccess = Boolean(
     userInfo && canAccessAdminAuthors(userInfo.platform_role),
@@ -36,12 +54,20 @@ const AdminAuthorsPage = () => {
   const tableColumnCount = showActionsColumn ? 6 : 5;
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["admin-authors", page, activationQueue],
+    queryKey: [
+      "admin-authors",
+      page,
+      inQueueView,
+      debouncedSearch,
+      roleFilter,
+    ],
     queryFn: () =>
       fetchAdminAuthors({
         skip: page * PAGE_SIZE,
         limit: PAGE_SIZE,
-        ...(activationQueue ? { is_verified: true, is_active: false } : {}),
+        ...(inQueueView ? { is_verified: true, is_active: false } : {}),
+        ...(debouncedSearch ? { search: debouncedSearch } : {}),
+        ...(roleFilter ? { platform_role: roleFilter } : {}),
       }),
     enabled: canAccess,
   });
@@ -88,6 +114,12 @@ const AdminAuthorsPage = () => {
   const displayName = (a: AdminAuthorDTO) =>
     [a.firstname, a.lastname].filter(Boolean).join(" ").trim() || contact(a);
 
+  const emptyMessage = debouncedSearch
+    ? `No authors match "${debouncedSearch}"${roleFilter ? ` with the ${roleFilter} role` : ""}.`
+    : roleFilter
+      ? `No authors have the ${roleFilter} role.`
+      : "No authors found.";
+
   if (userInfo && !canAccess) {
     return <Navigate to={ROUTES.dashboard} replace />;
   }
@@ -96,19 +128,64 @@ const AdminAuthorsPage = () => {
     <div className="font-dynamic border h-[calc(100vh-40px)] overflow-auto bg-[#F5F5F5] dark:bg-[#181818] my-4 rounded-l-2xl max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
       <div className="px-4 pt-10 pb-4 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">Authors</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="border w-fit px-2 bg-white dark:bg-input/30 rounded-md border-gray-200 dark:border-[#313132] flex items-center">
+            <IoMdSearch className="w-4 h-4 shrink-0" />
+            <Pecha.Input
+              type="search"
+              aria-label="Search authors"
+              placeholder="Search name, email or phone..."
+              className="w-64 rounded-md border-none dark:bg-transparent px-3 shadow-none py-2 max-md:w-48"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(0);
+              }}
+            />
+            {search ? (
+              <button
+                type="button"
+                aria-label="Clear search"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  setSearch("");
+                  setPage(0);
+                }}
+              >
+                <IoMdClose className="w-4 h-4" />
+              </button>
+            ) : null}
+          </div>
+          <select
+            aria-label="Filter by role"
+            className="h-9 rounded-md border bg-white px-2 text-sm dark:bg-input/30"
+            value={roleFilter}
+            onChange={(e) => {
+              setRoleFilter(e.target.value as PlatformRole | "");
+              setPage(0);
+            }}
+          >
+            <option value="">All roles</option>
+            {ROLE_OPTIONS.map((role) => (
+              <option key={role} value={role}>
+                {role}
+              </option>
+            ))}
+          </select>
           <Button
-            variant={activationQueue ? "default" : "outline"}
+            variant={inQueueView ? "default" : "outline"}
             size="sm"
             onClick={() => {
               setActivationQueue(true);
+              setSearch("");
+              setRoleFilter("");
               setPage(0);
             }}
           >
             Activation queue
           </Button>
           <Button
-            variant={!activationQueue ? "default" : "outline"}
+            variant={!inQueueView ? "default" : "outline"}
             size="sm"
             onClick={() => {
               setActivationQueue(false);
@@ -150,7 +227,7 @@ const AdminAuthorsPage = () => {
             ) : authors.length === 0 ? (
               <Pecha.TableRow>
                 <Pecha.TableCell colSpan={tableColumnCount}>
-                  No authors found.
+                  {emptyMessage}
                 </Pecha.TableCell>
               </Pecha.TableRow>
             ) : (
@@ -161,6 +238,7 @@ const AdminAuthorsPage = () => {
                   <Pecha.TableCell>
                     {writeEnabled ? (
                       <select
+                        aria-label={`Platform role of ${displayName(author)}`}
                         className="rounded border bg-background px-2 py-1 text-sm"
                         value={author.platform_role}
                         onChange={(e) =>

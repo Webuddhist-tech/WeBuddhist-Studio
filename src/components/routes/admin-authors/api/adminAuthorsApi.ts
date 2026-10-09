@@ -24,6 +24,7 @@ export type AdminAuthorsListResponse = {
 export type FetchAdminAuthorsParams = {
   is_verified?: boolean;
   is_active?: boolean;
+  platform_role?: PlatformRole;
   search?: string;
   skip?: number;
   limit?: number;
@@ -40,6 +41,7 @@ export const fetchAdminAuthors = async (
         limit: params.limit ?? 20,
         ...(params.is_verified != null && { is_verified: params.is_verified }),
         ...(params.is_active != null && { is_active: params.is_active }),
+        ...(params.platform_role && { platform_role: params.platform_role }),
         ...(params.search?.trim() && { search: params.search.trim() }),
       },
     },

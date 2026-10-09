@@ -2,6 +2,7 @@ import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import { type SortOrder, type VerseOfDayItem } from "./api/verseOfDayApi";
 import { format } from "date-fns";
+import VerseOfDayPageCell from "./VerseOfDayPageCell";
 import { FaSortAmountDown, FaSortAmountUp } from "react-icons/fa";
 
 interface VerseOfDayListProps {
@@ -64,7 +65,7 @@ const VerseOfDayList = ({
                 )}
               </button>
             </Pecha.TableHead>
-            <Pecha.TableHead className="w-[150px]">Group</Pecha.TableHead>
+            <Pecha.TableHead className="w-[150px]">Page</Pecha.TableHead>
             <Pecha.TableHead className="w-[180px] text-right">
               Actions
             </Pecha.TableHead>
@@ -107,9 +108,10 @@ const VerseOfDayList = ({
                 {format(new Date(verse.date), "MMM dd, yyyy")}
               </Pecha.TableCell>
               <Pecha.TableCell>
-                <p className="truncate text-sm">
-                  {verse.group_info?.[0]?.title || "—"}
-                </p>
+                <VerseOfDayPageCell
+                  pageId={verse.group_id}
+                  pageInfo={verse.group_info}
+                />
               </Pecha.TableCell>
               <Pecha.TableCell className="text-right">
                 <div className="flex justify-end gap-2">

@@ -3,14 +3,16 @@ import type { LanguageCode } from "@/lib/languageCodes";
 
 export type GroupLanguageCode = LanguageCode;
 
+/** One language's text. Only the title is required, in every language; the
+ *  sub-title and both descriptions may be left empty. */
 export const groupLanguageBlockSchema = z.object({
   title: z.string().trim().min(1, "Title is required"),
-  sub_title: z.string().trim().min(1, "Sub-title is required"),
+  sub_title: z.string().trim().optional(),
   description: z
     .string()
     .trim()
-    .min(1, "Description is required")
-    .max(200, "Description must be 200 characters or less"),
+    .max(200, "Description must be 200 characters or less")
+    .optional(),
   description_long: z.string().trim().optional(),
 });
 

@@ -3,10 +3,8 @@ import { Link, Navigate, useOutletContext } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
-import { IoMdAdd, IoMdClose } from "react-icons/io";
 import { toast } from "sonner";
 import { Pecha } from "@/components/ui/shadimport";
-import { Textarea } from "@/components/ui/atoms/textarea";
 import { Button } from "@/components/ui/atoms/button";
 import ImageContentData from "@/components/ui/molecules/modals/image-upload/ImageContentData";
 import { uploadImageToS3 } from "@/components/routes/task/api/taskApi";
@@ -17,7 +15,6 @@ import type { LanguageCode } from "@/schema/SeriesSchema";
 import { groupCoreSchema, type GroupCoreFormData } from "@/schema/GroupSchema";
 import {
   buildGroupMetadata,
-  languageLabelForCode,
   patchGroup,
   replaceGroupSocialLinks,
   replaceGroupTags,
@@ -29,6 +26,7 @@ import {
 import { canEditGroupSettings } from "./lib/groupPermissions";
 import GroupFormAssociationsPanel from "./components/GroupFormAssociationsPanel";
 import GroupImageField from "./components/GroupImageField";
+import GroupLanguageTabs from "./components/GroupLanguageTabs";
 import GroupTraditionField from "./components/GroupTraditionField";
 import { hasIncompleteSocialLink } from "./lib/groupSocialLinks";
 import { traditionCodeUpdate } from "./lib/groupTradition";
@@ -380,119 +378,13 @@ const GroupAboutEditPage = () => {
                   form={form}
                   currentTradition={group.tradition}
                 />
-                <div className="space-y-4">
-                  {addedLanguages.map((code) => (
-                    <div
-                      key={code}
-                      className="relative rounded-lg border border-input bg-[#FAFAFA] dark:bg-[#262626] p-4 space-y-3"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => removeLanguage(code)}
-                        className="absolute top-2 right-2 text-muted-foreground hover:text-foreground p-1"
-                        aria-label={`Remove ${languageLabelForCode(code)}`}
-                      >
-                        <IoMdClose className="h-4 w-4" />
-                      </button>
-                      <Pecha.FormField
-                        control={form.control}
-                        name={`languages.${code}.title`}
-                        render={({ field }) => (
-                          <Pecha.FormItem>
-                            <Pecha.FormLabel className="text-sm font-bold">
-                              {languageLabelForCode(code)} title
-                              <span className="text-destructive"> *</span>
-                            </Pecha.FormLabel>
-                            <Pecha.FormControl>
-                              <Pecha.Input
-                                className="h-12 bg-white dark:bg-[#181818]"
-                                {...field}
-                              />
-                            </Pecha.FormControl>
-                            <Pecha.FormMessage />
-                          </Pecha.FormItem>
-                        )}
-                      />
-                      <Pecha.FormField
-                        control={form.control}
-                        name={`languages.${code}.sub_title`}
-                        render={({ field }) => (
-                          <Pecha.FormItem>
-                            <Pecha.FormLabel className="text-sm font-bold">
-                              {languageLabelForCode(code)} sub-title
-                              <span className="text-destructive"> *</span>
-                            </Pecha.FormLabel>
-                            <Pecha.FormControl>
-                              <Pecha.Input
-                                className="h-12 bg-white dark:bg-[#181818]"
-                                {...field}
-                              />
-                            </Pecha.FormControl>
-                            <Pecha.FormMessage />
-                          </Pecha.FormItem>
-                        )}
-                      />
-                      <Pecha.FormField
-                        control={form.control}
-                        name={`languages.${code}.description`}
-                        render={({ field }) => (
-                          <Pecha.FormItem>
-                            <Pecha.FormLabel className="text-sm font-bold">
-                              {languageLabelForCode(code)} description
-                              <span className="text-destructive"> *</span>
-                            </Pecha.FormLabel>
-                            <Pecha.FormControl>
-                              <Textarea
-                                className="min-h-[100px] resize-none bg-white dark:bg-[#181818]"
-                                maxLength={200}
-                                {...field}
-                              />
-                            </Pecha.FormControl>
-                            <Pecha.FormMessage />
-                          </Pecha.FormItem>
-                        )}
-                      />
-                      <Pecha.FormField
-                        control={form.control}
-                        name={`languages.${code}.description_long`}
-                        render={({ field }) => (
-                          <Pecha.FormItem>
-                            <Pecha.FormLabel className="text-sm font-bold">
-                              {languageLabelForCode(code)} long description
-                            </Pecha.FormLabel>
-                            <Pecha.FormControl>
-                              <Textarea
-                                className="min-h-[160px] resize-y bg-white dark:bg-[#181818]"
-                                placeholder="A longer description with more detail…"
-                                {...field}
-                              />
-                            </Pecha.FormControl>
-                            <Pecha.FormMessage />
-                          </Pecha.FormItem>
-                        )}
-                      />
-                    </div>
-                  ))}
-                </div>
-                {availableLanguages.length > 0 && (
-                  <Pecha.Select
-                    onValueChange={(v) => addLanguage(v as LanguageCode)}
-                  >
-                    <Pecha.SelectTrigger className="w-fit border-dashed bg-white dark:bg-[#262626]">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <IoMdAdd className="h-4 w-4" />
-                        <Pecha.SelectValue placeholder="Add language" />
-                      </div>
-                    </Pecha.SelectTrigger>
-                    <Pecha.SelectContent>
-                      {availableLanguages.map((lang) => (
-                        <Pecha.SelectItem key={lang.value} value={lang.value}>
-                          {lang.label}
-                        </Pecha.SelectItem>
-                      ))}
-                    </Pecha.SelectContent>
-                  </Pecha.Select>
-                )}
+                <GroupLanguageTabs
+                  form={form}
+                  languages={addedLanguages}
+                  availableLanguages={availableLanguages}
+                  onAddLanguage={addLanguage}
+                  onRemoveLanguage={removeLanguage}
+                />
                 <div className="grid sm:grid-cols-2 gap-6">
                   <GroupImageField
                     label="Avatar"

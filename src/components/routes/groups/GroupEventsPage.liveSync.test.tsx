@@ -46,7 +46,9 @@ const liveSync = (
   schedules,
 });
 
-const renderPage = () => {
+const renderPage = (
+  overrides: Partial<{ myRole: string; readOnlyPlatform: boolean }> = {},
+) => {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -55,6 +57,7 @@ const renderPage = () => {
     myRole: "OWNER",
     userInfo: { id: "u1", platform_role: "CREATOR" },
     readOnlyPlatform: false,
+    ...overrides,
   };
   render(
     <QueryClientProvider client={client}>
@@ -126,5 +129,95 @@ describe("GroupEventsPage live sync", () => {
     expect(
       await screen.findByRole("button", { name: /youtube live sync \(1\)/i }),
     ).toBeInTheDocument();
+  });
+
+  it("selects and clears every event on the page", async () => {
+    renderPage();
+    await userEvent.click(
+      await screen.findByRole("checkbox", {
+        name: /select all events on this page/i,
+      }),
+    );
+    expect(
+      screen.getByRole("button", { name: /youtube live sync \(2\)/i }),
+    ).toBeInTheDocument();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /clear selection/i }),
+    );
+    expect(
+      screen.getByRole("button", { name: /youtube live sync$/i }),
+    ).toBeDisabled();
+  });
+
+  it("unticking the select-all box clears the page's selection", async () => {
+    renderPage();
+    const all = await screen.findByRole("checkbox", {
+      name: /select all events on this page/i,
+    });
+    await userEvent.click(all);
+    await userEvent.click(all);
+    expect(
+      screen.getByRole("button", { name: /youtube live sync$/i }),
+    ).toBeDisabled();
+  });
+
+  it("opens the schedule dialog for the ticked events", async () => {
+    renderPage();
+    await userEvent.click(
+      await screen.findByRole("checkbox", {
+        name: /select teaching for live sync/i,
+      }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: /youtube live sync \(1\)/i }),
+    );
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Events (1)")).toBeInTheDocument();
+    expect(within(dialog).getByText("Teaching")).toBeInTheDocument();
+  });
+
+  it("offers no live sync to a member who is not an owner or admin", async () => {
+    renderPage({ myRole: "AUTHOR" });
+    await screen.findByText("Teaching");
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /youtube live sync/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("offers no live sync on a read-only platform account", async () => {
+    renderPage({ readOnlyPlatform: true });
+    await screen.findByText("Teaching");
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  });
+
+  it("shows a paused schedule and the error of its last run", async () => {
+    vi.mocked(fetchYoutubeLiveSync).mockResolvedValue(
+      liveSync([
+        {
+          event_id: "e1",
+          enabled: false,
+          run_times: ["14:00"],
+          timezone: "UTC",
+          last_run_error: "The group has no YouTube channel link",
+        },
+      ]),
+    );
+    renderPage();
+    expect(await screen.findByText("Paused")).toBeInTheDocument();
+    expect(screen.getByText("2:00 PM (UTC)")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /last run failed: the group has no youtube channel link/i,
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no schedule for an event that has none", async () => {
+    renderPage();
+    await screen.findByText("Teaching");
+    expect(screen.queryByText("On")).not.toBeInTheDocument();
+    expect(screen.queryByText("Paused")).not.toBeInTheDocument();
   });
 });
