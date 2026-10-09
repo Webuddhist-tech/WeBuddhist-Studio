@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Pecha } from "@/components/ui/shadimport";
-import { Textarea } from "@/components/ui/atoms/textarea";
+import VisibleNewlineTextarea from "./VisibleNewlineTextarea";
 import { Input } from "@/components/ui/atoms/input";
 import { Button } from "@/components/ui/atoms/button";
 import { Calendar } from "@/components/ui/atoms/calendar";
@@ -254,9 +254,9 @@ const VerseOfDayForm = ({
             </button>
           ))}
         </div>
-        <Textarea
+        <VisibleNewlineTextarea
           value={verses[activeLanguage.toLowerCase()] ?? ""}
-          onChange={(e) => handleVerseChange(e.target.value)}
+          onValueChange={handleVerseChange}
           placeholder={`Enter verse content in ${getLanguageLabel(activeLanguage)}`}
           className="min-h-[120px] resize-none"
         />
