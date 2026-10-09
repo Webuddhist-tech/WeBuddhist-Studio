@@ -1,67 +1,36 @@
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import Navbar from "./components/ui/molecules/nav-bar/Navbar";
 import { setFontVariables } from "./config/font-config";
-import { useEffect, useState } from "react";
-import { ACCESS_TOKEN, LANGUAGE, REFRESH_TOKEN } from "./lib/constant";
-import { useAuth } from "./config/auth-context";
-import { useMutation } from "@tanstack/react-query";
-import axiosInstance from "./config/axios-config";
-import { AUTH_ROUTE_PATHS, ROUTES } from "./routes/paths";
+import { useEffect } from "react";
+import { LANGUAGE } from "./lib/constant";
+import { AUTH_ROUTE_PATHS } from "./routes/paths";
+import { useIsMobile } from "./hooks/useIsMobile";
+import {
+  MobileTabBar,
+  MobileTopBar,
+} from "./components/ui/molecules/nav-bar/MobileNav";
 
 function App() {
   const location = useLocation();
-  const { login } = useAuth();
-  const navigate = useNavigate();
-  const [intervalId, setIntervalId] = useState(null);
 
   const hideNavbar = AUTH_ROUTE_PATHS.includes(location.pathname);
-  const loginMutation = useMutation({
-    mutationFn: async (refreshToken: string) => {
-      const { data } = await axiosInstance.post(
-        "/api/v1/cms/auth/refresh-token",
-        {
-          token: refreshToken,
-        },
-      );
-      return data;
-    },
-    onSuccess: (data: any) => {
-      sessionStorage.setItem(ACCESS_TOKEN, data.access_token);
-      login(data.access_token);
-      if (!intervalId) {
-        startTokenRefreshCounter();
-      }
-    },
-    onError: () => {
-      sessionStorage.removeItem(ACCESS_TOKEN);
-      localStorage.removeItem(REFRESH_TOKEN);
-      navigate(ROUTES.login);
-    },
-  });
+  const isMobile = useIsMobile();
 
-  const startTokenRefreshCounter = () => {
-    const interval = setInterval(() => {
-      const refreshToken = localStorage.getItem(REFRESH_TOKEN);
-      if (refreshToken) {
-        loginMutation.mutate(refreshToken);
-      }
-    }, 60000);
-    setIntervalId(interval as any);
-  };
+  // Token bootstrap and renewal live in PlanAuthProvider - they have to settle
+  // before the route guards read `isLoggedIn`, which a layout-level effect
+  // cannot guarantee.
   useEffect(() => {
-    const refreshToken = localStorage.getItem(REFRESH_TOKEN);
-    if (refreshToken) {
-      loginMutation.mutate(refreshToken);
-    }
     setFontVariables(localStorage.getItem(LANGUAGE) || "en");
   }, []);
 
   return (
-    <div className="flex h-screen w-full">
-      {!hideNavbar && <Navbar />}
-      <div className="flex-1 overflow-auto">
+    // A phone stacks a top bar, the page and a tab bar; desktop keeps the sidebar.
+    <div className="flex h-screen w-full max-md:h-dvh max-md:flex-col">
+      {!hideNavbar && (isMobile ? <MobileTopBar /> : <Navbar />)}
+      <div className="relative min-h-0 flex-1 overflow-auto">
         <Outlet />
       </div>
+      {!hideNavbar && isMobile && <MobileTabBar />}
     </div>
   );
 }

@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   AUTHOR_NOT_ACTIVE_DETAIL,
+  canAccessAdminAuthors,
+  canAccessContentCatalogues,
+  canManageAmbientSounds,
   canWriteCms,
+  isContentAdmin,
+  isStaffRole,
+  isSuperAdmin,
   isAuthorNotActiveDetail,
   isPathAllowedWithoutGroup,
   needsGroupOnboardingRedirect,
@@ -68,6 +74,8 @@ describe("platformAccess", () => {
   it("gates routes without group for creators only", () => {
     expect(isPathAllowedWithoutGroup("/groups")).toBe(true);
     expect(isPathAllowedWithoutGroup("/groups/abc")).toBe(true);
+    expect(isPathAllowedWithoutGroup("/pages")).toBe(true);
+    expect(isPathAllowedWithoutGroup("/pages/new")).toBe(true);
     expect(isPathAllowedWithoutGroup("/admin/authors")).toBe(true);
     expect(isPathAllowedWithoutGroup("/dashboard")).toBe(false);
     expect(
@@ -98,5 +106,85 @@ describe("platformAccess", () => {
         platform_role: "REVIEWER",
       }),
     ).toBe(false);
+  });
+
+  describe("CONTENT_ADMIN", () => {
+    it("is recognised from API strings", () => {
+      expect(normalizePlatformRole("content_admin")).toBe("CONTENT_ADMIN");
+      expect(isContentAdmin("CONTENT_ADMIN")).toBe(true);
+      expect(isContentAdmin("CREATOR")).toBe(false);
+    });
+
+    it("is not platform staff, so it never sees every plan and space", () => {
+      expect(isStaffRole("CONTENT_ADMIN")).toBe(false);
+      expect(isSuperAdmin("CONTENT_ADMIN")).toBe(false);
+    });
+
+    it("opens the content catalogues and the ambient sounds", () => {
+      expect(canAccessContentCatalogues("CONTENT_ADMIN")).toBe(true);
+      expect(canAccessContentCatalogues("SUPER_ADMIN")).toBe(true);
+      expect(canAccessContentCatalogues("REVIEWER")).toBe(true);
+      expect(canAccessContentCatalogues("CREATOR")).toBe(false);
+      expect(canManageAmbientSounds("CONTENT_ADMIN")).toBe(true);
+      expect(canManageAmbientSounds("SUPER_ADMIN")).toBe(true);
+      expect(canManageAmbientSounds("REVIEWER")).toBe(false);
+      expect(canManageAmbientSounds("CREATOR")).toBe(false);
+    });
+
+    it("keeps out of user and moderation administration", () => {
+      expect(canAccessAdminAuthors("CONTENT_ADMIN")).toBe(false);
+    });
+
+    it("keeps CMS actions on, like a creator", () => {
+      expect(shouldShowCmsActionsColumn("CONTENT_ADMIN")).toBe(true);
+      expect(canAccessPlanRoutes("CONTENT_ADMIN")).toBe(true);
+      expect(
+        canWriteCms({
+          platform_role: "CONTENT_ADMIN",
+          is_active: true,
+          has_group: true,
+        }),
+      ).toBe(true);
+      expect(
+        canWriteCms({
+          platform_role: "CONTENT_ADMIN",
+          is_active: true,
+          has_group: false,
+        }),
+      ).toBe(false);
+    });
+
+    it("may open the catalogues before joining a space, but nothing else", () => {
+      const user = {
+        is_active: true,
+        has_group: false,
+        platform_role: "CONTENT_ADMIN" as const,
+      };
+      for (const path of [
+        "/verse-of-day",
+        "/poems",
+        "/poems/123",
+        "/text-audio",
+        "/tags",
+        "/traditions",
+        "/accumulator-presets",
+        "/prayer-intentions",
+        "/ambient-sounds",
+      ]) {
+        expect(needsGroupOnboardingRedirect(path, user)).toBe(false);
+      }
+      expect(needsGroupOnboardingRedirect("/dashboard", user)).toBe(true);
+      expect(needsGroupOnboardingRedirect("/groups", user)).toBe(false);
+    });
+
+    it("sends a plain creator without a space away from the catalogues", () => {
+      expect(
+        needsGroupOnboardingRedirect("/poems", {
+          is_active: true,
+          has_group: false,
+          platform_role: "CREATOR",
+        }),
+      ).toBe(true);
+    });
   });
 });

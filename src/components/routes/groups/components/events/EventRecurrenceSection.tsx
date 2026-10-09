@@ -1,6 +1,10 @@
 import type { UseFormReturn } from "react-hook-form";
 import { Pecha } from "@/components/ui/shadimport";
-import type { EventFormData, RecurrenceFormData } from "@/schema/EventSchema";
+import {
+  DAYS_OF_WEEK,
+  type EventFormData,
+  type RecurrenceFormData,
+} from "@/schema/EventSchema";
 
 type EventRecurrenceSectionProps = {
   form: UseFormReturn<EventFormData>;
@@ -57,6 +61,7 @@ const EventRecurrenceSection = ({
 
   const isLunar = recurrence.date_system === "TIBETAN_LUNAR";
   const isYearly = recurrence.frequency === "YEARLY";
+  const isWeekly = recurrence.frequency === "WEEKLY";
   const monthOptions = isLunar ? TIBETAN_MONTHS : GREGORIAN_MONTHS;
   const maxDay = isLunar ? 30 : 31;
 
@@ -68,9 +73,20 @@ const EventRecurrenceSection = ({
           <Pecha.Select
             value={recurrence.frequency}
             disabled={readOnly}
-            onValueChange={(value) =>
-              updateField("frequency", value as "YEARLY" | "MONTHLY")
-            }
+            onValueChange={(value) => {
+              const frequency = value as "YEARLY" | "MONTHLY" | "WEEKLY";
+              if (frequency === "WEEKLY") {
+                // Weekly recurrence only supports the Gregorian calendar.
+                onRecurrenceChange({
+                  ...recurrence,
+                  frequency,
+                  date_system: "GREGORIAN",
+                  calendar_type: "",
+                });
+              } else {
+                updateField("frequency", frequency);
+              }
+            }}
           >
             <Pecha.SelectTrigger className="h-12">
               <Pecha.SelectValue />
@@ -78,6 +94,7 @@ const EventRecurrenceSection = ({
             <Pecha.SelectContent>
               <Pecha.SelectItem value="YEARLY">Yearly</Pecha.SelectItem>
               <Pecha.SelectItem value="MONTHLY">Monthly</Pecha.SelectItem>
+              <Pecha.SelectItem value="WEEKLY">Weekly</Pecha.SelectItem>
             </Pecha.SelectContent>
           </Pecha.Select>
           {errors.recurrence?.frequency ? (
@@ -91,7 +108,7 @@ const EventRecurrenceSection = ({
           <label className="text-sm font-medium">Date System</label>
           <Pecha.Select
             value={recurrence.date_system}
-            disabled={readOnly}
+            disabled={readOnly || isWeekly}
             onValueChange={(value) =>
               updateField("date_system", value as "GREGORIAN" | "TIBETAN_LUNAR")
             }
@@ -101,11 +118,16 @@ const EventRecurrenceSection = ({
             </Pecha.SelectTrigger>
             <Pecha.SelectContent>
               <Pecha.SelectItem value="GREGORIAN">Gregorian</Pecha.SelectItem>
-              <Pecha.SelectItem value="TIBETAN_LUNAR">
+              <Pecha.SelectItem value="TIBETAN_LUNAR" disabled={isWeekly}>
                 Tibetan Lunar
               </Pecha.SelectItem>
             </Pecha.SelectContent>
           </Pecha.Select>
+          {isWeekly ? (
+            <p className="text-sm text-muted-foreground">
+              Weekly recurrence only supports the Gregorian calendar.
+            </p>
+          ) : null}
           {errors.recurrence?.date_system ? (
             <p className="text-sm text-destructive">
               {errors.recurrence.date_system.message}
@@ -114,7 +136,7 @@ const EventRecurrenceSection = ({
         </div>
       </div>
 
-      {isLunar ? (
+      {isLunar && !isWeekly ? (
         <div className="space-y-1">
           <label className="text-sm font-medium">Calendar Type</label>
           <Pecha.Select
@@ -168,26 +190,55 @@ const EventRecurrenceSection = ({
           </div>
         ) : null}
 
-        <div className="space-y-1">
-          <label className="text-sm font-medium">Day</label>
-          <Pecha.Input
-            type="number"
-            min={1}
-            max={maxDay}
-            value={recurrence.day}
-            disabled={readOnly}
-            onChange={(e) => {
-              const val = parseInt(e.target.value, 10);
-              if (!isNaN(val)) updateField("day", val);
-            }}
-            className="h-12"
-          />
-          {errors.recurrence?.day ? (
-            <p className="text-sm text-destructive">
-              {errors.recurrence.day.message}
-            </p>
-          ) : null}
-        </div>
+        {isWeekly ? (
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Day of week</label>
+            <Pecha.Select
+              value={recurrence.day_of_week?.toString() ?? ""}
+              disabled={readOnly}
+              onValueChange={(value) =>
+                updateField("day_of_week", value ? parseInt(value, 10) : null)
+              }
+            >
+              <Pecha.SelectTrigger className="h-12">
+                <Pecha.SelectValue placeholder="Select day of week" />
+              </Pecha.SelectTrigger>
+              <Pecha.SelectContent>
+                {DAYS_OF_WEEK.map((d) => (
+                  <Pecha.SelectItem key={d.value} value={d.value.toString()}>
+                    {d.label}
+                  </Pecha.SelectItem>
+                ))}
+              </Pecha.SelectContent>
+            </Pecha.Select>
+            {errors.recurrence?.day_of_week ? (
+              <p className="text-sm text-destructive">
+                {errors.recurrence.day_of_week.message}
+              </p>
+            ) : null}
+          </div>
+        ) : (
+          <div className="space-y-1">
+            <label className="text-sm font-medium">Start date</label>
+            <Pecha.Input
+              type="number"
+              min={1}
+              max={maxDay}
+              value={recurrence.day ?? ""}
+              disabled={readOnly}
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10);
+                if (!isNaN(val)) updateField("day", val);
+              }}
+              className="h-12"
+            />
+            {errors.recurrence?.day ? (
+              <p className="text-sm text-destructive">
+                {errors.recurrence.day.message}
+              </p>
+            ) : null}
+          </div>
+        )}
 
         <div className="space-y-1">
           <label className="text-sm font-medium">Duration (days)</label>

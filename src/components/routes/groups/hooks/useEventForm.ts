@@ -7,6 +7,7 @@ import {
   defaultEventFormValues,
   emptyMetadataRow,
   emptyLinkRow,
+  emptyYoutubeRow,
   emptyRecurrence,
   type EventFormData,
   type LanguageCode,
@@ -18,6 +19,7 @@ export type UseEventFormReturn = {
   form: UseFormReturn<EventFormData>;
   metadataRows: ReturnType<typeof useFieldArray<EventFormData, "metadata">>;
   linkRows: ReturnType<typeof useFieldArray<EventFormData, "links">>;
+  youtubeRows: ReturnType<typeof useFieldArray<EventFormData, "youtube">>;
   usedLanguages: LanguageCode[];
   availableLanguages: StudioLanguageOption[];
   addMetadataRow: () => void;
@@ -25,6 +27,9 @@ export type UseEventFormReturn = {
   addLinkRow: () => void;
   removeLinkRow: (index: number) => void;
   moveLinkRow: (from: number, to: number) => void;
+  addYoutubeRow: () => void;
+  removeYoutubeRow: (index: number) => void;
+  moveYoutubeRow: (from: number, to: number) => void;
   setImageUrl: (url: string) => void;
   setLocationId: (id: string) => void;
   setOneDay: (oneDay: boolean) => void;
@@ -37,7 +42,10 @@ export type UseEventFormReturn = {
   setRecurrence: (recurrence: RecurrenceFormData | null) => void;
 };
 
-export const useEventForm = (isNew: boolean = true): UseEventFormReturn => {
+/** `isNew` is required on purpose: it picks the resolver, and defaulting it
+ *  silently gave edit mode the create schema - rejecting a past start date on
+ *  an event that has already happened. Let the compiler ask the caller. */
+export const useEventForm = (isNew: boolean): UseEventFormReturn => {
   const { languageOptions } = useLanguages();
   const form = useForm<EventFormData>({
     resolver: zodResolver(isNew ? eventSchema : eventEditSchema),
@@ -53,6 +61,11 @@ export const useEventForm = (isNew: boolean = true): UseEventFormReturn => {
   const linkRows = useFieldArray({
     control: form.control,
     name: "links",
+  });
+
+  const youtubeRows = useFieldArray({
+    control: form.control,
+    name: "youtube",
   });
 
   const metadata = form.watch("metadata") ?? [];
@@ -79,9 +92,14 @@ export const useEventForm = (isNew: boolean = true): UseEventFormReturn => {
     [form, metadataRows],
   );
 
+  const defaultRowLanguage = useCallback((): LanguageCode => {
+    const current = form.getValues("metadata") ?? [];
+    return (current[0]?.language as LanguageCode | undefined) ?? "EN";
+  }, [form]);
+
   const addLinkRow = useCallback(() => {
-    linkRows.append(emptyLinkRow());
-  }, [linkRows]);
+    linkRows.append(emptyLinkRow(defaultRowLanguage()));
+  }, [linkRows, defaultRowLanguage]);
 
   const removeLinkRow = useCallback(
     (index: number) => {
@@ -101,6 +119,30 @@ export const useEventForm = (isNew: boolean = true): UseEventFormReturn => {
       });
     },
     [form, linkRows],
+  );
+
+  const addYoutubeRow = useCallback(() => {
+    youtubeRows.append(emptyYoutubeRow(defaultRowLanguage()));
+  }, [youtubeRows, defaultRowLanguage]);
+
+  const removeYoutubeRow = useCallback(
+    (index: number) => {
+      youtubeRows.remove(index);
+    },
+    [youtubeRows],
+  );
+
+  const moveYoutubeRow = useCallback(
+    (from: number, to: number) => {
+      const count = form.getValues("youtube")?.length ?? 0;
+      if (to < 0 || to >= count || from === to) return;
+      youtubeRows.move(from, to);
+      // move() alone does not flip isDirty; mark the field so Save enables.
+      form.setValue(`youtube.${to}.url`, form.getValues(`youtube.${to}.url`), {
+        shouldDirty: true,
+      });
+    },
+    [form, youtubeRows],
   );
 
   const setImageUrl = useCallback(
@@ -228,6 +270,7 @@ export const useEventForm = (isNew: boolean = true): UseEventFormReturn => {
     form,
     metadataRows,
     linkRows,
+    youtubeRows,
     usedLanguages,
     availableLanguages,
     addMetadataRow,
@@ -235,6 +278,9 @@ export const useEventForm = (isNew: boolean = true): UseEventFormReturn => {
     addLinkRow,
     removeLinkRow,
     moveLinkRow,
+    addYoutubeRow,
+    removeYoutubeRow,
+    moveYoutubeRow,
     setImageUrl,
     setLocationId,
     setOneDay,

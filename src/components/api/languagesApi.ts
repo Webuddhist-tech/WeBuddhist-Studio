@@ -54,12 +54,17 @@ export function toStudioLanguageOption(
 
 export async function fetchLanguages(
   enabledOnly = true,
+  recitationOnly = false,
 ): Promise<StudioLanguageOption[]> {
   const { data } = await axiosInstance.get<LanguageListResponse>(
     `/api/v1/languages`,
-    { params: { enabled_only: enabledOnly } },
+    { params: { enabled_only: enabledOnly, recitation_only: recitationOnly } },
   );
   const options = (data.languages ?? []).map(toStudioLanguageOption);
-  rememberLanguageOptions(options);
+  // The recitation-filtered set is a subset of the full list — never let it
+  // clobber the app-wide code -> label cache used by getLanguageLabel/getLanguageName.
+  if (!recitationOnly) {
+    rememberLanguageOptions(options);
+  }
   return options;
 }

@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { Button } from "@/components/ui/atoms/button";
 
 type GroupSectionHeaderProps = {
   title: string;
@@ -14,52 +13,6 @@ export const GroupSectionHeader = ({
     <h2 className="text-base font-bold">{title}</h2>
     {action}
   </div>
-);
-
-type GroupEditableSectionProps = {
-  title: string;
-  onSave: () => void;
-  isSaving: boolean;
-  saveLabel: string;
-  savingLabel: string;
-  saveDisabled?: boolean;
-  readOnly?: boolean;
-  children: ReactNode;
-};
-
-export const GroupEditableSection = ({
-  title,
-  onSave,
-  isSaving,
-  saveLabel,
-  savingLabel,
-  saveDisabled = false,
-  readOnly = false,
-  children,
-}: GroupEditableSectionProps) => (
-  <section className="space-y-4">
-    <GroupSectionHeader
-      title={title}
-      action={
-        readOnly ? undefined : (
-          <Button
-            type="button"
-            size="sm"
-            disabled={isSaving || saveDisabled}
-            onClick={onSave}
-          >
-            {isSaving ? savingLabel : saveLabel}
-          </Button>
-        )
-      }
-    />
-    <fieldset
-      disabled={readOnly}
-      className="space-y-4 min-w-0 border-0 p-0 m-0"
-    >
-      {children}
-    </fieldset>
-  </section>
 );
 
 export const GroupDetailCard = ({

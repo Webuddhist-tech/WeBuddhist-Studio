@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -10,14 +10,22 @@ import { useEventForm } from "./hooks/useEventForm";
 import { useEventImage } from "./hooks/useEventImage";
 import { canWriteEvents } from "./lib/eventPermissions";
 import {
+  EVENT_TABS,
+  tabsWithErrors,
+  type EventTabId,
+} from "./lib/eventFormTabs";
+import {
   buildCreateEventBody,
   buildUpdateEventBody,
   createCmsEvent,
   fetchCmsEvent,
   mapEventToFormData,
+  intentionIdsFromEventSlugs,
   resolveLinkedAccumulator,
+  resolveLinkedGroupAccumulator,
   resolveLinkedChantCollection,
   resolveLinkedContent,
+  eventName,
   updateCmsEvent,
   type EventDTO,
   type ImageUrlModel,
@@ -27,7 +35,15 @@ import EventMetadataRows from "./components/events/EventMetadataRows";
 import EventDateSection from "./components/events/EventDateSection";
 import EventLinksSection from "./components/events/EventLinksSection";
 import EventUrlLinksSection from "./components/events/EventUrlLinksSection";
+import EventYoutubeSection from "./components/events/EventYoutubeSection";
+import { findGroupYoutubeLink } from "./api/youtubeChannelApi";
 import EventImageField from "./components/events/EventImageField";
+import EventFormatField from "./components/events/EventFormatField";
+import EventChatField from "./components/events/EventChatField";
+import EventIntentionsField from "./components/events/EventIntentionsField";
+import EventNotificationsField from "./components/events/EventNotificationsField";
+import { fetchPrayerIntentions } from "@/components/routes/prayer-intentions/api/prayerIntentionsApi";
+import EventSendNotificationDialog from "./components/events/EventSendNotificationDialog";
 import LocationPicker from "./components/locations/LocationPicker";
 import type { EventLocation } from "./api/locationsApi";
 import type { EventFormData } from "@/schema/EventSchema";
@@ -49,8 +65,9 @@ const GroupEventFormPage = () => {
   }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { myRole, userInfo, readOnlyPlatform } =
+  const { group, myRole, userInfo, readOnlyPlatform } =
     useOutletContext<GroupOutletContext>();
+  const groupYoutubeUrl = findGroupYoutubeLink(group?.social_links);
 
   const isNew = !eventId;
   const canWrite =
@@ -61,6 +78,7 @@ const GroupEventFormPage = () => {
     form,
     metadataRows,
     linkRows,
+    youtubeRows,
     usedLanguages,
     availableLanguages,
     addMetadataRow,
@@ -68,6 +86,9 @@ const GroupEventFormPage = () => {
     addLinkRow,
     removeLinkRow,
     moveLinkRow,
+    addYoutubeRow,
+    removeYoutubeRow,
+    moveYoutubeRow,
     setImageUrl,
     setLocationId,
     setOneDay,
@@ -78,7 +99,7 @@ const GroupEventFormPage = () => {
     setTimezone,
     setIsRecurring,
     setRecurrence,
-  } = useEventForm();
+  } = useEventForm(isNew);
 
   const image = useEventImage({ setImageUrl });
   const { setImagePreview, setSelectedImage } = image;
@@ -87,6 +108,8 @@ const GroupEventFormPage = () => {
   const [accumulatorValue, setAccumulatorValue] = useState<FkOption | null>(
     null,
   );
+  const [groupAccumulatorValue, setGroupAccumulatorValue] =
+    useState<FkOption | null>(null);
   const [chantValue, setChantValue] = useState<FkOption | null>(null);
   const [locationValue, setLocationValue] = useState<EventLocation | null>(
     null,
@@ -100,10 +123,19 @@ const GroupEventFormPage = () => {
   });
   const eventData = eventQuery.data;
 
+  const prayerIntentionsQuery = useQuery({
+    queryKey: ["cms-prayer-intentions"],
+    queryFn: fetchPrayerIntentions,
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
+  });
+
   const originalRef = useRef<EventFormData | null>(null);
   const hydratedIdRef = useRef<string | null>(null);
+  const intentionIdsSyncedRef = useRef<string | null>(null);
   useEffect(() => {
     hydratedIdRef.current = null;
+    intentionIdsSyncedRef.current = null;
   }, [eventId]);
 
   useEffect(() => {
@@ -134,6 +166,14 @@ const GroupEventFormPage = () => {
     } else {
       setAccumulatorValue(null);
     }
+    if (formData.group_accumulator_id && groupId) {
+      resolveLinkedGroupAccumulator(
+        groupId,
+        formData.group_accumulator_id,
+      ).then(setGroupAccumulatorValue);
+    } else {
+      setGroupAccumulatorValue(null);
+    }
     if (formData.group_recitation_collection_id && groupId) {
       resolveLinkedChantCollection(
         groupId,
@@ -144,6 +184,23 @@ const GroupEventFormPage = () => {
     }
     setLocationValue(eventData.location ?? null);
   }, [isNew, eventData, form, groupId, setImagePreview, setSelectedImage]);
+
+  useEffect(() => {
+    if (isNew || !eventData || !prayerIntentionsQuery.data) return;
+    if (hydratedIdRef.current !== eventData.id) return;
+    if (intentionIdsSyncedRef.current === eventData.id) return;
+    intentionIdsSyncedRef.current = eventData.id;
+    const ids = intentionIdsFromEventSlugs(
+      eventData.intentions,
+      prayerIntentionsQuery.data.intentions,
+    );
+    // Update this field's default only — a full reset would treat in-flight edits
+    // as the new baseline and clear isDirty on other fields.
+    form.resetField("intention_ids", { defaultValue: ids });
+    if (originalRef.current) {
+      originalRef.current = { ...originalRef.current, intention_ids: ids };
+    }
+  }, [isNew, eventData, form, prayerIntentionsQuery.data]);
 
   const eventsListPath = groupId ? ROUTES.groupEvents(groupId) : ROUTES.groups;
 
@@ -169,10 +226,26 @@ const GroupEventFormPage = () => {
     onError: (err) => toast.error(getApiErrorMessage(err)),
   });
 
-  const onSubmit = form.handleSubmit((data) => {
-    if (readOnly) return;
-    mutation.mutate(data);
-  });
+  const [activeTab, setActiveTab] = useState<EventTabId>("about");
+
+  const errorTabs = useMemo(
+    () => new Set(tabsWithErrors(form.formState.errors)),
+    [form.formState.errors],
+  );
+
+  const onSubmit = form.handleSubmit(
+    (data) => {
+      if (readOnly) return;
+      mutation.mutate(data);
+    },
+    // Saving from any tab validates the whole event, so the field that failed
+    // is often on a panel that is not showing. Without this the submit just
+    // stops and the button looks broken - jump to the offending tab instead.
+    (errors) => {
+      const [firstInvalid] = tabsWithErrors(errors);
+      if (firstInvalid) setActiveTab(firstInvalid);
+    },
+  );
 
   if (!isNew && eventQuery.isLoading) {
     return (
@@ -205,8 +278,10 @@ const GroupEventFormPage = () => {
     return isNew ? "Create event" : "Save changes";
   };
 
+  const hasUnsavedChanges = form.formState.isDirty;
+
   const saveDisabled =
-    readOnly || mutation.isPending || (!isNew && !form.formState.isDirty);
+    readOnly || mutation.isPending || (!isNew && !hasUnsavedChanges);
 
   return (
     <div className="space-y-6">
@@ -214,6 +289,25 @@ const GroupEventFormPage = () => {
         <h1 className="text-xl font-bold">
           {isNew ? "New event" : "Edit event"}
         </h1>
+        {/* Only once the event exists: there is nobody to notify about an
+            event that has not been created yet.
+
+            Blocked while the form is dirty, because a send is answered from
+            the saved event, not from what is on screen. The notifications
+            switch is the case that matters: unchecked but not yet saved, the
+            page would show notifications as off while the send still went
+            out on the server's older, enabled value - notifying people
+            against the organizer's visible choice. Nothing here can
+            reconcile the two, so the send waits for the save. */}
+        {!isNew && !readOnly && eventData ? (
+          <EventSendNotificationDialog
+            eventId={eventData.id}
+            eventName={eventName(eventData)}
+            notificationsEnabled={eventData.notifications_enabled ?? true}
+            disabled={hasUnsavedChanges}
+            disabledReason="Save your changes before sending a notification"
+          />
+        ) : null}
       </div>
 
       {readOnly ? (
@@ -224,77 +318,170 @@ const GroupEventFormPage = () => {
       ) : null}
 
       <Pecha.Form {...form}>
-        <form onSubmit={onSubmit} className="space-y-8">
-          <EventDateSection
-            form={form}
-            isOneDay={isOneDay}
-            readOnly={readOnly}
-            isNew={isNew}
-            onStartChange={setStartDate}
-            onEndChange={setEndDate}
-            onStartTimeChange={setStartTime}
-            onEndTimeChange={setEndTime}
-            onTimezoneChange={setTimezone}
-            onOneDayChange={setOneDay}
-            onIsRecurringChange={setIsRecurring}
-            onRecurrenceChange={setRecurrence}
-          />
+        <form onSubmit={onSubmit}>
+          {/* Every panel stays mounted and is hidden with CSS instead of being
+              unmounted by Radix. The sections own effects that resync dates,
+              recurrence and pickers on mount, so tearing them down on each tab
+              change would re-run that work against a half-edited form. */}
+          <Pecha.Tabs
+            value={activeTab}
+            onValueChange={(value) => setActiveTab(value as EventTabId)}
+          >
+            <Pecha.TabsList>
+              {EVENT_TABS.map(({ id, label }) => (
+                <Pecha.TabsTrigger key={id} value={id}>
+                  {label}
+                  {errorTabs.has(id) ? (
+                    <span
+                      aria-label="has errors"
+                      className="size-1.5 rounded-full bg-destructive"
+                    />
+                  ) : null}
+                </Pecha.TabsTrigger>
+              ))}
+            </Pecha.TabsList>
 
-          <EventMetadataRows
-            form={form}
-            fields={metadataRows.fields}
-            usedLanguages={usedLanguages}
-            canAddLanguage={availableLanguages.length > 0}
-            readOnly={readOnly}
-            onAdd={addMetadataRow}
-            onRemove={removeMetadataRow}
-          />
+            <Pecha.TabsContent
+              value="about"
+              forceMount
+              className="space-y-8 data-[state=inactive]:hidden"
+            >
+              <EventMetadataRows
+                form={form}
+                fields={metadataRows.fields}
+                usedLanguages={usedLanguages}
+                canAddLanguage={availableLanguages.length > 0}
+                readOnly={readOnly}
+                onAdd={addMetadataRow}
+                onRemove={removeMetadataRow}
+              />
 
-          <LocationPicker
-            groupId={groupId ?? ""}
-            value={locationValue}
-            readOnly={readOnly}
-            canCreate={canWrite}
-            onChange={(location) => {
-              setLocationValue(location);
-              setLocationId(location?.id ?? "");
-            }}
-          />
+              <EventImageField
+                imagePreview={image.imagePreview}
+                selectedImage={image.selectedImage}
+                isDialogOpen={image.isImageDialogOpen}
+                isUploading={image.isImageUploading}
+                readOnly={readOnly}
+                onOpenDialog={image.openImageDialog}
+                onDialogOpenChange={image.setImageDialogOpen}
+                onUpload={image.uploadImage}
+                onRemove={image.removeImage}
+              />
+            </Pecha.TabsContent>
 
-          <EventLinksSection
-            form={form}
-            groupId={groupId ?? ""}
-            readOnly={readOnly}
-            contentValue={contentValue}
-            accumulatorValue={accumulatorValue}
-            chantValue={chantValue}
-            onContentChange={setContentValue}
-            onAccumulatorChange={setAccumulatorValue}
-            onChantChange={setChantValue}
-          />
+            <Pecha.TabsContent
+              value="schedule"
+              forceMount
+              className="space-y-8 data-[state=inactive]:hidden"
+            >
+              <EventDateSection
+                form={form}
+                isOneDay={isOneDay}
+                readOnly={readOnly}
+                isNew={isNew}
+                onStartChange={setStartDate}
+                onEndChange={setEndDate}
+                onStartTimeChange={setStartTime}
+                onEndTimeChange={setEndTime}
+                onTimezoneChange={setTimezone}
+                onOneDayChange={setOneDay}
+                onIsRecurringChange={setIsRecurring}
+                onRecurrenceChange={setRecurrence}
+              />
+            </Pecha.TabsContent>
 
-          <EventUrlLinksSection
-            form={form}
-            fields={linkRows.fields}
-            readOnly={readOnly}
-            onAdd={addLinkRow}
-            onRemove={removeLinkRow}
-            onMove={moveLinkRow}
-          />
+            <Pecha.TabsContent
+              value="venue"
+              forceMount
+              className="data-[state=inactive]:hidden"
+            >
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <LocationPicker
+                  groupId={groupId ?? ""}
+                  value={locationValue}
+                  readOnly={readOnly}
+                  canCreate={canWrite}
+                  onChange={(location) => {
+                    setLocationValue(location);
+                    setLocationId(location?.id ?? "");
+                  }}
+                />
 
-          <EventImageField
-            imagePreview={image.imagePreview}
-            selectedImage={image.selectedImage}
-            isDialogOpen={image.isImageDialogOpen}
-            isUploading={image.isImageUploading}
-            readOnly={readOnly}
-            onOpenDialog={image.openImageDialog}
-            onDialogOpenChange={image.setImageDialogOpen}
-            onUpload={image.uploadImage}
-            onRemove={image.removeImage}
-          />
+                <EventFormatField form={form} readOnly={readOnly} />
+              </div>
+            </Pecha.TabsContent>
 
-          <div className="flex justify-end gap-3 border-t border-dashed border-border pt-6">
+            <Pecha.TabsContent
+              value="youtube"
+              forceMount
+              className="data-[state=inactive]:hidden"
+            >
+              <EventYoutubeSection
+                form={form}
+                fields={youtubeRows.fields}
+                readOnly={readOnly}
+                channelUrl={groupYoutubeUrl}
+                onAdd={addYoutubeRow}
+                onRemove={removeYoutubeRow}
+                onMove={moveYoutubeRow}
+              />
+            </Pecha.TabsContent>
+
+            <Pecha.TabsContent
+              value="links"
+              forceMount
+              className="space-y-8 data-[state=inactive]:hidden"
+            >
+              <EventUrlLinksSection
+                form={form}
+                fields={linkRows.fields}
+                readOnly={readOnly}
+                onAdd={addLinkRow}
+                onRemove={removeLinkRow}
+                onMove={moveLinkRow}
+              />
+
+              <EventLinksSection
+                form={form}
+                groupId={groupId ?? ""}
+                readOnly={readOnly}
+                contentValue={contentValue}
+                accumulatorValue={accumulatorValue}
+                groupAccumulatorValue={groupAccumulatorValue}
+                chantValue={chantValue}
+                onContentChange={setContentValue}
+                onAccumulatorChange={setAccumulatorValue}
+                onGroupAccumulatorChange={setGroupAccumulatorValue}
+                onChantChange={setChantValue}
+              />
+            </Pecha.TabsContent>
+
+            <Pecha.TabsContent
+              value="settings"
+              forceMount
+              className="data-[state=inactive]:hidden"
+            >
+              <div className="grid grid-cols-1 gap-4">
+                <EventChatField form={form} readOnly={readOnly} />
+
+                <EventNotificationsField form={form} readOnly={readOnly} />
+
+                <EventIntentionsField form={form} readOnly={readOnly} />
+              </div>
+            </Pecha.TabsContent>
+          </Pecha.Tabs>
+
+          {/* Sticky so the save stays reachable from every tab without
+              scrolling the panel to its end. The scroll container is
+              `GroupPageShell`, so the bar matches that shell's background
+              rather than `bg-background` - otherwise it reads as a pale strip
+              laid over the page. */}
+          <div className="sticky bottom-0 z-10 mt-8 flex items-center justify-end gap-3 border-t border-border bg-[#F3F3F3] py-4 dark:bg-[#181818]">
+            {errorTabs.size > 0 ? (
+              <p className="mr-auto text-xs text-destructive">
+                Some fields need attention — see the marked tabs.
+              </p>
+            ) : null}
             <Pecha.Button
               type="button"
               variant="outline"

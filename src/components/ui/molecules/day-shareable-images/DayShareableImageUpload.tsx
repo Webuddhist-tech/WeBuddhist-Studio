@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Pecha } from "@/components/ui/shadimport";
 import { FiLoader } from "react-icons/fi";
 import { FaTrash } from "react-icons/fa6";
+import ImageCropDialog from "../modals/image-upload/image-crop/ImageCropDialog";
 import {
   deleteDayShareableImage,
   uploadDayShareableImage,
@@ -31,6 +32,7 @@ const DayShareableImageUpload = ({
   const queryClient = useQueryClient();
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [cropFile, setCropFile] = useState<File | null>(null);
 
   useEffect(() => {
     setPendingFile(null);
@@ -114,12 +116,20 @@ const DayShareableImageUpload = ({
 
       {isEditable && (
         <>
+          <ImageCropDialog
+            file={cropFile}
+            onCancel={() => setCropFile(null)}
+            onDone={(file) => {
+              setPendingFile(file);
+              setCropFile(null);
+            }}
+          />
           <Dropzone
             accept={{ "image/*": [] }}
             multiple={false}
             disabled={isBusy}
             onDrop={(files) => {
-              if (files[0]) setPendingFile(files[0]);
+              if (files[0]) setCropFile(files[0]);
             }}
           >
             {({ getRootProps, getInputProps }) => (

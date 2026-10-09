@@ -12,7 +12,13 @@ import {
   ImageContent,
   TextContent,
   SourceReferenceContent,
+  LinkedContent,
 } from "../../../../ui/molecules/content-sub/ContentComponents";
+import {
+  LINKED_CONTENT_LABELS,
+  isLinkedContentType,
+  type LinkedContentType,
+} from "@/components/ui/molecules/linked-content/linkedContent";
 import { SortableList, SortableItem } from "@/components/ui/atoms/sortable";
 import { PiDotsSixVertical } from "react-icons/pi";
 import { useSubtaskReorder } from "../../hooks/useSubtaskReorder";
@@ -20,7 +26,14 @@ import { FaPen } from "react-icons/fa";
 import { formatMs } from "@/lib/utils";
 import { AudioSegmentPlayer } from "@/components/ui/molecules/audio-segment-player/AudioSegmentPlayer";
 
-type ContentType = "TEXT" | "IMAGE" | "AUDIO" | "VIDEO" | "SOURCE_REFERENCE";
+import { getAccessToken } from "@/lib/auth-storage";
+type ContentType =
+  | "TEXT"
+  | "IMAGE"
+  | "AUDIO"
+  | "VIDEO"
+  | "SOURCE_REFERENCE"
+  | LinkedContentType;
 
 interface TaskViewProps {
   taskId: string;
@@ -30,7 +43,7 @@ interface TaskViewProps {
 }
 
 const fetchTaskDetails = async (task_id: string) => {
-  const accessToken = sessionStorage.getItem("accessToken");
+  const accessToken = getAccessToken();
   const { data } = await axiosInstance.get(`/api/v1/cms/tasks/${task_id}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -40,10 +53,29 @@ const fetchTaskDetails = async (task_id: string) => {
 const SubtaskContent = ({
   type,
   content,
+  segmentNumbers,
+  segmentRefs,
+  reference,
+  referenceId,
 }: {
   type: ContentType;
   content: string;
+  segmentNumbers?: number[] | null;
+  segmentRefs?: (string | null)[] | null;
+  reference?: any;
+  referenceId?: string | null;
 }) => {
+  // Linked subtasks carry no inline content - the reference is the content.
+  if (isLinkedContentType(type)) {
+    return (
+      <LinkedContent
+        type={type}
+        reference={reference}
+        referenceId={referenceId}
+      />
+    );
+  }
+
   if (!content) return null;
 
   switch (type) {
@@ -56,7 +88,13 @@ const SubtaskContent = ({
     case "IMAGE":
       return <ImageContent content={content} />;
     case "SOURCE_REFERENCE":
-      return <SourceReferenceContent content={content} />;
+      return (
+        <SourceReferenceContent
+          content={content}
+          segmentNumbers={segmentNumbers}
+          segmentRefs={segmentRefs}
+        />
+      );
   }
 };
 
@@ -83,6 +121,7 @@ const SourceReferenceWithVersion = ({ subtask }: { subtask: any }) => {
       <SourceReferenceContent
         content={subtask.content}
         segmentNumbers={subtask.segment_numbers}
+        segmentRefs={subtask.segment_refs}
       />
       {preset && (
         <div className="relative mt-2 ml-4">
@@ -137,7 +176,10 @@ const SubtaskCard = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="flex items-center border w-fit bg-[#F7F7F7] dark:bg-sidebar-secondary px-2 py-1 text-sm rounded-md border-dashed gap-2">
-              <ContentIcon type={subtask.content_type} /> {subtask.content_type}
+              <ContentIcon type={subtask.content_type} />{" "}
+              {LINKED_CONTENT_LABELS[
+                subtask.content_type as LinkedContentType
+              ] ?? subtask.content_type}
             </div>
             {subtask.content_type === "SOURCE_REFERENCE" &&
               !preset &&
@@ -154,7 +196,7 @@ const SubtaskCard = ({
           </div>
           {listeners && isEditable && (
             <PiDotsSixVertical
-              className="w-5 h-5 text-gray-400 dark:text-muted-foreground cursor-grab active:cursor-grabbing"
+              className="w-5 h-5 shrink-0 touch-none text-gray-400 dark:text-muted-foreground cursor-grab active:cursor-grabbing"
               {...listeners}
             />
           )}
@@ -165,6 +207,8 @@ const SubtaskCard = ({
           <SubtaskContent
             type={subtask.content_type}
             content={subtask.content}
+            reference={subtask.reference}
+            referenceId={subtask.reference_id}
           />
         )}
         {subtask.audio_url ? (
@@ -233,9 +277,9 @@ const TaskView = ({
   const displaySubtasks = getDisplaySubtasks();
 
   return (
-    <div className="w-full my-4 h-[calc(100vh-40px)] bg-[#F5F5F5] border-dashed dark:bg-[#181818]  rounded-l-2xl border overflow-y-auto">
+    <div className="w-full my-4 h-[calc(100vh-40px)] bg-[#F5F5F5] border-dashed dark:bg-[#181818]  rounded-l-2xl border overflow-y-auto max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
       <div className=" space-y-4  overflow-y-auto">
-        <div className="flex p-4 items-center justify-between w-3/4">
+        <div className="flex p-4 items-center justify-between w-3/4 max-md:w-full">
           <h2 className="text-xl font-semibold">Task</h2>
           {isEditable && (
             <Pecha.Button
@@ -249,7 +293,7 @@ const TaskView = ({
           )}
         </div>
         <div className="p-4">
-          <div className="h-12 p-4 bg-white dark:bg-input/30 rounded-md lg:w-2/3 w-full text-base flex items-center border">
+          <div className="h-12 p-4 bg-white dark:bg-input/30 rounded-md lg:w-2/3 w-full text-base flex items-center border max-md:h-auto max-md:min-h-12 max-md:py-3">
             {isLoading ? (
               <Pecha.Skeleton className="h-6  w-1/2 rounded" />
             ) : (

@@ -71,6 +71,7 @@ describe("mapEventToFormData — location", () => {
     end_date: "2026-01-01",
     is_one_day: true,
     featured: false,
+    event_format: "hybrid",
     metadata: [{ id: "m1", name: "Teaching", language: "EN" }],
     created_at: "2026-01-01",
     created_by: "u1",

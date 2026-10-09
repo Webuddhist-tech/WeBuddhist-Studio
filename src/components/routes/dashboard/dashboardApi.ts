@@ -106,6 +106,8 @@ export interface FetchDashboardItemsParams {
   language?: string;
   featured?: boolean;
   group_id?: string;
+  /** Also include series/plans the group is a SeriesPartner of, not just owned. */
+  includePartnerGroups?: boolean;
   /** Tolgee UI locale used to pick localized series titles from metadata. */
   localeLanguage?: string;
 }
@@ -136,6 +138,7 @@ export async function fetchDashboardItems(
         ...(params.language && { language: params.language }),
         ...(params.featured != null && { featured: params.featured }),
         ...(params.group_id && { group_id: params.group_id }),
+        ...(params.includePartnerGroups && { include_partner_groups: true }),
       },
     },
   );

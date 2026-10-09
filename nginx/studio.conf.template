@@ -1,3 +1,9 @@
+# "upgrade" for a WebSocket handshake, and no Connection header otherwise.
+map $http_upgrade $connection_upgrade {
+  default upgrade;
+  ''      '';
+}
+
 server {
   listen 4173;
   server_name localhost;
@@ -13,8 +19,46 @@ server {
       include /etc/nginx/security-headers.conf;
   }
 
+  # The installed app (PWA). The service worker, the manifest and the page
+  # shell must be revalidated on every load, or a deploy never reaches people
+  # who installed the Studio; the hashed files under /assets can be cached.
+  location = /sw.js {
+      add_header Cache-Control "no-cache";
+      include /etc/nginx/security-headers.conf;
+  }
+
+  location = /manifest.webmanifest {
+      types { application/manifest+json webmanifest; }
+      add_header Cache-Control "no-cache";
+      include /etc/nginx/security-headers.conf;
+  }
+
+  location = /index.html {
+      add_header Cache-Control "no-cache";
+      include /etc/nginx/security-headers.conf;
+  }
+
+  # Also carries the live-control socket: nginx passes a WebSocket through only
+  # when told to carry the upgrade. It lives here rather than in a location of
+  # its own, as the route has an id in it and so could only be matched by a
+  # regex, where proxy_pass may not have a path - and the backend URL may.
+  # The controller pings every 25s, well inside the read timeout.
   location /api {
       proxy_pass ${VITE_BACKEND_BASE_URL};
+      proxy_ssl_server_name on;
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection $connection_upgrade;
+      proxy_read_timeout 300s;
+      proxy_send_timeout 300s;
+  }
+
+  # The library (OpenPecha) API, behind our own origin: its host never appears in
+  # a browser request and the X-Application header it requires is added here
+  # rather than shipped in the bundle. Mirrors the /library proxy in vite.config.ts.
+  location /library/ {
+      rewrite ^/library/(.*)$ /$1 break;
+      proxy_pass ${VITE_LIBRARY_BASE_URL};
+      proxy_set_header X-Application ${VITE_LIBRARY_APP_NAME};
       proxy_ssl_server_name on;
       proxy_read_timeout 300s;
       proxy_send_timeout 300s;

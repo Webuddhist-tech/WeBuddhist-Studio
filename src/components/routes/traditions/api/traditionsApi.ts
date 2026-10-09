@@ -1,6 +1,7 @@
 import axiosInstance from "@/config/axios-config";
 import type { LanguageCode } from "@/schema/SeriesSchema";
 
+import { getAuthHeaders } from "@/lib/auth-storage";
 export interface TraditionMetadataDTO {
   id: string;
   language: string;
@@ -40,10 +41,6 @@ export interface TraditionPayload {
   metadata: TraditionMetadataInput[];
 }
 
-const getAuthHeaders = () => ({
-  Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
-});
-
 export const fetchTraditions = async (
   page: number,
   limit: number,
@@ -62,6 +59,33 @@ export const fetchTraditions = async (
     },
   );
   return data;
+};
+
+/** One entry of the public picker list: the code a group is marked with and its localized name. */
+export interface TraditionOption {
+  code: string;
+  name: string;
+  regions?: string[];
+}
+
+/**
+ * Every tradition a group can be marked with, in one call. Uses the public
+ * list rather than the paged CMS one, so any group owner can load it and the
+ * codes are exactly the ones the group endpoints accept.
+ */
+export const fetchTraditionOptions = async (
+  language = "en",
+): Promise<TraditionOption[]> => {
+  const { data } = await axiosInstance.get<{ traditions: TraditionOption[] }>(
+    `/api/v1/traditions`,
+    { params: { language } },
+  );
+  // A changed response shape fails loudly, so the picker shows its load
+  // error rather than an empty list.
+  if (!Array.isArray(data?.traditions)) {
+    throw new Error("Unexpected traditions response");
+  }
+  return data.traditions;
 };
 
 export const createTradition = async (

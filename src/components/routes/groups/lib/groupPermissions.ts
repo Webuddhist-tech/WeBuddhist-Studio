@@ -101,6 +101,13 @@ export function canManageJoinRequests(
   return role ? MEMBER_MANAGEMENT_ROLES.includes(role) : false;
 }
 
+/** Removing a joined community user (and banning them) is owner/admin only. */
+export function canModerateGroupUsers(
+  role: AuthorGroupMemberRole | undefined,
+): boolean {
+  return role ? MEMBER_MANAGEMENT_ROLES.includes(role) : false;
+}
+
 export function inviteRoleOptions(
   myRole: AuthorGroupMemberRole | undefined,
 ): AuthorGroupMemberRole[] {

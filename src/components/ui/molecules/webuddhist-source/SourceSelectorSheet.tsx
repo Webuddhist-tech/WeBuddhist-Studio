@@ -13,6 +13,7 @@ import {
   searchSources,
   searchTitles,
   fetchTextDetails,
+  fetchTextSegmentCount,
 } from "@/components/api/searchApi";
 import {
   flattenSegments,
@@ -20,6 +21,10 @@ import {
   getLastSegmentId,
 } from "@/lib/utils";
 import type { SourceData } from "./SourceDetail";
+
+/** The sheet previews one page at a time. A long selection is not downloaded
+ * through this query — Add asks for that window in a single request. */
+const PREVIEW_PAGE_SIZE = 20;
 
 type TextDetailsPageParam =
   | {
@@ -105,7 +110,6 @@ export const SourceSelectorSheet = ({
     fetchPreviousPage,
     hasNextPage,
     hasPreviousPage,
-    isFetching,
     isFetchingNextPage,
     isFetchingPreviousPage,
   } = useInfiniteQuery<
@@ -118,13 +122,13 @@ export const SourceSelectorSheet = ({
     queryKey: ["textDetails", selectedSource?.id, segmentRange],
     initialPageParam: (segmentRange
       ? { start: segmentRange.start, end: segmentRange.end }
-      : { size: 20 }) as TextDetailsPageParam,
+      : { size: PREVIEW_PAGE_SIZE }) as TextDetailsPageParam,
     queryFn: ({ pageParam }) =>
       fetchTextDetails({
         textId: selectedSource.id,
         segmentId: pageParam?.segmentId,
         direction: pageParam?.direction,
-        size: pageParam?.size ?? 20,
+        size: pageParam?.size ?? PREVIEW_PAGE_SIZE,
         start: pageParam?.start,
         end: pageParam?.end,
       }),
@@ -138,10 +142,10 @@ export const SourceSelectorSheet = ({
         return {
           segmentId: lastSegmentId,
           direction: "next" as const,
-          size: 20,
+          size: PREVIEW_PAGE_SIZE,
         };
       }
-      return { start: lastNumber + 1, end: lastNumber + 20 };
+      return { start: lastNumber + 1, end: lastNumber + PREVIEW_PAGE_SIZE };
     },
     getPreviousPageParam: (firstPage) => {
       if (!firstPage?.has_more_up) return undefined;
@@ -153,11 +157,11 @@ export const SourceSelectorSheet = ({
         return {
           segmentId: firstSegmentId,
           direction: "previous" as const,
-          size: 20,
+          size: PREVIEW_PAGE_SIZE,
         };
       }
       return {
-        start: Math.max(1, firstNumber - 20),
+        start: Math.max(1, firstNumber - PREVIEW_PAGE_SIZE),
         end: firstNumber - 1,
       };
     },
@@ -208,6 +212,16 @@ export const SourceSelectorSheet = ({
     fetchPreviousPage,
   ]);
 
+  // The text's real length, asked for on its own so "Select All" can cover the
+  // whole text before any of it has been paged in.
+  const { data: segmentCount } = useQuery({
+    queryKey: ["textSegmentCount", selectedSource?.id],
+    queryFn: () => fetchTextSegmentCount(selectedSource.id),
+    enabled: !!selectedSource?.id && searchOnlyTitles,
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000,
+  });
+
   const detailSegments = useMemo(() => {
     if (!detailsData?.pages) return [];
     const allSegments = detailsData.pages.flatMap((page: any) =>
@@ -220,19 +234,19 @@ export const SourceSelectorSheet = ({
     );
   }, [detailsData?.pages]);
 
-  const totalSegments = detailsData?.pages?.[0]?.total_segments ?? 0;
+  const totalSegments =
+    segmentCount ?? detailsData?.pages?.[0]?.total_segments ?? 0;
 
   const handleRangeNavigate = useCallback((start: number, end: number) => {
     setBlockPreviousUntilLeave(true);
-    setSegmentRange({ start, end });
+    // Jump the preview to the start of the range. Keep the page short so
+    // Select All does not turn into a request for every segment.
+    setSegmentRange({
+      start,
+      end: Math.min(end, start + PREVIEW_PAGE_SIZE - 1),
+    });
     setScrollToSegmentNumber(start);
   }, []);
-
-  const isRangeLoading =
-    Boolean(segmentRange) &&
-    isFetching &&
-    !isFetchingNextPage &&
-    !isFetchingPreviousPage;
 
   const isLoading = searchOnlyTitles ? isTitleLoading : isMultilingualLoading;
 
@@ -318,7 +332,6 @@ export const SourceSelectorSheet = ({
                     topRef={topSentinelRef}
                     isFetchingNextPage={isFetchingNextPage}
                     isFetchingPreviousPage={isFetchingPreviousPage}
-                    isRangeLoading={isRangeLoading}
                     totalSegments={totalSegments}
                     onRangeNavigate={handleRangeNavigate}
                     scrollToSegmentNumber={scrollToSegmentNumber}

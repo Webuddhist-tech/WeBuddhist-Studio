@@ -1,7 +1,6 @@
 export const ROUTES = {
   home: "/",
   login: "/login",
-  adminLogin: "/admin/login",
   signup: "/signup",
   forgotPassword: "/forgot-password",
   resetPassword: "/reset-password",
@@ -21,25 +20,36 @@ export const ROUTES = {
   traditions: "/traditions",
   verseOfDay: "/verse-of-day",
   poems: "/poems",
+  prayerIntentions: "/prayer-intentions",
+  /** Lists the COMMUNITY groups, which the CMS calls practice spaces. */
   groups: "/groups",
   groupNew: "/groups/new",
+  /** Lists the PAGE groups. Opening one still lands on its `/groups/:id` routes. */
+  pages: "/pages",
+  pageNew: "/pages/new",
   group: (groupId: string) => `/groups/${groupId}`,
   groupContent: (groupId: string) => `/groups/${groupId}/content`,
   groupTransfers: (groupId: string) => `/groups/${groupId}/transfers`,
   groupMembers: (groupId: string) => `/groups/${groupId}/members`,
   groupJoinRequests: (groupId: string) => `/groups/${groupId}/join-requests`,
+  groupCommunity: (groupId: string) => `/groups/${groupId}/community`,
   groupEvents: (groupId: string) => `/groups/${groupId}/events`,
   groupEventNew: (groupId: string) => `/groups/${groupId}/events/new`,
   groupEvent: (groupId: string, eventId: string) =>
     `/groups/${groupId}/events/${eventId}`,
   groupEventEdit: (groupId: string, eventId: string) =>
     `/groups/${groupId}/events/${eventId}/edit`,
+  /** Standalone operator control. Signed out by design, so it takes no group. */
+  liveControl: (eventId: string) => `/live-control/${eventId}`,
+  /** Dry run of autoplay: plays by recorded times, never touches the room. */
+  liveAutoplayTest: (eventId: string) => `/live/${eventId}/autoplay-test`,
   groupChants: (groupId: string) => `/groups/${groupId}/chants`,
   groupChantNew: (groupId: string) => `/groups/${groupId}/chants/new`,
   groupChant: (groupId: string, collectionId: string) =>
     `/groups/${groupId}/chants/${collectionId}`,
   groupChantEdit: (groupId: string, collectionId: string) =>
     `/groups/${groupId}/chants/${collectionId}/edit`,
+  groupAssets: (groupId: string) => `/groups/${groupId}/assets`,
   groupPosts: (groupId: string) => `/groups/${groupId}/posts`,
   groupPostNew: (groupId: string) => `/groups/${groupId}/posts/new`,
   groupPostEdit: (groupId: string, postId: string) =>
@@ -52,11 +62,11 @@ export const ROUTES = {
   adminChatReports: "/admin/chat-reports",
   accumulatorPresets: "/accumulator-presets",
   textAudio: "/text-audio",
+  ambientSounds: "/ambient-sounds",
 } as const;
 
 export const AUTH_ROUTE_PATHS: readonly string[] = [
   ROUTES.login,
-  ROUTES.adminLogin,
   ROUTES.signup,
   ROUTES.forgotPassword,
   ROUTES.resetPassword,

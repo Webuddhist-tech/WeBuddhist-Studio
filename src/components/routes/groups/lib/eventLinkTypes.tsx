@@ -1,6 +1,8 @@
 import type { IconType } from "react-icons";
 import { LuGlobe, LuLink, LuVideo } from "react-icons/lu";
-import { SiGooglemeet, SiZoom } from "react-icons/si";
+import { SiGooglemeet, SiZoom, SiYoutube } from "react-icons/si";
+
+export const EVENT_YOUTUBE_ICON: IconType = SiYoutube;
 
 export type EventLinkTypeOption = {
   value: string;

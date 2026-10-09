@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Pecha } from "@/components/ui/shadimport";
-import { Textarea } from "@/components/ui/atoms/textarea";
+import VisibleNewlineTextarea from "./VisibleNewlineTextarea";
+import { Input } from "@/components/ui/atoms/input";
 import { Button } from "@/components/ui/atoms/button";
 import { Calendar } from "@/components/ui/atoms/calendar";
 import { useLanguages } from "@/hooks/useLanguages";
@@ -54,6 +55,7 @@ const VerseOfDayForm = ({
   const [isImageDialogOpen, setIsImageDialogOpen] = useState(false);
   const [isImageUploading, setIsImageUploading] = useState(false);
   const [groupId, setGroupId] = useState("");
+  const [source, setSource] = useState("");
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [showCalendar, setShowCalendar] = useState(false);
 
@@ -71,8 +73,9 @@ const VerseOfDayForm = ({
       // Set image preview from existing data
       setImageKey(null);
       setImagePreview(initialData.image_url || null);
-      // Use group_id directly from the response
+      // group_id is the linked page
       setGroupId(initialData.group_id || "");
+      setSource(initialData.source || "");
       setDate(parse(initialData.date, "yyyy-MM-dd", new Date()));
     } else {
       setActiveLanguage("EN");
@@ -80,6 +83,7 @@ const VerseOfDayForm = ({
       setImageKey(null);
       setImagePreview(null);
       setGroupId("");
+      setSource("");
       setDate(new Date());
     }
   }, [mode, initialData, languageCodes.join(",")]);
@@ -142,7 +146,7 @@ const VerseOfDayForm = ({
     }
 
     if (!groupId.trim()) {
-      toast.error("Please select a group");
+      toast.error("Please select a page");
       return;
     }
 
@@ -171,6 +175,7 @@ const VerseOfDayForm = ({
     const trimmedVerses = Object.fromEntries(
       Object.entries(verses).map(([key, value]) => [key, value.trim()]),
     );
+    const trimmedSource = source.trim() || null;
 
     // For create, send all required fields
     // For update, only send fields that have changed
@@ -201,6 +206,11 @@ const VerseOfDayForm = ({
         updatePayload.group_id = trimmedGroupId;
       }
 
+      const previousSource = initialData.source?.trim() || null;
+      if (trimmedSource !== previousSource) {
+        updatePayload.source = trimmedSource;
+      }
+
       updateMutation.mutate({ id: initialData.id, payload: updatePayload });
     } else {
       const createPayload: any = {
@@ -208,6 +218,7 @@ const VerseOfDayForm = ({
         image_urls: imageKey ? [imageKey] : [],
         group_id: groupId.trim() || null,
         date: format(date, "yyyy-MM-dd"),
+        source: trimmedSource,
       };
       createMutation.mutate(createPayload);
     }
@@ -243,11 +254,23 @@ const VerseOfDayForm = ({
             </button>
           ))}
         </div>
-        <Textarea
+        <VisibleNewlineTextarea
           value={verses[activeLanguage.toLowerCase()] ?? ""}
-          onChange={(e) => handleVerseChange(e.target.value)}
+          onValueChange={handleVerseChange}
           placeholder={`Enter verse content in ${getLanguageLabel(activeLanguage)}`}
           className="min-h-[120px] resize-none"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <label htmlFor="verse-source" className="text-sm font-bold">
+          Source / Reference
+        </label>
+        <Input
+          id="verse-source"
+          value={source}
+          onChange={(e) => setSource(e.target.value)}
+          placeholder="Dhp 1.5"
         />
       </div>
 
@@ -284,7 +307,11 @@ const VerseOfDayForm = ({
         </div>
       </div>
 
-      <GroupSelectField groupId={groupId} setGroupId={setGroupId} />
+      <PageSelectField
+        pageId={groupId}
+        setPageId={setGroupId}
+        fallbackTitle={initialData?.group_info?.[0]?.title}
+      />
 
       <div className="space-y-2">
         <label className="text-sm font-bold">Date</label>
@@ -358,26 +385,37 @@ export default VerseOfDayForm;
 
 export { VerseOfDayForm };
 
-interface GroupSelectFieldProps {
-  groupId: string;
-  setGroupId: (id: string) => void;
+interface PageSelectFieldProps {
+  pageId: string;
+  setPageId: (id: string) => void;
+  /** Title of the page already linked, shown until the list has loaded. */
+  fallbackTitle?: string;
 }
 
-const GroupSelectField = ({ groupId, setGroupId }: GroupSelectFieldProps) => {
+const PageSelectField = ({
+  pageId,
+  setPageId,
+  fallbackTitle,
+}: PageSelectFieldProps) => {
   const [open, setOpen] = useState(false);
 
-  const { data: groupsData, isLoading: isLoadingGroups } = useQuery({
-    queryKey: ["groups-list-for-verse"],
-    queryFn: () => fetchGroups({ page: 1, limit: 100 }),
+  const { data: pagesData, isLoading: isLoadingPages } = useQuery({
+    queryKey: ["pages-list-for-verse"],
+    queryFn: () => fetchGroups({ page: 1, limit: 100, group_type: "PAGE" }),
     staleTime: 5 * 60 * 1000,
   });
 
-  const groups = groupsData?.groups ?? [];
-  const selectedGroup = groups.find((g) => g.id === groupId);
+  const pages = pagesData?.groups ?? [];
+  const selectedPage = pages.find((g) => g.id === pageId);
+  const selectedTitle = selectedPage
+    ? pickGroupTitle(selectedPage.metadata, "Untitled page")
+    : pageId && fallbackTitle
+      ? fallbackTitle
+      : null;
 
   return (
     <div className="space-y-2">
-      <label className="text-sm font-bold">Group</label>
+      <label className="text-sm font-bold">Page</label>
       <Pecha.Popover open={open} onOpenChange={setOpen}>
         <Pecha.PopoverTrigger asChild>
           <Button
@@ -387,11 +425,9 @@ const GroupSelectField = ({ groupId, setGroupId }: GroupSelectFieldProps) => {
             aria-expanded={open}
             className="w-full justify-between font-normal"
           >
-            {isLoadingGroups
-              ? "Loading groups..."
-              : selectedGroup
-                ? pickGroupTitle(selectedGroup.metadata)
-                : "Select a group..."}
+            {isLoadingPages
+              ? "Loading pages..."
+              : (selectedTitle ?? "Select a page...")}
             <FaChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </Pecha.PopoverTrigger>
@@ -400,27 +436,30 @@ const GroupSelectField = ({ groupId, setGroupId }: GroupSelectFieldProps) => {
           align="start"
         >
           <Pecha.Command>
-            <Pecha.CommandInput placeholder="Search groups..." />
+            <Pecha.CommandInput placeholder="Search pages..." />
             <Pecha.CommandList>
-              <Pecha.CommandEmpty>No groups found.</Pecha.CommandEmpty>
+              <Pecha.CommandEmpty>No pages found.</Pecha.CommandEmpty>
               <Pecha.CommandGroup>
-                {groups.map((group) => (
-                  <Pecha.CommandItem
-                    key={group.id}
-                    value={pickGroupTitle(group.metadata)}
-                    onSelect={() => {
-                      setGroupId(group.id);
-                      setOpen(false);
-                    }}
-                  >
-                    <FaCheck
-                      className={`mr-2 h-4 w-4 ${
-                        groupId === group.id ? "opacity-100" : "opacity-0"
-                      }`}
-                    />
-                    {pickGroupTitle(group.metadata)}
-                  </Pecha.CommandItem>
-                ))}
+                {pages.map((page) => {
+                  const title = pickGroupTitle(page.metadata, "Untitled page");
+                  return (
+                    <Pecha.CommandItem
+                      key={page.id}
+                      value={title}
+                      onSelect={() => {
+                        setPageId(page.id);
+                        setOpen(false);
+                      }}
+                    >
+                      <FaCheck
+                        className={`mr-2 h-4 w-4 ${
+                          pageId === page.id ? "opacity-100" : "opacity-0"
+                        }`}
+                      />
+                      {title}
+                    </Pecha.CommandItem>
+                  );
+                })}
               </Pecha.CommandGroup>
             </Pecha.CommandList>
           </Pecha.Command>

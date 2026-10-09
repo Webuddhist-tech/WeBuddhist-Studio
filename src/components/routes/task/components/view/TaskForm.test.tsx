@@ -7,6 +7,7 @@ import TaskForm from "./TaskForm";
 const mockPlanData = {
   id: "test-plan-id",
   title: "Test Plan",
+  group_id: "group-1",
   days: [
     {
       id: "day-1",
@@ -94,12 +95,27 @@ vi.mock("@/components/routes/task/api/taskApi", () => ({
 }));
 
 vi.mock("@/components/ui/molecules/content-sub/ContentTypeSelector", () => ({
-  ContentTypeSelector: ({ onSelectType }: any) => (
+  ContentTypeSelector: ({ onSelectType, groupId }: any) => (
     <div>
       <button onClick={() => onSelectType("TEXT")}>Add Text</button>
       <button onClick={() => onSelectType("VIDEO")}>Add Video</button>
       <button onClick={() => onSelectType("AUDIO")}>Add Audio</button>
       <button onClick={() => onSelectType("IMAGE")}>Add Image</button>
+      <span data-testid="selector-group-id">{groupId ?? "none"}</span>
+      <button
+        onClick={() =>
+          onSelectType("EVENT", undefined, {
+            id: "event-1",
+            title: "Losar",
+            subtitle: "Feb 18, 2026",
+            imageUrl: null,
+          })
+        }
+      >
+        Add Event
+      </button>
+      {/* A linked type dismissed without picking anything. */}
+      <button onClick={() => onSelectType("POST")}>Add Post (cancelled)</button>
     </div>
   ),
 }));
@@ -157,6 +173,22 @@ vi.mock("@/components/ui/molecules/subtask-card/SubTaskCard", () => ({
             value={subTask.content}
             data-testid="audio-input"
           />
+          <button
+            data-testid="remove-subtask-button"
+            onClick={() => onRemove(index)}
+          >
+            Remove Subtask
+          </button>
+        </>
+      )}
+      {["GROUP_ACCUMULATION", "GROUP_COLLECTION", "EVENT", "POST"].includes(
+        subTask.content_type,
+      ) && (
+        <>
+          <div data-testid="linked-subtask">
+            {subTask.content_type}:{subTask.reference_id}:
+            {subTask.reference?.title}
+          </div>
           <button
             data-testid="remove-subtask-button"
             onClick={() => onRemove(index)}
@@ -296,6 +328,38 @@ describe("TaskForm Component", () => {
         estimated_time: 30,
       });
     });
+  });
+
+  it("blocks submit and explains when the plan has no days", async () => {
+    const { createTask } = await import("../../api/taskApi");
+    const { toast } = await import("sonner");
+    renderWithProviders(<TaskForm selectedDay={1} onCancel={mockOnCancel} />, {
+      '["planDetails","test-plan-id"]': { ...mockPlanData, days: [] },
+    });
+
+    fireEvent.change(screen.getByPlaceholderText("Task Title"), {
+      target: { value: "New Task" },
+    });
+    fireEvent.click(screen.getByText("Add Text"));
+    await waitFor(() => {
+      expect(
+        screen.getByPlaceholderText("Enter your text content"),
+      ).toBeInTheDocument();
+    });
+
+    const submitButton = screen.getByText("Submit");
+    expect(submitButton.closest("button")).toBeDisabled();
+
+    fireEvent.submit(submitButton.closest("form")!);
+    await waitFor(() => {
+      expect(toast.error).toHaveBeenCalledWith(
+        "Create a day first",
+        expect.objectContaining({
+          description: "Add a day to this plan before adding a task.",
+        }),
+      );
+    });
+    expect(createTask).not.toHaveBeenCalled();
   });
 
   it("populates form with all content types in edit mode", async () => {
@@ -528,6 +592,115 @@ describe("TaskForm Component", () => {
       expect(
         screen.getByPlaceholderText("Enter your text content"),
       ).toBeInTheDocument();
+    });
+  });
+
+  it("passes the plan's group to the content type selector", async () => {
+    renderWithProviders(<TaskForm selectedDay={1} onCancel={mockOnCancel} />);
+    expect(screen.getByTestId("selector-group-id")).toHaveTextContent(
+      "group-1",
+    );
+  });
+
+  it("adds a linked subtask with the picked reference", async () => {
+    renderWithProviders(<TaskForm selectedDay={1} onCancel={mockOnCancel} />);
+    fireEvent.click(screen.getByText("Add Event"));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("linked-subtask")).toHaveTextContent(
+        "EVENT:event-1:Losar",
+      );
+    });
+  });
+
+  it("ignores a linked type when no content was picked", async () => {
+    renderWithProviders(<TaskForm selectedDay={1} onCancel={mockOnCancel} />);
+    fireEvent.click(screen.getByText("Add Post (cancelled)"));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("linked-subtask")).not.toBeInTheDocument();
+    });
+  });
+
+  it("sends reference_id when saving a linked subtask", async () => {
+    const { fetchTaskDetails, updateSubTasks } = await import(
+      "../../api/taskApi"
+    );
+    const taskWithLink = {
+      id: "task-123",
+      title: "Test Task",
+      subtasks: [
+        {
+          id: "sub-linked",
+          content: "",
+          content_type: "EVENT",
+          display_order: 1,
+          reference_id: "event-1",
+          reference: { id: "event-1", content_type: "EVENT", title: "Losar" },
+        },
+      ],
+    };
+    vi.mocked(fetchTaskDetails).mockResolvedValue(taskWithLink as any);
+    vi.mocked(updateSubTasks).mockResolvedValue(undefined as any);
+
+    renderWithProviders(
+      <TaskForm
+        selectedDay={1}
+        editingTask={mockEditingTask}
+        onCancel={mockOnCancel}
+      />,
+      { '["taskDetails","task-123"]': taskWithLink },
+    );
+
+    await screen.findByTestId("linked-subtask");
+    fireEvent.click(screen.getByText("Update"));
+
+    await waitFor(() => {
+      expect(updateSubTasks).toHaveBeenCalledWith("task-123", [
+        expect.objectContaining({
+          id: "sub-linked",
+          content_type: "EVENT",
+          reference_id: "event-1",
+        }),
+      ]);
+    });
+  });
+
+  it("maps a linked subtask back into the form in edit mode", async () => {
+    const { fetchTaskDetails } = await import("../../api/taskApi");
+    const taskWithLink = {
+      id: "task-123",
+      title: "Test Task",
+      subtasks: [
+        {
+          id: "sub-linked",
+          content: "",
+          content_type: "GROUP_COLLECTION",
+          display_order: 1,
+          reference_id: "collection-1",
+          reference: {
+            id: "collection-1",
+            content_type: "GROUP_COLLECTION",
+            title: "Morning chants",
+          },
+        },
+      ],
+    };
+    vi.mocked(fetchTaskDetails).mockResolvedValue(taskWithLink as any);
+
+    renderWithProviders(
+      <TaskForm
+        selectedDay={1}
+        editingTask={mockEditingTask}
+        onCancel={mockOnCancel}
+      />,
+      { '["taskDetails","task-123"]': taskWithLink },
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("linked-subtask")).toHaveTextContent(
+        "GROUP_COLLECTION:collection-1:Morning chants",
+      );
     });
   });
 

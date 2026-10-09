@@ -14,16 +14,12 @@ import axiosInstance from "@/config/axios-config";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/config/auth-context";
 import { useTranslate } from "@tolgee/react";
-import { cn, createPasswordHash } from "@/lib/utils";
+import { createPasswordHash } from "@/lib/utils";
 import {
   AUTHOR_NOT_ACTIVE_DETAIL,
   isAuthorNotActiveDetail,
-  isRoleAllowedForLoginVariant,
-  normalizePlatformRole,
-  type LoginVariant,
 } from "@/lib/platformAccess";
 import { getApiErrorDetail, isTransientApiError } from "@/lib/apiErrors";
-import LoginModeTabs from "./LoginModeTabs";
 import { ROUTES } from "@/routes/paths";
 import { useStudioAuth0 } from "@/config/studio-auth0";
 import {
@@ -64,14 +60,8 @@ interface LoginData {
   password: string;
 }
 
-interface LoginProps {
-  variant?: LoginVariant;
-}
-
-const Login = ({ variant = "user" }: LoginProps) => {
+const Login = () => {
   const { t } = useTranslate();
-  const pageTitle =
-    variant === "admin" ? "Staff & reviewer sign in" : t("studio.login.title");
   const navigate = useNavigate();
   const location = useLocation();
   const [email, setEmail] = useState("");
@@ -109,28 +99,9 @@ const Login = ({ variant = "user" }: LoginProps) => {
     }
   }, [location.state]);
 
-  /** Confirms the account's platform role matches this login page before granting access. */
-  const completeLogin = async (accessToken: string, refreshToken?: string) => {
-    let role: ReturnType<typeof normalizePlatformRole> | undefined;
-    try {
-      const { data } = await axiosInstance.get(`/api/v1/authors/info`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      role = normalizePlatformRole(data?.platform_role);
-    } catch {
-      setErrors("Unable to verify your account. Please try again.");
-      return;
-    }
-
-    if (!isRoleAllowedForLoginVariant(role, variant)) {
-      setErrors(
-        variant === "admin"
-          ? "This sign-in is for staff accounts only. Please use the regular login."
-          : "This account is a staff account. Please use the staff login.",
-      );
-      return;
-    }
-
+  /** Any account (CREATOR, REVIEWER, SUPER_ADMIN) signs in here; the dashboard
+   * and nav branch on platform_role/has_group from useUserInfo afterwards. */
+  const completeLogin = (accessToken: string, refreshToken?: string) => {
     login(accessToken, refreshToken);
     navigate(ROUTES.dashboard);
   };
@@ -471,7 +442,7 @@ const Login = ({ variant = "user" }: LoginProps) => {
         },
         appState: {
           intent,
-          returnTo: variant === "admin" ? ROUTES.adminLogin : ROUTES.login,
+          returnTo: ROUTES.login,
         },
       });
     } catch {
@@ -520,10 +491,7 @@ const Login = ({ variant = "user" }: LoginProps) => {
 
   if (inactiveOnly) {
     return (
-      <ContainerLayout
-        title={pageTitle}
-        accent={variant === "admin" ? "staff" : "default"}
-      >
+      <ContainerLayout title={t("studio.login.title")}>
         <div className="animate-in fade-in-0 slide-in-from-top-1 w-full max-w-[425px] space-y-4 text-center duration-500">
           <p className="text-sm text-muted-foreground">
             {errors || AUTHOR_NOT_ACTIVE_DETAIL}
@@ -546,10 +514,7 @@ const Login = ({ variant = "user" }: LoginProps) => {
           : phoneExchangeMutation.isPending;
 
     return (
-      <ContainerLayout
-        title={pageTitle}
-        accent={variant === "admin" ? "staff" : "default"}
-      >
+      <ContainerLayout title={t("studio.login.title")}>
         <form
           key="oauth-profile"
           className="animate-in fade-in-0 slide-in-from-bottom-2 w-full max-w-[425px] space-y-4 duration-500"
@@ -601,11 +566,7 @@ const Login = ({ variant = "user" }: LoginProps) => {
   }
 
   return (
-    <ContainerLayout
-      title={pageTitle}
-      accent={variant === "admin" ? "staff" : "default"}
-    >
-      <LoginModeTabs variant={variant} />
+    <ContainerLayout title={t("studio.login.title")}>
       <form
         key="email-login"
         className="animate-in fade-in-0 slide-in-from-bottom-2 w-full max-w-[425px] space-y-4 duration-500"
@@ -650,12 +611,7 @@ const Login = ({ variant = "user" }: LoginProps) => {
         <div className="flex justify-center pt-2">
           <Button
             type="submit"
-            className={cn(
-              "w-full text-sm text-white shadow-lg transition-transform hover:scale-[1.02] active:scale-[0.98]",
-              variant === "admin"
-                ? "bg-gradient-to-r from-indigo-500 to-violet-500 shadow-indigo-500/20 hover:from-indigo-600 hover:to-violet-600"
-                : "bg-gradient-to-r from-amber-500 to-orange-500 shadow-amber-500/20 hover:from-amber-600 hover:to-orange-600",
-            )}
+            className="w-full bg-gradient-to-r from-amber-500 to-orange-500 text-sm text-white shadow-lg shadow-amber-500/20 transition-transform hover:scale-[1.02] hover:from-amber-600 hover:to-orange-600 active:scale-[0.98]"
           >
             {t("common.button.submit")}
           </Button>
@@ -731,16 +687,14 @@ const Login = ({ variant = "user" }: LoginProps) => {
           </Link>
         </div>
 
-        {variant === "user" && (
-          <div className="flex justify-center">
-            <Link
-              to="/signup"
-              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-            >
-              {t("studio.login.no_account")}
-            </Link>
-          </div>
-        )}
+        <div className="flex justify-center">
+          <Link
+            to="/signup"
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {t("studio.login.no_account")}
+          </Link>
+        </div>
       </form>
     </ContainerLayout>
   );

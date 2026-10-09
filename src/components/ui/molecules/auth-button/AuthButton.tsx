@@ -17,7 +17,14 @@ import {
 
 type MenuView = "options" | "notifications";
 
-const AuthButton = () => {
+type AuthButtonProps = {
+  /** "compact" is the bare avatar for the phone's top bar. Page headers use the
+   * default, which steps aside on a phone because that top bar carries it. */
+  variant?: "header" | "compact";
+};
+
+const AuthButton = ({ variant = "header" }: AuthButtonProps) => {
+  const compact = variant === "compact";
   const { isLoggedIn } = useAuth();
   const { data: userInfo } = useUserInfo();
   const [open, setOpen] = useState(false);
@@ -37,7 +44,9 @@ const AuthButton = () => {
       <Pecha.DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="flex items-center font-dynamic gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className={`flex items-center font-dynamic gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+            compact ? "" : "max-md:hidden"
+          }`}
           aria-label="Account menu"
         >
           <div className="relative">
@@ -48,15 +57,25 @@ const AuthButton = () => {
                 NO_PROFILE_IMAGE
               }
               alt="user"
-              className="hidden w-10 h-10 object-cover md:block rounded-full"
+              className={
+                compact
+                  ? "block h-8 w-8 rounded-full object-cover"
+                  : "hidden w-10 h-10 object-cover md:block rounded-full"
+              }
             />
             {unreadCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 hidden md:flex h-4 min-w-4 items-center justify-center rounded-full bg-[#A51C21] px-1 text-[10px] font-medium text-white">
+              <span
+                className={`absolute -top-0.5 -right-0.5 ${
+                  compact ? "flex" : "hidden md:flex"
+                } h-4 min-w-4 items-center justify-center rounded-full bg-[#A51C21] px-1 text-[10px] font-medium text-white`}
+              >
                 {unreadCount > 9 ? "9+" : unreadCount}
               </span>
             )}
           </div>
-          <div className="md:flex hidden flex-col text-left">
+          <div
+            className={compact ? "hidden" : "md:flex hidden flex-col text-left"}
+          >
             <span className="text-sm font-medium">
               {userInfo?.firstname} {userInfo?.lastname}
             </span>

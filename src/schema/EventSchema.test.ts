@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_TIMEZONE,
   defaultEventFormValues,
+  emptyLinkRow,
   emptyMetadataRow,
+  emptyYoutubeRow,
+  eventFormatLabel,
+  eventRecurrenceLabel,
+  eventLinkRowSchema,
+  eventYoutubeRowSchema,
   eventSchema,
   eventEditSchema,
   type EventFormData,
@@ -23,6 +29,38 @@ function baseValidData(overrides: Partial<EventFormData> = {}): EventFormData {
     ...overrides,
   };
 }
+
+describe("eventFormatLabel", () => {
+  it("maps each backend value to its display label", () => {
+    expect(eventFormatLabel("offline")).toBe("In person");
+    expect(eventFormatLabel("online")).toBe("Live");
+    expect(eventFormatLabel("hybrid")).toBe("Hybrid");
+  });
+
+  it("returns null for an unset or unrecognized value", () => {
+    expect(eventFormatLabel(null)).toBeNull();
+    expect(eventFormatLabel(undefined)).toBeNull();
+    expect(eventFormatLabel("something-else")).toBeNull();
+  });
+});
+
+describe("eventRecurrenceLabel", () => {
+  it("labels a one-time event", () => {
+    expect(eventRecurrenceLabel(false)).toBe("One-time");
+    expect(eventRecurrenceLabel(undefined)).toBe("One-time");
+  });
+
+  it("labels known recurrence frequencies", () => {
+    expect(eventRecurrenceLabel(true, "WEEKLY")).toBe("Weekly");
+    expect(eventRecurrenceLabel(true, "MONTHLY")).toBe("Monthly");
+    expect(eventRecurrenceLabel(true, "YEARLY")).toBe("Yearly");
+  });
+
+  it("falls back to Recurring when frequency is missing", () => {
+    expect(eventRecurrenceLabel(true)).toBe("Recurring");
+    expect(eventRecurrenceLabel(true, "DAILY")).toBe("Recurring");
+  });
+});
 
 describe("defaultEventFormValues", () => {
   it("defaults start_time/end_time to null and timezone to Asia/Kolkata", () => {
@@ -112,5 +150,83 @@ describe("eventEditSchema", () => {
       baseValidData({ start_date: "2000-01-01", end_date: "2000-01-01" }),
     );
     expect(result.success).toBe(true);
+  });
+});
+
+describe("eventLinkRowSchema", () => {
+  it("requires a language", () => {
+    const result = eventLinkRowSchema.safeParse({
+      type: "web",
+      url: "https://example.com",
+      label: "",
+      language: "",
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts a fully populated row", () => {
+    const result = eventLinkRowSchema.safeParse({
+      type: "web",
+      url: "https://example.com",
+      label: "Join here",
+      language: "BO",
+    });
+    expect(result.success).toBe(true);
+  });
+});
+
+describe("eventYoutubeRowSchema", () => {
+  it.each([
+    "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "https://youtube.com/watch?v=dQw4w9WgXcQ",
+    "https://youtu.be/dQw4w9WgXcQ",
+    "https://m.youtube.com/watch?v=dQw4w9WgXcQ",
+  ])("accepts a youtube URL: %s", (url) => {
+    const result = eventYoutubeRowSchema.safeParse({
+      url,
+      label: "",
+      language: "EN",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it.each(["https://vimeo.com/12345", "https://example.com", "not-a-url"])(
+    "rejects a non-youtube URL: %s",
+    (url) => {
+      const result = eventYoutubeRowSchema.safeParse({
+        url,
+        label: "",
+        language: "EN",
+      });
+      expect(result.success).toBe(false);
+    },
+  );
+
+  it("requires a language", () => {
+    const result = eventYoutubeRowSchema.safeParse({
+      url: "https://youtu.be/dQw4w9WgXcQ",
+      label: "",
+      language: "",
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("emptyLinkRow / emptyYoutubeRow", () => {
+  it("stamps the given language onto a new link row", () => {
+    expect(emptyLinkRow("BO")).toEqual({
+      type: "",
+      url: "",
+      label: "",
+      language: "BO",
+    });
+  });
+
+  it("stamps the given language onto a new youtube row", () => {
+    expect(emptyYoutubeRow("ZH")).toEqual({
+      url: "",
+      label: "",
+      language: "ZH",
+    });
   });
 });

@@ -13,6 +13,7 @@ import { usesStaffWideDashboardGroupList } from "@/lib/platformAccess";
 import type { UserInfo } from "@/hooks/useUserInfo";
 import { capitalizeFirstLetter } from "@/lib/textUtils";
 
+import { getAuthHeaders } from "@/lib/auth-storage";
 export type AuthorGroupMemberRole = "OWNER" | "ADMIN" | "AUTHOR" | "VIEWER";
 
 export type AuthorGroupType = "PAGE" | "COMMUNITY";
@@ -23,23 +24,6 @@ export type AuthorGroupStatus = "DRAFT" | "PUBLISHED" | "UNPUBLISHED";
 export function isGroupVisibleInApp(status?: AuthorGroupStatus): boolean {
   return status === "PUBLISHED";
 }
-
-export const GROUP_TYPE_OPTIONS: {
-  value: AuthorGroupType;
-  label: string;
-  description: string;
-}[] = [
-  {
-    value: "PAGE",
-    label: "Page",
-    description: "Users follow this group to stay updated.",
-  },
-  {
-    value: "COMMUNITY",
-    label: "Community",
-    description: "Users join this group as members.",
-  },
-];
 
 export interface GroupMetadataDTO {
   id?: string;
@@ -52,8 +36,8 @@ export interface GroupMetadataDTO {
 
 export interface GroupMetadataInput {
   title: string;
-  sub_title: string;
-  description: string;
+  sub_title?: string | null;
+  description?: string | null;
   description_long?: string | null;
   language: LanguageCode;
 }
@@ -135,8 +119,18 @@ export interface AuthorGroupListItem {
   avatar?: string | null;
   avatar_key?: string | null;
   avatar_url?: string | null;
+  /** Null for groups nobody has marked with a tradition yet. */
+  tradition?: GroupTraditionDTO | null;
   /** Current user's membership role when returned by the CMS list API. */
   my_role?: AuthorGroupMemberRole | null;
+}
+
+export interface GroupTraditionDTO {
+  id: string;
+  /** What create/update send back as `tradition_code`. */
+  code: string;
+  /** Localized; null when the tradition has no name in any language. */
+  name?: string | null;
 }
 
 export interface AuthorGroupDetailDTO extends AuthorGroupListItem {
@@ -158,11 +152,14 @@ export interface AuthorGroupListResponse {
 }
 
 export interface CreateAuthorGroupRequest {
-  slug: string;
+  /** Omitted for practice spaces: the backend generates one from the name. */
+  slug?: string;
   group_type?: AuthorGroupType;
   is_public?: boolean;
   avatar_key?: string | null;
   banner_key?: string | null;
+  /** A code from GET /traditions; omit to leave the group unmarked. */
+  tradition_code?: string | null;
   metadata: GroupMetadataInput[];
 }
 
@@ -171,6 +168,8 @@ export interface UpdateAuthorGroupRequest {
   is_public?: boolean;
   avatar_key?: string | null;
   banner_key?: string | null;
+  /** null clears the group's tradition; omitting it leaves it unchanged. */
+  tradition_code?: string | null;
   metadata?: GroupMetadataInput[];
 }
 
@@ -260,18 +259,6 @@ export interface FetchGroupsParams {
 }
 
 export const TRANSFER_GROUPS_PAGE_LIMIT = 100;
-
-const getAuthHeaders = () => ({
-  Authorization: `Bearer ${sessionStorage.getItem("accessToken")}`,
-});
-
-export function groupTypeLabel(groupType?: AuthorGroupType): string {
-  if (!groupType) return "—";
-  return (
-    GROUP_TYPE_OPTIONS.find((option) => option.value === groupType)?.label ??
-    groupType
-  );
-}
 
 export const fetchGroups = async ({
   page,
@@ -706,8 +693,8 @@ export function buildGroupMetadata(
       LanguageCode,
       {
         title: string;
-        sub_title: string;
-        description: string;
+        sub_title?: string;
+        description?: string;
         description_long?: string;
       }
     >
@@ -717,13 +704,13 @@ export function buildGroupMetadata(
   for (const code of sortLanguageCodes(Object.keys(languages))) {
     const block = languages[code];
     if (!block) continue;
-    const descriptionLong = block.description_long?.trim() ?? "";
+    // Only the title is required; anything left empty is sent as null.
     out.push({
       language: code,
       title: block.title.trim(),
-      sub_title: block.sub_title.trim(),
-      description: block.description.trim(),
-      description_long: descriptionLong || null,
+      sub_title: block.sub_title?.trim() || null,
+      description: block.description?.trim() || null,
+      description_long: block.description_long?.trim() || null,
     });
   }
   return out;

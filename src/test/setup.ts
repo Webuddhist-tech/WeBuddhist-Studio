@@ -47,6 +47,8 @@ vi.mock("@/config/axios-config", () => ({
     put: vi.fn(),
     delete: vi.fn(),
   },
+  REFRESH_TOKEN_ENDPOINT: "/api/v1/cms/auth/refresh-token",
+  setUnauthorizedHandler: vi.fn(),
 }));
 
 vi.mock("@tolgee/react", () => ({

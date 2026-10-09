@@ -4,6 +4,7 @@ import type { EventFormData } from "@/schema/EventSchema";
 import type { FkOption } from "../FkMultiSearchSelector";
 import { makeLinkedContentSearchFn } from "@/components/routes/groups/api/groupPickerApi";
 import { searchAccumulatorPresets } from "@/components/routes/groups/api/accumulatorPresetSearchApi";
+import { makeGroupAccumulatorSearchFn } from "@/components/routes/groups/api/groupAccumulatorsApi";
 import { makeChantCollectionSearchFn } from "@/components/routes/groups/api/chantsApi";
 import EventLinkPicker from "./EventLinkPicker";
 
@@ -13,9 +14,11 @@ type EventLinksSectionProps = {
   readOnly: boolean;
   contentValue: FkOption | null;
   accumulatorValue: FkOption | null;
+  groupAccumulatorValue: FkOption | null;
   chantValue: FkOption | null;
   onContentChange: (item: FkOption | null) => void;
   onAccumulatorChange: (item: FkOption | null) => void;
+  onGroupAccumulatorChange: (item: FkOption | null) => void;
   onChantChange: (item: FkOption | null) => void;
 };
 
@@ -25,9 +28,11 @@ const EventLinksSection = ({
   readOnly,
   contentValue,
   accumulatorValue,
+  groupAccumulatorValue,
   chantValue,
   onContentChange,
   onAccumulatorChange,
+  onGroupAccumulatorChange,
   onChantChange,
 }: EventLinksSectionProps) => {
   const handleContentChange = (item: FkOption | null) => {
@@ -40,6 +45,14 @@ const EventLinksSection = ({
   const handleAccumulatorChange = (item: FkOption | null) => {
     onAccumulatorChange(item);
     form.setValue("accumulator_id", item?.id ?? "", {
+      shouldDirty: true,
+      shouldValidate: true,
+    });
+  };
+
+  const handleGroupAccumulatorChange = (item: FkOption | null) => {
+    onGroupAccumulatorChange(item);
+    form.setValue("group_accumulator_id", item?.id ?? "", {
       shouldDirty: true,
       shouldValidate: true,
     });
@@ -63,6 +76,11 @@ const EventLinksSection = ({
     [groupId],
   );
 
+  const groupAccumulatorSearchFn = useMemo(
+    () => makeGroupAccumulatorSearchFn(groupId),
+    [groupId],
+  );
+
   return (
     <div className="space-y-4">
       <h3 className="text-sm font-bold">Linked content (optional)</h3>
@@ -83,6 +101,15 @@ const EventLinksSection = ({
           searchFn={searchAccumulatorPresets}
           queryKeyPrefix="event-accumulator-picker"
           searchPlaceholder="Search accumulators…"
+          disabled={readOnly}
+        />
+        <EventLinkPicker
+          label="Group accumulator"
+          value={groupAccumulatorValue}
+          onChange={handleGroupAccumulatorChange}
+          searchFn={groupAccumulatorSearchFn}
+          queryKeyPrefix={`event-group-accumulator-picker-${groupId}`}
+          searchPlaceholder="Search group accumulators…"
           disabled={readOnly}
         />
         <EventLinkPicker

@@ -5,6 +5,7 @@ import {
   pickGroupTitle,
   type AuthorGroupListItem,
   type AuthorGroupMemberRole,
+  type AuthorGroupType,
 } from "@/components/routes/groups/api/groupsApi";
 import type { UserInfo } from "@/hooks/useUserInfo";
 import {
@@ -41,7 +42,11 @@ function rolesMapFromGroups(
   return map;
 }
 
-export function useDashboardGroupFilterOptions(userInfo?: UserInfo | null) {
+export function useDashboardGroupFilterOptions(
+  userInfo?: UserInfo | null,
+  /** Limit the filter options to one group type (roles still cover all groups). */
+  groupType?: AuthorGroupType,
+) {
   const platformRole = userInfo?.platform_role;
   const isStaffWideList = usesStaffWideDashboardGroupList(platformRole);
   const canLoad = canUseDashboardGroupFilter(userInfo);
@@ -54,10 +59,13 @@ export function useDashboardGroupFilterOptions(userInfo?: UserInfo | null) {
     refetchOnWindowFocus: false,
   });
 
-  const options = useMemo(
-    () => toFilterOptions(query.data ?? [], !isStaffWideList),
-    [query.data, isStaffWideList],
-  );
+  const options = useMemo(() => {
+    const groups = query.data ?? [];
+    const filtered = groupType
+      ? groups.filter((group) => group.group_type === groupType)
+      : groups;
+    return toFilterOptions(filtered, !isStaffWideList);
+  }, [query.data, isStaffWideList, groupType]);
 
   const rolesByGroupId = useMemo(
     () => rolesMapFromGroups(query.data ?? []),

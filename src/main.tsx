@@ -8,6 +8,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ThemeProvider } from "./providers/theme-provider.tsx";
 import { PlanAuthProvider } from "./config/auth-context.tsx";
 import { Toaster } from "@/components/ui/atoms/sonner";
+import { AppUpdateProvider } from "@/components/ui/molecules/install-app/AppUpdateProvider";
+import { PwaUpdatePrompt } from "@/components/ui/molecules/install-app/PwaUpdatePrompt";
+import { DEFERS_APP_UPDATE } from "@/components/ui/molecules/install-app/defersAppUpdate";
+import "./lib/pwaInstall";
 import {
   BackendFetch,
   DevTools,
@@ -17,7 +21,6 @@ import {
 } from "@tolgee/react";
 import { LANGUAGE } from "./lib/constant.ts";
 import Login from "./components/auth/login/Login";
-import AdminLogin from "./components/auth/login/AdminLogin";
 import ForgotPassword from "./components/auth/forgot-password/ForgotPassword";
 import EmailVerification from "./components/auth/email-verification/EmailVerification";
 import Signup from "./components/auth/signup/Signup";
@@ -36,6 +39,7 @@ import Tags from "./components/routes/tags/Tags.tsx";
 import TraditionsPage from "./components/routes/traditions/TraditionsPage.tsx";
 import VerseOfDay from "./components/routes/verse-of-day/VerseOfDay.tsx";
 import Poems from "./components/routes/poems/Poems.tsx";
+import PrayerIntentionsPage from "./components/routes/prayer-intentions/PrayerIntentionsPage.tsx";
 import Groups from "./components/routes/groups/Groups.tsx";
 import GroupLayout from "./components/routes/groups/GroupLayout.tsx";
 import GroupAboutPage from "./components/routes/groups/GroupAboutPage.tsx";
@@ -44,12 +48,16 @@ import GroupContentPage from "./components/routes/groups/GroupContentPage.tsx";
 import GroupTransfersPage from "./components/routes/groups/GroupTransfersPage.tsx";
 import GroupMembersPage from "./components/routes/groups/GroupMembersPage.tsx";
 import GroupJoinRequestsPage from "./components/routes/groups/GroupJoinRequestsPage.tsx";
+import GroupCommunityPage from "./components/routes/groups/GroupCommunityPage.tsx";
 import GroupEventsPage from "./components/routes/groups/GroupEventsPage.tsx";
 import GroupEventFormPage from "./components/routes/groups/GroupEventFormPage.tsx";
 import GroupEventDetailPage from "./components/routes/groups/GroupEventDetailPage.tsx";
+import LiveControlPage from "./components/routes/live-control/LiveControlPage.tsx";
+import AutoplayTestPage from "./components/routes/live-control/AutoplayTestPage.tsx";
 import GroupChantsPage from "./components/routes/groups/GroupChantsPage.tsx";
 import GroupChantFormPage from "./components/routes/groups/GroupChantFormPage.tsx";
 import GroupChantDetailPage from "./components/routes/groups/GroupChantDetailPage.tsx";
+import GroupAssetsPage from "./components/routes/groups/GroupAssetsPage.tsx";
 import GroupPostsPage from "./components/routes/groups/GroupPostsPage.tsx";
 import GroupPostFormPage from "./components/routes/groups/GroupPostFormPage.tsx";
 import GroupFormPage from "./components/routes/groups/GroupFormPage.tsx";
@@ -58,6 +66,7 @@ import ChinaRestrictionsPage from "./components/routes/china-restrictions/ChinaR
 import ChatReportsPage from "./components/routes/chat-reports/ChatReportsPage.tsx";
 import AccumulatorPresetsPage from "./components/routes/accumulator-presets/AccumulatorPresetsPage.tsx";
 import TextAudioPage from "./components/routes/text-audio/TextAudioPage.tsx";
+import AmbientSoundsPage from "./components/routes/ambient-sounds/AmbientSoundsPage.tsx";
 import { UserbackProvider } from "./config/userback-context.tsx";
 import { Navigate } from "react-router-dom";
 import { ROUTES } from "./routes/paths.ts";
@@ -71,7 +80,7 @@ const tolgee = Tolgee()
   .use(
     BackendFetch({
       prefix:
-        "https://cdn.tolg.ee/300fa406912d362adee8a983f8f4682d/reactjs_json",
+        "https://cdn.tolg.ee/50cc3287503c99e8f336aad9ee80f6f1/reactjs_json",
       fallbackOnFail: true,
     }),
   )
@@ -81,6 +90,20 @@ const tolgee = Tolgee()
   });
 
 const router = createBrowserRouter([
+  // Outside the app shell on purpose: the operator control is opened in its own
+  // tab, signs nobody in, and carries no navbar - the emit token is what lets it
+  // drive the room.
+  {
+    path: "/live-control/:eventId",
+    element: <LiveControlPage />,
+    handle: DEFERS_APP_UPDATE,
+  },
+  // Plays a text back by its recorded times on this screen only: no socket,
+  // nothing published, so autoplay can be checked without moving a room.
+  {
+    path: "/live/:eventId/autoplay-test",
+    element: <AutoplayTestPage />,
+  },
   {
     path: "/",
     element: <App />,
@@ -88,10 +111,6 @@ const router = createBrowserRouter([
       {
         path: "/login",
         element: <Login />,
-      },
-      {
-        path: ROUTES.adminLogin,
-        element: <AdminLogin />,
       },
       {
         path: "/signup",
@@ -242,6 +261,14 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: ROUTES.prayerIntentions,
+        element: (
+          <ProtectedRoute>
+            <PrayerIntentionsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
         path: ROUTES.accumulatorPresets,
         element: (
           <ProtectedRoute>
@@ -258,10 +285,21 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: ROUTES.ambientSounds,
+        element: (
+          <ProtectedRoute>
+            <AmbientSoundsPage />
+          </ProtectedRoute>
+        ),
+      },
+      // Practice spaces and pages are both groups; the list and create routes
+      // fix the type, and the key keeps one list's search from carrying into the
+      // other.
+      {
         path: ROUTES.groups,
         element: (
           <ProtectedRoute>
-            <Groups />
+            <Groups key="COMMUNITY" groupType="COMMUNITY" />
           </ProtectedRoute>
         ),
       },
@@ -269,7 +307,23 @@ const router = createBrowserRouter([
         path: ROUTES.groupNew,
         element: (
           <ProtectedRoute>
-            <GroupFormPage />
+            <GroupFormPage key="COMMUNITY" groupType="COMMUNITY" />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: ROUTES.pages,
+        element: (
+          <ProtectedRoute>
+            <Groups key="PAGE" groupType="PAGE" />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: ROUTES.pageNew,
+        element: (
+          <ProtectedRoute>
+            <GroupFormPage key="PAGE" groupType="PAGE" />
           </ProtectedRoute>
         ),
       },
@@ -287,6 +341,7 @@ const router = createBrowserRouter([
           { path: "transfers", element: <GroupTransfersPage /> },
           { path: "members", element: <GroupMembersPage /> },
           { path: "join-requests", element: <GroupJoinRequestsPage /> },
+          { path: "community", element: <GroupCommunityPage /> },
           { path: "events", element: <GroupEventsPage /> },
           { path: "events/new", element: <GroupEventFormPage /> },
           { path: "events/:eventId", element: <GroupEventDetailPage /> },
@@ -301,6 +356,7 @@ const router = createBrowserRouter([
             path: "chants/:collectionId/edit",
             element: <GroupChantFormPage />,
           },
+          { path: "assets", element: <GroupAssetsPage /> },
         ],
       },
       {
@@ -347,9 +403,12 @@ createRoot(document.getElementById("root")!).render(
           <PlanAuthProvider>
             <UserbackProvider>
               <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-                <RouterProvider router={router} />
-                <ReactQueryDevtools initialIsOpen={false} />
-                <Toaster />
+                <AppUpdateProvider>
+                  <RouterProvider router={router} />
+                  <ReactQueryDevtools initialIsOpen={false} />
+                  <Toaster />
+                  <PwaUpdatePrompt router={router} />
+                </AppUpdateProvider>
               </ThemeProvider>
             </UserbackProvider>
           </PlanAuthProvider>

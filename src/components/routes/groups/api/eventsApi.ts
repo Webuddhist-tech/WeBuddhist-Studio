@@ -2,13 +2,16 @@ import axiosInstance from "@/config/axios-config";
 import { uploadImageToS3 } from "@/components/routes/task/api/taskApi";
 import { makeLinkedContentSearchFn } from "@/components/routes/groups/api/groupPickerApi";
 import { searchAccumulatorPresets } from "@/components/routes/groups/api/accumulatorPresetSearchApi";
+import { makeGroupAccumulatorSearchFn } from "@/components/routes/groups/api/groupAccumulatorsApi";
 import { fetchChantCollection } from "@/components/routes/groups/api/chantsApi";
 import type { EventLocation } from "@/components/routes/groups/api/locationsApi";
 import type { FkOption } from "@/components/routes/groups/components/FkMultiSearchSelector";
 import type {
+  EventFormat,
   EventFormData,
   EventLinkRow,
   EventMetadataRow,
+  EventYoutubeRow,
   LanguageCode,
   RecurrenceFormData,
 } from "@/schema/EventSchema";
@@ -52,6 +55,15 @@ export interface EventLinkDTO {
   type: string;
   url: string;
   label?: string;
+  language: string;
+  display_order: number;
+}
+
+export interface EventYoutubeDTO {
+  id: string;
+  url: string;
+  label?: string;
+  language: string;
   display_order: number;
 }
 
@@ -60,7 +72,8 @@ export interface RecurrenceDTO {
   date_system: string;
   calendar_type?: string;
   month?: number;
-  day: number;
+  day?: number;
+  day_of_week?: number;
   duration_days: number;
 }
 
@@ -69,8 +82,17 @@ export interface RecurrenceInput {
   date_system: string;
   calendar_type?: string;
   month?: number | null;
-  day: number;
+  day?: number | null;
+  day_of_week?: number | null;
   duration_days: number;
+}
+
+export interface EventPrayerIntentionDTO {
+  slug: string;
+  label: string;
+  color: string;
+  description: string;
+  display_order: number;
 }
 
 export interface EventDTO {
@@ -79,9 +101,15 @@ export interface EventDTO {
   plan_id?: string;
   series_id?: string;
   accumulator_id?: string;
+  group_accumulator_id?: string;
   group_recitation_collection_id?: string;
   location_id?: string;
   location?: EventLocation;
+  event_format: EventFormat;
+  chat_enabled?: boolean;
+  notifications_enabled?: boolean;
+  intentions?: EventPrayerIntentionDTO[];
+  chat_room_id?: string | null;
   start_date: string;
   end_date: string;
   timezone?: string | null;
@@ -92,6 +120,7 @@ export interface EventDTO {
   occurrence_date?: string;
   metadata: EventMetadataResponse;
   links?: EventLinkDTO[];
+  youtube?: EventYoutubeDTO[];
   image?: ImageUrlModel;
   image_url?: string;
   participant_count?: number;
@@ -117,6 +146,14 @@ export interface EventLinkInput {
   type: string;
   url: string;
   label?: string;
+  language: LanguageCode;
+  display_order: number;
+}
+
+export interface EventYoutubeInput {
+  url: string;
+  label?: string;
+  language: LanguageCode;
   display_order: number;
 }
 
@@ -127,12 +164,18 @@ export interface CreateEventRequest {
   timezone?: string;
   metadata: EventMetadataInput[];
   links?: EventLinkInput[];
+  youtube?: EventYoutubeInput[];
   image_url?: string;
   plan_id?: string;
   series_id?: string;
   accumulator_id?: string;
+  group_accumulator_id?: string;
   group_recitation_collection_id?: string;
   location_id?: string;
+  event_format?: EventFormat;
+  chat_enabled?: boolean;
+  notifications_enabled?: boolean;
+  intention_ids?: string[];
   recurrence?: RecurrenceInput;
 }
 
@@ -143,13 +186,19 @@ export interface UpdateEventRequest {
   timezone?: string;
   metadata?: EventMetadataInput[];
   links?: EventLinkInput[];
+  youtube?: EventYoutubeInput[];
   image_url?: string;
-  plan_id?: string;
-  series_id?: string;
-  accumulator_id?: string;
+  plan_id?: string | null;
+  series_id?: string | null;
+  accumulator_id?: string | null;
+  group_accumulator_id?: string | null;
   group_recitation_collection_id?: string | null;
   location_id?: string | null;
-  recurrence?: RecurrenceInput;
+  event_format?: EventFormat;
+  chat_enabled?: boolean;
+  notifications_enabled?: boolean;
+  intention_ids?: string[];
+  recurrence?: RecurrenceInput | null;
 }
 
 export interface EventListFilters {
@@ -201,6 +250,39 @@ export const updateCmsEvent = async (
 ): Promise<EventDTO> => {
   const { data } = await axiosInstance.put<EventDTO>(
     `/api/v1/cms/events/${eventId}`,
+    body,
+  );
+  return data;
+};
+
+export type EventNotificationAudience = "participants" | "group";
+
+export interface SendEventNotificationRequest {
+  title: string;
+  body: string;
+  audience: EventNotificationAudience;
+}
+
+export interface SendEventNotificationResponse {
+  event_id: string;
+  announcement_id: string;
+  audience: EventNotificationAudience;
+  sqs_message_id: string;
+}
+
+/**
+ * Send a one-off notification about an event.
+ *
+ * Resolves once the backend has queued it, not once devices have it: a 202
+ * means accepted for delivery. A 409 means the event's notifications switch
+ * is off.
+ */
+export const sendCmsEventNotification = async (
+  eventId: string,
+  body: SendEventNotificationRequest,
+): Promise<SendEventNotificationResponse> => {
+  const { data } = await axiosInstance.post<SendEventNotificationResponse>(
+    `/api/v1/cms/events/${eventId}/notifications`,
     body,
   );
   return data;
@@ -266,19 +348,35 @@ export function mapEventToFormData(event: EventDTO): EventFormData {
         type: link.type?.trim() ?? "",
         url: link.url?.trim() ?? "",
         label: link.label?.trim() ?? "",
+        // Unlike metadata rows, an unparseable language here defaults to EN
+        // rather than dropping the row - links aren't the source of truth
+        // for which languages the event supports, so silently deleting a
+        // user's link would be worse than mislabeling its language.
+        language: normalizeLanguageCode(link.language ?? "") ?? "EN",
+      }),
+    );
+
+  const youtube = [...(event.youtube ?? [])]
+    .sort((a, b) => a.display_order - b.display_order)
+    .map(
+      (item): EventYoutubeRow => ({
+        url: item.url?.trim() ?? "",
+        label: item.label?.trim() ?? "",
+        language: normalizeLanguageCode(item.language ?? "") ?? "EN",
       }),
     );
 
   let recurrence: RecurrenceFormData | null = null;
   if (event.recurrence) {
     recurrence = {
-      frequency: event.recurrence.frequency as "YEARLY" | "MONTHLY",
+      frequency: event.recurrence.frequency as "YEARLY" | "MONTHLY" | "WEEKLY",
       date_system: event.recurrence.date_system as
         | "GREGORIAN"
         | "TIBETAN_LUNAR",
       calendar_type: event.recurrence.calendar_type?.trim() ?? "",
       month: event.recurrence.month ?? null,
-      day: event.recurrence.day,
+      day: event.recurrence.day ?? null,
+      day_of_week: event.recurrence.day_of_week ?? null,
       duration_days: event.recurrence.duration_days,
     };
   }
@@ -304,14 +402,37 @@ export function mapEventToFormData(event: EventDTO): EventFormData {
     metadata:
       rows.length > 0 ? rows : [{ language: "EN", name: "", description: "" }],
     links,
+    youtube,
     image_url: event.image_url?.trim() ?? "",
     plan_id: event.plan_id?.trim() ?? "",
     series_id: event.series_id?.trim() ?? "",
     accumulator_id: event.accumulator_id?.trim() ?? "",
+    group_accumulator_id: event.group_accumulator_id?.trim() ?? "",
     group_recitation_collection_id:
       event.group_recitation_collection_id?.trim() ?? "",
     location_id: event.location_id?.trim() ?? "",
+    event_format: event.event_format ?? "hybrid",
+    chat_enabled: event.chat_enabled ?? true,
+    notifications_enabled: event.notifications_enabled ?? true,
+    intention_ids: [],
   };
+}
+
+function intentionIdsEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const sortedA = [...a].sort();
+  const sortedB = [...b].sort();
+  return sortedA.every((id, index) => id === sortedB[index]);
+}
+
+/** Map linked intention slugs from the event to CMS catalog ids. */
+export function intentionIdsFromEventSlugs(
+  eventIntentions: EventPrayerIntentionDTO[] | undefined,
+  catalog: { id: string; slug: string }[],
+): string[] {
+  if (!eventIntentions?.length) return [];
+  const slugs = new Set(eventIntentions.map((row) => row.slug));
+  return catalog.filter((row) => slugs.has(row.slug)).map((row) => row.id);
 }
 
 function buildLinksInput(rows: EventLinkRow[]): EventLinkInput[] {
@@ -320,6 +441,7 @@ function buildLinksInput(rows: EventLinkRow[]): EventLinkInput[] {
     return {
       type: row.type.trim(),
       url: row.url.trim(),
+      language: row.language,
       display_order: index + 1,
       ...(label ? { label } : {}),
     };
@@ -332,6 +454,29 @@ function linksEqual(a: EventLinkRow[], b: EventLinkRow[]): boolean {
     if (a[i].type.trim() !== b[i].type.trim()) return false;
     if (a[i].url.trim() !== b[i].url.trim()) return false;
     if (a[i].label.trim() !== b[i].label.trim()) return false;
+    if (a[i].language !== b[i].language) return false;
+  }
+  return true;
+}
+
+function buildYoutubeInput(rows: EventYoutubeRow[]): EventYoutubeInput[] {
+  return rows.map((row, index) => {
+    const label = row.label.trim();
+    return {
+      url: row.url.trim(),
+      language: row.language,
+      display_order: index + 1,
+      ...(label ? { label } : {}),
+    };
+  });
+}
+
+function youtubeEqual(a: EventYoutubeRow[], b: EventYoutubeRow[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].url.trim() !== b[i].url.trim()) return false;
+    if (a[i].label.trim() !== b[i].label.trim()) return false;
+    if (a[i].language !== b[i].language) return false;
   }
   return true;
 }
@@ -356,6 +501,21 @@ function composeBackendDate(
   return toBackendISO(dateOnlyToDate(dateOnly), hhmm || fallbackHhmm, timezone);
 }
 
+/**
+ * For a recurring event, the calendar date comes from the recurrence rule
+ * (day/month), not from a picker — only the time-of-day is meaningful here.
+ * The backend derives the actual occurrence dates and keeps just the time
+ * component off this value, so any anchor date works; "now" is used since
+ * there's nothing more meaningful to pick.
+ */
+function composeRecurrenceTimeAnchor(
+  hhmm: string | null | undefined,
+  fallbackHhmm: string,
+  timezone: string,
+): string {
+  return toBackendISO(new Date(), hhmm || fallbackHhmm, timezone);
+}
+
 function buildRecurrenceInput(recurrence: RecurrenceFormData): RecurrenceInput {
   const calendarType = recurrence.calendar_type.trim();
   return {
@@ -364,6 +524,7 @@ function buildRecurrenceInput(recurrence: RecurrenceFormData): RecurrenceInput {
     ...(calendarType ? { calendar_type: calendarType } : {}),
     month: recurrence.month,
     day: recurrence.day,
+    day_of_week: recurrence.day_of_week,
     duration_days: recurrence.duration_days,
   };
 }
@@ -376,6 +537,7 @@ export function buildCreateEventBody(
   const planId = data.plan_id.trim();
   const seriesId = data.series_id.trim();
   const accumulatorId = data.accumulator_id.trim();
+  const groupAccumulatorId = data.group_accumulator_id.trim();
   const chantCollectionId = data.group_recitation_collection_id.trim();
   const locationId = data.location_id.trim();
 
@@ -386,18 +548,36 @@ export function buildCreateEventBody(
     timezone,
     metadata: buildMetadataInput(data.metadata),
     ...(data.links.length ? { links: buildLinksInput(data.links) } : {}),
+    ...(data.youtube.length
+      ? { youtube: buildYoutubeInput(data.youtube) }
+      : {}),
     ...(imageUrl ? { image_url: imageUrl } : {}),
     ...(planId ? { plan_id: planId } : {}),
     ...(seriesId ? { series_id: seriesId } : {}),
     ...(accumulatorId ? { accumulator_id: accumulatorId } : {}),
+    ...(groupAccumulatorId ? { group_accumulator_id: groupAccumulatorId } : {}),
     ...(chantCollectionId
       ? { group_recitation_collection_id: chantCollectionId }
       : {}),
     ...(locationId ? { location_id: locationId } : {}),
+    event_format: data.event_format,
+    chat_enabled: data.chat_enabled,
+    notifications_enabled: data.notifications_enabled,
+    ...(data.intention_ids.length ? { intention_ids: data.intention_ids } : {}),
   };
 
   if (data.is_recurring && data.recurrence) {
     body.recurrence = buildRecurrenceInput(data.recurrence);
+    body.start_date = composeRecurrenceTimeAnchor(
+      data.start_time,
+      DEFAULT_START_TIME,
+      timezone,
+    );
+    body.end_date = composeRecurrenceTimeAnchor(
+      data.end_time,
+      DEFAULT_END_TIME,
+      timezone,
+    );
   } else {
     body.start_date = composeBackendDate(
       data.start_date,
@@ -441,7 +621,11 @@ async function resolveLinkOption(
       const fetched = res.skip + res.items.length;
       if (fetched >= res.total || res.items.length === 0) break;
     }
-  } catch {}
+  } catch {
+    // Deliberately swallowed: this only resolves a label for an id the caller
+    // already holds, so a failed lookup falls through to the fallback option
+    // below rather than taking down the form that renders it.
+  }
   return {
     id,
     title: fallbackLabel,
@@ -465,6 +649,17 @@ export function resolveLinkedContent(
 
 export function resolveLinkedAccumulator(id: string): Promise<FkOption> {
   return resolveLinkOption(id, "Linked accumulator", searchAccumulatorPresets);
+}
+
+export function resolveLinkedGroupAccumulator(
+  groupId: string,
+  id: string,
+): Promise<FkOption> {
+  return resolveLinkOption(
+    id,
+    "Linked group accumulator",
+    makeGroupAccumulatorSearchFn(groupId),
+  );
 }
 
 export async function resolveLinkedChantCollection(
@@ -535,14 +730,27 @@ export function buildUpdateEventBody(
     body.links = buildLinksInput(data.links);
   }
 
-  const scalarKeys: (keyof Pick<
+  if (!youtubeEqual(data.youtube, original.youtube)) {
+    body.youtube = buildYoutubeInput(data.youtube);
+  }
+
+  const nextImageUrl = data.image_url.trim();
+  const prevImageUrl = original.image_url.trim();
+  if (nextImageUrl !== prevImageUrl) {
+    body.image_url = nextImageUrl;
+  }
+
+  // These are unlink-able FK fields: an empty value means "clear the link"
+  // and must be sent as `null`, not `""` — the backend interprets an empty
+  // string as an invalid UUID rather than an unlink instruction.
+  const nullableFkKeys: (keyof Pick<
     EventFormData,
-    "image_url" | "plan_id" | "series_id" | "accumulator_id"
-  >)[] = ["image_url", "plan_id", "series_id", "accumulator_id"];
-  for (const key of scalarKeys) {
+    "plan_id" | "series_id" | "accumulator_id" | "group_accumulator_id"
+  >)[] = ["plan_id", "series_id", "accumulator_id", "group_accumulator_id"];
+  for (const key of nullableFkKeys) {
     const next = data[key].trim();
     const prev = original[key].trim();
-    if (next !== prev) body[key] = next;
+    if (next !== prev) body[key] = next || null;
   }
 
   const nextChant = data.group_recitation_collection_id.trim();
@@ -557,11 +765,45 @@ export function buildUpdateEventBody(
     body.location_id = nextLocation || null;
   }
 
+  if (data.event_format !== original.event_format) {
+    body.event_format = data.event_format;
+  }
+
+  if (data.notifications_enabled !== original.notifications_enabled) {
+    body.notifications_enabled = data.notifications_enabled;
+  }
+  if (data.chat_enabled !== original.chat_enabled) {
+    body.chat_enabled = data.chat_enabled;
+  }
+
+  if (!intentionIdsEqual(data.intention_ids, original.intention_ids)) {
+    body.intention_ids = data.intention_ids;
+  }
+
   // Handle recurrence changes
+  const recurrenceTimeChanged =
+    data.start_time !== original.start_time ||
+    data.end_time !== original.end_time ||
+    timezone !== originalTimezone;
+
   if (data.is_recurring !== original.is_recurring) {
     if (data.is_recurring && data.recurrence) {
       body.recurrence = buildRecurrenceInput(data.recurrence);
+      body.start_date = composeRecurrenceTimeAnchor(
+        data.start_time,
+        DEFAULT_START_TIME,
+        timezone,
+      );
+      body.end_date = composeRecurrenceTimeAnchor(
+        data.end_time,
+        DEFAULT_END_TIME,
+        timezone,
+      );
     } else {
+      // Explicit null tells the backend to drop the recurrence rule; sending
+      // only dates would leave is_recurring=true and the list would still
+      // expand the next occurrence (which then disagrees with the detail page).
+      body.recurrence = null;
       body.start_date = composeBackendDate(
         data.start_date,
         data.start_time,
@@ -576,16 +818,35 @@ export function buildUpdateEventBody(
       );
     }
   } else if (data.is_recurring && data.recurrence && original.recurrence) {
-    // Check if recurrence fields changed
-    if (
+    // Check if the recurrence rule itself changed
+    const recurrenceRuleChanged =
       data.recurrence.frequency !== original.recurrence.frequency ||
       data.recurrence.date_system !== original.recurrence.date_system ||
       data.recurrence.calendar_type !== original.recurrence.calendar_type ||
       data.recurrence.month !== original.recurrence.month ||
       data.recurrence.day !== original.recurrence.day ||
-      data.recurrence.duration_days !== original.recurrence.duration_days
-    ) {
+      data.recurrence.day_of_week !== original.recurrence.day_of_week ||
+      data.recurrence.duration_days !== original.recurrence.duration_days;
+
+    if (recurrenceRuleChanged) {
       body.recurrence = buildRecurrenceInput(data.recurrence);
+    }
+
+    // The recurrence rule only pins the calendar day; the start/end time of
+    // day rides along on start_date/end_date, so send them whenever the
+    // time (or the zone it's interpreted in) changed, even if the rule
+    // itself did not.
+    if (recurrenceTimeChanged) {
+      body.start_date = composeRecurrenceTimeAnchor(
+        data.start_time,
+        DEFAULT_START_TIME,
+        timezone,
+      );
+      body.end_date = composeRecurrenceTimeAnchor(
+        data.end_time,
+        DEFAULT_END_TIME,
+        timezone,
+      );
     }
   }
 

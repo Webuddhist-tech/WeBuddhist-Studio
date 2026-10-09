@@ -136,7 +136,7 @@ const Dashboard = () => {
     showFilter: showGroupFilter,
     isStaffWideList: isStaffWideGroupList,
     allowedGroupIds,
-  } = useDashboardGroupFilterOptions(userInfo);
+  } = useDashboardGroupFilterOptions(userInfo, "COMMUNITY");
 
   const fetchParams = useMemo(
     () => ({
@@ -272,7 +272,7 @@ const Dashboard = () => {
       {showGroupFilter ? (
         <div className="flex min-w-[200px] flex-col gap-1">
           <span className="text-xs font-medium text-muted-foreground">
-            Group
+            Spaces
           </span>
           <Pecha.Select
             value={groupFilterValue}
@@ -287,12 +287,12 @@ const Dashboard = () => {
             <Pecha.SelectTrigger className="h-9 w-[220px] bg-white dark:bg-input/30">
               <Pecha.SelectValue
                 placeholder={
-                  isGroupFilterLoading ? "Loading groups…" : "All groups"
+                  isGroupFilterLoading ? "Loading spaces…" : "All spaces"
                 }
               />
             </Pecha.SelectTrigger>
             <Pecha.SelectContent>
-              <Pecha.SelectItem value="all">All groups</Pecha.SelectItem>
+              <Pecha.SelectItem value="all">All spaces</Pecha.SelectItem>
               {groupFilterOptions.map((group) => (
                 <Pecha.SelectItem key={group.id} value={group.id}>
                   {group.label}
@@ -358,7 +358,7 @@ const Dashboard = () => {
   );
 
   return (
-    <div className="flex flex-col border h-[calc(100vh-40px)] overflow-auto bg-[#F5F5F5] dark:bg-[#181818] my-4 rounded-l-2xl font-dynamic">
+    <div className="flex flex-col border h-[calc(100vh-40px)] overflow-auto bg-[#F5F5F5] dark:bg-[#181818] my-4 rounded-l-2xl font-dynamic max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
       <div className="mb-4 px-4 pt-10 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <div className="border w-fit px-2 bg-white dark:bg-input/30 rounded-md border-gray-200 dark:border-[#313132] flex items-center">

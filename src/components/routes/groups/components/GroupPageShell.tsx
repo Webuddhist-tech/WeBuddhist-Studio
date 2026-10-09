@@ -3,8 +3,16 @@ import { Button } from "@/components/ui/atoms/button";
 import AuthButton from "@/components/ui/molecules/auth-button/AuthButton";
 import GroupTitleWithAvatar from "./GroupTitleWithAvatar";
 
+/** On a phone the whole page scrolls as one, so the header scrolls away and
+ * leaves the screen to the content instead of pinning above a small window. */
 const shellClassName =
-  "flex flex-col border h-[calc(100vh-40px)] overflow-hidden bg-[#F3F3F3] dark:bg-[#181818] my-4 rounded-l-2xl font-dynamic";
+  "flex flex-col border h-[calc(100vh-40px)] overflow-hidden bg-[#F3F3F3] dark:bg-[#181818] my-4 rounded-l-2xl font-dynamic max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0 max-md:overflow-y-auto";
+
+/** `relative` keeps absolutely positioned descendants (such as the hidden
+ * native inputs Radix renders for form controls) inside this scroller, so they
+ * cannot stretch the document and make the whole page scroll. */
+const scrollAreaClassName =
+  "relative flex-1 min-h-0 overflow-auto max-md:flex-none max-md:overflow-visible";
 
 type GroupPageShellProps = {
   backLabel: string;
@@ -28,8 +36,8 @@ export const GroupPageShell = ({
   children,
 }: GroupPageShellProps) => (
   <div className={shellClassName}>
-    <div className="shrink-0 mb-4 px-4 sm:px-8 pt-10 flex items-start justify-between gap-4">
-      <div className="min-w-0 flex-1">
+    <div className="shrink-0 mb-4 px-4 sm:px-8 pt-10 flex items-start justify-between gap-4 max-md:flex-col max-md:gap-3 max-md:pt-4">
+      <div className="min-w-0 flex-1 max-md:w-full">
         <Button
           variant="ghost"
           size="sm"
@@ -47,14 +55,18 @@ export const GroupPageShell = ({
         />
         {subtitle}
       </div>
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-2 shrink-0 max-md:w-full max-md:flex-wrap max-md:shrink">
         {headerActions}
         <AuthButton />
       </div>
     </div>
     <div className="border-b w-full border-dashed border-gray-300 dark:border-input shrink-0" />
-    {nav ? <div className="shrink-0">{nav}</div> : null}
-    <div className="flex-1 min-h-0 overflow-auto">{children}</div>
+    {nav ? (
+      <div className="shrink-0 max-md:sticky max-md:top-0 max-md:z-10 max-md:bg-[#F3F3F3] max-md:dark:bg-[#181818]">
+        {nav}
+      </div>
+    ) : null}
+    <div className={scrollAreaClassName}>{children}</div>
   </div>
 );
 
@@ -70,7 +82,7 @@ export const GroupListShell = ({
   <div className={shellClassName}>
     <div className="shrink-0">{toolbar}</div>
     <div className="border-b w-full border-dashed border-gray-300 dark:border-input shrink-0" />
-    <div className="flex-1 min-h-0 overflow-auto">{children}</div>
+    <div className={scrollAreaClassName}>{children}</div>
     {footer ? <div className="shrink-0">{footer}</div> : null}
   </div>
 );

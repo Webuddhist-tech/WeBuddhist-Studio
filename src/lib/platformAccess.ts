@@ -1,6 +1,13 @@
 import type { UserInfo } from "@/hooks/useUserInfo";
 
-export type PlatformRole = "CREATOR" | "REVIEWER" | "SUPER_ADMIN";
+/** CONTENT_ADMIN is a creator who also manages the app-wide content
+ *  catalogues (verse of the day, poems, text audio, tags, ...). Like a creator
+ *  they see only the plans and spaces they belong to, never all of them. */
+export type PlatformRole =
+  | "CREATOR"
+  | "REVIEWER"
+  | "SUPER_ADMIN"
+  | "CONTENT_ADMIN";
 
 export const AUTHOR_NOT_ACTIVE_DETAIL = "Author not active";
 
@@ -14,7 +21,12 @@ function normalizeRoleArg(
 /** Maps API platform_role strings to a canonical role (defaults to CREATOR). */
 export function normalizePlatformRole(role?: string | null): PlatformRole {
   const raw = normalizeRoleArg(role);
-  if (raw === "SUPER_ADMIN" || raw === "REVIEWER" || raw === "CREATOR") {
+  if (
+    raw === "SUPER_ADMIN" ||
+    raw === "REVIEWER" ||
+    raw === "CREATOR" ||
+    raw === "CONTENT_ADMIN"
+  ) {
     return raw;
   }
   return "CREATOR";
@@ -28,19 +40,13 @@ export function isReviewer(role?: PlatformRole | string): boolean {
   return normalizeRoleArg(role) === "REVIEWER";
 }
 
-/** Platform staff (SUPER_ADMIN, REVIEWER) use the admin login; everyone else uses the regular login. */
-export function isAdminLoginRole(role?: PlatformRole | string): boolean {
-  return isSuperAdmin(role) || isReviewer(role);
+export function isContentAdmin(role?: PlatformRole | string): boolean {
+  return normalizeRoleArg(role) === "CONTENT_ADMIN";
 }
 
-export type LoginVariant = "user" | "admin";
-
-export function isRoleAllowedForLoginVariant(
-  role: PlatformRole | undefined,
-  variant: LoginVariant,
-): boolean {
-  const isAdminRole = isAdminLoginRole(role);
-  return variant === "admin" ? isAdminRole : !isAdminRole;
+/** Platform staff (SUPER_ADMIN, REVIEWER), as opposed to a plain CREATOR account. */
+export function isStaffRole(role?: PlatformRole | string): boolean {
+  return isSuperAdmin(role) || isReviewer(role);
 }
 
 /** Row menus (dashboard, series plans, tags, group members, etc.). */
@@ -77,6 +83,7 @@ export function isAuthorNotActiveError(error: unknown): boolean {
 /** Routes allowed when a CREATOR has no group yet. */
 export const NO_GROUP_ALLOWED_PREFIXES = [
   "/groups",
+  "/pages",
   "/profile",
   "/admin/authors",
   "/admin/china-restrictions",
@@ -110,12 +117,48 @@ export function needsGroupOnboardingRedirect(
     return false;
   }
   if (user.has_group !== false) return false;
+  if (isContentAdmin(user.platform_role) && isContentCataloguePath(pathname)) {
+    return false;
+  }
   return !isPathAllowedWithoutGroup(pathname);
 }
 
 /** Admin authors + auth routes for platform staff. */
 export function canAccessAdminAuthors(role?: PlatformRole | string): boolean {
   return isSuperAdmin(role) || isReviewer(role);
+}
+
+/** The ambient sound catalogue is the one background-sound catalogue: curated
+ * in Studio, chosen per timer in the app. CRUD is for Super Admins and Content
+ * Admins (shared, sitewide media/S3 writes). */
+export function canManageAmbientSounds(role?: PlatformRole | string): boolean {
+  return isSuperAdmin(role) || isContentAdmin(role);
+}
+
+/** The app-wide content and configuration catalogues, none of them tied to a
+ * space: staff see them, and so do Content Admins. */
+export function canAccessContentCatalogues(
+  role?: PlatformRole | string,
+): boolean {
+  return isStaffRole(role) || isContentAdmin(role);
+}
+
+/** Catalogue routes a Content Admin may open before joining any space. */
+export const CONTENT_ADMIN_NO_GROUP_PREFIXES = [
+  "/verse-of-day",
+  "/poems",
+  "/text-audio",
+  "/tags",
+  "/traditions",
+  "/accumulator-presets",
+  "/prayer-intentions",
+  "/ambient-sounds",
+] as const;
+
+export function isContentCataloguePath(pathname: string): boolean {
+  return CONTENT_ADMIN_NO_GROUP_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
 }
 
 /** Whether dashboard group filter should load (staff-wide vs membership list). */

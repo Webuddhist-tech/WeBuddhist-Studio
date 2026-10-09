@@ -85,6 +85,11 @@ const renderTableBody = ({
       </Pecha.TableCell>
       <Pecha.TableCell>
         <div className="max-w-[24rem]">
+          {report.message_type === "PRAYER" ? (
+            <Pecha.Badge variant="secondary" className="mb-1">
+              Prayer request
+            </Pecha.Badge>
+          ) : null}
           <p
             className="line-clamp-3 break-words"
             title={report.message_text ?? ""}
@@ -100,7 +105,14 @@ const renderTableBody = ({
       </Pecha.TableCell>
       <Pecha.TableCell>{formatEnumLabel(report.reason)}</Pecha.TableCell>
       <Pecha.TableCell>
-        {report.room_name?.trim() || (
+        {report.room_name?.trim() ? (
+          <div className="flex flex-col gap-0.5">
+            <span>{report.room_name.trim()}</span>
+            {report.room_kind === "EVENT" ? (
+              <span className="text-xs text-muted-foreground">Event chat</span>
+            ) : null}
+          </div>
+        ) : (
           <span className="text-muted-foreground">—</span>
         )}
       </Pecha.TableCell>
@@ -165,7 +177,7 @@ const ChatReportsPage = () => {
   }
 
   return (
-    <div className="font-dynamic border h-[calc(100vh-40px)] overflow-auto bg-[#F5F5F5] dark:bg-[#181818] my-4 rounded-l-2xl">
+    <div className="font-dynamic border h-[calc(100vh-40px)] overflow-auto bg-[#F5F5F5] dark:bg-[#181818] my-4 rounded-l-2xl max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
       <div className="px-4 pt-10 pb-4">
         <h1 className="text-xl font-semibold">Chat reports</h1>
         <p className="text-sm text-muted-foreground mt-1">
