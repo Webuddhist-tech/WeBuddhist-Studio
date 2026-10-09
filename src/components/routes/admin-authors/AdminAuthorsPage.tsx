@@ -172,6 +172,7 @@ const AdminAuthorsPage = () => {
                         disabled={roleMutation.isPending}
                       >
                         <option value="CREATOR">CREATOR</option>
+                        <option value="CONTENT_ADMIN">CONTENT_ADMIN</option>
                         <option value="REVIEWER">REVIEWER</option>
                         <option value="SUPER_ADMIN">SUPER_ADMIN</option>
                       </select>

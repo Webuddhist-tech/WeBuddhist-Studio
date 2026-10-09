@@ -331,6 +331,60 @@ describe("Navbar", () => {
     expect(screen.getByText("Tags")).toBeInTheDocument();
   });
 
+  it("gives a CONTENT_ADMIN the catalogues but not the all-plans views", () => {
+    vi.mocked(useUserInfo).mockReturnValue({
+      data: { id: "1", platform_role: "CONTENT_ADMIN" },
+      isLoading: false,
+    } as ReturnType<typeof useUserInfo>);
+    openAllSections();
+
+    renderNavbar();
+
+    // Content and configuration, none of it tied to a space.
+    for (const name of [
+      /verse of day/i,
+      /^poems$/i,
+      /manage text audio/i,
+      /manage ambient sound catalog/i,
+      /manage tags/i,
+      /manage traditions/i,
+      /manage accumulator presets/i,
+      /prayer intentions catalog/i,
+    ]) {
+      expect(screen.getByRole("link", { name })).toBeInTheDocument();
+    }
+    // Like a creator: own spaces only.
+    expect(
+      screen.getByRole("link", { name: /manage practice spaces/i }),
+    ).toHaveAttribute("href", "/groups");
+    for (const name of [
+      /go to dashboard/i,
+      /view analytics/i,
+      /manage pages/i,
+      /author administration/i,
+      /china content restrictions/i,
+      /chat moderation reports/i,
+    ]) {
+      expect(screen.queryByRole("link", { name })).not.toBeInTheDocument();
+    }
+    expect(
+      screen.queryByRole("button", { name: /^administration$/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("points a CONTENT_ADMIN's logo link to Practice spaces", () => {
+    vi.mocked(useUserInfo).mockReturnValue({
+      data: { id: "1", platform_role: "CONTENT_ADMIN" },
+      isLoading: false,
+    } as ReturnType<typeof useUserInfo>);
+
+    renderNavbar();
+
+    expect(
+      screen.getByRole("link", { name: /webuddhist studio logo/i }),
+    ).toHaveAttribute("href", "/groups");
+  });
+
   it("hides the Administration section from a CREATOR account", () => {
     vi.mocked(useUserInfo).mockReturnValue({
       data: { id: "1", platform_role: "CREATOR" },
