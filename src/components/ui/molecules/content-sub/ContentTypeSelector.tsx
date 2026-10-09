@@ -9,7 +9,6 @@ import { useState } from "react";
 import { SourceSelectorSheet } from "../webuddhist-source/SourceSelectorSheet";
 import { LinkedContentSelectorSheet } from "../linked-content/LinkedContentSelectorSheet";
 import {
-  LINKED_CONTENT_LABELS,
   isLinkedContentType,
   type LinkedContentOption,
   type LinkedContentType,
@@ -44,38 +43,47 @@ const iconClassName = "w-4 h-4 text-gray-400";
 const contentTypes = [
   {
     key: "IMAGE",
+    label: "Image",
     icon: <MdOutlineImage className={iconClassName} />,
   },
   {
     key: "AUDIO",
+    label: "Audio",
     icon: <IoMusicalNotesSharp className={iconClassName} />,
   },
   {
     key: "VIDEO",
+    label: "Video",
     icon: <IoMdVideocam className={iconClassName} />,
   },
   {
     key: "TEXT",
+    label: "Text",
     icon: <IoTextOutline className={iconClassName} />,
   },
   {
     key: "SOURCE_REFERENCE",
+    label: "Source",
     icon: <img src={pechaIcon} alt="Webuddhist Icon" className="w-4 h-4" />,
   },
   {
     key: "GROUP_ACCUMULATION",
+    label: "Accumulation",
     icon: <GiPrayerBeads className={iconClassName} />,
   },
   {
     key: "GROUP_COLLECTION",
+    label: "Chant collection",
     icon: <LuLayers className={iconClassName} />,
   },
   {
     key: "EVENT",
+    label: "Event",
     icon: <LuCalendarDays className={iconClassName} />,
   },
   {
     key: "POST",
+    label: "Post",
     icon: <LuNewspaper className={iconClassName} />,
   },
 ];
@@ -116,11 +124,11 @@ export const ContentTypeSelector = ({
 
   return (
     <>
-      <div className="flex h-12 px-4 items-center gap-4 max-md:h-auto max-md:items-start max-md:gap-2">
+      <div className="flex min-h-12 px-4 items-stretch gap-4 max-md:items-start max-md:gap-2">
         <Pecha.Button
           type="button"
           variant="outline"
-          className="h-full transition-transform active:scale-95 max-md:h-12"
+          className="h-12 transition-transform active:scale-95"
           onClick={() => setShowContentTypes(!showContentTypes)}
         >
           <IoMdAdd
@@ -129,8 +137,8 @@ export const ContentTypeSelector = ({
         </Pecha.Button>
 
         {showContentTypes && (
-          <div className="flex border h-full bg-white dark:bg-[#161616] items-center px-1 border-gray-300 dark:border-input rounded-sm overflow-visible max-md:h-auto max-md:min-w-0 max-md:flex-1 max-md:flex-wrap max-md:py-1 animate-in zoom-in-90 slide-in-from-left-3 duration-300 ease-out">
-            {contentTypes.map(({ key, icon }, index) => (
+          <div className="flex flex-wrap border min-h-12 bg-white dark:bg-[#161616] items-center px-1 border-gray-300 dark:border-input rounded-sm overflow-visible min-w-0 flex-1 py-1 animate-in zoom-in-90 slide-in-from-left-3 duration-300 ease-out">
+            {contentTypes.map(({ key, label, icon }, index) => (
               <Pecha.Button
                 key={key}
                 type="button"
@@ -143,9 +151,7 @@ export const ContentTypeSelector = ({
                 }}
               >
                 {icon}
-                <span className="sr-only">
-                  {isLinkedContentType(key) ? LINKED_CONTENT_LABELS[key] : key}
-                </span>
+                <span className="text-xs">{label}</span>
               </Pecha.Button>
             ))}
           </div>
