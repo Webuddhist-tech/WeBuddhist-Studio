@@ -78,3 +78,93 @@ describe("groupCoreSchema (editing)", () => {
     },
   );
 });
+
+describe("group language text", () => {
+  const languageErrors = (
+    result: ReturnType<typeof groupCoreSchema.safeParse>,
+  ) =>
+    result.success
+      ? []
+      : result.error.issues
+          .filter((issue) => issue.path[0] === "languages")
+          .map((issue) => `${issue.path.slice(1).join(".")}: ${issue.message}`);
+
+  const withLanguages = (languages: GroupCoreFormData["languages"]) =>
+    groupCoreSchema.safeParse(
+      formData({ slug: "dharma-circle_4821", languages }),
+    );
+
+  it("needs only a title", () => {
+    expect(withLanguages({ EN: { title: "Dharma Circle" } }).success).toBe(
+      true,
+    );
+  });
+
+  it("accepts empty strings for everything but the title", () => {
+    expect(
+      withLanguages({
+        EN: {
+          title: "Dharma Circle",
+          sub_title: "",
+          description: "",
+          description_long: "",
+        },
+      }).success,
+    ).toBe(true);
+  });
+
+  it("still needs a title, even with the rest filled in", () => {
+    expect(
+      languageErrors(
+        withLanguages({
+          EN: { title: "", sub_title: "Sub", description: "Desc" },
+        }),
+      ),
+    ).toEqual(["EN.title: Title is required"]);
+  });
+
+  it("treats a title of spaces as missing", () => {
+    expect(
+      languageErrors(withLanguages({ EN: { title: "   " } })),
+    ).toEqual(["EN.title: Title is required"]);
+  });
+
+  it("needs a title in every language", () => {
+    expect(
+      languageErrors(
+        withLanguages({
+          EN: { title: "Dharma Circle" },
+          BO: { title: "", description: "Something" },
+        }),
+      ),
+    ).toEqual(["BO.title: Title is required"]);
+  });
+
+  it("applies when creating and when editing", () => {
+    const languages = { EN: { title: "Dharma Circle" } };
+    expect(
+      groupCreateSchema.safeParse(formData({ languages })).success,
+    ).toBe(true);
+    expect(
+      groupCoreSchema.safeParse(
+        formData({ languages, slug: "dharma-circle_4821" }),
+      ).success,
+    ).toBe(true);
+  });
+
+  it("still caps a description at 200 characters", () => {
+    expect(
+      languageErrors(
+        withLanguages({
+          EN: { title: "Dharma Circle", description: "x".repeat(201) },
+        }),
+      ),
+    ).toEqual(["EN.description: Description must be 200 characters or less"]);
+    expect(
+      withLanguages({
+        EN: { title: "Dharma Circle", description: "x".repeat(200) },
+      }).success,
+    ).toBe(true);
+  });
+});
+
