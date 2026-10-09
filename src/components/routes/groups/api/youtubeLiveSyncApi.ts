@@ -31,7 +31,11 @@ export interface YoutubeLiveSyncPayload {
 export interface YoutubeLiveSyncRunResult {
   live_streams_found: number;
   events_checked: number;
+  /** Links added because the event had none in that language. */
   links_added: number;
+  /** Links switched to the live stream because the event already had one in
+   *  that language. */
+  links_replaced?: number;
   skipped_unknown_language: number;
 }
 
@@ -110,8 +114,17 @@ export const formatRunTime = (value: string): string => {
 
 /** One sentence for the toast after "Run now". */
 export const describeRunResult = (result: YoutubeLiveSyncRunResult): string => {
-  if (result.links_added > 0) {
-    return `Added the live stream to ${result.links_added} event link${result.links_added === 1 ? "" : "s"}.`;
+  const added = result.links_added;
+  const replaced = result.links_replaced ?? 0;
+  if (added + replaced > 0) {
+    const parts = [
+      added > 0 ? `added ${added} link${added === 1 ? "" : "s"}` : null,
+      replaced > 0
+        ? `replaced ${replaced} link${replaced === 1 ? "" : "s"}`
+        : null,
+    ].filter(Boolean);
+    const sentence = parts.join(" and ");
+    return `Live stream ${sentence}.`;
   }
   if (result.live_streams_found === 0) {
     return "No stream is live on the channel right now.";

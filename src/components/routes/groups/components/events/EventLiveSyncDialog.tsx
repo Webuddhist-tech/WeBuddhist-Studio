@@ -141,8 +141,10 @@ const LiveSyncForm = ({
         <Pecha.DialogTitle>YouTube live sync</Pecha.DialogTitle>
         <DialogDescription>
           At the times you set, the group&rsquo;s YouTube channel is checked and
-          the stream that is live is added to the events below. Its language is
-          picked from the stream title. Other events are not changed.
+          the stream that is live is put on the events below. Its language is
+          picked from the stream title. If an event already has a YouTube link
+          in that language, that link is replaced with the live stream;
+          otherwise one is added. Other events are not changed.
         </DialogDescription>
       </Pecha.DialogHeader>
 

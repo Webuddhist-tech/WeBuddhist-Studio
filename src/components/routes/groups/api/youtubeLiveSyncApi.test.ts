@@ -113,12 +113,40 @@ describe("describeRunResult", () => {
   };
 
   it("says how many links were added", () => {
-    expect(describeRunResult({ ...base, live_streams_found: 1, links_added: 2 })).toMatch(
-      /2 event links/,
-    );
-    expect(describeRunResult({ ...base, live_streams_found: 1, links_added: 1 })).toMatch(
-      /1 event link\./,
-    );
+    expect(
+      describeRunResult({ ...base, live_streams_found: 1, links_added: 2 }),
+    ).toBe("Live stream added 2 links.");
+    expect(
+      describeRunResult({ ...base, live_streams_found: 1, links_added: 1 }),
+    ).toBe("Live stream added 1 link.");
+  });
+
+  it("says how many links were replaced", () => {
+    expect(
+      describeRunResult({
+        ...base,
+        live_streams_found: 1,
+        links_replaced: 1,
+      }),
+    ).toBe("Live stream replaced 1 link.");
+    expect(
+      describeRunResult({
+        ...base,
+        live_streams_found: 1,
+        links_replaced: 3,
+      }),
+    ).toBe("Live stream replaced 3 links.");
+  });
+
+  it("says when some links were added and some replaced", () => {
+    expect(
+      describeRunResult({
+        ...base,
+        live_streams_found: 1,
+        links_added: 1,
+        links_replaced: 2,
+      }),
+    ).toBe("Live stream added 1 link and replaced 2 links.");
   });
 
   it("says when nothing is live", () => {
