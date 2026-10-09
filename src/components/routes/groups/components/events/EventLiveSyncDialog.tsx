@@ -26,7 +26,12 @@ type EventLiveSyncDialogProps = {
   groupId: string;
   /** The events the admin ticked. Only these are ever changed. */
   events: EventDTO[];
+  /** The group's saved schedules. The form waits for them, so it never starts
+   *  from defaults that saving would then write over a real schedule. */
   liveSync: YoutubeLiveSyncList | undefined;
+  isLoading?: boolean;
+  isError?: boolean;
+  onRetry?: () => void;
 };
 
 const timezoneOptions = (current: string) =>
@@ -34,7 +39,10 @@ const timezoneOptions = (current: string) =>
     ? TIMEZONE_OPTIONS
     : [{ value: current, label: current }, ...TIMEZONE_OPTIONS];
 
-type FormProps = Omit<EventLiveSyncDialogProps, "open">;
+type FormProps = Pick<
+  EventLiveSyncDialogProps,
+  "onOpenChange" | "groupId" | "events"
+> & { liveSync: YoutubeLiveSyncList };
 
 const LiveSyncForm = ({
   onOpenChange,
@@ -45,10 +53,7 @@ const LiveSyncForm = ({
   const queryClient = useQueryClient();
   const eventIds = events.map((event) => event.id);
   const scheduleByEvent = new Map(
-    (liveSync?.schedules ?? []).map((schedule) => [
-      schedule.event_id,
-      schedule,
-    ]),
+    liveSync.schedules.map((schedule) => [schedule.event_id, schedule]),
   );
   const scheduled = events.filter((event) => scheduleByEvent.has(event.id));
   const existing = scheduleByEvent.get(scheduled[0]?.id ?? "");
@@ -67,7 +72,7 @@ const LiveSyncForm = ({
     (time) => time.trim() !== "" && normalizeRunTime(time) === null,
   );
   const needsTime = enabled && runTimes.length === 0;
-  const hasChannel = Boolean(liveSync?.channel_url);
+  const hasChannel = Boolean(liveSync.channel_url);
   const recurringCount = events.filter((event) => event.is_recurring).length;
 
   const saveMutation = useMutation({
@@ -99,16 +104,29 @@ const LiveSyncForm = ({
   });
 
   const removeMutation = useMutation({
-    mutationFn: () =>
-      Promise.all(
+    // Every removal is attempted and awaited, so the outcome is known for
+    // each event and the lists can be refreshed whatever happened.
+    mutationFn: async () => {
+      const results = await Promise.allSettled(
         scheduled.map((event) => deleteYoutubeLiveSync(groupId, event.id)),
-      ),
-    onSuccess: () => {
-      toast.success("Schedule removed");
-      refresh();
-      onOpenChange(false);
+      );
+      return scheduled.filter((_, index) => results[index].status === "rejected");
     },
-    onError: (err) => toast.error(getApiErrorMessage(err, "Could not remove")),
+    onSuccess: (failed) => {
+      refresh();
+      if (failed.length === 0) {
+        toast.success("Schedule removed");
+        onOpenChange(false);
+        return;
+      }
+      toast.error(
+        `Could not remove the schedule from: ${failed.map((event) => eventName(event)).join(", ")}`,
+      );
+    },
+    onError: (err) => {
+      refresh();
+      toast.error(getApiErrorMessage(err, "Could not remove"));
+    },
   });
 
   const busy =
@@ -152,7 +170,7 @@ const LiveSyncForm = ({
           </p>
         ) : (
           <p className="truncate text-xs text-muted-foreground">
-            Channel: {liveSync?.channel_url}
+            Channel: {liveSync.channel_url}
           </p>
         )}
 
@@ -298,13 +316,41 @@ const LiveSyncForm = ({
 const EventLiveSyncDialog = ({
   open,
   onOpenChange,
-  ...formProps
+  groupId,
+  events,
+  liveSync,
+  isLoading = false,
+  isError = false,
+  onRetry,
 }: EventLiveSyncDialogProps) => (
   <Pecha.Dialog open={open} onOpenChange={onOpenChange}>
     <Pecha.DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-lg">
-      {open ? (
-        <LiveSyncForm onOpenChange={onOpenChange} {...formProps} />
-      ) : null}
+      {!open ? null : liveSync ? (
+        <LiveSyncForm
+          onOpenChange={onOpenChange}
+          groupId={groupId}
+          events={events}
+          liveSync={liveSync}
+        />
+      ) : (
+        <>
+          <Pecha.DialogHeader>
+            <Pecha.DialogTitle>YouTube live sync</Pecha.DialogTitle>
+            <DialogDescription>
+              {isError
+                ? "The saved schedules could not be loaded, so nothing can be changed safely."
+                : "Loading the saved schedules\u2026"}
+            </DialogDescription>
+          </Pecha.DialogHeader>
+          {isError && !isLoading ? (
+            <DialogFooter>
+              <Pecha.Button type="button" variant="outline" onClick={onRetry}>
+                Retry
+              </Pecha.Button>
+            </DialogFooter>
+          ) : null}
+        </>
+      )}
     </Pecha.DialogContent>
   </Pecha.Dialog>
 );

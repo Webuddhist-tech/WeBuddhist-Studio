@@ -57,7 +57,9 @@ const LiveSyncBadge = ({
       >
         {schedule.enabled ? "On" : "Paused"}
       </Pecha.Badge>
-      <span className="text-muted-foreground">{times}</span>
+      <span className="text-muted-foreground">
+        {times} ({schedule.timezone})
+      </span>
       {schedule.last_run_error ? (
         <span
           className="max-w-48 truncate text-xs text-destructive"
@@ -100,7 +102,12 @@ const GroupEventsPage = () => {
   // The backend lets only group owners and admins schedule live sync.
   const canSchedule = !readOnlyPlatform && canEditGroupSettings(myRole);
 
-  const { data: liveSync } = useQuery({
+  const {
+    data: liveSync,
+    isLoading: liveSyncLoading,
+    isError: liveSyncError,
+    refetch: refetchLiveSync,
+  } = useQuery({
     queryKey: youtubeLiveSyncQueryKey(groupId),
     queryFn: () => fetchYoutubeLiveSync(groupId),
     enabled: Boolean(groupId),
@@ -124,10 +131,19 @@ const GroupEventsPage = () => {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteCmsEvent(id),
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
       toast.success("Event deleted");
       setPendingDelete(null);
+      setSelected((current) => {
+        if (!current.has(id)) return current;
+        const next = new Map(current);
+        next.delete(id);
+        return next;
+      });
       queryClient.invalidateQueries({ queryKey: ["cms-events", groupId] });
+      queryClient.invalidateQueries({
+        queryKey: youtubeLiveSyncQueryKey(groupId),
+      });
     },
     onError: (err) => toast.error(getApiErrorMessage(err)),
   });
@@ -404,6 +420,9 @@ const GroupEventsPage = () => {
         groupId={groupId}
         events={[...selected.values()]}
         liveSync={liveSync}
+        isLoading={liveSyncLoading}
+        isError={liveSyncError}
+        onRetry={() => refetchLiveSync()}
       />
 
       <Pecha.AlertDialog
