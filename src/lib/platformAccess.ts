@@ -1,6 +1,13 @@
 import type { UserInfo } from "@/hooks/useUserInfo";
 
-export type PlatformRole = "CREATOR" | "REVIEWER" | "SUPER_ADMIN";
+/** CONTENT_ADMIN is a creator who also manages the app-wide content
+ *  catalogues (verse of the day, poems, text audio, tags, ...). Like a creator
+ *  they see only the plans and spaces they belong to, never all of them. */
+export type PlatformRole =
+  | "CREATOR"
+  | "REVIEWER"
+  | "SUPER_ADMIN"
+  | "CONTENT_ADMIN";
 
 export const AUTHOR_NOT_ACTIVE_DETAIL = "Author not active";
 
@@ -14,7 +21,12 @@ function normalizeRoleArg(
 /** Maps API platform_role strings to a canonical role (defaults to CREATOR). */
 export function normalizePlatformRole(role?: string | null): PlatformRole {
   const raw = normalizeRoleArg(role);
-  if (raw === "SUPER_ADMIN" || raw === "REVIEWER" || raw === "CREATOR") {
+  if (
+    raw === "SUPER_ADMIN" ||
+    raw === "REVIEWER" ||
+    raw === "CREATOR" ||
+    raw === "CONTENT_ADMIN"
+  ) {
     return raw;
   }
   return "CREATOR";
@@ -26,6 +38,10 @@ export function isSuperAdmin(role?: PlatformRole | string): boolean {
 
 export function isReviewer(role?: PlatformRole | string): boolean {
   return normalizeRoleArg(role) === "REVIEWER";
+}
+
+export function isContentAdmin(role?: PlatformRole | string): boolean {
+  return normalizeRoleArg(role) === "CONTENT_ADMIN";
 }
 
 /** Platform staff (SUPER_ADMIN, REVIEWER), as opposed to a plain CREATOR account. */
@@ -101,6 +117,9 @@ export function needsGroupOnboardingRedirect(
     return false;
   }
   if (user.has_group !== false) return false;
+  if (isContentAdmin(user.platform_role) && isContentCataloguePath(pathname)) {
+    return false;
+  }
   return !isPathAllowedWithoutGroup(pathname);
 }
 
@@ -110,10 +129,36 @@ export function canAccessAdminAuthors(role?: PlatformRole | string): boolean {
 }
 
 /** The ambient sound catalogue is the one background-sound catalogue: curated
- * in Studio, chosen per timer in the app. CRUD is Super Admin only (shared,
- * sitewide media/S3 writes). */
+ * in Studio, chosen per timer in the app. CRUD is for Super Admins and Content
+ * Admins (shared, sitewide media/S3 writes). */
 export function canManageAmbientSounds(role?: PlatformRole | string): boolean {
-  return isSuperAdmin(role);
+  return isSuperAdmin(role) || isContentAdmin(role);
+}
+
+/** The app-wide content and configuration catalogues, none of them tied to a
+ * space: staff see them, and so do Content Admins. */
+export function canAccessContentCatalogues(
+  role?: PlatformRole | string,
+): boolean {
+  return isStaffRole(role) || isContentAdmin(role);
+}
+
+/** Catalogue routes a Content Admin may open before joining any space. */
+export const CONTENT_ADMIN_NO_GROUP_PREFIXES = [
+  "/verse-of-day",
+  "/poems",
+  "/text-audio",
+  "/tags",
+  "/traditions",
+  "/accumulator-presets",
+  "/prayer-intentions",
+  "/ambient-sounds",
+] as const;
+
+export function isContentCataloguePath(pathname: string): boolean {
+  return CONTENT_ADMIN_NO_GROUP_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+  );
 }
 
 /** Whether dashboard group filter should load (staff-wide vs membership list). */

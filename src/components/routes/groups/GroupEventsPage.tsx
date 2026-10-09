@@ -3,8 +3,10 @@ import { Link, useNavigate, useOutletContext } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IoMdAdd, IoMdTrash } from "react-icons/io";
 import { IoPeopleOutline } from "react-icons/io5";
+import { SiYoutube } from "react-icons/si";
 import { toast } from "sonner";
 import { Pecha } from "@/components/ui/shadimport";
+import { Checkbox } from "@/components/ui/atoms/checkbox";
 import { Pagination } from "@/components/ui/molecules/pagination/Pagination";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import { eventFormatLabel, eventRecurrenceLabel } from "@/schema/EventSchema";
@@ -12,6 +14,7 @@ import { ROUTES } from "@/routes/paths";
 import { FeaturedStar } from "@/components/routes/dashboard/dashboardTableUi";
 import type { GroupOutletContext } from "./GroupLayout";
 import { canWriteEvents } from "./lib/eventPermissions";
+import { canEditGroupSettings } from "./lib/groupPermissions";
 import { formatEventScheduleRange } from "./lib/eventSchedule";
 import {
   deleteCmsEvent,
@@ -20,6 +23,13 @@ import {
   toggleEventFeatured,
   type EventDTO,
 } from "./api/eventsApi";
+import {
+  fetchYoutubeLiveSync,
+  formatRunTime,
+  youtubeLiveSyncQueryKey,
+  type YoutubeLiveSyncSchedule,
+} from "./api/youtubeLiveSyncApi";
+import EventLiveSyncDialog from "./components/events/EventLiveSyncDialog";
 
 const PAGE_SIZE = 20;
 
@@ -32,6 +42,34 @@ const eventThumbnail = (event: EventDTO): string | null => {
   return null;
 };
 
+const LiveSyncBadge = ({
+  schedule,
+}: {
+  schedule: YoutubeLiveSyncSchedule | undefined;
+}) => {
+  if (!schedule) return <span className="text-muted-foreground">{"\u2014"}</span>;
+  const times = schedule.run_times.map(formatRunTime).join(", ");
+  return (
+    <div className="flex flex-col gap-0.5 text-sm">
+      <Pecha.Badge
+        variant={schedule.enabled ? "default" : "secondary"}
+        className="w-fit text-xs"
+      >
+        {schedule.enabled ? "On" : "Paused"}
+      </Pecha.Badge>
+      <span className="text-muted-foreground">{times}</span>
+      {schedule.last_run_error ? (
+        <span
+          className="max-w-48 truncate text-xs text-destructive"
+          title={schedule.last_run_error}
+        >
+          Last run failed: {schedule.last_run_error}
+        </span>
+      ) : null}
+    </div>
+  );
+};
+
 const GroupEventsPage = () => {
   const { groupId, myRole, userInfo, readOnlyPlatform } =
     useOutletContext<GroupOutletContext>();
@@ -40,6 +78,9 @@ const GroupEventsPage = () => {
 
   const [page, setPage] = useState(1);
   const [pendingDelete, setPendingDelete] = useState<EventDTO | null>(null);
+  // The events ticked for live sync, kept across pages. Only these are changed.
+  const [selected, setSelected] = useState<Map<string, EventDTO>>(new Map());
+  const [syncOpen, setSyncOpen] = useState(false);
 
   const canWrite =
     !readOnlyPlatform && canWriteEvents(myRole, userInfo?.platform_role);
@@ -55,6 +96,27 @@ const GroupEventsPage = () => {
     enabled: Boolean(groupId),
     refetchOnWindowFocus: false,
   });
+
+  // The backend lets only group owners and admins schedule live sync.
+  const canSchedule = !readOnlyPlatform && canEditGroupSettings(myRole);
+
+  const { data: liveSync } = useQuery({
+    queryKey: youtubeLiveSyncQueryKey(groupId),
+    queryFn: () => fetchYoutubeLiveSync(groupId),
+    enabled: Boolean(groupId),
+    refetchOnWindowFocus: false,
+    retry: false,
+  });
+  const scheduleByEvent = useMemo(
+    () =>
+      new Map<string, YoutubeLiveSyncSchedule>(
+        (liveSync?.schedules ?? []).map((schedule) => [
+          schedule.event_id,
+          schedule,
+        ]),
+      ),
+    [liveSync],
+  );
 
   const events = useMemo(() => data?.events ?? [], [data]);
   const total = data?.total ?? 0;
@@ -79,7 +141,28 @@ const GroupEventsPage = () => {
       toast.error(getApiErrorMessage(err, "Could not update featured")),
   });
 
-  const columnCount = canWrite ? 4 : 3;
+  const toggleSelected = (event: EventDTO, checked: boolean) =>
+    setSelected((current) => {
+      const next = new Map(current);
+      if (checked) next.set(event.id, event);
+      else next.delete(event.id);
+      return next;
+    });
+
+  const allOnPageSelected =
+    events.length > 0 && events.every((event) => selected.has(event.id));
+
+  const togglePage = (checked: boolean) =>
+    setSelected((current) => {
+      const next = new Map(current);
+      for (const event of events) {
+        if (checked) next.set(event.id, event);
+        else next.delete(event.id);
+      }
+      return next;
+    });
+
+  const columnCount = 4 + (canWrite ? 1 : 0) + (canSchedule ? 1 : 0);
 
   const body = useMemo(() => {
     if (isLoading) {
@@ -116,6 +199,17 @@ const GroupEventsPage = () => {
       const schedule = formatEventScheduleRange(event);
       return (
         <Pecha.TableRow key={event.id}>
+          {canSchedule ? (
+            <Pecha.TableCell className="w-10">
+              <Checkbox
+                checked={selected.has(event.id)}
+                onCheckedChange={(value) =>
+                  toggleSelected(event, value === true)
+                }
+                aria-label={`Select ${eventName(event)} for live sync`}
+              />
+            </Pecha.TableCell>
+          ) : null}
           <Pecha.TableCell className="font-medium">
             <Link
               to={ROUTES.groupEvent(groupId, event.id)}
@@ -169,6 +263,9 @@ const GroupEventsPage = () => {
               {event.participant_count ?? 0}
             </span>
           </Pecha.TableCell>
+          <Pecha.TableCell>
+            <LiveSyncBadge schedule={scheduleByEvent.get(event.id)} />
+          </Pecha.TableCell>
           {canWrite ? (
             <Pecha.TableCell className="text-right">
               <div className="flex justify-end gap-2">
@@ -212,6 +309,9 @@ const GroupEventsPage = () => {
     events,
     columnCount,
     canWrite,
+    canSchedule,
+    selected,
+    scheduleByEvent,
     groupId,
     navigate,
     featuredMutation,
@@ -221,23 +321,64 @@ const GroupEventsPage = () => {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold">Events</h2>
-        {canWrite ? (
-          <Pecha.Button
-            className="gap-1 bg-[#A51C21] text-white hover:bg-[#A51C21]/90"
-            onClick={() => navigate(ROUTES.groupEventNew(groupId))}
-          >
-            <IoMdAdd className="h-4 w-4" /> New event
-          </Pecha.Button>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {canSchedule ? (
+            <>
+              {selected.size > 0 ? (
+                <Pecha.Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSelected(new Map())}
+                >
+                  Clear selection
+                </Pecha.Button>
+              ) : null}
+              <Pecha.Button
+                variant="outline"
+                className="gap-1"
+                disabled={selected.size === 0}
+                onClick={() => setSyncOpen(true)}
+              >
+                <SiYoutube className="h-4 w-4 text-[#FF0000]" /> YouTube live
+                sync{selected.size > 0 ? ` (${selected.size})` : ""}
+              </Pecha.Button>
+            </>
+          ) : null}
+          {canWrite ? (
+            <Pecha.Button
+              className="gap-1 bg-[#A51C21] text-white hover:bg-[#A51C21]/90"
+              onClick={() => navigate(ROUTES.groupEventNew(groupId))}
+            >
+              <IoMdAdd className="h-4 w-4" /> New event
+            </Pecha.Button>
+          ) : null}
+        </div>
       </div>
+      {canSchedule ? (
+        <p className="text-xs text-muted-foreground">
+          Tick events to add the group&rsquo;s live YouTube stream to them at
+          set times. Only ticked events are changed.
+        </p>
+      ) : null}
 
       <div className="rounded-lg border">
         <Pecha.Table>
           <Pecha.TableHeader>
             <Pecha.TableRow>
+              {canSchedule ? (
+                <Pecha.TableHead className="w-10">
+                  <Checkbox
+                    checked={allOnPageSelected}
+                    onCheckedChange={(value) => togglePage(value === true)}
+                    disabled={events.length === 0}
+                    aria-label="Select all events on this page"
+                  />
+                </Pecha.TableHead>
+              ) : null}
               <Pecha.TableHead>Name</Pecha.TableHead>
               <Pecha.TableHead>Dates</Pecha.TableHead>
               <Pecha.TableHead>Participants</Pecha.TableHead>
+              <Pecha.TableHead>Live sync</Pecha.TableHead>
               {canWrite ? (
                 <Pecha.TableHead className="text-right">
                   Actions
@@ -256,6 +397,14 @@ const GroupEventsPage = () => {
           />
         ) : null}
       </div>
+
+      <EventLiveSyncDialog
+        open={syncOpen}
+        onOpenChange={setSyncOpen}
+        groupId={groupId}
+        events={[...selected.values()]}
+        liveSync={liveSync}
+      />
 
       <Pecha.AlertDialog
         open={Boolean(pendingDelete)}

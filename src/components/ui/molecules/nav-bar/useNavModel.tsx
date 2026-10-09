@@ -24,7 +24,9 @@ import { useUserInfo } from "@/hooks/useUserInfo";
 import { useOpenGroupListPath } from "@/hooks/useOpenGroupListPath";
 import {
   canAccessAdminAuthors,
+  canAccessContentCatalogues,
   canManageAmbientSounds,
+  isContentAdmin,
   isStaffRole,
 } from "@/lib/platformAccess";
 
@@ -114,6 +116,13 @@ const configurationItems: NavItem[] = [
   },
 ];
 
+const prayerIntentionsItem: NavItem = {
+  icon: <IoHeartOutline className="w-4 h-4" />,
+  label: "Prayer intentions",
+  path: ROUTES.prayerIntentions,
+  tooltip: "Prayer intentions catalog",
+};
+
 const administrationItems: NavItem[] = [
   {
     icon: <MdAdminPanelSettings className="w-4 h-4" />,
@@ -133,12 +142,7 @@ const administrationItems: NavItem[] = [
     path: ROUTES.adminChatReports,
     tooltip: "Chat moderation reports",
   },
-  {
-    icon: <IoHeartOutline className="w-4 h-4" />,
-    label: "Prayer intentions",
-    path: ROUTES.prayerIntentions,
-    tooltip: "Prayer intentions catalog",
-  },
+  prayerIntentionsItem,
 ];
 
 /** Super Admin only, but it reads as one of the media catalogues. */
@@ -172,12 +176,18 @@ export function useNavModel() {
   const location = useLocation();
   const { data: userInfo, isLoading: isUserInfoLoading } = useUserInfo();
   const showAdminAuthors = canAccessAdminAuthors(userInfo?.platform_role);
-  /** Reviewers reach the admin section, but this catalogue is Super Admin only. */
+  /** Reviewers reach the admin section, but this catalogue is for Super
+   * Admins and Content Admins only. */
   const showAmbientSounds = canManageAmbientSounds(userInfo?.platform_role);
-  /** Plain CREATOR accounts only manage their practice spaces — no pages and
-   * no other CMS pages. */
-  const isGroupsOnly =
+  const isContentAdminRole = isContentAdmin(userInfo?.platform_role);
+  /** Everyone but platform staff only gets Practice spaces pinned: no
+   * dashboard, analytics or pages, which list every plan and space. */
+  const pinsOnlyGroups =
     !isUserInfoLoading && !isStaffRole(userInfo?.platform_role);
+  /** A plain CREATOR has nothing else. A Content Admin adds the app-wide
+   * catalogues, which are not tied to any space. */
+  const isGroupsOnly =
+    pinsOnlyGroups && !canAccessContentCatalogues(userInfo?.platform_role);
   const openGroup = useOpenGroupListPath(location.pathname);
 
   /**
@@ -189,7 +199,7 @@ export function useNavModel() {
       ? openGroup.listPath === itemPath
       : isActivePath(itemPath, location.pathname);
 
-  const visiblePinnedItems = isGroupsOnly
+  const visiblePinnedItems = pinsOnlyGroups
     ? pinnedItems.filter((item) => item.path === ROUTES.groups)
     : pinnedItems;
 
@@ -207,7 +217,9 @@ export function useNavModel() {
         {
           id: "configuration",
           label: "Configuration",
-          items: configurationItems,
+          items: isContentAdminRole
+            ? [...configurationItems, prayerIntentionsItem]
+            : configurationItems,
         },
         ...(showAdminAuthors
           ? [
@@ -226,7 +238,7 @@ export function useNavModel() {
 
   return {
     pathname: location.pathname,
-    homePath: isGroupsOnly ? ROUTES.groups : ROUTES.dashboard,
+    homePath: pinsOnlyGroups ? ROUTES.groups : ROUTES.dashboard,
     isActive,
     visiblePinnedItems,
     sections,
