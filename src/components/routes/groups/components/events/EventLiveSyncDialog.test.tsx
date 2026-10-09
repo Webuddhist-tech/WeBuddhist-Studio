@@ -78,6 +78,7 @@ describe("EventLiveSyncDialog", () => {
     vi.mocked(runYoutubeLiveSyncNow).mockReset();
     vi.mocked(deleteYoutubeLiveSync).mockReset();
     vi.mocked(toast.error).mockReset();
+    vi.mocked(toast.success).mockReset();
   });
 
   it("lists the chosen events", () => {
@@ -261,5 +262,99 @@ describe("EventLiveSyncDialog", () => {
         queryKey: ["youtube-live-sync", "g1"],
       }),
     );
+  });
+
+  it("adds and removes time rows", async () => {
+    renderDialog([event("e1", "Teaching")]);
+    expect(screen.queryByLabelText("Remove time 1")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /add time/i }));
+    expect(screen.getByLabelText("Time 2")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByLabelText("Remove time 2"));
+    expect(screen.queryByLabelText("Time 2")).not.toBeInTheDocument();
+  });
+
+  it("saves a paused schedule without needing a time", async () => {
+    vi.mocked(saveYoutubeLiveSync).mockResolvedValue(liveSync());
+    renderDialog([event("e1", "Teaching")]);
+
+    await userEvent.click(screen.getByRole("checkbox", { name: /enabled/i }));
+    expect(screen.queryByText(/add at least one time/i)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(saveYoutubeLiveSync).toHaveBeenCalledWith("g1", {
+        event_ids: ["e1"],
+        enabled: false,
+        run_times: [],
+        timezone: "Asia/Kolkata",
+      }),
+    );
+    expect(toast.success).toHaveBeenCalledWith(expect.stringContaining("paused"));
+  });
+
+  it("says what a run did and keeps the dialog open", async () => {
+    vi.mocked(runYoutubeLiveSyncNow).mockResolvedValue({
+      live_streams_found: 0,
+      events_checked: 1,
+      links_added: 0,
+      skipped_unknown_language: 0,
+    });
+    const onOpenChange = renderDialog([event("e1", "Teaching")]);
+    await userEvent.click(screen.getByRole("button", { name: /run now/i }));
+    await waitFor(() =>
+      expect(toast.success).toHaveBeenCalledWith(
+        expect.stringMatching(/no stream is live/i),
+      ),
+    );
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+  });
+
+  it("reports a failed save and a failed run", async () => {
+    vi.mocked(saveYoutubeLiveSync).mockRejectedValue(new Error("nope"));
+    vi.mocked(runYoutubeLiveSyncNow).mockRejectedValue(new Error("nope"));
+    renderDialog([event("e1", "Teaching")]);
+
+    fireEvent.change(screen.getByLabelText("Time 1"), {
+      target: { value: "08:30" },
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(1));
+
+    await userEvent.click(screen.getByRole("button", { name: /run now/i }));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(2));
+  });
+
+  it("tells the admin that saving replaces several existing schedules", () => {
+    renderDialog(
+      [event("e1", "Teaching"), event("e2", "Retreat")],
+      liveSync({
+        schedules: [
+          { event_id: "e1", enabled: true, run_times: ["08:30"], timezone: "UTC" },
+          { event_id: "e2", enabled: true, run_times: ["09:00"], timezone: "UTC" },
+        ],
+      }),
+    );
+    expect(
+      screen.getByText(/saving replaces the schedule on all 2 events/i),
+    ).toBeInTheDocument();
+  });
+
+  it("closes once every schedule is removed", async () => {
+    vi.mocked(deleteYoutubeLiveSync).mockResolvedValue(undefined);
+    const onOpenChange = renderDialog(
+      [event("e1", "Teaching")],
+      liveSync({
+        schedules: [
+          { event_id: "e1", enabled: true, run_times: ["08:30"], timezone: "UTC" },
+        ],
+      }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: /remove schedule/i }),
+    );
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(toast.success).toHaveBeenCalledWith("Schedule removed");
   });
 });
