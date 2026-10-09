@@ -2,10 +2,16 @@ import type { ComponentProps } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import VerseOfDayForm from "./VerseOfDayForm";
 import type { VerseOfDayItem } from "./api/verseOfDayApi";
 import { createVerseOfDay, updateVerseOfDay } from "./api/verseOfDayApi";
+import { fetchGroups } from "@/components/routes/groups/api/groupsApi";
+
+beforeAll(() => {
+  // jsdom has no scrollIntoView, which the cmdk list calls on selection.
+  Element.prototype.scrollIntoView = vi.fn();
+});
 
 const GROUP_ID = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
 
@@ -100,9 +106,7 @@ const fillRequiredCreateFields = async () => {
     screen.getByPlaceholderText(/enter verse content in english/i),
     "May all beings be happy.",
   );
-  await userEvent.click(
-    await screen.findByRole("combobox", { name: /select a group/i }),
-  );
+  await userEvent.click(await screen.findByText("Select a page..."));
   await userEvent.click(await screen.findByText("Dhamma group"));
 };
 
@@ -125,7 +129,7 @@ describe("VerseOfDayForm — source", () => {
     await userEvent.click(screen.getByRole("button", { name: /^create$/i }));
 
     await waitFor(() => expect(createVerseOfDay).toHaveBeenCalledTimes(1));
-    expect(createVerseOfDay).toHaveBeenCalledWith(
+    expect(vi.mocked(createVerseOfDay).mock.calls[0][0]).toEqual(
       expect.objectContaining({ source: "Dhp 1.5" }),
     );
   });
@@ -137,7 +141,7 @@ describe("VerseOfDayForm — source", () => {
     await userEvent.click(screen.getByRole("button", { name: /^create$/i }));
 
     await waitFor(() => expect(createVerseOfDay).toHaveBeenCalledTimes(1));
-    expect(createVerseOfDay).toHaveBeenCalledWith(
+    expect(vi.mocked(createVerseOfDay).mock.calls[0][0]).toEqual(
       expect.objectContaining({ source: null }),
     );
   });
@@ -193,6 +197,20 @@ describe("VerseOfDayForm — source", () => {
     expect(updateVerseOfDay).toHaveBeenCalledWith(
       "verse-1",
       expect.objectContaining({ source: null }),
+    );
+  });
+});
+
+describe("VerseOfDayForm — page picker", () => {
+  it("lists only PAGE type groups and labels the field Page", async () => {
+    renderForm();
+
+    await userEvent.click(await screen.findByText("Select a page..."));
+
+    expect(screen.getByText("Page")).toBeInTheDocument();
+    expect(screen.queryByText("Group")).not.toBeInTheDocument();
+    expect(fetchGroups).toHaveBeenCalledWith(
+      expect.objectContaining({ group_type: "PAGE" }),
     );
   });
 });
