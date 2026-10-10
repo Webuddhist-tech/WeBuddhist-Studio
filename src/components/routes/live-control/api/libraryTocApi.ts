@@ -110,7 +110,9 @@ const extractTitle = (
  * edition id - the same ambiguity the backend's own text routes carry - so read
  * it as an edition first and fall back to the text's first critical edition.
  */
-const resolveEditionId = async (textOrEditionId: string): Promise<string> => {
+export const resolveEditionId = async (
+  textOrEditionId: string,
+): Promise<string> => {
   try {
     await libraryClient.get(
       `/v2/editions/${encodeURIComponent(textOrEditionId)}`,

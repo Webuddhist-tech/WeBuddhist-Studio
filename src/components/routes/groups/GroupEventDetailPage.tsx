@@ -8,8 +8,8 @@ import {
   LuBookOpen,
   LuCircleDot,
   LuLibrary,
-  LuRadio,
   LuScrollText,
+  LuSettings2,
 } from "react-icons/lu";
 import { Pecha } from "@/components/ui/shadimport";
 import { MarkdownPreview } from "@/components/ui/molecules/markdown-editor/MarkdownPreview";
@@ -41,6 +41,7 @@ import { formatCoordinates, hasCoordinates } from "./api/locationsApi";
 import LocationMap from "./components/locations/LocationMap";
 import PrayerPdfActions from "./components/prayer-pdf/PrayerPdfActions";
 import InPersonCountsActions from "./components/events/InPersonCountsActions";
+import { LiveControlSummaryCard } from "./components/live-control/LiveControlSummaryCard";
 
 const languageLabel = (code: string) => getLanguageLabel(code);
 
@@ -265,18 +266,12 @@ const GroupEventDetailPage = () => {
               variant="outline"
               size="sm"
               className="gap-1.5"
-              // Its own tab: the control needs no session, and the operator
-              // keeps Studio open beside it.
               onClick={() =>
-                window.open(
-                  ROUTES.liveControl(data.id),
-                  "_blank",
-                  "noopener,noreferrer",
-                )
+                navigate(ROUTES.groupEventLive(groupId ?? "", data.id))
               }
             >
-              <LuRadio className="h-4 w-4" />
-              {t("studio.groups.pages.event_detail.live_control")}
+              <LuSettings2 className="h-4 w-4" />
+              {t("studio.live_settings.open_settings")}
             </Pecha.Button>
             <PrayerPdfActions scope={{ kind: "event", eventId: data.id }} />
             {data.group_accumulator_id ? (
@@ -396,6 +391,10 @@ const GroupEventDetailPage = () => {
           ) : null}
         </div>
       </div>
+
+      {canWrite && groupId ? (
+        <LiveControlSummaryCard groupId={groupId} eventId={data.id} />
+      ) : null}
 
       {rows.length > 1 ? (
         <div className="flex flex-wrap gap-2">

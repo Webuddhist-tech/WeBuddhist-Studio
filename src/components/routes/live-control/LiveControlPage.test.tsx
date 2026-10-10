@@ -170,6 +170,11 @@ vi.mock("./api/liveControlApi", async () => {
     searchTextsByTitle,
     fetchEditionTitle,
     fetchSegmentPlayTimes,
+    // No repeats or returns set in Studio: the built-in returns are used.
+    fetchEditionRecitationSettings: async () => ({
+      repeats: {},
+      returnJumps: [],
+    }),
     publishMove,
     startAutoplay,
     stopAutoplay,
@@ -190,6 +195,7 @@ vi.mock("./useRecitationSocket", async () => {
 vi.mock("./api/libraryTocApi", () => ({
   fetchEditionSections,
   fetchEditionYigchungs,
+  resolveEditionId: async (id: string) => id,
 }));
 
 vi.mock("react-router-dom", async () => {
@@ -349,6 +355,18 @@ const pressKey = async (code: string) => {
     );
   });
 };
+
+/**
+ * The titles button by the title. The floating touch dot is named the same,
+ * and shows once the outline is in, so it is told apart by what it opens.
+ */
+const findTitlesButton = async () =>
+  (
+    await screen.findAllByRole("button", {
+      name: "studio.live_control.toc.open",
+    })
+  ).find((button) => button.getAttribute("data-slot") === "dialog-trigger") ??
+  Promise.reject(new Error("no titles button"));
 
 describe("LiveControlPage", () => {
   beforeEach(() => {
@@ -2853,11 +2871,7 @@ describe("LiveControlPage", () => {
       renderPage();
       expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
-      await user.click(
-        await screen.findByRole("button", {
-          name: "studio.live_control.toc.open",
-        }),
-      );
+      await user.click(await findTitlesButton());
       const popup = screen.getByRole("dialog", {
         name: "studio.live_control.toc.title",
       });
@@ -2875,11 +2889,7 @@ describe("LiveControlPage", () => {
       renderPage();
       expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
-      await user.click(
-        await screen.findByRole("button", {
-          name: "studio.live_control.toc.open",
-        }),
-      );
+      await user.click(await findTitlesButton());
       await user.click(
         within(screen.getByRole("dialog")).getByRole("button", {
           name: "studio.common.close",

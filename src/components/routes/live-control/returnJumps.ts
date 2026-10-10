@@ -84,19 +84,62 @@ export const RETURN_JUMPS: ReturnJump[] = [
   },
 ];
 
-const byAfterSegment = new Map<
-  string,
-  { key: string; labelKey: string; targetSegmentId: string }
->();
+/**
+ * A return set in Studio for one edition: the button after one segment, back to
+ * another, taken `times` times in a puja. `key` is shared by every language
+ * edition of the text, so its count follows it across them.
+ */
+export interface StudioReturnJump {
+  key: string;
+  afterSegmentId: string;
+  toSegmentId: string;
+  times: number;
+  label: Record<string, string>;
+}
+
+interface JumpTarget {
+  key: string;
+  label: () => string;
+  targetSegmentId: string;
+  times?: number;
+}
+
+const builtInByAfterSegment = new Map<string, JumpTarget>();
 for (const jump of RETURN_JUMPS) {
   for (const language of ["bo", "en", "zh"] as const) {
-    byAfterSegment.set(jump.after[language], {
+    builtInByAfterSegment.set(jump.after[language], {
       key: jump.afterVerse,
-      labelKey: jump.labelKey,
+      label: () => tolgee.t(jump.labelKey),
       targetSegmentId: jump.to[language],
     });
   }
 }
+
+/** A Studio label in the page's language, else English, else any. */
+const studioLabel = (label: Record<string, string>) => {
+  const language = tolgee.getLanguage() ?? "en";
+  return (
+    label[language] || label.en || Object.values(label).find(Boolean) || ""
+  );
+};
+
+/**
+ * Returns by the segment they sit after. An edition with returns set in Studio
+ * uses only those; one with none keeps the built-in list.
+ */
+const jumpsByAfterSegment = (studio?: StudioReturnJump[]) => {
+  if (!studio || studio.length === 0) return builtInByAfterSegment;
+  const map = new Map<string, JumpTarget>();
+  for (const jump of studio) {
+    map.set(jump.afterSegmentId, {
+      key: jump.key,
+      label: () => studioLabel(jump.label),
+      targetSegmentId: jump.toSegmentId,
+      times: jump.times,
+    });
+  }
+  return map;
+};
 
 /**
  * The repeated passages among these lines: from the verse a return button goes
@@ -106,22 +149,26 @@ for (const jump of RETURN_JUMPS) {
  */
 export const returnPassages = (
   lines: { id: string }[],
+  studio?: StudioReturnJump[],
 ): { key: string; start: number; end: number }[] => {
   const indexOf = new Map<string, number>();
   lines.forEach((line, index) => {
     if (!indexOf.has(line.id)) indexOf.set(line.id, index);
   });
-  const find = (ids: Record<string, string>) =>
-    Object.values(ids)
-      .map((id) => indexOf.get(id))
-      .find((index) => index !== undefined);
-  return RETURN_JUMPS.flatMap((jump) => {
-    const start = find(jump.to);
-    const end = find(jump.after);
-    return start !== undefined && end !== undefined && start <= end
-      ? [{ key: jump.afterVerse, start, end }]
-      : [];
+  const passages: { key: string; start: number; end: number }[] = [];
+  jumpsByAfterSegment(studio).forEach((jump, afterSegmentId) => {
+    const start = indexOf.get(jump.targetSegmentId);
+    const end = indexOf.get(afterSegmentId);
+    if (
+      start !== undefined &&
+      end !== undefined &&
+      start <= end &&
+      !passages.some((passage) => passage.key === jump.key)
+    ) {
+      passages.push({ key: jump.key, start, end });
+    }
   });
+  return passages;
 };
 
 /**
@@ -140,14 +187,16 @@ export const passageAt = (
  * The return button under this line, if this segment is one the operator can
  * jump back from and the target verse is among the lines on screen. `key` names
  * the button the same in every edition, so its count follows it across them.
+ * `times` is how many returns Studio set for it, when it set one.
  */
 export const returnButtonForLine = (
   segmentId: string,
   lines: { id: string }[],
-): { key: string; label: string; index: number } | null => {
-  const jump = byAfterSegment.get(segmentId);
+  studio?: StudioReturnJump[],
+): { key: string; label: string; index: number; times?: number } | null => {
+  const jump = jumpsByAfterSegment(studio).get(segmentId);
   if (!jump) return null;
   const index = lines.findIndex((line) => line.id === jump.targetSegmentId);
   if (index < 0) return null;
-  return { key: jump.key, label: tolgee.t(jump.labelKey), index };
+  return { key: jump.key, label: jump.label(), index, times: jump.times };
 };

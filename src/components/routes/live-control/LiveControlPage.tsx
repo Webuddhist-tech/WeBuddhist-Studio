@@ -35,6 +35,7 @@ import {
   fetchLiveControlEvent,
   fetchRecitationDetails,
   fetchSegmentPlayTimes,
+  fetchEditionRecitationSettings,
   fetchTextEditions,
   publishMove,
   searchTextsByTitle,
@@ -54,6 +55,7 @@ import {
 import {
   fetchEditionSections,
   fetchEditionYigchungs,
+  resolveEditionId,
   type SegmentYigchung,
   type TocEntry,
 } from "./api/libraryTocApi";
@@ -134,6 +136,28 @@ const storeToken = (token: string | null) => {
   } catch {
     // A browser with site data blocked still drives the room this session.
   }
+};
+
+/**
+ * A token handed over in the link Studio opens (`#token=…`). It is saved like
+ * one typed in, and taken out of the address bar so it is not left on screen,
+ * in the history, or in a link copied from there.
+ */
+const takeLinkToken = (): string | null => {
+  const hash = window.location.hash.replace(/^#/, "");
+  if (!hash) return null;
+  const params = new URLSearchParams(hash);
+  const token = params.get("token")?.trim();
+  if (!token) return null;
+  params.delete("token");
+  const rest = params.toString();
+  window.history.replaceState(
+    window.history.state,
+    "",
+    `${window.location.pathname}${window.location.search}${rest ? `#${rest}` : ""}`,
+  );
+  storeToken(token);
+  return token;
 };
 
 /** The languages the room reads in. A new work follows these of its
@@ -626,7 +650,9 @@ const LiveControlPage = () => {
   const { eventId } = useParams<{ eventId: string }>();
   useHostsUpdateButton();
 
-  const [token, setToken] = useState<string | null>(() => readStoredToken());
+  const [token, setToken] = useState<string | null>(
+    () => takeLinkToken() ?? readStoredToken(),
+  );
   const [tokenDraft, setTokenDraft] = useState("");
   const [showTokenBox, setShowTokenBox] = useState(() => !readStoredToken());
   /**
@@ -725,6 +751,28 @@ const LiveControlPage = () => {
     setCue(next);
     storeCue(next);
   };
+  // What Studio set for the edition on screen: lines read more than once,
+  // shown as ×N, and its return buttons with how many times each is taken.
+  // Without it every line shows no count and the built-in returns are used.
+  const { data: studioSettings } = useQuery({
+    queryKey: ["live-control-edition-settings", driverTextId],
+    queryFn: async () =>
+      fetchEditionRecitationSettings(await resolveEditionId(driverTextId)),
+    enabled: Boolean(driverTextId),
+    refetchOnWindowFocus: false,
+    retry: false,
+    staleTime: 1000 * 60,
+  });
+  const repeats = studioSettings?.repeats;
+  const studioJumps = studioSettings?.returnJumps;
+  /** Returns Studio set for a button, by its key. */
+  const studioTimes = useMemo(
+    () =>
+      Object.fromEntries(
+        (studioJumps ?? []).map((jump) => [jump.key, jump.times]),
+      ) as Record<string, number>,
+    [studioJumps],
+  );
   const [returnCounts, updateReturnCounts] = useStoredCounts(
     returnCountsStorageKey(eventId),
   );
@@ -734,8 +782,12 @@ const LiveControlPage = () => {
   const [plannedRounds, updatePlannedRounds] = useStoredCounts(
     plannedRoundsStorageKey(eventId),
   );
-  /** Rounds autoplay recites a passage in: once, unless set otherwise. */
-  const plannedRoundsOf = (key: string) => plannedRounds[key] ?? FIRST_ROUND;
+  /** Rounds autoplay recites a passage in: once, unless set otherwise. Studio
+   * sets how many times the passage is read in all, the first time included. */
+  const plannedRoundsOf = (key: string) =>
+    studioTimes[key] !== undefined
+      ? Math.min(MAX_PLANNED_ROUNDS, Math.max(FIRST_ROUND, studioTimes[key]))
+      : (plannedRounds[key] ?? FIRST_ROUND);
   /** Sets how many rounds a passage is recited; once clears it. */
   const planRounds = (key: string, rounds: number) =>
     updatePlannedRounds((current) => {
@@ -1348,7 +1400,10 @@ const LiveControlPage = () => {
    * edition that does not carry the row has nothing to send for this move.
    */
   /** The repeated passages of the edition on screen, for the round of a line. */
-  const passages = useMemo(() => returnPassages(driverLines), [driverLines]);
+  const passages = useMemo(
+    () => returnPassages(driverLines, studioJumps),
+    [driverLines, studioJumps],
+  );
   const roundForLine = useCallback(
     (index: number) => {
       const passage = passageAt(passages, index);
@@ -1468,12 +1523,16 @@ const LiveControlPage = () => {
       const upTo = next === from ? driverLines.length : next;
       const reached: { key: string; index: number }[] = [];
       for (let at = from; at < upTo; at += 1) {
-        const button = returnButtonForLine(driverLines[at].id, driverLines);
+        const button = returnButtonForLine(
+          driverLines[at].id,
+          driverLines,
+          studioJumps,
+        );
         if (button) reached.push(button);
       }
       return reached;
     },
-    [driverLines, landingFrom],
+    [driverLines, landingFrom, studioJumps],
   );
 
   /**
@@ -1641,13 +1700,13 @@ const LiveControlPage = () => {
     const keys = new Set<string>();
     let last: string | null = null;
     for (const line of driverLines) {
-      const button = returnButtonForLine(line.id, driverLines);
+      const button = returnButtonForLine(line.id, driverLines, studioJumps);
       if (!button) continue;
       keys.add(button.key);
       last = button.key;
     }
     return keys.size > 1 ? last : null;
-  }, [driverLines]);
+  }, [driverLines, studioJumps]);
   /** A fresh puja to hand to autoplay from this line, once the counts it was
    * started with are cleared from state. */
   const [freshPujaFrom, setFreshPujaFrom] = useState<number | null>(null);
@@ -1676,6 +1735,33 @@ const LiveControlPage = () => {
     goTo(index, round);
   };
 
+  /**
+   * Next on a line with a Studio return still to take goes back, as tapping the
+   * Return would: the passage is read again until its count reaches 0. Read
+   * through a ref, since the counts change with every round.
+   */
+  const takeReturnOnNextRef = useRef<() => boolean>(() => false);
+  takeReturnOnNextRef.current = () => {
+    if (
+      !studioJumps?.length ||
+      currentIndex < 0 ||
+      currentIndex >= driverLines.length
+    ) {
+      return false;
+    }
+    const returnTo = returnsReachedFrom(currentIndex).find(
+      (button) =>
+        studioTimes[button.key] !== undefined &&
+        button.key !== lastReturnKey &&
+        plannedRoundsOf(button.key) - roundOf(button.key) > 0,
+    );
+    if (!returnTo) return false;
+    // Never the last return's start-over: that clears every count, so Next
+    // would come back to it for good.
+    beginNextRound(returnTo.key, returnTo.index);
+    return true;
+  };
+
   const step = useCallback(
     (delta: number) => {
       if (onAirRef.current && autoplayRef.current && stepPlanRef.current(delta))
@@ -1684,6 +1770,7 @@ const LiveControlPage = () => {
         setHeldMoves((current) => [...current, delta]);
         return;
       }
+      if (delta > 0 && takeReturnOnNextRef.current()) return;
       const next = landingFrom(currentIndex, delta);
       if (next !== currentIndex) jump(next);
     },
@@ -3599,10 +3686,19 @@ const LiveControlPage = () => {
                     const returnTo = returnButtonForLine(
                       segment.id,
                       driverLines,
+                      studioJumps,
                     );
+                    /** Times the passage is still to be read: Studio counts
+                     * the reading that led to the button, so it starts one
+                     * short - 3 times shows 2/3 here. */
+                    const returnsLeftOf = (round: number) =>
+                      returnTo?.times === undefined
+                        ? undefined
+                        : Math.max(0, returnTo.times - round);
                     const yigchung = yigchungs?.[segment.id];
                     const isYigchung = Boolean(yigchung?.full);
                     const playTime = playTimes?.[segment.id];
+                    const repeat = repeats?.[segment.id];
                     return (
                       <Fragment key={segment.id}>
                         <button
@@ -3692,6 +3788,23 @@ const LiveControlPage = () => {
                             content={segment.content}
                             yigchung={yigchung}
                           />
+                          {/* How many times the line is read, set in Studio:
+                           * at its end, where the reader arrives before
+                           * going round again. */}
+                          {repeat && !isYigchung ? (
+                            <span
+                              data-repeat={repeat}
+                              title={t(
+                                "studio.live_control.line.repeat_title",
+                                {
+                                  count: repeat,
+                                },
+                              )}
+                              className="ml-2 inline-block rounded-md bg-[#c9a063] px-2 py-1 align-middle font-sans text-base leading-none font-bold whitespace-nowrap text-black tabular-nums shadow-[0_0_0_1px_#e0bd84] select-none"
+                            >
+                              ×{repeat}
+                            </span>
+                          ) : null}
                         </button>
                         {returnTo ? (
                           <div className="mt-1 mb-4 ml-1.5 flex flex-wrap items-center gap-2">
@@ -3714,13 +3827,45 @@ const LiveControlPage = () => {
                               className="flex cursor-pointer items-center gap-3 rounded-[9px] border border-[#e5231c] bg-[#2c2c2e] py-2.5 pr-2.5 pl-5 text-left text-base font-semibold text-[#f2f2f7] hover:bg-[#3a3a3c]"
                             >
                               <span>{returnTo.label}</span>
-                              {/* Which round this is, where the finger lands. */}
-                              <span
-                                aria-hidden="true"
-                                className="min-w-[2.25rem] shrink-0 rounded-full bg-[#e5231c] px-2.5 py-0.5 text-center text-sm font-bold text-white tabular-nums"
-                              >
-                                {acceptedRound(returnTo.key)}
-                              </span>
+                              {/* Which round this is, where the finger lands.
+                               * The last return starts the puja over whatever
+                               * the counts, so it carries none. */}
+                              {returnTo.times !== undefined &&
+                              returnTo.key ===
+                                lastReturnKey ? null : returnTo.times !==
+                                undefined ? (
+                                // Studio's count, counted down as returns are
+                                // taken: 2/3 on arriving, then 1/3, then 0/3.
+                                <span
+                                  data-returns-left={returnsLeftOf(
+                                    acceptedRound(returnTo.key),
+                                  )}
+                                  title={t(
+                                    "studio.live_control.return.left_title",
+                                    {
+                                      left: returnsLeftOf(
+                                        acceptedRound(returnTo.key),
+                                      ),
+                                      times: returnTo.times,
+                                    },
+                                  )}
+                                  className={`min-w-[3rem] shrink-0 rounded-full px-3 py-1 text-center text-lg leading-none font-bold tabular-nums ${
+                                    returnsLeftOf(acceptedRound(returnTo.key))
+                                      ? "bg-[#e5231c] text-white"
+                                      : "bg-[#3a3a3c] text-[#8e8e93]"
+                                  }`}
+                                >
+                                  {returnsLeftOf(acceptedRound(returnTo.key))}/
+                                  {returnTo.times}
+                                </span>
+                              ) : (
+                                <span
+                                  aria-hidden="true"
+                                  className="min-w-[2.25rem] shrink-0 rounded-full bg-[#e5231c] px-2.5 py-0.5 text-center text-sm font-bold text-white tabular-nums"
+                                >
+                                  {acceptedRound(returnTo.key)}
+                                </span>
+                              )}
                               {/* Begun but not yet taken by the room: shown apart,
                                * so the badge never runs ahead of the recitation. */}
                               {roundOf(returnTo.key) >
@@ -3732,11 +3877,18 @@ const LiveControlPage = () => {
                                   )}
                                   className="shrink-0 text-sm font-semibold text-[#8e8e93] tabular-nums"
                                 >
-                                  → {roundOf(returnTo.key)}
+                                  →{" "}
+                                  {returnTo.times !== undefined
+                                    ? `${returnsLeftOf(roundOf(returnTo.key))}/${returnTo.times}`
+                                    : roundOf(returnTo.key)}
                                 </span>
                               ) : null}
                             </button>
-                            {roundOf(returnTo.key) > FIRST_ROUND ? (
+                            {roundOf(returnTo.key) > FIRST_ROUND &&
+                            !(
+                              returnTo.times !== undefined &&
+                              returnTo.key === lastReturnKey
+                            ) ? (
                               <button
                                 type="button"
                                 aria-label={t(
@@ -3746,7 +3898,7 @@ const LiveControlPage = () => {
                                   },
                                 )}
                                 title={t(
-                                  "studio.live_control.return.reset_title",
+                                  "studio.live_control.return.reset_count_title",
                                 )}
                                 onClick={() => {
                                   resetReturn(returnTo.key);
@@ -3754,12 +3906,12 @@ const LiveControlPage = () => {
                                 }}
                                 className="cursor-pointer rounded-[9px] bg-[#1c1c1e] px-3 py-2.5 text-sm font-semibold text-[#8e8e93] hover:bg-[#2c2c2e] hover:text-[#f2f2f7]"
                               >
-                                {t("studio.live_control.return.reset")}
+                                {t("studio.live_control.return.reset_count")}
                               </button>
                             ) : null}
                             {/* Only while this screen's autoplay runs: a change
                              * then rebuilds its plan. By hand it has no use. */}
-                            {autoplay ? (
+                            {autoplay && returnTo.times === undefined ? (
                               <ReturnPlan
                                 label={returnTo.label}
                                 planned={plannedRoundsOf(returnTo.key)}

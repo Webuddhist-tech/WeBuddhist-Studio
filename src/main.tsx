@@ -46,6 +46,8 @@ import GroupCommunityPage from "./components/routes/groups/GroupCommunityPage.ts
 import GroupEventsPage from "./components/routes/groups/GroupEventsPage.tsx";
 import GroupEventFormPage from "./components/routes/groups/GroupEventFormPage.tsx";
 import GroupEventDetailPage from "./components/routes/groups/GroupEventDetailPage.tsx";
+import GroupEventLivePage from "./components/routes/groups/GroupEventLivePage.tsx";
+import GroupEventLiveTextPage from "./components/routes/groups/GroupEventLiveTextPage.tsx";
 import LiveControlPage from "./components/routes/live-control/LiveControlPage.tsx";
 import AutoplayTestPage from "./components/routes/live-control/AutoplayTestPage.tsx";
 import GroupChantsPage from "./components/routes/groups/GroupChantsPage.tsx";
@@ -325,6 +327,11 @@ const router = createBrowserRouter([
           { path: "events/new", element: <GroupEventFormPage /> },
           { path: "events/:eventId", element: <GroupEventDetailPage /> },
           { path: "events/:eventId/edit", element: <GroupEventFormPage /> },
+          { path: "events/:eventId/live", element: <GroupEventLivePage /> },
+          {
+            path: "events/:eventId/live/texts/:textId",
+            element: <GroupEventLiveTextPage />,
+          },
           { path: "posts", element: <GroupPostsPage /> },
           { path: "posts/new", element: <GroupPostFormPage /> },
           { path: "posts/:postId/edit", element: <GroupPostFormPage /> },
