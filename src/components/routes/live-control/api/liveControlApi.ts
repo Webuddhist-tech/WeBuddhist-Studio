@@ -133,12 +133,12 @@ export function toOperatorSegments(
     .filter((segment) => Boolean(segment.id));
 }
 
-/** The event's public record: readable without a session, unlike the CMS one. */
+/** The event's CMS record, read with the operator's Studio session. */
 export const fetchLiveControlEvent = async (
   eventId: string,
 ): Promise<LiveControlEvent> => {
   const { data } = await axiosInstance.get(
-    `/api/v1/events/${encodeURIComponent(eventId)}`,
+    `/api/v1/cms/events/${encodeURIComponent(eventId)}`,
   );
   const rows = Array.isArray(data?.metadata)
     ? data.metadata

@@ -1,4 +1,5 @@
 import axios from "axios";
+import tocShortTitles from "../tocShortTitles.json";
 
 /**
  * The edition's table of contents, read straight from the WeBuddhist library
@@ -51,10 +52,37 @@ type LibraryPage<T> = { items: T[]; has_more: boolean };
  */
 export interface TocEntry {
   id: string;
+  /** What the sidebar shows: the short title, where one is set. */
   title: string;
+  /** The title as the library gives it, for when the short one is not enough. */
+  fullTitle: string;
+  /** An emoji drawn before the title, so a section is found at a glance. */
+  icon?: string;
   depth: number;
   segmentId?: string;
 }
+
+/** How the sidebar names a section, where the library's own title will not do. */
+interface SectionLabel {
+  title?: string;
+  icon?: string;
+}
+
+/**
+ * Short titles, and an icon each, for the sections of the liturgies in use - a
+ * liturgy's full title runs to a line or two, too long for the sidebar. Kept by
+ * edition in tocShortTitles.json, looked up by section id; a section not there
+ * shows the library's own title and no icon. Each translation's section carries
+ * the same icon as the Tibetan, so it is found the same way in any language.
+ */
+const SECTION_LABELS: ReadonlyMap<string, SectionLabel> = new Map(
+  Object.values(
+    tocShortTitles as Record<string, Record<string, SectionLabel>>,
+  ).flatMap((sections) => Object.entries(sections)),
+);
+
+export const sectionLabelOf = (sectionId: string): SectionLabel =>
+  SECTION_LABELS.get(sectionId) ?? {};
 
 /** Segment spans come down in pages; a long text is a handful of them. */
 const SEGMENT_SCAN_PAGE_SIZE = 500;
@@ -186,9 +214,12 @@ const flatten = (
   sections.forEach((section) => {
     const title = extractTitle(section.title, language);
     if (title) {
+      const label = sectionLabelOf(section.id);
       into.push({
         id: section.id,
-        title,
+        title: label.title?.trim() || title,
+        fullTitle: title,
+        ...(label.icon ? { icon: label.icon } : {}),
         depth,
         segmentId: anchorOf(section, spans),
       });

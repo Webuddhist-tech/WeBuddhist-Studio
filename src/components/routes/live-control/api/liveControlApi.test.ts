@@ -539,7 +539,7 @@ describe("fetchLiveControlEvent", () => {
       title: "Tara Puja",
       collectionId: "col-1",
     });
-    expect(axiosInstance.get).toHaveBeenCalledWith("/api/v1/events/e1");
+    expect(axiosInstance.get).toHaveBeenCalledWith("/api/v1/cms/events/e1");
   });
 
   it("takes a single metadata object, and an event with no collection", async () => {

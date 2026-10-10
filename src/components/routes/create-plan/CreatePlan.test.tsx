@@ -414,13 +414,13 @@ describe("CreatePlan Component", () => {
     const submitButton = screen.getByText("studio.plan.next_button");
     fireEvent.click(submitButton);
     expect(
-      await screen.findByText("Plan title is required"),
+      await screen.findByText("studio.validation.plan_title_required"),
     ).toBeInTheDocument();
     expect(
-      await screen.findByText("Description is required"),
+      await screen.findByText("studio.validation.description_required"),
     ).toBeInTheDocument();
     expect(
-      await screen.findByText("Difficulty is required"),
+      await screen.findByText("studio.validation.difficulty_required"),
     ).toBeInTheDocument();
   });
 

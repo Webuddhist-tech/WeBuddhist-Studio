@@ -264,27 +264,27 @@ describe("Dashboard Component", () => {
     });
 
     const seriesActions = screen.getByRole("button", {
-      name: "Series actions",
+      name: "studio.shell.content_actions.series_actions",
     });
     await user.click(seriesActions);
 
     expect(
-      await screen.findByRole("menuitem", { name: "Unpublish" }),
+      await screen.findByRole("menuitem", { name: "studio.common.unpublish" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("menuitem", { name: "Edit Series" }),
+      screen.getByRole("menuitem", { name: "studio.shell.content_actions.edit_series" }),
     ).toBeInTheDocument();
 
     await user.keyboard("{Escape}");
 
-    const planActions = screen.getByRole("button", { name: "Plan actions" });
+    const planActions = screen.getByRole("button", { name: "studio.shell.content_actions.plan_actions" });
     await user.click(planActions);
 
     expect(
-      await screen.findByRole("menuitem", { name: "Unpublish" }),
+      await screen.findByRole("menuitem", { name: "studio.common.unpublish" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("menuitem", { name: "Edit Plan" }),
+      screen.getByRole("menuitem", { name: "studio.shell.content_actions.edit_plan" }),
     ).toBeInTheDocument();
   });
 
