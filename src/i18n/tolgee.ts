@@ -16,8 +16,13 @@ const initialLanguage = resolveUiLanguage(
 );
 setFontVariables(initialLanguage);
 
+/**
+ * The Studio's Tolgee project, `studio` namespace, published as one
+ * `<cdnCode>.json` per language.
+ */
 const TOLGEE_CDN =
-  "https://cdn.tolg.ee/50cc3287503c99e8f336aad9ee80f6f1/reactjs_json";
+  import.meta.env.VITE_TOLGEE_CDN_URL ||
+  "https://cdn.tolg.ee/c1435f067d4e41c0dd6908cebd39805b/studio";
 const LOCAL_TRANSLATIONS: Record<string, Record<string, string>> = {
   en: localeEn,
   "bo-IN": localeBo,

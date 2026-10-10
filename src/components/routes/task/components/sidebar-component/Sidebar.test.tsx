@@ -191,7 +191,7 @@ describe("SideBar Component", () => {
     await waitFor(() => {
       expect(screen.getByText("Test Plan Title")).toBeInTheDocument();
     });
-    const addButton = screen.getByText("studio.modals.day_add.add_new_day");
+    const addButton = screen.getByText("Add New Day");
     fireEvent.click(addButton);
     await waitFor(() => {
       expect(axiosInstance.post).toHaveBeenCalledWith(

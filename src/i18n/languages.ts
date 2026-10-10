@@ -1,13 +1,18 @@
 /**
  * The interface languages the Studio ships, in the order the language menu
- * lists them. `code` is the Tolgee language tag (shared with the WeBuddhist
- * Tolgee project, hence `bo-IN`); `cdnCode` is the file the Tolgee CDN serves
- * for it, when it serves one at all.
+ * lists them. `code` is the language Tolgee runs in; `cdnCode` names the file
+ * the Studio's Tolgee CDN serves for it (`<cdnCode>.json`). A language the CDN
+ * has no file for yet just uses the bundled JSON.
  */
 export const UI_LANGUAGES = [
   { code: "en", label: "English", fontClass: "font-inter", cdnCode: "en" },
-  { code: "bo-IN", label: "བོད་ཡིག", fontClass: "font-monlam", cdnCode: "bo-IN" },
-  { code: "zh", label: "中文", fontClass: "font-inter", cdnCode: null },
+  {
+    code: "bo-IN",
+    label: "བོད་ཡིག",
+    fontClass: "font-monlam",
+    cdnCode: "bo-IN",
+  },
+  { code: "zh", label: "中文", fontClass: "font-inter", cdnCode: "zh" },
 ] as const;
 
 export type UiLanguageCode = (typeof UI_LANGUAGES)[number]["code"];

@@ -313,7 +313,7 @@ describe("NotificationForm Component", () => {
 
       await waitFor(() => {
         const planRadio = screen.getByRole("radio", {
-          name: "studio.task.notification.use_plan_cover",
+          name: /studio.task.notification.use_plan_cover/,
         });
         fireEvent.click(planRadio);
         expect(planRadio).toBeChecked();
@@ -748,7 +748,7 @@ describe("NotificationForm Component", () => {
 
       await waitFor(() => {
         const planRadio = screen.getByRole("radio", {
-          name: "studio.task.notification.use_plan_cover",
+          name: /studio.task.notification.use_plan_cover/,
         });
         fireEvent.click(planRadio);
 
@@ -856,7 +856,7 @@ describe("NotificationForm Component", () => {
 
       await waitFor(() => {
         const planRadio = screen.getByRole("radio", {
-          name: "studio.task.notification.use_plan_cover",
+          name: /studio.task.notification.use_plan_cover/,
         });
         expect(planRadio).toBeChecked();
       });
