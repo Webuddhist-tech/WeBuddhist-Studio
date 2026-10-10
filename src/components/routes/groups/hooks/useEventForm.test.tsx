@@ -35,7 +35,9 @@ describe("useEventForm resolver selection", () => {
   it("rejects a past start date when creating", async () => {
     const errors = await validateWithPastStartDate(true);
 
-    expect(errors.start_date?.message).toBe("Start date cannot be in the past");
+    expect(errors.start_date?.message).toBe(
+      "studio.validation.start_date_in_past",
+    );
   });
 
   /** Regression: the page called `useEventForm()` with no argument, so the

@@ -21,7 +21,11 @@ vi.mock("./api/adminAuthorsApi", async (importOriginal) => {
   return { ...actual, fetchAdminAuthors: vi.fn() };
 });
 
-const author = (id: string, firstname: string, extra: Partial<AdminAuthorDTO> = {}) =>
+const author = (
+  id: string,
+  firstname: string,
+  extra: Partial<AdminAuthorDTO> = {},
+) =>
   ({
     id,
     firstname,
@@ -59,7 +63,9 @@ const lastParams = () => vi.mocked(fetchAdminAuthors).mock.calls.at(-1)?.[0];
 describe("AdminAuthorsPage search", () => {
   beforeEach(() => {
     vi.mocked(fetchAdminAuthors).mockReset();
-    vi.mocked(fetchAdminAuthors).mockResolvedValue(list([author("a1", "Tenzin")]));
+    vi.mocked(fetchAdminAuthors).mockResolvedValue(
+      list([author("a1", "Tenzin")]),
+    );
     vi.mocked(useUserInfo).mockReturnValue({
       data: { id: "me", platform_role: "SUPER_ADMIN" },
       isLoading: false,
@@ -81,7 +87,10 @@ describe("AdminAuthorsPage search", () => {
     renderPage();
     await screen.findByText("Tenzin Dorje");
 
-    await userEvent.type(screen.getByLabelText("Search authors"), "pema");
+    await userEvent.type(
+      screen.getByLabelText("studio.admin_authors.search_aria"),
+      "pema",
+    );
 
     await waitFor(() => expect(lastParams()).toMatchObject({ search: "pema" }));
     // The queue filter is dropped, otherwise most authors could never be found.
@@ -93,14 +102,20 @@ describe("AdminAuthorsPage search", () => {
   it("trims the search before sending it", async () => {
     renderPage();
     await screen.findByText("Tenzin Dorje");
-    await userEvent.type(screen.getByLabelText("Search authors"), "  pema  ");
+    await userEvent.type(
+      screen.getByLabelText("studio.admin_authors.search_aria"),
+      "  pema  ",
+    );
     await waitFor(() => expect(lastParams()).toMatchObject({ search: "pema" }));
   });
 
   it("does not search for a blank entry", async () => {
     renderPage();
     await screen.findByText("Tenzin Dorje");
-    await userEvent.type(screen.getByLabelText("Search authors"), "   ");
+    await userEvent.type(
+      screen.getByLabelText("studio.admin_authors.search_aria"),
+      "   ",
+    );
     await new Promise((resolve) => setTimeout(resolve, 600));
     expect(lastParams()).not.toHaveProperty("search");
     expect(lastParams()).toMatchObject({ is_verified: true, is_active: false });
@@ -109,35 +124,58 @@ describe("AdminAuthorsPage search", () => {
   it("clears the search and returns to the queue", async () => {
     renderPage();
     await screen.findByText("Tenzin Dorje");
-    await userEvent.type(screen.getByLabelText("Search authors"), "pema");
+    await userEvent.type(
+      screen.getByLabelText("studio.admin_authors.search_aria"),
+      "pema",
+    );
     await waitFor(() => expect(lastParams()).toMatchObject({ search: "pema" }));
 
-    await userEvent.click(screen.getByRole("button", { name: "Clear search" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.admin_authors.clear_search" }),
+    );
 
     await waitFor(() => expect(lastParams()).not.toHaveProperty("search"));
     expect(lastParams()).toMatchObject({ is_verified: true, is_active: false });
-    expect(screen.getByLabelText("Search authors")).toHaveValue("");
+    expect(
+      screen.getByLabelText("studio.admin_authors.search_aria"),
+    ).toHaveValue("");
   });
 
   it("the Activation queue button drops the search", async () => {
     renderPage();
     await screen.findByText("Tenzin Dorje");
-    await userEvent.type(screen.getByLabelText("Search authors"), "pema");
+    await userEvent.type(
+      screen.getByLabelText("studio.admin_authors.search_aria"),
+      "pema",
+    );
     await waitFor(() => expect(lastParams()).toMatchObject({ search: "pema" }));
 
-    await userEvent.click(screen.getByRole("button", { name: "Activation queue" }));
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "studio.admin_authors.activation_queue",
+      }),
+    );
 
     await waitFor(() => expect(lastParams()).not.toHaveProperty("search"));
-    expect(screen.getByLabelText("Search authors")).toHaveValue("");
+    expect(
+      screen.getByLabelText("studio.admin_authors.search_aria"),
+    ).toHaveValue("");
   });
 
   it("keeps the search when switching to All authors", async () => {
     renderPage();
     await screen.findByText("Tenzin Dorje");
-    await userEvent.type(screen.getByLabelText("Search authors"), "pema");
-    await userEvent.click(screen.getByRole("button", { name: "All authors" }));
+    await userEvent.type(
+      screen.getByLabelText("studio.admin_authors.search_aria"),
+      "pema",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.admin_authors.all_authors" }),
+    );
     await waitFor(() => expect(lastParams()).toMatchObject({ search: "pema" }));
-    expect(screen.getByLabelText("Search authors")).toHaveValue("pema");
+    expect(
+      screen.getByLabelText("studio.admin_authors.search_aria"),
+    ).toHaveValue("pema");
   });
 
   it("says when nothing matches the search", async () => {
@@ -145,9 +183,14 @@ describe("AdminAuthorsPage search", () => {
     await screen.findByText("Tenzin Dorje");
     vi.mocked(fetchAdminAuthors).mockResolvedValue(list([]));
 
-    await userEvent.type(screen.getByLabelText("Search authors"), "nobody");
+    await userEvent.type(
+      screen.getByLabelText("studio.admin_authors.search_aria"),
+      "nobody",
+    );
 
-    expect(await screen.findByText('No authors match "nobody".')).toBeInTheDocument();
+    expect(
+      await screen.findByText("studio.admin_authors.empty.search"),
+    ).toBeInTheDocument();
   });
 
   it("shows the matches so their role can be changed", async () => {
@@ -157,19 +200,24 @@ describe("AdminAuthorsPage search", () => {
       list([author("a2", "Pema", { platform_role: "CONTENT_ADMIN" })]),
     );
 
-    await userEvent.type(screen.getByLabelText("Search authors"), "pema");
+    await userEvent.type(
+      screen.getByLabelText("studio.admin_authors.search_aria"),
+      "pema",
+    );
 
     expect(await screen.findByText("Pema Dorje")).toBeInTheDocument();
-    expect(screen.getByLabelText("Platform role of Pema Dorje")).toHaveValue(
-      "CONTENT_ADMIN",
-    );
+    expect(
+      screen.getByLabelText("studio.admin_authors.table.role_select_aria"),
+    ).toHaveValue("CONTENT_ADMIN");
   });
 });
 
 describe("AdminAuthorsPage role filter", () => {
   beforeEach(() => {
     vi.mocked(fetchAdminAuthors).mockReset();
-    vi.mocked(fetchAdminAuthors).mockResolvedValue(list([author("a1", "Tenzin")]));
+    vi.mocked(fetchAdminAuthors).mockResolvedValue(
+      list([author("a1", "Tenzin")]),
+    );
     vi.mocked(useUserInfo).mockReturnValue({
       data: { id: "me", platform_role: "SUPER_ADMIN" },
       isLoading: false,
@@ -179,7 +227,7 @@ describe("AdminAuthorsPage role filter", () => {
   it("offers every role, with all roles chosen to begin with", async () => {
     renderPage();
     await screen.findByText("Tenzin Dorje");
-    const filter = screen.getByLabelText("Filter by role");
+    const filter = screen.getByLabelText("studio.admin_authors.filter_by_role");
     expect(filter).toHaveValue("");
     expect(
       Array.from((filter as HTMLSelectElement).options).map((o) => o.value),
@@ -192,12 +240,15 @@ describe("AdminAuthorsPage role filter", () => {
     await screen.findByText("Tenzin Dorje");
 
     await userEvent.selectOptions(
-      screen.getByLabelText("Filter by role"),
+      screen.getByLabelText("studio.admin_authors.filter_by_role"),
       "CONTENT_ADMIN",
     );
 
     await waitFor(() =>
-      expect(lastParams()).toMatchObject({ platform_role: "CONTENT_ADMIN", skip: 0 }),
+      expect(lastParams()).toMatchObject({
+        platform_role: "CONTENT_ADMIN",
+        skip: 0,
+      }),
     );
     expect(lastParams()).not.toHaveProperty("is_verified");
     expect(lastParams()).not.toHaveProperty("is_active");
@@ -207,45 +258,86 @@ describe("AdminAuthorsPage role filter", () => {
     renderPage();
     await screen.findByText("Tenzin Dorje");
 
-    await userEvent.type(screen.getByLabelText("Search authors"), "pema");
-    await userEvent.selectOptions(screen.getByLabelText("Filter by role"), "CREATOR");
+    await userEvent.type(
+      screen.getByLabelText("studio.admin_authors.search_aria"),
+      "pema",
+    );
+    await userEvent.selectOptions(
+      screen.getByLabelText("studio.admin_authors.filter_by_role"),
+      "CREATOR",
+    );
 
     await waitFor(() =>
-      expect(lastParams()).toMatchObject({ search: "pema", platform_role: "CREATOR" }),
+      expect(lastParams()).toMatchObject({
+        search: "pema",
+        platform_role: "CREATOR",
+      }),
     );
   });
 
   it("choosing all roles again returns to the queue", async () => {
     renderPage();
     await screen.findByText("Tenzin Dorje");
-    await userEvent.selectOptions(screen.getByLabelText("Filter by role"), "REVIEWER");
-    await waitFor(() => expect(lastParams()).toMatchObject({ platform_role: "REVIEWER" }));
+    await userEvent.selectOptions(
+      screen.getByLabelText("studio.admin_authors.filter_by_role"),
+      "REVIEWER",
+    );
+    await waitFor(() =>
+      expect(lastParams()).toMatchObject({ platform_role: "REVIEWER" }),
+    );
 
-    await userEvent.selectOptions(screen.getByLabelText("Filter by role"), "");
+    await userEvent.selectOptions(
+      screen.getByLabelText("studio.admin_authors.filter_by_role"),
+      "",
+    );
 
-    await waitFor(() => expect(lastParams()).not.toHaveProperty("platform_role"));
+    await waitFor(() =>
+      expect(lastParams()).not.toHaveProperty("platform_role"),
+    );
     expect(lastParams()).toMatchObject({ is_verified: true, is_active: false });
   });
 
   it("the Activation queue button clears the role filter too", async () => {
     renderPage();
     await screen.findByText("Tenzin Dorje");
-    await userEvent.selectOptions(screen.getByLabelText("Filter by role"), "REVIEWER");
-    await waitFor(() => expect(lastParams()).toMatchObject({ platform_role: "REVIEWER" }));
+    await userEvent.selectOptions(
+      screen.getByLabelText("studio.admin_authors.filter_by_role"),
+      "REVIEWER",
+    );
+    await waitFor(() =>
+      expect(lastParams()).toMatchObject({ platform_role: "REVIEWER" }),
+    );
 
-    await userEvent.click(screen.getByRole("button", { name: "Activation queue" }));
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "studio.admin_authors.activation_queue",
+      }),
+    );
 
-    await waitFor(() => expect(lastParams()).not.toHaveProperty("platform_role"));
-    expect(screen.getByLabelText("Filter by role")).toHaveValue("");
+    await waitFor(() =>
+      expect(lastParams()).not.toHaveProperty("platform_role"),
+    );
+    expect(
+      screen.getByLabelText("studio.admin_authors.filter_by_role"),
+    ).toHaveValue("");
   });
 
   it("the All authors button keeps the chosen role", async () => {
     renderPage();
     await screen.findByText("Tenzin Dorje");
-    await userEvent.selectOptions(screen.getByLabelText("Filter by role"), "REVIEWER");
-    await userEvent.click(screen.getByRole("button", { name: "All authors" }));
-    await waitFor(() => expect(lastParams()).toMatchObject({ platform_role: "REVIEWER" }));
-    expect(screen.getByLabelText("Filter by role")).toHaveValue("REVIEWER");
+    await userEvent.selectOptions(
+      screen.getByLabelText("studio.admin_authors.filter_by_role"),
+      "REVIEWER",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.admin_authors.all_authors" }),
+    );
+    await waitFor(() =>
+      expect(lastParams()).toMatchObject({ platform_role: "REVIEWER" }),
+    );
+    expect(
+      screen.getByLabelText("studio.admin_authors.filter_by_role"),
+    ).toHaveValue("REVIEWER");
   });
 
   it("says which role has no authors", async () => {
@@ -254,12 +346,12 @@ describe("AdminAuthorsPage role filter", () => {
     vi.mocked(fetchAdminAuthors).mockResolvedValue(list([]));
 
     await userEvent.selectOptions(
-      screen.getByLabelText("Filter by role"),
+      screen.getByLabelText("studio.admin_authors.filter_by_role"),
       "CONTENT_ADMIN",
     );
 
     expect(
-      await screen.findByText("No authors have the CONTENT_ADMIN role."),
+      await screen.findByText("studio.admin_authors.empty.role"),
     ).toBeInTheDocument();
   });
 
@@ -268,11 +360,17 @@ describe("AdminAuthorsPage role filter", () => {
     await screen.findByText("Tenzin Dorje");
     vi.mocked(fetchAdminAuthors).mockResolvedValue(list([]));
 
-    await userEvent.type(screen.getByLabelText("Search authors"), "pema");
-    await userEvent.selectOptions(screen.getByLabelText("Filter by role"), "REVIEWER");
+    await userEvent.type(
+      screen.getByLabelText("studio.admin_authors.search_aria"),
+      "pema",
+    );
+    await userEvent.selectOptions(
+      screen.getByLabelText("studio.admin_authors.filter_by_role"),
+      "REVIEWER",
+    );
 
     expect(
-      await screen.findByText('No authors match "pema" with the REVIEWER role.'),
+      await screen.findByText("studio.admin_authors.empty.search_and_role"),
     ).toBeInTheDocument();
   });
 
@@ -285,10 +383,15 @@ describe("AdminAuthorsPage role filter", () => {
     });
     renderPage();
     await screen.findByText("Tenzin Dorje");
-    await userEvent.click(screen.getByRole("button", { name: "Next" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.common.next" }),
+    );
     await waitFor(() => expect(lastParams()).toMatchObject({ skip: 20 }));
 
-    await userEvent.selectOptions(screen.getByLabelText("Filter by role"), "CREATOR");
+    await userEvent.selectOptions(
+      screen.getByLabelText("studio.admin_authors.filter_by_role"),
+      "CREATOR",
+    );
 
     await waitFor(() =>
       expect(lastParams()).toMatchObject({ platform_role: "CREATOR", skip: 0 }),

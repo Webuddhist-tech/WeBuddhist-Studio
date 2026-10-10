@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslate } from "@tolgee/react";
 import { useQuery } from "@tanstack/react-query";
 import { SiYoutube } from "react-icons/si";
 import { format } from "date-fns";
@@ -14,10 +15,16 @@ type EventYoutubeLivePickerProps = {
   onSelect: (video: YoutubeLiveVideo) => void;
 };
 
-const STATUS_GROUPS: { status: YoutubeLiveStatus; heading: string }[] = [
-  { status: "live", heading: "Live now" },
-  { status: "upcoming", heading: "Upcoming" },
-  { status: "completed", heading: "Past live streams" },
+const STATUS_GROUPS: { status: YoutubeLiveStatus; headingKey: string }[] = [
+  { status: "live", headingKey: "studio.groups.events.youtube.status_live" },
+  {
+    status: "upcoming",
+    headingKey: "studio.groups.events.youtube.status_upcoming",
+  },
+  {
+    status: "completed",
+    headingKey: "studio.groups.events.youtube.status_completed",
+  },
 ];
 
 const formatStart = (value: string | null): string | null => {
@@ -31,6 +38,7 @@ const EventYoutubeLivePicker = ({
   channelUrl,
   onSelect,
 }: EventYoutubeLivePickerProps) => {
+  const { t } = useTranslate();
   const [open, setOpen] = useState(false);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
@@ -52,8 +60,8 @@ const EventYoutubeLivePicker = ({
           size="sm"
           className="gap-1"
         >
-          <SiYoutube className="h-4 w-4 text-[#FF0000]" /> Choose from group
-          channel
+          <SiYoutube className="h-4 w-4 text-[#FF0000]" />{" "}
+          {t("studio.groups.events.youtube.choose_from_channel")}
         </Pecha.Button>
       </Pecha.PopoverTrigger>
       <Pecha.PopoverContent
@@ -61,18 +69,20 @@ const EventYoutubeLivePicker = ({
         align="start"
       >
         <Pecha.Command>
-          <Pecha.CommandInput placeholder="Search live streams…" />
+          <Pecha.CommandInput
+            placeholder={t("studio.groups.events.youtube.search_placeholder")}
+          />
           <Pecha.CommandList className="max-h-80">
             {isLoading ? (
               <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-                Loading live streams…
+                {t("studio.groups.events.youtube.loading")}
               </div>
             ) : isError ? (
               <div className="space-y-2 px-3 py-6 text-center text-sm">
                 <p className="text-destructive">
                   {error instanceof Error
                     ? error.message
-                    : "Could not load live streams."}
+                    : t("studio.groups.events.youtube.load_error")}
                 </p>
                 <Pecha.Button
                   type="button"
@@ -80,19 +90,19 @@ const EventYoutubeLivePicker = ({
                   size="sm"
                   onClick={() => refetch()}
                 >
-                  Retry
+                  {t("studio.common.retry")}
                 </Pecha.Button>
               </div>
             ) : (
               <>
                 <Pecha.CommandEmpty>
-                  No live streams found on this channel.
+                  {t("studio.groups.events.youtube.empty")}
                 </Pecha.CommandEmpty>
-                {STATUS_GROUPS.map(({ status, heading }) => {
+                {STATUS_GROUPS.map(({ status, headingKey }) => {
                   const items = videos.filter((v) => v.status === status);
                   if (!items.length) return null;
                   return (
-                    <Pecha.CommandGroup key={status} heading={heading}>
+                    <Pecha.CommandGroup key={status} heading={t(headingKey)}>
                       {items.map((video) => (
                         <Pecha.CommandItem
                           key={video.id}

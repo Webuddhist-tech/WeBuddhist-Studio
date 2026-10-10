@@ -2,7 +2,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import Navbar from "./components/ui/molecules/nav-bar/Navbar";
 import { setFontVariables } from "./config/font-config";
 import { useEffect } from "react";
-import { LANGUAGE } from "./lib/constant";
+import { useTolgee } from "@tolgee/react";
 import { AUTH_ROUTE_PATHS } from "./routes/paths";
 import { useIsMobile } from "./hooks/useIsMobile";
 import {
@@ -19,9 +19,10 @@ function App() {
   // Token bootstrap and renewal live in PlanAuthProvider - they have to settle
   // before the route guards read `isLoggedIn`, which a layout-level effect
   // cannot guarantee.
+  const language = useTolgee(["language"]).getLanguage();
   useEffect(() => {
-    setFontVariables(localStorage.getItem(LANGUAGE) || "en");
-  }, []);
+    setFontVariables(language ?? "en");
+  }, [language]);
 
   return (
     // A phone stacks a top bar, the page and a tab bar; desktop keeps the sidebar.

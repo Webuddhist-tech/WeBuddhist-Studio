@@ -2,6 +2,7 @@ import { useState } from "react";
 import { IoMdAdd, IoMdClose } from "react-icons/io";
 import { PiDotsSixVertical } from "react-icons/pi";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { SortableItem, SortableList } from "@/components/ui/atoms/sortable";
 import ImageContentData from "@/components/ui/molecules/modals/image-upload/ImageContentData";
@@ -33,6 +34,7 @@ const PostMediaSection = ({
   onStartReplace,
   onClear,
 }: PostMediaSectionProps) => {
+  const { t } = useTranslate();
   const [isDialogOpen, setDialogOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -62,15 +64,15 @@ const PostMediaSection = ({
         is_existing: false,
       });
       setDialogOpen(false);
-      toast.success("Image uploaded");
+      toast.success(t("studio.groups.shared.image_uploaded"));
     } catch (error: unknown) {
       const err = error as { response?: { status?: number } };
       if (err?.response?.status === 413) {
-        toast.error("Failed to upload image", {
-          description: "File exceeds the maximum size of 1MB",
+        toast.error(t("studio.groups.shared.image_upload_error"), {
+          description: t("studio.groups.shared.image_too_large"),
         });
       } else {
-        toast.error("Failed to upload image");
+        toast.error(t("studio.groups.shared.image_upload_error"));
       }
     } finally {
       setIsUploading(false);
@@ -81,10 +83,13 @@ const PostMediaSection = ({
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-bold">Media (optional)</h3>
+          <h3 className="text-sm font-bold">
+            {t("studio.groups.posts.media.title")}
+          </h3>
           <p className="text-xs text-muted-foreground">
-            Up to {MAX_POST_MEDIA_ITEMS} images. At least one of caption, media,
-            or a link is required.
+            {t("studio.groups.posts.media.description", {
+              max: MAX_POST_MEDIA_ITEMS,
+            })}
           </p>
         </div>
         {!readOnly ? (
@@ -96,7 +101,7 @@ const PostMediaSection = ({
                 size="sm"
                 onClick={onStartReplace}
               >
-                Replace media
+                {t("studio.groups.posts.media.replace")}
               </Pecha.Button>
             ) : null}
             {(isNew || mediaDirty) && media.length > 0 ? (
@@ -106,7 +111,7 @@ const PostMediaSection = ({
                 size="sm"
                 onClick={onClear}
               >
-                Clear
+                {t("studio.common.clear")}
               </Pecha.Button>
             ) : null}
             {canAdd ? (
@@ -117,7 +122,8 @@ const PostMediaSection = ({
                 onClick={() => setDialogOpen(true)}
                 className="gap-1"
               >
-                <IoMdAdd className="h-4 w-4" /> Add image
+                <IoMdAdd className="h-4 w-4" />{" "}
+                {t("studio.groups.posts.media.add_image")}
               </Pecha.Button>
             ) : null}
           </div>
@@ -126,12 +132,14 @@ const PostMediaSection = ({
 
       {showingExisting ? (
         <p className="text-xs text-muted-foreground">
-          Existing media is kept unless you replace it.
+          {t("studio.groups.posts.media.existing_kept")}
         </p>
       ) : null}
 
       {fields.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No media added.</p>
+        <p className="text-sm text-muted-foreground">
+          {t("studio.groups.posts.media.empty")}
+        </p>
       ) : (
         <SortableList
           items={fields.map((f) => f.id)}
@@ -159,7 +167,11 @@ const PostMediaSection = ({
                         />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
-                          {item?.media_type ?? "Media"}
+                          {item?.media_type
+                            ? t(
+                                `studio.common.${item.media_type.toLowerCase()}`,
+                              )
+                            : t("studio.groups.posts.media.media")}
                         </div>
                       )}
                       {!readOnly && (isNew || mediaDirty) ? (
@@ -167,7 +179,9 @@ const PostMediaSection = ({
                           {canReorder ? (
                             <button
                               type="button"
-                              aria-label="Reorder media"
+                              aria-label={t(
+                                "studio.groups.posts.media.reorder_aria",
+                              )}
                               className="cursor-grab rounded p-0.5 text-white active:cursor-grabbing"
                               {...listeners}
                             >
@@ -178,7 +192,9 @@ const PostMediaSection = ({
                           )}
                           <button
                             type="button"
-                            aria-label="Remove media"
+                            aria-label={t(
+                              "studio.groups.posts.media.remove_aria",
+                            )}
                             onClick={() => onRemove(index)}
                             className="rounded p-0.5 text-white"
                           >
@@ -198,7 +214,9 @@ const PostMediaSection = ({
       <Pecha.Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
         <Pecha.DialogContent showCloseButton={true}>
           <Pecha.DialogHeader>
-            <Pecha.DialogTitle>Upload &amp; crop image</Pecha.DialogTitle>
+            <Pecha.DialogTitle>
+              {t("studio.groups.posts.media.upload_dialog_title")}
+            </Pecha.DialogTitle>
           </Pecha.DialogHeader>
           <ImageContentData onUpload={handleUpload} isLoading={isUploading} />
         </Pecha.DialogContent>

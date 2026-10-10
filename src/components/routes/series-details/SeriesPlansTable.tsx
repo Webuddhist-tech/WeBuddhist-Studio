@@ -14,6 +14,7 @@ import {
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
 import { Pecha } from "@/components/ui/shadimport";
+import { useTranslate } from "@tolgee/react";
 import { useNavigate } from "react-router-dom";
 import defaultCover from "/default-image.webp";
 import { PiDotsSixVertical } from "react-icons/pi";
@@ -53,6 +54,7 @@ function SortablePlanRow({
   readonly showActionsColumn: boolean;
 }) {
   const navigate = useNavigate();
+  const { t } = useTranslate();
   const {
     attributes,
     listeners,
@@ -68,7 +70,10 @@ function SortablePlanRow({
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const daysLabel = `${plan.total_days} ${plan.total_days === 1 ? "Day" : "Days"}`;
+  const daysLabel =
+    plan.total_days === 1
+      ? t("studio.dashboard.days_count_one", { count: plan.total_days })
+      : t("studio.dashboard.days_count_other", { count: plan.total_days });
   const canOpenPlan = canAccessPlanRoutes(platformRole);
 
   return (
@@ -82,7 +87,9 @@ function SortablePlanRow({
         <button
           type="button"
           className="shrink-0 rounded p-1 text-muted-foreground hover:text-foreground touch-none disabled:cursor-not-allowed disabled:opacity-30"
-          aria-label={`Reorder ${plan.title}`}
+          aria-label={t("studio.series.plans.reorder_aria", {
+            title: plan.title,
+          })}
           disabled={!canReorder}
           {...listeners}
         >
@@ -108,7 +115,7 @@ function SortablePlanRow({
               <div className="text-sm font-semibold">{plan.title}</div>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {languageChip(plan.language)}
-                {statusChip(plan.status)}
+                {statusChip(plan.status, t)}
                 <span className="rounded-full bg-[#DEAD2D4D] px-2.5 py-0.5 text-xs font-medium text-[#020C1D] dark:bg-[#DEAD2D4D] dark:text-white">
                   {daysLabel}
                 </span>
@@ -129,7 +136,7 @@ function SortablePlanRow({
               <div className="text-sm font-semibold">{plan.title}</div>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {languageChip(plan.language)}
-                {statusChip(plan.status)}
+                {statusChip(plan.status, t)}
                 <span className="rounded-full bg-[#DEAD2D4D] px-2.5 py-0.5 text-xs font-medium text-[#020C1D] dark:bg-[#DEAD2D4D] dark:text-white">
                   {daysLabel}
                 </span>
@@ -179,6 +186,7 @@ export function SeriesPlansTable({
   onReorder,
   onRemoveFromSeries,
 }: SeriesPlansTableProps) {
+  const { t } = useTranslate();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
@@ -206,11 +214,13 @@ export function SeriesPlansTable({
         <Pecha.TableHeader className="dark:bg-[#1d1d1f]">
           <Pecha.TableRow className="font-dynamic">
             <Pecha.TableHead className="w-10" />
-            <Pecha.TableHead className="font-bold">Title</Pecha.TableHead>
+            <Pecha.TableHead className="font-bold">
+              {t("studio.common.title")}
+            </Pecha.TableHead>
 
             {showActionsColumn ? (
               <Pecha.TableHead className="w-[100px] text-center font-bold">
-                Actions
+                {t("studio.common.actions")}
               </Pecha.TableHead>
             ) : null}
           </Pecha.TableRow>

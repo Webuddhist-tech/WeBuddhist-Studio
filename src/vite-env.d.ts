@@ -4,6 +4,7 @@
 interface ImportMetaEnv {
   readonly VITE_BACKEND_BASE_URL: string;
   readonly VITE_DEFAULT_LANGUAGE?: string;
+  readonly VITE_TOLGEE_CDN_URL?: string;
   readonly VITE_ENV_SALT?: string;
   readonly VITE_YOUTUBE_API_KEY?: string;
   readonly VITE_WEBUDDHIST_PLAN_VIEWER_URL?: string;

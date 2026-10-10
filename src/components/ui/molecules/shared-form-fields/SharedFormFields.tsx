@@ -1,5 +1,6 @@
 import { IoMdAdd, IoMdClose } from "react-icons/io";
 import type { Control } from "react-hook-form";
+import { useTranslate } from "@tolgee/react";
 import { Textarea } from "@/components/ui/atoms/textarea";
 import { Pecha } from "@/components/ui/shadimport";
 import TagInput from "@/components/ui/molecules/tag-input/TagInput";
@@ -91,6 +92,7 @@ export const CoverImageField = ({
   onOpenUploadDialog,
   onRemoveImage,
 }: CoverImageFieldProps) => {
+  const { t } = useTranslate();
   return (
     <Pecha.FormField
       control={control}
@@ -108,7 +110,9 @@ export const CoverImageField = ({
                   type="button"
                   onClick={onOpenUploadDialog}
                   className="border w-48 h-32 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors cursor-pointer focus:outline-none"
-                  aria-label="Upload cover image"
+                  aria-label={t(
+                    "studio.molecules.form_fields.upload_cover_image",
+                  )}
                 >
                   <IoMdAdd className="mx-auto h-8 w-8 text-gray-400 mb-2" />
                 </button>
@@ -118,7 +122,7 @@ export const CoverImageField = ({
                 <div className="relative">
                   <img
                     src={imagePreview}
-                    alt="Cover preview"
+                    alt={t("studio.molecules.form_fields.cover_preview_alt")}
                     className="w-48 h-32 object-cover rounded-lg border"
                   />
                   <div className="flex items-center justify-between absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent rounded-b-lg p-2">
@@ -128,7 +132,9 @@ export const CoverImageField = ({
                       </p>
                     )}
                     <button
-                      aria-label="Remove image"
+                      aria-label={t(
+                        "studio.molecules.form_fields.remove_image",
+                      )}
                       type="button"
                       onClick={onRemoveImage}
                       className=" text-white cursor-pointer rounded-full p-1 transition-colors ml-2"

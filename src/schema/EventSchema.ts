@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { LanguageCode } from "@/lib/languageCodes";
 import { dateOnlyToDate, isPastDate } from "@/lib/utils";
+import { tolgee } from "@/i18n/tolgee";
 
 export const DEFAULT_TIMEZONE = "Asia/Kolkata";
 export const DEFAULT_START_TIME = "06:00";
@@ -28,9 +29,21 @@ export type RecurrenceDateSystem =
   (typeof RecurrenceDateSystem)[keyof typeof RecurrenceDateSystem];
 
 export const EVENT_FORMAT_OPTIONS = [
-  { value: "offline", label: "In person" },
-  { value: "online", label: "Live" },
-  { value: "hybrid", label: "Hybrid" },
+  {
+    value: "offline",
+    label: "In person",
+    labelKey: "studio.ui.options.event_format.offline",
+  },
+  {
+    value: "online",
+    label: "Live",
+    labelKey: "studio.ui.options.event_format.online",
+  },
+  {
+    value: "hybrid",
+    label: "Hybrid",
+    labelKey: "studio.ui.options.event_format.hybrid",
+  },
 ] as const;
 
 export type EventFormat = (typeof EVENT_FORMAT_OPTIONS)[number]["value"];
@@ -42,31 +55,30 @@ const eventFormatValues = EVENT_FORMAT_OPTIONS.map(
 export function eventFormatLabel(
   value: string | null | undefined,
 ): string | null {
-  return (
-    EVENT_FORMAT_OPTIONS.find((option) => option.value === value)?.label ?? null
-  );
+  const option = EVENT_FORMAT_OPTIONS.find((o) => o.value === value);
+  return option ? tolgee.t(option.labelKey) : null;
 }
 
 export function eventRecurrenceLabel(
   isRecurring?: boolean,
   frequency?: string | null,
 ): string {
-  if (!isRecurring) return "One-time";
+  if (!isRecurring) return tolgee.t("studio.ui.options.recurrence.one_time");
   switch (frequency) {
     case RecurrenceFrequency.WEEKLY:
-      return "Weekly";
+      return tolgee.t("studio.ui.options.recurrence.weekly");
     case RecurrenceFrequency.MONTHLY:
-      return "Monthly";
+      return tolgee.t("studio.ui.options.recurrence.monthly");
     case RecurrenceFrequency.YEARLY:
-      return "Yearly";
+      return tolgee.t("studio.ui.options.recurrence.yearly");
     default:
-      return "Recurring";
+      return tolgee.t("studio.ui.options.recurrence.recurring");
   }
 }
 
 export const eventMetadataRowSchema = z.object({
-  language: z.string().trim().min(1, "Language is required"),
-  name: z.string().trim().min(1, "Name is required"),
+  language: z.string().trim().min(1, "studio.validation.language_required"),
+  name: z.string().trim().min(1, "studio.validation.name_required"),
   description: z.string().trim(),
 });
 
@@ -76,19 +88,19 @@ export const eventLinkRowSchema = z.object({
   type: z
     .string()
     .trim()
-    .min(1, "Type is required")
-    .max(50, "Type must be at most 50 characters"),
+    .min(1, "studio.validation.type_required")
+    .max(50, "studio.validation.type_max_50"),
   url: z
     .string()
     .trim()
-    .min(1, "URL is required")
-    .max(2000, "URL must be at most 2000 characters")
+    .min(1, "studio.validation.url_required")
+    .max(2000, "studio.validation.url_max_2000")
     .refine(
       (value) => /^https?:\/\/.+/i.test(value),
-      "URL must start with http:// or https://",
+      "studio.validation.url_http_prefix",
     ),
-  label: z.string().trim().max(255, "Label must be at most 255 characters"),
-  language: z.string().trim().min(1, "Language is required"),
+  label: z.string().trim().max(255, "studio.validation.label_max_255"),
+  language: z.string().trim().min(1, "studio.validation.language_required"),
 });
 
 export type EventLinkRow = z.infer<typeof eventLinkRowSchema>;
@@ -111,27 +123,55 @@ export const eventYoutubeRowSchema = z.object({
   url: z
     .string()
     .trim()
-    .min(1, "URL is required")
-    .max(2000, "URL must be at most 2000 characters")
+    .min(1, "studio.validation.url_required")
+    .max(2000, "studio.validation.url_max_2000")
     .refine(
       (value) => /^https?:\/\/.+/i.test(value),
-      "URL must start with http:// or https://",
+      "studio.validation.url_http_prefix",
     )
-    .refine(isYoutubeUrl, "URL must be a youtube.com or youtu.be link"),
-  label: z.string().trim().max(255, "Label must be at most 255 characters"),
-  language: z.string().trim().min(1, "Language is required"),
+    .refine(isYoutubeUrl, "studio.validation.url_youtube"),
+  label: z.string().trim().max(255, "studio.validation.label_max_255"),
+  language: z.string().trim().min(1, "studio.validation.language_required"),
 });
 
 export type EventYoutubeRow = z.infer<typeof eventYoutubeRowSchema>;
 
 export const DAYS_OF_WEEK = [
-  { value: 0, label: "Monday" },
-  { value: 1, label: "Tuesday" },
-  { value: 2, label: "Wednesday" },
-  { value: 3, label: "Thursday" },
-  { value: 4, label: "Friday" },
-  { value: 5, label: "Saturday" },
-  { value: 6, label: "Sunday" },
+  {
+    value: 0,
+    label: "Monday",
+    labelKey: "studio.ui.options.weekday.monday",
+  },
+  {
+    value: 1,
+    label: "Tuesday",
+    labelKey: "studio.ui.options.weekday.tuesday",
+  },
+  {
+    value: 2,
+    label: "Wednesday",
+    labelKey: "studio.ui.options.weekday.wednesday",
+  },
+  {
+    value: 3,
+    label: "Thursday",
+    labelKey: "studio.ui.options.weekday.thursday",
+  },
+  {
+    value: 4,
+    label: "Friday",
+    labelKey: "studio.ui.options.weekday.friday",
+  },
+  {
+    value: 5,
+    label: "Saturday",
+    labelKey: "studio.ui.options.weekday.saturday",
+  },
+  {
+    value: 6,
+    label: "Sunday",
+    labelKey: "studio.ui.options.weekday.sunday",
+  },
 ] as const;
 
 export const recurrenceSchema = z
@@ -149,14 +189,14 @@ export const recurrenceSchema = z
       if (data.day_of_week === null) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Day of week is required for weekly recurrence",
+          message: "studio.validation.recurrence_day_of_week_required",
           path: ["day_of_week"],
         });
       }
       if (data.date_system !== "GREGORIAN") {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Weekly recurrence only supports the Gregorian calendar",
+          message: "studio.validation.recurrence_weekly_gregorian_only",
           path: ["date_system"],
         });
       }
@@ -166,7 +206,7 @@ export const recurrenceSchema = z
     if (data.day === null) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Day is required",
+        message: "studio.validation.recurrence_day_required",
         path: ["day"],
       });
       return;
@@ -176,20 +216,20 @@ export const recurrenceSchema = z
       if (!data.calendar_type || data.calendar_type.trim() === "") {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Calendar type is required for Tibetan Lunar",
+          message: "studio.validation.recurrence_calendar_type_required",
           path: ["calendar_type"],
         });
       } else if (!["phugpa", "tsurphu"].includes(data.calendar_type)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Calendar type must be 'phugpa' or 'tsurphu'",
+          message: "studio.validation.recurrence_calendar_type_invalid",
           path: ["calendar_type"],
         });
       }
       if (data.day > 30) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Lunar day must be between 1 and 30",
+          message: "studio.validation.recurrence_lunar_day_range",
           path: ["day"],
         });
       }
@@ -199,7 +239,7 @@ export const recurrenceSchema = z
       if (data.month === null) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Month is required for yearly recurrence",
+          message: "studio.validation.recurrence_month_required",
           path: ["month"],
         });
       }
@@ -217,7 +257,9 @@ const baseEventSchema = z.object({
   timezone: z.string().trim().min(1),
   is_one_day: z.boolean(),
   recurrence: recurrenceSchema.nullable(),
-  metadata: z.array(eventMetadataRowSchema).min(1, "Add at least one language"),
+  metadata: z
+    .array(eventMetadataRowSchema)
+    .min(1, "studio.validation.add_at_least_one_language"),
   links: z.array(eventLinkRowSchema),
   youtube: z.array(eventYoutubeRowSchema),
   image_url: z.string().trim(),
@@ -242,14 +284,14 @@ const commonValidation = (
     if (!data.start_date || data.start_date.trim() === "") {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Start date is required",
+        message: "studio.validation.start_date_required",
         path: ["start_date"],
       });
     }
     if (!data.end_date || data.end_date.trim() === "") {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "End date is required",
+        message: "studio.validation.end_date_required",
         path: ["end_date"],
       });
     }
@@ -263,8 +305,7 @@ const commonValidation = (
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message:
-          "End date and time must be on or after the start date and time",
+        message: "studio.validation.end_after_start_datetime",
         path: ["end_time"],
       });
     }
@@ -277,7 +318,7 @@ const commonValidation = (
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "End time must be on or after the start time",
+        message: "studio.validation.end_time_after_start_time",
         path: ["end_time"],
       });
     }
@@ -288,7 +329,7 @@ const commonValidation = (
     if (seen.has(row.language)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Each language can only be added once",
+        message: "studio.validation.language_duplicate",
         path: ["metadata", index, "language"],
       });
     }
@@ -306,7 +347,7 @@ export const eventSchema = baseEventSchema.superRefine((data, ctx) => {
     if (isPastDate(dateOnlyToDate(data.start_date))) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Start date cannot be in the past",
+        message: "studio.validation.start_date_in_past",
         path: ["start_date"],
       });
     }

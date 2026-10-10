@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import {
@@ -24,6 +25,7 @@ const GroupRemoveUserDialog = ({
   onOpenChange,
   onConfirm,
 }: GroupRemoveUserDialogProps) => {
+  const { t } = useTranslate();
   const [duration, setDuration] = useState(String(DEFAULT_BAN_DURATION_DAYS));
   const [reason, setReason] = useState("");
 
@@ -41,16 +43,19 @@ const GroupRemoveUserDialog = ({
     >
       <Pecha.DialogContent>
         <Pecha.DialogHeader>
-          <Pecha.DialogTitle>Remove from group?</Pecha.DialogTitle>
+          <Pecha.DialogTitle>
+            {t("studio.groups.components.remove_user.title")}
+          </Pecha.DialogTitle>
         </Pecha.DialogHeader>
 
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
             <span className="font-medium text-foreground">
-              {user?.fullname || user?.username || "This user"}
+              {user?.fullname ||
+                user?.username ||
+                t("studio.groups.components.remove_user.this_user")}
             </span>{" "}
-            will be removed from the group and blocked from rejoining until the
-            ban ends. You can lift it early from the Banned list.
+            {t("studio.groups.components.remove_user.body")}
           </p>
 
           <div className="space-y-2">
@@ -58,7 +63,7 @@ const GroupRemoveUserDialog = ({
               htmlFor="ban-duration"
               className="text-sm font-medium leading-none"
             >
-              Blocked for
+              {t("studio.groups.components.remove_user.blocked_for")}
             </label>
             <Pecha.Select
               value={duration}
@@ -74,7 +79,9 @@ const GroupRemoveUserDialog = ({
                     key={option.value}
                     value={String(option.value)}
                   >
-                    {option.label}
+                    {t(
+                      `studio.groups.components.remove_user.ban_duration_${option.value}`,
+                    )}
                   </Pecha.SelectItem>
                 ))}
               </Pecha.SelectContent>
@@ -86,9 +93,9 @@ const GroupRemoveUserDialog = ({
               htmlFor="ban-reason"
               className="text-sm font-medium leading-none"
             >
-              Reason{" "}
+              {t("studio.groups.components.remove_user.reason")}{" "}
               <span className="font-normal text-muted-foreground">
-                (optional)
+                ({t("studio.common.optional")})
               </span>
             </label>
             <Pecha.Textarea
@@ -96,7 +103,9 @@ const GroupRemoveUserDialog = ({
               value={reason}
               maxLength={500}
               rows={3}
-              placeholder="Visible to other moderators of this group."
+              placeholder={t(
+                "studio.groups.components.remove_user.reason_placeholder",
+              )}
               disabled={isPending}
               onChange={(event) => setReason(event.target.value)}
             />
@@ -109,7 +118,7 @@ const GroupRemoveUserDialog = ({
               disabled={isPending}
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              {t("studio.common.cancel")}
             </Button>
             <Button
               type="button"
@@ -119,7 +128,9 @@ const GroupRemoveUserDialog = ({
                 onConfirm({ banDurationDays: Number(duration), reason })
               }
             >
-              {isPending ? "Removing…" : "Remove"}
+              {isPending
+                ? t("studio.groups.components.remove_user.removing")
+                : t("studio.common.remove")}
             </Button>
           </div>
         </div>

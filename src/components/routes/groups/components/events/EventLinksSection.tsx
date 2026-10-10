@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useTranslate } from "@tolgee/react";
 import type { UseFormReturn } from "react-hook-form";
 import type { EventFormData } from "@/schema/EventSchema";
 import type { FkOption } from "../FkMultiSearchSelector";
@@ -35,6 +36,7 @@ const EventLinksSection = ({
   onGroupAccumulatorChange,
   onChantChange,
 }: EventLinksSectionProps) => {
+  const { t } = useTranslate();
   const handleContentChange = (item: FkOption | null) => {
     onContentChange(item);
     const opts = { shouldDirty: true, shouldValidate: true } as const;
@@ -83,42 +85,52 @@ const EventLinksSection = ({
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-bold">Linked content (optional)</h3>
+      <h3 className="text-sm font-bold">
+        {t("studio.groups.events.links.heading")}
+      </h3>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <EventLinkPicker
-          label="Plan or series"
+          label={t("studio.groups.events.links.content_label")}
           value={contentValue}
           onChange={handleContentChange}
           searchFn={contentSearchFn}
           queryKeyPrefix={`event-content-picker-${groupId}`}
-          searchPlaceholder="Search plans & series…"
+          searchPlaceholder={t(
+            "studio.groups.events.links.content_search_placeholder",
+          )}
           disabled={readOnly}
         />
         <EventLinkPicker
-          label="Accumulator"
+          label={t("studio.groups.events.links.accumulator_label")}
           value={accumulatorValue}
           onChange={handleAccumulatorChange}
           searchFn={searchAccumulatorPresets}
           queryKeyPrefix="event-accumulator-picker"
-          searchPlaceholder="Search accumulators…"
+          searchPlaceholder={t(
+            "studio.groups.events.links.accumulator_search_placeholder",
+          )}
           disabled={readOnly}
         />
         <EventLinkPicker
-          label="Group accumulator"
+          label={t("studio.groups.events.links.group_accumulator_label")}
           value={groupAccumulatorValue}
           onChange={handleGroupAccumulatorChange}
           searchFn={groupAccumulatorSearchFn}
           queryKeyPrefix={`event-group-accumulator-picker-${groupId}`}
-          searchPlaceholder="Search group accumulators…"
+          searchPlaceholder={t(
+            "studio.groups.events.links.group_accumulator_search_placeholder",
+          )}
           disabled={readOnly}
         />
         <EventLinkPicker
-          label="Chant collection"
+          label={t("studio.groups.events.links.chant_label")}
           value={chantValue}
           onChange={handleChantChange}
           searchFn={chantSearchFn}
           queryKeyPrefix={`event-chant-picker-${groupId}`}
-          searchPlaceholder="Search chant collections…"
+          searchPlaceholder={t(
+            "studio.groups.events.links.chant_search_placeholder",
+          )}
           disabled={readOnly}
         />
       </div>

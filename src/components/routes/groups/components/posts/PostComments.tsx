@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { formatDistanceToNow } from "date-fns";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IoHeart, IoHeartOutline, IoTrashOutline } from "react-icons/io5";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import type { UserInfo } from "@/hooks/useUserInfo";
@@ -15,6 +15,7 @@ import {
   type GroupPostCommentDTO,
   type GroupPostCommentsResponse,
 } from "../../api/groupPostInteractionsApi";
+import { formatRelativeTime } from "../../lib/relativeTime";
 
 type PostCommentsProps = {
   postId: string;
@@ -25,16 +26,12 @@ type PostCommentsProps = {
 const commentQueryKey = (postId: string) =>
   ["group-post-comments", postId] as const;
 
-const relativeTime = (value: string): string => {
-  try {
-    return formatDistanceToNow(new Date(value), { addSuffix: true });
-  } catch {
-    return "";
-  }
-};
+const relativeTime = (value: string): string => formatRelativeTime(value, "");
 
-const displayNameFromEmail = (email: string | null | undefined): string =>
-  email?.split("@")[0] || "User";
+const displayNameFromEmail = (
+  email: string | null | undefined,
+  fallback = "User",
+): string => email?.split("@")[0] || fallback;
 
 const commentInitial = (email: string | null | undefined): string =>
   displayNameFromEmail(email).charAt(0).toUpperCase() || "U";
@@ -44,6 +41,7 @@ const PostComments = ({
   currentUser,
   onCommentCountChange,
 }: PostCommentsProps) => {
+  const { t } = useTranslate();
   const queryClient = useQueryClient();
   const [commentText, setCommentText] = useState("");
   const [replyingTo, setReplyingTo] = useState<GroupPostCommentDTO | null>(
@@ -99,7 +97,9 @@ const PostComments = ({
       onCommentCountChange(1);
     },
     onError: (error) =>
-      toast.error(getApiErrorMessage(error, "Could not add comment")),
+      toast.error(
+        getApiErrorMessage(error, t("studio.groups.posts.comments.add_error")),
+      ),
   });
 
   const deleteMutation = useMutation({
@@ -121,7 +121,12 @@ const PostComments = ({
       onCommentCountChange(-1);
     },
     onError: (error) =>
-      toast.error(getApiErrorMessage(error, "Could not delete comment")),
+      toast.error(
+        getApiErrorMessage(
+          error,
+          t("studio.groups.posts.comments.delete_error"),
+        ),
+      ),
   });
 
   const toggleCommentLike = useMutation({
@@ -186,7 +191,9 @@ const PostComments = ({
       if (context?.previous) {
         queryClient.setQueryData(commentQueryKey(postId), context.previous);
       }
-      toast.error(getApiErrorMessage(error, "Could not update comment like"));
+      toast.error(
+        getApiErrorMessage(error, t("studio.groups.posts.comments.like_error")),
+      );
     },
   });
 
@@ -212,7 +219,10 @@ const PostComments = ({
           <div className="min-w-0 flex-1">
             <div className="rounded-2xl bg-muted px-3 py-2">
               <div className="text-xs font-semibold">
-                {displayNameFromEmail(comment.user_email)}
+                {displayNameFromEmail(
+                  comment.user_email,
+                  t("studio.groups.posts.comments.anonymous_user"),
+                )}
               </div>
               <p className="whitespace-pre-wrap break-words text-sm">
                 {comment.text}
@@ -225,12 +235,14 @@ const PostComments = ({
                 onClick={() => setReplyingTo(comment)}
                 className="font-medium hover:text-foreground"
               >
-                Reply
+                {t("studio.groups.posts.comments.reply")}
               </button>
               <button
                 type="button"
                 aria-label={
-                  comment.liked_by_me ? "Unlike comment" : "Like comment"
+                  comment.liked_by_me
+                    ? t("studio.groups.posts.comments.unlike_aria")
+                    : t("studio.groups.posts.comments.like_aria")
                 }
                 onClick={() => toggleCommentLike.mutate(comment)}
                 className={`inline-flex items-center gap-1 font-medium hover:text-foreground ${
@@ -247,7 +259,7 @@ const PostComments = ({
               {isOwnComment ? (
                 <button
                   type="button"
-                  aria-label="Delete comment"
+                  aria-label={t("studio.groups.posts.comments.delete_aria")}
                   disabled={deleteMutation.isPending}
                   onClick={() => deleteMutation.mutate(comment.id)}
                   className="hover:text-destructive"
@@ -272,25 +284,35 @@ const PostComments = ({
         </div>
       ) : commentsQuery.isError ? (
         <p className="py-4 text-sm text-destructive">
-          {getApiErrorMessage(commentsQuery.error, "Could not load comments")}
+          {getApiErrorMessage(
+            commentsQuery.error,
+            t("studio.groups.posts.comments.load_error"),
+          )}
         </p>
       ) : rootComments.length > 0 ? (
         <div>{rootComments.map((comment) => renderComment(comment))}</div>
       ) : (
         <p className="py-4 text-sm text-muted-foreground">
-          No comments yet. Start the conversation.
+          {t("studio.groups.posts.comments.empty")}
         </p>
       )}
 
       {replyingTo ? (
         <div className="mt-4 flex items-center justify-between rounded-md bg-muted px-3 py-2 text-xs">
-          <span>Replying to {displayNameFromEmail(replyingTo.user_email)}</span>
+          <span>
+            {t("studio.groups.posts.comments.replying_to", {
+              name: displayNameFromEmail(
+                replyingTo.user_email,
+                t("studio.groups.posts.comments.anonymous_user"),
+              ),
+            })}
+          </span>
           <button
             type="button"
             onClick={() => setReplyingTo(null)}
             className="font-medium hover:text-foreground"
           >
-            Cancel
+            {t("studio.common.cancel")}
           </button>
         </div>
       ) : null}
@@ -321,7 +343,11 @@ const PostComments = ({
           }}
           rows={1}
           maxLength={5000}
-          placeholder={replyingTo ? "Write a reply…" : "Write a comment…"}
+          placeholder={
+            replyingTo
+              ? t("studio.groups.posts.comments.reply_placeholder")
+              : t("studio.groups.posts.comments.comment_placeholder")
+          }
           className="min-h-10 resize-none rounded-2xl"
         />
         <Pecha.Button
@@ -331,7 +357,9 @@ const PostComments = ({
           onClick={submitComment}
           className="bg-[#A51C21] text-white hover:bg-[#A51C21]/90"
         >
-          {createMutation.isPending ? "Posting…" : "Post"}
+          {createMutation.isPending
+            ? t("studio.groups.posts.comments.posting")
+            : t("studio.groups.posts.comments.post")}
         </Pecha.Button>
       </div>
     </div>

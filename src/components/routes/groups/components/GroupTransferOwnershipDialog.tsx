@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import { getApiErrorMessage } from "@/lib/apiErrors";
@@ -24,6 +25,7 @@ const GroupTransferOwnershipDialog = ({
   candidates,
   onSuccess,
 }: GroupTransferOwnershipDialogProps) => {
+  const { t } = useTranslate();
   const [selectedAuthorId, setSelectedAuthorId] = useState("");
 
   useEffect(() => {
@@ -40,7 +42,7 @@ const GroupTransferOwnershipDialog = ({
         new_owner_author_id: selectedAuthorId,
       }),
     onSuccess: () => {
-      toast.success("Ownership transferred");
+      toast.success(t("studio.groups.components.transfer.success_toast"));
       onOpenChange(false);
       onSuccess();
     },
@@ -55,17 +57,18 @@ const GroupTransferOwnershipDialog = ({
     <Pecha.Dialog open={open} onOpenChange={onOpenChange}>
       <Pecha.DialogContent>
         <Pecha.DialogHeader>
-          <Pecha.DialogTitle>Transfer ownership</Pecha.DialogTitle>
+          <Pecha.DialogTitle>
+            {t("studio.groups.components.transfer.title")}
+          </Pecha.DialogTitle>
         </Pecha.DialogHeader>
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Choose a member to become the group owner. You will become an admin
-            and can still edit group settings.
+            {t("studio.groups.components.transfer.description")}
           </p>
 
           {candidates.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Add another member before transferring ownership.
+              {t("studio.groups.components.transfer.no_candidates")}
             </p>
           ) : (
             <Pecha.Select
@@ -73,7 +76,11 @@ const GroupTransferOwnershipDialog = ({
               onValueChange={setSelectedAuthorId}
             >
               <Pecha.SelectTrigger className="w-full">
-                <Pecha.SelectValue placeholder="Select member" />
+                <Pecha.SelectValue
+                  placeholder={t(
+                    "studio.groups.components.transfer.select_member",
+                  )}
+                />
               </Pecha.SelectTrigger>
               <Pecha.SelectContent>
                 {candidates.map((member) => (
@@ -95,7 +102,7 @@ const GroupTransferOwnershipDialog = ({
               disabled={transferMutation.isPending}
               onClick={() => onOpenChange(false)}
             >
-              Cancel
+              {t("studio.common.cancel")}
             </Button>
             <Button
               type="button"
@@ -108,10 +115,12 @@ const GroupTransferOwnershipDialog = ({
               onClick={() => transferMutation.mutate()}
             >
               {transferMutation.isPending
-                ? "Transferring…"
+                ? t("studio.groups.components.transfer.transferring")
                 : selectedMember
-                  ? `Transfer to ${selectedMember.firstname}`
-                  : "Transfer"}
+                  ? t("studio.groups.components.transfer.transfer_to", {
+                      name: selectedMember.firstname,
+                    })
+                  : t("studio.groups.components.transfer.transfer")}
             </Button>
           </div>
         </div>

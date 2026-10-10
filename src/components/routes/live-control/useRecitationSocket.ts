@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { tolgee } from "@/i18n/tolgee";
 import {
   commandRefused,
   recitationSocketUrl,
@@ -71,10 +72,10 @@ const newMoveId = (): string =>
 
 const moveRefused = (code: unknown, message: unknown): string => {
   if (code === "THROTTLED") {
-    return "The room is taking positions as fast as it can; slow down a little.";
+    return tolgee.t("studio.live_control.errors.positions_throttled");
   }
   if (typeof message === "string" && message) return message;
-  return "The room did not take that move. It will be sent again on the next one.";
+  return tolgee.t("studio.live_control.errors.move_not_taken");
 };
 
 /**
@@ -134,7 +135,7 @@ export function useRecitationSocket(
           ok: false,
           lost: true,
           message: result.ok
-            ? "Lost the connection to the server."
+            ? tolgee.t("studio.live_control.errors.server_connection_lost")
             : result.message,
         });
       });
@@ -283,7 +284,7 @@ export function useRecitationSocket(
         settleAll({
           ok: false,
           lost: true,
-          message: "Lost the connection to the room. Reconnecting…",
+          message: tolgee.t("studio.live_control.errors.room_connection_lost"),
         });
         if (disposed) return;
         if (turnedAway) {
@@ -311,7 +312,7 @@ export function useRecitationSocket(
       settleAll({
         ok: false,
         lost: true,
-        message: "The connection to the room closed.",
+        message: tolgee.t("studio.live_control.errors.room_connection_closed"),
       });
       if (socket) {
         socket.onclose = null;
@@ -342,8 +343,7 @@ export function useRecitationSocket(
           resolve({
             ok: false,
             lost: true,
-            message:
-              "The room did not answer in time. The line will be sent again on the next move.",
+            message: tolgee.t("studio.live_control.errors.room_timeout"),
           });
         }, MOVE_ACK_TIMEOUT_MS);
         pendingRef.current.set(moveId, { resolve, timer });
@@ -363,7 +363,7 @@ export function useRecitationSocket(
           resolve({
             ok: false,
             lost: true,
-            message: "Could not reach the room.",
+            message: tolgee.t("studio.live_control.errors.room_unreachable"),
           });
         }
       });
@@ -388,7 +388,7 @@ export function useRecitationSocket(
           resolve({
             ok: false,
             lost: true,
-            message: "The server did not answer in time. Try again.",
+            message: tolgee.t("studio.live_control.errors.server_timeout"),
           });
         }, MOVE_ACK_TIMEOUT_MS);
         commandsRef.current.set(commandId, { resolve, timer });
@@ -403,7 +403,10 @@ export function useRecitationSocket(
         } catch {
           window.clearTimeout(timer);
           commandsRef.current.delete(commandId);
-          resolve({ ok: false, message: "Could not reach the server." });
+          resolve({
+            ok: false,
+            message: tolgee.t("studio.live_control.errors.server_unreachable"),
+          });
         }
       });
     },

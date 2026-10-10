@@ -16,6 +16,15 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }));
 
+// Like the global mock, but keeps interpolated values visible so tests can
+// check which events or counts a message names.
+vi.mock("@tolgee/react", () => ({
+  useTranslate: () => ({
+    t: (key: string, params?: Record<string, unknown>) =>
+      params ? [key, ...Object.values(params)].join(" ") : key,
+  }),
+}));
+
 vi.mock("../../api/youtubeLiveSyncApi", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("../../api/youtubeLiveSyncApi")>();
@@ -70,7 +79,10 @@ const renderDialog = (
 };
 
 const setFirstTime = (value: string) =>
-  fireEvent.change(screen.getByLabelText("Time 1"), { target: { value } });
+  fireEvent.change(
+    screen.getByLabelText("studio.groups.events.live_sync.time_aria 1"),
+    { target: { value } },
+  );
 
 describe("EventLiveSyncDialog", () => {
   beforeEach(() => {
@@ -83,19 +95,33 @@ describe("EventLiveSyncDialog", () => {
 
   it("lists the chosen events", () => {
     renderDialog([event("e1", "Teaching"), event("e2", "Retreat")]);
-    expect(screen.getByText("Events (2)")).toBeInTheDocument();
+    expect(
+      screen.getByText("studio.groups.events.live_sync.events_count 2"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Teaching")).toBeInTheDocument();
     expect(screen.getByText("Retreat")).toBeInTheDocument();
   });
 
   it("saves the times for exactly the chosen events", async () => {
     vi.mocked(saveYoutubeLiveSync).mockResolvedValue(liveSync());
-    const onOpenChange = renderDialog([event("e1", "Teaching"), event("e2", "Retreat")]);
+    const onOpenChange = renderDialog([
+      event("e1", "Teaching"),
+      event("e2", "Retreat"),
+    ]);
 
     setFirstTime("08:30");
-    await userEvent.click(screen.getByRole("button", { name: /add time/i }));
-    fireEvent.change(screen.getByLabelText("Time 2"), { target: { value: "14:00" } });
-    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "studio.groups.events.live_sync.add_time",
+      }),
+    );
+    fireEvent.change(
+      screen.getByLabelText("studio.groups.events.live_sync.time_aria 2"),
+      { target: { value: "14:00" } },
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.common.save" }),
+    );
 
     await waitFor(() =>
       expect(saveYoutubeLiveSync).toHaveBeenCalledWith("g1", {
@@ -110,10 +136,16 @@ describe("EventLiveSyncDialog", () => {
 
   it("will not save an enabled schedule with no time", () => {
     renderDialog([event("e1", "Teaching")]);
-    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
-    expect(screen.getByText(/add at least one time/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "studio.common.save" }),
+    ).toBeDisabled();
+    expect(
+      screen.getByText("studio.groups.events.live_sync.needs_time"),
+    ).toBeInTheDocument();
     setFirstTime("08:30");
-    expect(screen.getByRole("button", { name: "Save" })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "studio.common.save" }),
+    ).toBeEnabled();
   });
 
   it("starts from the schedule the event already has", () => {
@@ -130,8 +162,14 @@ describe("EventLiveSyncDialog", () => {
         ],
       }),
     );
-    expect(screen.getByLabelText("Time 1")).toHaveValue("06:15");
-    expect(screen.getByRole("button", { name: /remove schedule/i })).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("studio.groups.events.live_sync.time_aria 1"),
+    ).toHaveValue("06:15");
+    expect(
+      screen.getByRole("button", {
+        name: "studio.groups.events.live_sync.remove_schedule",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("runs now only for the chosen events", async () => {
@@ -142,7 +180,11 @@ describe("EventLiveSyncDialog", () => {
       skipped_unknown_language: 0,
     });
     renderDialog([event("e1", "Teaching")]);
-    await userEvent.click(screen.getByRole("button", { name: /run now/i }));
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "studio.groups.events.live_sync.run_now",
+      }),
+    );
     await waitFor(() =>
       expect(runYoutubeLiveSyncNow).toHaveBeenCalledWith("g1", ["e1"]),
     );
@@ -154,32 +196,55 @@ describe("EventLiveSyncDialog", () => {
       [event("e1", "Teaching"), event("e2", "Retreat")],
       liveSync({
         schedules: [
-          { event_id: "e1", enabled: true, run_times: ["08:30"], timezone: "UTC" },
+          {
+            event_id: "e1",
+            enabled: true,
+            run_times: ["08:30"],
+            timezone: "UTC",
+          },
         ],
       }),
     );
-    await userEvent.click(screen.getByRole("button", { name: /remove schedule/i }));
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "studio.groups.events.live_sync.remove_schedule",
+      }),
+    );
     await waitFor(() => expect(deleteYoutubeLiveSync).toHaveBeenCalledTimes(1));
     expect(deleteYoutubeLiveSync).toHaveBeenCalledWith("g1", "e1");
   });
 
   it("warns and blocks Run now when the group has no channel link", () => {
     renderDialog([event("e1", "Teaching")], liveSync({ channel_url: null }));
-    expect(screen.getByText(/no youtube channel link/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /run now/i })).toBeDisabled();
+    expect(
+      screen.getByText("studio.groups.events.live_sync.no_channel"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "studio.groups.events.live_sync.run_now",
+      }),
+    ).toBeDisabled();
   });
 
   it("tells the admin a recurring event keeps the link for the series", () => {
     renderDialog([event("e1", "Weekly", { is_recurring: true })]);
-    expect(screen.getByText(/stays on every date of the series/i)).toBeInTheDocument();
+    expect(
+      screen.getByText("studio.groups.events.live_sync.recurring_one"),
+    ).toBeInTheDocument();
   });
 
   it("waits for the saved schedules instead of starting from defaults", () => {
     renderDialog([event("e1", "Teaching")], null, vi.fn(), { isLoading: true });
-    expect(screen.getByText(/loading the saved schedules/i)).toBeInTheDocument();
+    expect(
+      screen.getByText("studio.groups.events.live_sync.loading"),
+    ).toBeInTheDocument();
     // No editable form, so nothing can be saved over a schedule not yet seen.
-    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Time 1")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "studio.common.save" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("studio.groups.events.live_sync.time_aria 1"),
+    ).not.toBeInTheDocument();
   });
 
   it("offers a retry when the schedules could not be loaded", async () => {
@@ -188,9 +253,15 @@ describe("EventLiveSyncDialog", () => {
       isError: true,
       onRetry,
     });
-    expect(screen.getByText(/could not be loaded/i)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Save" })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(
+      screen.getByText("studio.groups.events.live_sync.load_error"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "studio.common.save" }),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.common.retry" }),
+    );
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
@@ -199,34 +270,59 @@ describe("EventLiveSyncDialog", () => {
       [event("e1", "Teaching")],
       liveSync({
         schedules: [
-          { event_id: "e1", enabled: false, run_times: ["06:15"], timezone: "UTC" },
+          {
+            event_id: "e1",
+            enabled: false,
+            run_times: ["06:15"],
+            timezone: "UTC",
+          },
         ],
       }),
       vi.fn(),
       { isError: false },
     );
-    expect(screen.getByLabelText("Time 1")).toHaveValue("06:15");
+    expect(
+      screen.getByLabelText("studio.groups.events.live_sync.time_aria 1"),
+    ).toHaveValue("06:15");
   });
 
   it("keeps the dialog open and names the events whose removal failed", async () => {
-    vi.mocked(deleteYoutubeLiveSync).mockImplementation(async (_group, eventId) => {
-      if (eventId === "e2") throw new Error("boom");
-    });
+    vi.mocked(deleteYoutubeLiveSync).mockImplementation(
+      async (_group, eventId) => {
+        if (eventId === "e2") throw new Error("boom");
+      },
+    );
     const onOpenChange = renderDialog(
       [event("e1", "Teaching"), event("e2", "Retreat")],
       liveSync({
         schedules: [
-          { event_id: "e1", enabled: true, run_times: ["08:30"], timezone: "UTC" },
-          { event_id: "e2", enabled: true, run_times: ["08:30"], timezone: "UTC" },
+          {
+            event_id: "e1",
+            enabled: true,
+            run_times: ["08:30"],
+            timezone: "UTC",
+          },
+          {
+            event_id: "e2",
+            enabled: true,
+            run_times: ["08:30"],
+            timezone: "UTC",
+          },
         ],
       }),
     );
-    await userEvent.click(screen.getByRole("button", { name: /remove schedule/i }));
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "studio.groups.events.live_sync.remove_schedule",
+      }),
+    );
 
     // Both removals were attempted, not abandoned at the first failure.
     await waitFor(() => expect(deleteYoutubeLiveSync).toHaveBeenCalledTimes(2));
     await waitFor(() =>
-      expect(toast.error).toHaveBeenCalledWith(expect.stringContaining("Retreat")),
+      expect(toast.error).toHaveBeenCalledWith(
+        expect.stringContaining("Retreat"),
+      ),
     );
     expect(toast.error).toHaveBeenCalledWith(
       expect.not.stringContaining("Teaching"),
@@ -235,10 +331,14 @@ describe("EventLiveSyncDialog", () => {
   });
 
   it("refreshes the schedules after a partly failed removal", async () => {
-    vi.mocked(deleteYoutubeLiveSync).mockImplementation(async (_group, eventId) => {
-      if (eventId === "e2") throw new Error("boom");
+    vi.mocked(deleteYoutubeLiveSync).mockImplementation(
+      async (_group, eventId) => {
+        if (eventId === "e2") throw new Error("boom");
+      },
+    );
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
     });
-    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const invalidate = vi.spyOn(client, "invalidateQueries");
     render(
       <QueryClientProvider client={client}>
@@ -249,14 +349,28 @@ describe("EventLiveSyncDialog", () => {
           events={[event("e1", "Teaching"), event("e2", "Retreat")]}
           liveSync={liveSync({
             schedules: [
-              { event_id: "e1", enabled: true, run_times: ["08:30"], timezone: "UTC" },
-              { event_id: "e2", enabled: true, run_times: ["08:30"], timezone: "UTC" },
+              {
+                event_id: "e1",
+                enabled: true,
+                run_times: ["08:30"],
+                timezone: "UTC",
+              },
+              {
+                event_id: "e2",
+                enabled: true,
+                run_times: ["08:30"],
+                timezone: "UTC",
+              },
             ],
           })}
         />
       </QueryClientProvider>,
     );
-    await userEvent.click(screen.getByRole("button", { name: /remove schedule/i }));
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "studio.groups.events.live_sync.remove_schedule",
+      }),
+    );
     await waitFor(() =>
       expect(invalidate).toHaveBeenCalledWith({
         queryKey: ["youtube-live-sync", "g1"],
@@ -266,22 +380,46 @@ describe("EventLiveSyncDialog", () => {
 
   it("adds and removes time rows", async () => {
     renderDialog([event("e1", "Teaching")]);
-    expect(screen.queryByLabelText("Remove time 1")).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText(
+        "studio.groups.events.live_sync.remove_time_aria 1",
+      ),
+    ).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: /add time/i }));
-    expect(screen.getByLabelText("Time 2")).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "studio.groups.events.live_sync.add_time",
+      }),
+    );
+    expect(
+      screen.getByLabelText("studio.groups.events.live_sync.time_aria 2"),
+    ).toBeInTheDocument();
 
-    await userEvent.click(screen.getByLabelText("Remove time 2"));
-    expect(screen.queryByLabelText("Time 2")).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByLabelText(
+        "studio.groups.events.live_sync.remove_time_aria 2",
+      ),
+    );
+    expect(
+      screen.queryByLabelText("studio.groups.events.live_sync.time_aria 2"),
+    ).not.toBeInTheDocument();
   });
 
   it("saves a paused schedule without needing a time", async () => {
     vi.mocked(saveYoutubeLiveSync).mockResolvedValue(liveSync());
     renderDialog([event("e1", "Teaching")]);
 
-    await userEvent.click(screen.getByRole("checkbox", { name: /enabled/i }));
-    expect(screen.queryByText(/add at least one time/i)).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await userEvent.click(
+      screen.getByRole("checkbox", {
+        name: "studio.groups.events.live_sync.enabled",
+      }),
+    );
+    expect(
+      screen.queryByText("studio.groups.events.live_sync.needs_time"),
+    ).not.toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.common.save" }),
+    );
 
     await waitFor(() =>
       expect(saveYoutubeLiveSync).toHaveBeenCalledWith("g1", {
@@ -291,7 +429,9 @@ describe("EventLiveSyncDialog", () => {
         timezone: "Asia/Kolkata",
       }),
     );
-    expect(toast.success).toHaveBeenCalledWith(expect.stringContaining("paused"));
+    expect(toast.success).toHaveBeenCalledWith(
+      "studio.groups.events.live_sync.toast_paused_one 1",
+    );
   });
 
   it("says what a run did and keeps the dialog open", async () => {
@@ -302,10 +442,14 @@ describe("EventLiveSyncDialog", () => {
       skipped_unknown_language: 0,
     });
     const onOpenChange = renderDialog([event("e1", "Teaching")]);
-    await userEvent.click(screen.getByRole("button", { name: /run now/i }));
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "studio.groups.events.live_sync.run_now",
+      }),
+    );
     await waitFor(() =>
       expect(toast.success).toHaveBeenCalledWith(
-        expect.stringMatching(/no stream is live/i),
+        expect.stringMatching(/live_sync.none_live/),
       ),
     );
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
@@ -316,13 +460,22 @@ describe("EventLiveSyncDialog", () => {
     vi.mocked(runYoutubeLiveSyncNow).mockRejectedValue(new Error("nope"));
     renderDialog([event("e1", "Teaching")]);
 
-    fireEvent.change(screen.getByLabelText("Time 1"), {
-      target: { value: "08:30" },
-    });
-    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.change(
+      screen.getByLabelText("studio.groups.events.live_sync.time_aria 1"),
+      {
+        target: { value: "08:30" },
+      },
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.common.save" }),
+    );
     await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(1));
 
-    await userEvent.click(screen.getByRole("button", { name: /run now/i }));
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "studio.groups.events.live_sync.run_now",
+      }),
+    );
     await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(2));
   });
 
@@ -331,13 +484,23 @@ describe("EventLiveSyncDialog", () => {
       [event("e1", "Teaching"), event("e2", "Retreat")],
       liveSync({
         schedules: [
-          { event_id: "e1", enabled: true, run_times: ["08:30"], timezone: "UTC" },
-          { event_id: "e2", enabled: true, run_times: ["09:00"], timezone: "UTC" },
+          {
+            event_id: "e1",
+            enabled: true,
+            run_times: ["08:30"],
+            timezone: "UTC",
+          },
+          {
+            event_id: "e2",
+            enabled: true,
+            run_times: ["09:00"],
+            timezone: "UTC",
+          },
         ],
       }),
     );
     expect(
-      screen.getByText(/saving replaces the schedule on all 2 events/i),
+      screen.getByText("studio.groups.events.live_sync.replaces_all 2"),
     ).toBeInTheDocument();
   });
 
@@ -347,14 +510,23 @@ describe("EventLiveSyncDialog", () => {
       [event("e1", "Teaching")],
       liveSync({
         schedules: [
-          { event_id: "e1", enabled: true, run_times: ["08:30"], timezone: "UTC" },
+          {
+            event_id: "e1",
+            enabled: true,
+            run_times: ["08:30"],
+            timezone: "UTC",
+          },
         ],
       }),
     );
     await userEvent.click(
-      screen.getByRole("button", { name: /remove schedule/i }),
+      screen.getByRole("button", {
+        name: "studio.groups.events.live_sync.remove_schedule",
+      }),
     );
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
-    expect(toast.success).toHaveBeenCalledWith("Schedule removed");
+    expect(toast.success).toHaveBeenCalledWith(
+      "studio.groups.events.live_sync.removed",
+    );
   });
 });

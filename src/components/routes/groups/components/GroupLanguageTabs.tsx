@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { IoMdAdd } from "react-icons/io";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Textarea } from "@/components/ui/atoms/textarea";
 import { Button } from "@/components/ui/atoms/button";
@@ -33,6 +34,7 @@ const GroupLanguageTabs = ({
   onAddLanguage,
   onRemoveLanguage,
 }: GroupLanguageTabsProps) => {
+  const { t } = useTranslate();
   const [active, setActive] = useState<string>(languages[0] ?? ADD_TAB);
 
   const languageErrors = form.formState.errors.languages as
@@ -44,7 +46,8 @@ const GroupLanguageTabs = ({
   // A removed language (or an add tab with nothing left to add) leaves the
   // active tab pointing at nothing; fall back to the first language.
   useEffect(() => {
-    const gone = active !== ADD_TAB && !languages.includes(active as LanguageCode);
+    const gone =
+      active !== ADD_TAB && !languages.includes(active as LanguageCode);
     const addUnavailable = active === ADD_TAB && !canAdd;
     if (gone || addUnavailable) setActive(languages[0] ?? ADD_TAB);
   }, [active, languages, canAdd]);
@@ -75,7 +78,9 @@ const GroupLanguageTabs = ({
             {languageLabelForCode(code)}
             {hasErrors(code) ? (
               <span
-                aria-label="has errors"
+                aria-label={t(
+                  "studio.groups.components.language_tabs.has_errors",
+                )}
                 className="size-1.5 rounded-full bg-destructive"
               />
             ) : null}
@@ -84,7 +89,7 @@ const GroupLanguageTabs = ({
         {canAdd ? (
           <Pecha.TabsTrigger value={ADD_TAB}>
             <IoMdAdd className="h-4 w-4" />
-            Add language
+            {t("studio.groups.components.language_tabs.add_language")}
           </Pecha.TabsTrigger>
         ) : null}
       </Pecha.TabsList>
@@ -106,7 +111,9 @@ const GroupLanguageTabs = ({
               render={({ field }) => (
                 <Pecha.FormItem>
                   <Pecha.FormLabel className="text-sm font-bold">
-                    {label} title
+                    {t("studio.groups.components.language_tabs.title_label", {
+                      language: label,
+                    })}
                     <span className="text-destructive"> *</span>
                   </Pecha.FormLabel>
                   <Pecha.FormControl>
@@ -125,10 +132,15 @@ const GroupLanguageTabs = ({
               render={({ field }) => (
                 <Pecha.FormItem>
                   <Pecha.FormLabel className="text-sm font-bold">
-                    {label} sub-title
+                    {t(
+                      "studio.groups.components.language_tabs.sub_title_label",
+                      {
+                        language: label,
+                      },
+                    )}
                     <span className="font-normal text-muted-foreground">
                       {" "}
-                      (optional)
+                      ({t("studio.common.optional")})
                     </span>
                   </Pecha.FormLabel>
                   <Pecha.FormControl>
@@ -148,10 +160,13 @@ const GroupLanguageTabs = ({
               render={({ field }) => (
                 <Pecha.FormItem>
                   <Pecha.FormLabel className="text-sm font-bold">
-                    {label} description
+                    {t(
+                      "studio.groups.components.language_tabs.description_label",
+                      { language: label },
+                    )}
                     <span className="font-normal text-muted-foreground">
                       {" "}
-                      (optional)
+                      ({t("studio.common.optional")})
                     </span>
                   </Pecha.FormLabel>
                   <Pecha.FormControl>
@@ -172,16 +187,21 @@ const GroupLanguageTabs = ({
               render={({ field }) => (
                 <Pecha.FormItem>
                   <Pecha.FormLabel className="text-sm font-bold">
-                    {label} long description
+                    {t(
+                      "studio.groups.components.language_tabs.description_long_label",
+                      { language: label },
+                    )}
                     <span className="font-normal text-muted-foreground">
                       {" "}
-                      (optional)
+                      ({t("studio.common.optional")})
                     </span>
                   </Pecha.FormLabel>
                   <Pecha.FormControl>
                     <Textarea
                       className="min-h-[160px] resize-y bg-white dark:bg-[#181818]"
-                      placeholder="A longer description with more detail…"
+                      placeholder={t(
+                        "studio.groups.components.language_tabs.description_long_placeholder",
+                      )}
                       {...field}
                       value={field.value ?? ""}
                     />
@@ -199,7 +219,9 @@ const GroupLanguageTabs = ({
                   className="text-muted-foreground hover:text-destructive"
                   onClick={() => onRemoveLanguage(code)}
                 >
-                  Remove {label}
+                  {t("studio.groups.components.language_tabs.remove_language", {
+                    language: label,
+                  })}
                 </Button>
               </div>
             ) : null}
@@ -213,7 +235,7 @@ const GroupLanguageTabs = ({
           className="space-y-3 rounded-lg border border-dashed border-input p-4"
         >
           <p className="text-sm text-muted-foreground">
-            Choose a language to add. Only its title is required.
+            {t("studio.groups.components.language_tabs.add_hint")}
           </p>
           <div className="flex flex-wrap gap-2">
             {availableLanguages.map((lang) => (

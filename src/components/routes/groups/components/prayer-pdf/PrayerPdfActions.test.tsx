@@ -76,12 +76,16 @@ const renderActions = () => {
 };
 
 const openSidebar = async () => {
-  await userEvent.click(screen.getByRole("button", { name: /prayers/i }));
-  await screen.findByText("Prayer requests");
+  await userEvent.click(
+    screen.getByRole("button", { name: "studio.groups.prayer_pdf.prayers" }),
+  );
+  await screen.findByText("studio.groups.prayer_pdf.title");
 };
 
 const showAllDays = async () => {
-  await userEvent.click(screen.getByRole("button", { name: /all days/i }));
+  await userEvent.click(
+    screen.getByRole("button", { name: "studio.groups.prayer_pdf.all_days" }),
+  );
 };
 
 // 20:00 UTC on the 3rd is already the 4th in India, still the 3rd in New York.
@@ -107,8 +111,10 @@ describe("PrayerPdfActions", () => {
 
   it("shows one Prayers button and loads nothing until it is opened", () => {
     renderActions();
-    expect(screen.getByRole("button", { name: /prayers/i })).toBeTruthy();
-    expect(screen.queryByText(/download prayers/i)).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "studio.groups.prayer_pdf.prayers" }),
+    ).toBeTruthy();
+    expect(screen.queryByText("studio.groups.prayer_pdf.download")).toBeNull();
     expect(fetchPrayerRequests).not.toHaveBeenCalled();
   });
 
@@ -117,15 +123,21 @@ describe("PrayerPdfActions", () => {
     await openSidebar();
 
     expect(await screen.findByText("Please pray for my mother.")).toBeTruthy();
-    expect((screen.getByLabelText("Day") as HTMLInputElement).value).toBe(
-      TODAY_IN_INDIA,
-    );
+    expect(
+      (
+        screen.getByLabelText(
+          "studio.groups.prayer_pdf.day",
+        ) as HTMLInputElement
+      ).value,
+    ).toBe(TODAY_IN_INDIA);
     expect(fetchPrayerRequests).toHaveBeenCalledWith(scope, {
       day: TODAY_IN_INDIA,
       skip: 0,
       limit: 20,
     });
-    const download = screen.getByRole("button", { name: /download prayers/i });
+    const download = screen.getByRole("button", {
+      name: "studio.groups.prayer_pdf.download",
+    });
     expect((download as HTMLButtonElement).disabled).toBe(false);
   });
 
@@ -137,9 +149,13 @@ describe("PrayerPdfActions", () => {
     await openSidebar();
 
     await waitFor(() =>
-      expect((screen.getByLabelText("Day") as HTMLInputElement).value).toBe(
-        TODAY_IN_NEW_YORK,
-      ),
+      expect(
+        (
+          screen.getByLabelText(
+            "studio.groups.prayer_pdf.day",
+          ) as HTMLInputElement
+        ).value,
+      ).toBe(TODAY_IN_NEW_YORK),
     );
     await waitFor(() =>
       expect(fetchPrayerRequests).toHaveBeenLastCalledWith(scope, {
@@ -165,7 +181,9 @@ describe("PrayerPdfActions", () => {
         limit: 20,
       }),
     );
-    const download = screen.getByRole("button", { name: /download prayers/i });
+    const download = screen.getByRole("button", {
+      name: "studio.groups.prayer_pdf.download",
+    });
     expect((download as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -197,7 +215,7 @@ describe("PrayerPdfActions", () => {
     renderActions();
     await openSidebar();
 
-    fireEvent.change(screen.getByLabelText("Day"), {
+    fireEvent.change(screen.getByLabelText("studio.groups.prayer_pdf.day"), {
       target: { value: "2026-10-01" },
     });
 
@@ -210,7 +228,9 @@ describe("PrayerPdfActions", () => {
     );
 
     await userEvent.click(
-      screen.getByRole("button", { name: /download prayers/i }),
+      screen.getByRole("button", {
+        name: "studio.groups.prayer_pdf.download",
+      }),
     );
     await waitFor(() =>
       expect(saveBlobAs).toHaveBeenCalledWith(
@@ -225,7 +245,11 @@ describe("PrayerPdfActions", () => {
     renderActions();
     await openSidebar();
 
-    await userEvent.click(screen.getByRole("button", { name: /prayer pdf/i }));
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "studio.groups.prayer_pdf.prayer_pdf",
+      }),
+    );
 
     expect(screen.getByText("Settings dialog")).toBeTruthy();
   });
@@ -242,7 +266,9 @@ describe("PrayerPdfActions", () => {
     await openSidebar();
     await screen.findByText("Please pray for my mother.");
 
-    await userEvent.click(screen.getByRole("button", { name: /copy as csv/i }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.groups.prayer_pdf.copy_csv" }),
+    );
 
     await waitFor(() => expect(copyTextFromPromise).toHaveBeenCalled());
     expect(fetchAllPrayerRequests).toHaveBeenCalledWith(scope, TODAY_IN_INDIA);

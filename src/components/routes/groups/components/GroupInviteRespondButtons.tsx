@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Button } from "@/components/ui/atoms/button";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import { ROUTES } from "@/routes/paths";
@@ -24,6 +25,7 @@ const GroupInviteRespondButtons = ({
   align = "center",
   onSettled,
 }: GroupInviteRespondButtonsProps) => {
+  const { t } = useTranslate();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const expired = isGroupInviteExpired(invite);
@@ -44,7 +46,7 @@ const GroupInviteRespondButtons = ({
   const acceptMutation = useMutation({
     mutationFn: () => acceptGroupInvite(invite.id),
     onSuccess: (group) => {
-      toast.success("Invitation accepted");
+      toast.success(t("studio.groups.components.invite.accepted_toast"));
       invalidate();
       onSettled?.();
       navigate(ROUTES.group(group.id));
@@ -55,7 +57,7 @@ const GroupInviteRespondButtons = ({
   const rejectMutation = useMutation({
     mutationFn: () => rejectGroupInvite(invite.id),
     onSuccess: () => {
-      toast.success("Invitation declined");
+      toast.success(t("studio.groups.components.invite.declined_toast"));
       invalidate();
       onSettled?.();
     },
@@ -75,7 +77,9 @@ const GroupInviteRespondButtons = ({
         disabled={disabled || pending}
         onClick={() => acceptMutation.mutate()}
       >
-        {acceptMutation.isPending ? "Accepting…" : "Accept"}
+        {acceptMutation.isPending
+          ? t("studio.groups.components.invite.accepting")
+          : t("studio.groups.components.invite.accept")}
       </Button>
       <Button
         type="button"
@@ -84,7 +88,9 @@ const GroupInviteRespondButtons = ({
         disabled={disabled || pending}
         onClick={() => rejectMutation.mutate()}
       >
-        {rejectMutation.isPending ? "Declining…" : "Reject"}
+        {rejectMutation.isPending
+          ? t("studio.groups.components.invite.declining")
+          : t("studio.groups.components.invite.reject")}
       </Button>
     </div>
   );

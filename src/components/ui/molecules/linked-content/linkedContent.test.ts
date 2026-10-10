@@ -98,7 +98,7 @@ describe("fetchLinkedContent", () => {
     expect(page.items[0]).toMatchObject({
       id: "a1",
       title: "Mani",
-      subtitle: "Target 100,000",
+      subtitle: "studio.content.linked.accumulation.target",
       imageUrl: "m",
     });
   });
@@ -115,7 +115,9 @@ describe("fetchLinkedContent", () => {
 
     const page = await fetchLinkedContent("GROUP_ACCUMULATION", PAGE);
 
-    expect(page.items[0].title).toBe("Untitled accumulation");
+    expect(page.items[0].title).toBe(
+      "studio.content.linked.accumulation.untitled",
+    );
     expect(page.items[0].subtitle).toBeNull();
     expect(page.items[0].imageUrl).toBeNull();
   });
@@ -137,9 +139,11 @@ describe("fetchLinkedContent", () => {
     expect(page.items[0]).toMatchObject({
       id: "c1",
       title: "Morning",
-      subtitle: "1 chant",
+      subtitle: "studio.content.linked.chant_collection.chants_one",
     });
-    expect(page.items[1].subtitle).toBe("4 chants");
+    expect(page.items[1].subtitle).toBe(
+      "studio.content.linked.chant_collection.chants_other",
+    );
   });
 
   it("scopes events to the group and names them from metadata", async () => {
@@ -198,7 +202,7 @@ describe("fetchLinkedContent", () => {
     expect(fetchGroupPosts).toHaveBeenCalledWith(GROUP_ID, 0, 10, "PUBLISHED");
     expect(page.items[0].title).toBe("A post caption");
     expect(page.items[0].imageUrl).toBe("thumb");
-    expect(page.items[1].title).toBe("Untitled post");
+    expect(page.items[1].title).toBe("studio.content.linked.post.untitled");
     expect(page.items[1].imageUrl).toBeNull();
   });
 

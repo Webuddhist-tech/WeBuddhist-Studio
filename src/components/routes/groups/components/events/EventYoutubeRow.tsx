@@ -1,3 +1,4 @@
+import { useTranslate } from "@tolgee/react";
 import type { UseFormReturn } from "react-hook-form";
 import { IoMdClose } from "react-icons/io";
 import { PiDotsSixVertical } from "react-icons/pi";
@@ -27,6 +28,7 @@ const EventYoutubeRow = ({
   channelUrl,
   onRemove,
 }: EventYoutubeRowProps) => {
+  const { t } = useTranslate();
   const { languageOptions } = useLanguages();
 
   const renderRow = ({ listeners }: { listeners: Record<string, unknown> }) => (
@@ -36,7 +38,7 @@ const EventYoutubeRow = ({
           {!readOnly ? (
             <button
               type="button"
-              aria-label="Reorder YouTube link"
+              aria-label={t("studio.groups.events.youtube.reorder_aria")}
               disabled={!canReorder}
               className="mt-8 shrink-0 cursor-grab touch-none rounded p-1 text-muted-foreground hover:text-foreground active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-30"
               {...listeners}
@@ -50,7 +52,7 @@ const EventYoutubeRow = ({
             name={`youtube.${index}.language`}
             render={({ field: langField }) => (
               <Pecha.FormItem className="w-40">
-                <Pecha.FormLabel>Language</Pecha.FormLabel>
+                <Pecha.FormLabel>{t("studio.common.language")}</Pecha.FormLabel>
                 <Pecha.Select
                   value={langField.value}
                   onValueChange={langField.onChange}
@@ -58,7 +60,9 @@ const EventYoutubeRow = ({
                 >
                   <Pecha.FormControl>
                     <Pecha.SelectTrigger className="w-full bg-white dark:bg-[#181818]">
-                      <Pecha.SelectValue placeholder="Language" />
+                      <Pecha.SelectValue
+                        placeholder={t("studio.common.language")}
+                      />
                     </Pecha.SelectTrigger>
                   </Pecha.FormControl>
                   <Pecha.SelectContent>
@@ -78,7 +82,7 @@ const EventYoutubeRow = ({
         {!readOnly ? (
           <button
             type="button"
-            aria-label="Remove YouTube link"
+            aria-label={t("studio.groups.events.youtube.remove_aria")}
             onClick={() => onRemove(index)}
             className="mt-8 text-muted-foreground hover:text-destructive"
           >
@@ -114,7 +118,9 @@ const EventYoutubeRow = ({
         name={`youtube.${index}.url`}
         render={({ field: urlField }) => (
           <Pecha.FormItem>
-            <Pecha.FormLabel>YouTube URL</Pecha.FormLabel>
+            <Pecha.FormLabel>
+              {t("studio.groups.events.youtube.url_label")}
+            </Pecha.FormLabel>
             <Pecha.FormControl>
               <Pecha.Input
                 {...urlField}
@@ -135,11 +141,15 @@ const EventYoutubeRow = ({
         name={`youtube.${index}.label`}
         render={({ field: labelField }) => (
           <Pecha.FormItem>
-            <Pecha.FormLabel>Label (optional)</Pecha.FormLabel>
+            <Pecha.FormLabel>
+              {t("studio.groups.events.url_links.label_label")}
+            </Pecha.FormLabel>
             <Pecha.FormControl>
               <Pecha.Input
                 {...labelField}
-                placeholder="Display text"
+                placeholder={t(
+                  "studio.groups.events.url_links.label_placeholder",
+                )}
                 disabled={readOnly}
                 className="bg-white dark:bg-[#181818]"
               />

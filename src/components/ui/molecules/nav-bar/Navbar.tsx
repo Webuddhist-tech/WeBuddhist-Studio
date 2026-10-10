@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import pechaIcon from "../../../../assets/icon/pecha_icon.png";
 import { Link } from "react-router-dom";
+import { useTranslate } from "@tolgee/react";
 import { ModeToggle } from "../mode-toggle/modetoggle";
 import {
   IoChevronBack,
@@ -26,38 +27,39 @@ import {
 import AuthAvatar from "@/components/ui/molecules/auth-avatar/AuthAvatar";
 import { useNavModel, type NavItem } from "./useNavModel";
 
+/** Labels are translation keys. */
 const tooltipItems = [
   {
     id: "avatar",
     component: <AuthAvatar />,
-    label: "View Profile",
+    label: "studio.nav.view_profile",
     /** The header already shows the avatar on wider screens. */
     rowClassName: "md:hidden",
   },
   {
     id: "update",
     component: <AppUpdateButton side="right" />,
-    label: "Update ready",
+    label: "studio.nav.update_ready",
   },
   {
     id: "install",
     component: <InstallAppButton />,
-    label: "Install app",
+    label: "studio.nav.install_app",
   },
   {
     id: "theme",
     component: <ModeToggle />,
-    label: "Change theme",
+    label: "studio.nav.change_theme",
   },
   {
     id: "language",
     component: <LanguageToggle />,
-    label: "Change language",
+    label: "studio.nav.change_language",
   },
   {
     id: "logout",
     component: <AuthLogout />,
-    label: "Logout",
+    label: "studio.nav.logout",
   },
 ];
 
@@ -103,6 +105,7 @@ const Navbar = () => {
     sections,
     activeSectionId,
   } = useNavModel();
+  const { t } = useTranslate();
   const installMode = useInstallMode();
   useHostsUpdateButton();
   const updateWaiting = useUpdateWaiting();
@@ -170,7 +173,7 @@ const Navbar = () => {
       item.path,
       <Link
         to={item.path}
-        aria-label={item.tooltip}
+        aria-label={t(item.tooltip)}
         aria-current={isActive(item.path) ? "page" : undefined}
         className={`flex items-center rounded-md border p-2 transition-all duration-300 hover:cursor-pointer hover:text-black dark:hover:text-white ${
           expanded ? "w-full gap-3" : "justify-center"
@@ -181,15 +184,15 @@ const Navbar = () => {
         }`}
       >
         {item.icon}
-        {expanded && <span className="truncate text-sm">{item.label}</span>}
+        {expanded && <span className="truncate text-sm">{t(item.label)}</span>}
       </Link>,
-      item.tooltip,
+      t(item.tooltip),
     );
 
   return (
     <TooltipProvider>
       <nav
-        aria-label="Main"
+        aria-label={t("studio.nav.main_aria")}
         data-expanded={expanded}
         className={`font-dynamic flex shrink-0 flex-col justify-between overflow-hidden border-r border-gray-200 dark:border-[#313132] p-2 transition-[width] duration-300 ${
           expanded ? "w-56" : "w-16"
@@ -209,7 +212,7 @@ const Navbar = () => {
             >
               <img
                 src={pechaIcon}
-                alt="Webuddhist Studio Logo"
+                alt={t("studio.nav.logo_alt")}
                 className="h-10 w-10 shrink-0 transition-transform duration-800 group-hover:rotate-180"
               />
               {expanded && (
@@ -223,7 +226,11 @@ const Navbar = () => {
               type="button"
               onClick={toggleExpanded}
               aria-expanded={expanded}
-              aria-label={expanded ? "Collapse sidebar" : "Expand sidebar"}
+              aria-label={
+                expanded
+                  ? t("studio.nav.collapse_sidebar")
+                  : t("studio.nav.expand_sidebar")
+              }
               className="rounded-md border p-1.5 text-zinc-400 transition-colors hover:text-black dark:text-zinc-500 dark:hover:text-white"
             >
               {expanded ? (
@@ -250,7 +257,7 @@ const Navbar = () => {
                     aria-expanded={openSections.includes(section.id)}
                     className="mt-2 flex items-center justify-between rounded-md px-2 py-1 text-xs font-semibold uppercase tracking-wide text-zinc-500 transition-colors hover:text-black dark:text-zinc-400 dark:hover:text-white"
                   >
-                    <span className="truncate">{section.label}</span>
+                    <span className="truncate">{t(section.label)}</span>
                     <IoChevronDown
                       className={`h-3 w-3 shrink-0 transition-transform duration-200 ${
                         openSections.includes(section.id) ? "" : "-rotate-90"
@@ -287,14 +294,14 @@ const Navbar = () => {
               >
                 {item.component}
                 <span className="truncate text-sm text-zinc-500 dark:text-zinc-400">
-                  {item.label}
+                  {t(item.label)}
                 </span>
               </div>
             ) : (
               withTooltip(
                 item.id,
                 <div className={item.rowClassName}>{item.component}</div>,
-                item.label,
+                t(item.label),
               )
             ),
           )}

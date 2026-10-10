@@ -19,6 +19,18 @@ import type {
 } from "./api/liveControlApi";
 import type { RecitationSocket, SocketMoveResult } from "./useRecitationSocket";
 
+// Echo interpolated values so assertions can still check them.
+const { echoT } = vi.hoisted(() => ({
+  echoT: (key: string, params?: Record<string, unknown>) =>
+    params
+      ? `${key} ${Object.entries(params)
+          .map(([name, value]) => `${name}=${String(value)}`)
+          .join(" ")}`
+      : key,
+}));
+vi.mock("@tolgee/react", () => ({ useTranslate: () => ({ t: echoT }) }));
+vi.mock("@/i18n/tolgee", () => ({ tolgee: { t: echoT } }));
+
 const {
   fetchLiveControlEvent,
   fetchLiturgies,
@@ -266,7 +278,10 @@ const setupPanel = () => {
 /** Unticks every translation, for a test about the edition on screen alone:
  * a new work follows all of its translations from the start. */
 const followNone = async (user: ReturnType<typeof userEvent.setup>) => {
-  for (const name of ["Follow Praise (en)", "Follow Praise (zh)"]) {
+  for (const name of [
+    "studio.live_control.editions.follow_aria title=Praise (en)",
+    "studio.live_control.editions.follow_aria title=Praise (zh)",
+  ]) {
     const box = await screen.findByRole("checkbox", { name });
     if ((box as HTMLInputElement).checked) await user.click(box);
   }
@@ -277,7 +292,10 @@ const openTextByName = async (
   user: ReturnType<typeof userEvent.setup>,
   name: string,
 ) => {
-  await user.type(await screen.findByLabelText("Search texts"), name);
+  await user.type(
+    await screen.findByLabelText("studio.live_control.setup.search_aria"),
+    name,
+  );
   await user.click(
     await screen.findByRole("option", { name: "Praise to the 21 Taras" }),
   );
@@ -290,6 +308,39 @@ const titlesScaleOnPage = () =>
   document
     .querySelector("[data-titles-scale]")
     ?.getAttribute("data-titles-scale");
+
+/** Live, Auto and Hold sit in the controls menu at the top: it is opened, if
+ * it is shut, before one of them is looked for. */
+const openControls = () => {
+  const menu = screen.getByRole("button", {
+    name: "studio.live_control.controls.settings",
+  });
+  if (menu.getAttribute("aria-expanded") !== "true") fireEvent.click(menu);
+};
+const controlButton = (name: string) => {
+  openControls();
+  return screen.getByRole("button", { name });
+};
+const queryControlButton = (name: string) => {
+  openControls();
+  return screen.queryByRole("button", { name });
+};
+
+/** Status, the titles, size and cue sit in the settings menu too. */
+const publishState = () => {
+  openControls();
+  return screen.getByTestId("publish-state");
+};
+const textSizePicker = () => {
+  openControls();
+  return screen.getByRole("combobox", {
+    name: "studio.live_control.text_size",
+  });
+};
+const roomStatus = () => {
+  openControls();
+  return document.querySelector("[data-room]");
+};
 
 const pressKey = async (code: string) => {
   await act(async () => {
@@ -456,13 +507,19 @@ describe("LiveControlPage", () => {
     expect(localStorage.getItem("live-control-open-text:e1")).toBe("root");
     // Every edition moves with the room unless the operator unticks it.
     expect(
-      screen.getByRole("checkbox", { name: "Follow Praise (en)" }),
+      screen.getByRole("checkbox", {
+        name: "studio.live_control.editions.follow_aria title=Praise (en)",
+      }),
     ).toBeChecked();
     expect(
-      screen.getByRole("checkbox", { name: "Follow Praise (zh)" }),
+      screen.getByRole("checkbox", {
+        name: "studio.live_control.editions.follow_aria title=Praise (zh)",
+      }),
     ).toBeChecked();
     // The edition being read is always published, so its tick is fixed on.
-    const driver = screen.getByRole("checkbox", { name: "Follow Praise (bo)" });
+    const driver = screen.getByRole("checkbox", {
+      name: "studio.live_control.editions.follow_aria title=Praise (bo)",
+    });
     expect(driver).toBeChecked();
     expect(driver).toBeDisabled();
 
@@ -488,7 +545,9 @@ describe("LiveControlPage", () => {
 
     await waitFor(() => expect(fetchLiveControlEvent).toHaveBeenCalled());
     expect(screen.queryByText("other line 1")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Search texts")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("studio.live_control.setup.search_aria"),
+    ).toBeInTheDocument();
   });
 
   it("follows only the Tibetan, English and Chinese editions by default", async () => {
@@ -504,13 +563,19 @@ describe("LiveControlPage", () => {
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
     expect(
-      screen.getByRole("checkbox", { name: "Follow Praise (en)" }),
+      screen.getByRole("checkbox", {
+        name: "studio.live_control.editions.follow_aria title=Praise (en)",
+      }),
     ).toBeChecked();
     expect(
-      screen.getByRole("checkbox", { name: "Follow Praise (zh)" }),
+      screen.getByRole("checkbox", {
+        name: "studio.live_control.editions.follow_aria title=Praise (zh)",
+      }),
     ).toBeChecked();
     expect(
-      screen.getByRole("checkbox", { name: "Follow Praise (fr)" }),
+      screen.getByRole("checkbox", {
+        name: "studio.live_control.editions.follow_aria title=Praise (fr)",
+      }),
     ).not.toBeChecked();
     // An edition nobody follows is not fetched until it is ticked.
     expect(fetchRecitationDetails).not.toHaveBeenCalledWith("root-fr", "fr");
@@ -522,7 +587,7 @@ describe("LiveControlPage", () => {
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
     expect(textScaleOnPage()).toBe("1");
 
-    const picker = screen.getByRole("combobox", { name: "Text size" });
+    const picker = textSizePicker();
     await user.selectOptions(picker, "120%");
     expect(textScaleOnPage()).toBe("1.2");
     expect(localStorage.getItem("live-control-text-scale")).toBe("1.2");
@@ -549,7 +614,9 @@ describe("LiveControlPage", () => {
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
     await user.selectOptions(
-      await screen.findByRole("combobox", { name: "Title size" }),
+      await screen.findByRole("combobox", {
+        name: "studio.live_control.title_size",
+      }),
       "150%",
     );
 
@@ -558,10 +625,7 @@ describe("LiveControlPage", () => {
     expect(localStorage.getItem("live-control-titles-scale")).toBe("1.5");
     expect(localStorage.getItem("live-control-text-scale")).toBeNull();
 
-    await user.selectOptions(
-      screen.getByRole("combobox", { name: "Text size" }),
-      "80%",
-    );
+    await user.selectOptions(textSizePicker(), "80%");
     expect(titlesScaleOnPage()).toBe("1.5");
     expect(textScaleOnPage()).toBe("0.8");
   });
@@ -585,11 +649,11 @@ describe("LiveControlPage", () => {
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
-    expect(screen.getByRole("combobox", { name: "Text size" })).toHaveValue(
-      "1.3",
-    );
+    expect(textSizePicker()).toHaveValue("1.3");
     expect(
-      await screen.findByRole("combobox", { name: "Title size" }),
+      await screen.findByRole("combobox", {
+        name: "studio.live_control.title_size",
+      }),
     ).toHaveValue("0.4");
   });
 
@@ -606,9 +670,7 @@ describe("LiveControlPage", () => {
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
     expect(textScaleOnPage()).toBe("1.5");
-    expect(screen.getByRole("combobox", { name: "Text size" })).toHaveValue(
-      "1.5",
-    );
+    expect(textSizePicker()).toHaveValue("1.5");
   });
 
   it("loads a pasted text id and its translations", async () => {
@@ -621,7 +683,9 @@ describe("LiveControlPage", () => {
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
     expect(fetchTextEditions).toHaveBeenCalledWith("root");
     expect(
-      screen.getByRole("checkbox", { name: "Follow Praise (en)" }),
+      screen.getByRole("checkbox", {
+        name: "studio.live_control.editions.follow_aria title=Praise (en)",
+      }),
     ).toBeInTheDocument();
   });
 
@@ -636,7 +700,9 @@ describe("LiveControlPage", () => {
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
     expect(fetchTextEditions).toHaveBeenCalledWith("root");
     // The search closes once a text is picked.
-    expect(screen.getByLabelText("Search texts")).toHaveValue("");
+    expect(
+      screen.getByLabelText("studio.live_control.setup.search_aria"),
+    ).toHaveValue("");
   });
 
   it("does not open an earlier search's result on Enter", async () => {
@@ -645,7 +711,9 @@ describe("LiveControlPage", () => {
     noEventLiturgies();
     renderPage();
 
-    const box = await screen.findByLabelText("Search texts");
+    const box = await screen.findByLabelText(
+      "studio.live_control.setup.search_aria",
+    );
     await user.type(box, "Praise");
     expect(
       await screen.findByRole("option", { name: "Praise to the 21 Taras" }),
@@ -665,10 +733,14 @@ describe("LiveControlPage", () => {
     localStorage.removeItem("live-control-recent-texts");
     renderPage();
 
-    const box = await screen.findByLabelText("Search texts");
+    const box = await screen.findByLabelText(
+      "studio.live_control.setup.search_aria",
+    );
     await user.type(box, "RefugePrayerTextAbcde");
     expect(
-      screen.queryByRole("option", { name: /^Open id/ }),
+      screen.queryByRole("option", {
+        name: /^studio.live_control.setup\.open_id/,
+      }),
     ).not.toBeInTheDocument();
     expect(
       await screen.findByRole("option", { name: "Praise to the 21 Taras" }),
@@ -685,7 +757,7 @@ describe("LiveControlPage", () => {
     renderPage();
 
     await user.type(
-      await screen.findByLabelText("Search texts"),
+      await screen.findByLabelText("studio.live_control.setup.search_aria"),
       "Zt5c0fe1OMJI1Kh8rp2FM{Enter}",
     );
 
@@ -701,7 +773,9 @@ describe("LiveControlPage", () => {
     searchTextsByTitle.mockRejectedValue(new Error("offline"));
     renderPage();
 
-    const box = await screen.findByLabelText("Search texts");
+    const box = await screen.findByLabelText(
+      "studio.live_control.setup.search_aria",
+    );
     await user.type(box, "ZtAcBfeXOMJIaKhYrpQFM");
     await waitFor(() =>
       expect(searchTextsByTitle).toHaveBeenCalledWith("ZtAcBfeXOMJIaKhYrpQFM"),
@@ -719,7 +793,9 @@ describe("LiveControlPage", () => {
     searchTextsByTitle.mockResolvedValue([]);
     renderPage();
 
-    const box = await screen.findByLabelText("Search texts");
+    const box = await screen.findByLabelText(
+      "studio.live_control.setup.search_aria",
+    );
     await user.type(box, "ZtAcBfeXOMJIaKhYrpQFM");
     await waitFor(() =>
       expect(searchTextsByTitle).toHaveBeenCalledWith("ZtAcBfeXOMJIaKhYrpQFM"),
@@ -737,12 +813,12 @@ describe("LiveControlPage", () => {
 
     expect(
       await screen.findByRole("button", {
-        name: "Open Title of Zt5c0fe1OMJI1Kh8rp2FM",
+        name: "studio.live_control.setup.open_aria title=Title of Zt5c0fe1OMJI1Kh8rp2FM",
       }),
     ).toHaveTextContent("Title of Zt5c0fe1OMJI1Kh8rp2FM");
     expect(
       await screen.findByRole("button", {
-        name: "Open Title of lEmYv8BrRQkOMPY9ymQpS",
+        name: "studio.live_control.setup.open_aria title=Title of lEmYv8BrRQkOMPY9ymQpS",
       }),
     ).toBeInTheDocument();
   });
@@ -761,7 +837,9 @@ describe("LiveControlPage", () => {
       ).toEqual([{ textId: "root", title: "Praise (bo)" }]),
     );
     expect(
-      screen.getByRole("button", { name: "Open Praise (bo)" }),
+      screen.getByRole("button", {
+        name: "studio.live_control.setup.open_aria title=Praise (bo)",
+      }),
     ).toHaveAttribute("aria-pressed", "true");
   });
 
@@ -775,10 +853,14 @@ describe("LiveControlPage", () => {
 
     expect(
       await screen.findByRole("button", {
-        name: "Open Title of Zt5c0fe1OMJI1Kh8rp2FM",
+        name: "studio.live_control.setup.open_aria title=Title of Zt5c0fe1OMJI1Kh8rp2FM",
       }),
     ).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Open Praise (bo)" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: "studio.live_control.setup.open_aria title=Praise (bo)",
+      }),
+    );
 
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
     expect(fetchTextEditions).toHaveBeenCalledWith("root");
@@ -796,7 +878,7 @@ describe("LiveControlPage", () => {
     );
     expect(fetchRecitationDetails).toHaveBeenCalledWith("root-zh", "zh");
     expect(
-      await screen.findByText(/2 more editions following/),
+      await screen.findByText(/following_other count=2/),
     ).toBeInTheDocument();
 
     fetchRecitationDetails.mockClear();
@@ -811,7 +893,7 @@ describe("LiveControlPage", () => {
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
-    await screen.findByText(/2 more editions following/);
+    await screen.findByText(/following_other count=2/);
     publishPosition.mockClear();
 
     await pressKey("Space");
@@ -925,7 +1007,7 @@ describe("LiveControlPage", () => {
     onTestFinished(() => now.mockRestore());
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
-    await screen.findByText(/2 more editions following/);
+    await screen.findByText(/following_other count=2/);
     publishPosition.mockClear();
 
     await pressKey("Space");
@@ -942,7 +1024,7 @@ describe("LiveControlPage", () => {
     localStorage.setItem("recitation_emit_token", "tok-123");
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
-    await screen.findByText(/2 more editions following/);
+    await screen.findByText(/following_other count=2/);
     publishMove.mockClear();
 
     await pressKey("Space");
@@ -970,7 +1052,7 @@ describe("LiveControlPage", () => {
     socketStore.set({ status: "open", sendMove: overSocket });
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
-    await screen.findByText(/2 more editions following/);
+    await screen.findByText(/following_other count=2/);
     publishMove.mockClear();
 
     await pressKey("Space");
@@ -1011,6 +1093,106 @@ describe("LiveControlPage", () => {
     expect(publishMove).not.toHaveBeenCalled();
   });
 
+  describe("stop / go live", () => {
+    it("moves only this screen while stopped, and remembers it in this browser", async () => {
+      const user = userEvent.setup();
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+      await screen.findByText(/following_other count=2/);
+
+      await user.click(
+        screen.getByRole("button", { name: "studio.live_control.on_air.stop" }),
+      );
+      expect(localStorage.getItem("live-control-on-air:e1")).toBe("false");
+      expect(
+        screen.getByText("studio.live_control.on_air.stopped"),
+      ).toBeInTheDocument();
+      expect(publishState()).toHaveTextContent(
+        "studio.live_control.status.stopped",
+      );
+      expect(
+        controlButton("▶ studio.live_control.controls.auto"),
+      ).toBeDisabled();
+      publishPosition.mockClear();
+
+      await pressKey("Space");
+      await user.click(screen.getByText("root line 3"));
+      expect(
+        await screen.findByText(/position\.line_of line=3 total=3/),
+      ).toBeInTheDocument();
+      expect(publishPosition).not.toHaveBeenCalled();
+      expect(publishMove).not.toHaveBeenCalled();
+      expect(startAutoplay).not.toHaveBeenCalled();
+
+      await user.click(
+        screen.getByRole("button", {
+          name: "studio.live_control.on_air.go_live",
+        }),
+      );
+      expect(localStorage.getItem("live-control-on-air:e1")).toBe("true");
+      // Going live sends nothing by itself; the next move does.
+      expect(publishPosition).not.toHaveBeenCalled();
+
+      await user.click(screen.getByText("root line 2"));
+      await waitFor(() =>
+        expect(publishPosition).toHaveBeenCalledWith(
+          "e1",
+          "tok-123",
+          { textId: "root", segmentId: "root-s2", index: 1, roundNumber: 1 },
+          expect.any(String),
+        ),
+      );
+    });
+
+    it("opens stopped when it was stopped in this browser", async () => {
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      localStorage.setItem("live-control-on-air:e1", "false");
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+      await screen.findByText(/following_other count=2/);
+
+      expect(
+        screen.getByRole("button", {
+          name: "studio.live_control.on_air.go_live",
+        }),
+      ).toHaveAttribute("aria-pressed", "false");
+      await pressKey("Space");
+      expect(
+        await screen.findByText(/position\.line_of line=1 total=3/),
+      ).toBeInTheDocument();
+      expect(publishMove).not.toHaveBeenCalled();
+    });
+
+    it("pauses the backend's autoplay on Stop, then sends nothing more", async () => {
+      const user = userEvent.setup();
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      fetchSegmentPlayTimes.mockResolvedValue({
+        "root-s1": 20_000,
+        "root-s2": 20_000,
+        "root-s3": 20_000,
+      });
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+      await screen.findByText(/following_other count=2/);
+
+      await user.click(controlButton("▶ studio.live_control.controls.auto"));
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+
+      await user.click(
+        screen.getByRole("button", { name: "studio.live_control.on_air.stop" }),
+      );
+      await waitFor(() => expect(stopAutoplay).toHaveBeenCalledTimes(1));
+
+      await user.click(screen.getByText("root line 3"));
+      expect(
+        await screen.findByText(/position\.line_of line=3 total=3/),
+      ).toBeInTheDocument();
+      expect(startAutoplay).toHaveBeenCalledTimes(1);
+      expect(sendAutoplayCommand).not.toHaveBeenCalled();
+    });
+  });
+
   it("sends the edition on screen again when a translation is ticked on the line being read", async () => {
     const user = userEvent.setup();
     localStorage.setItem("recitation_emit_token", "tok-123");
@@ -1029,7 +1211,9 @@ describe("LiveControlPage", () => {
     await waitFor(() => expect(order).toEqual(["root"]));
 
     await user.click(
-      screen.getByRole("checkbox", { name: "Follow Praise (en)" }),
+      screen.getByRole("checkbox", {
+        name: "studio.live_control.editions.follow_aria title=Praise (en)",
+      }),
     );
     await waitFor(() =>
       expect(fetchRecitationDetails).toHaveBeenCalledWith("root-en", "en"),
@@ -1060,7 +1244,7 @@ describe("LiveControlPage", () => {
     localStorage.setItem("recitation_emit_token", "tok-123");
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
-    await screen.findByText(/2 more editions following/);
+    await screen.findByText(/following_other count=2/);
     publishPosition.mockClear();
     const runsOf = (textId: string) =>
       publishPosition.mock.calls
@@ -1073,7 +1257,7 @@ describe("LiveControlPage", () => {
     await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(6));
 
     const english = screen.getByRole("checkbox", {
-      name: "Follow Praise (en)",
+      name: "studio.live_control.editions.follow_aria title=Praise (en)",
     });
     await user.click(english);
     await pressKey("Space");
@@ -1101,13 +1285,15 @@ describe("LiveControlPage", () => {
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
-    await screen.findByText(/2 more editions following/);
+    await screen.findByText(/following_other count=2/);
     const english = screen.getByRole("checkbox", {
-      name: "Follow Praise (en)",
+      name: "studio.live_control.editions.follow_aria title=Praise (en)",
     });
     await user.click(english);
     await user.click(
-      screen.getByRole("checkbox", { name: "Follow Praise (zh)" }),
+      screen.getByRole("checkbox", {
+        name: "studio.live_control.editions.follow_aria title=Praise (zh)",
+      }),
     );
     expect(english).not.toBeChecked();
     publishPosition.mockClear();
@@ -1154,12 +1340,18 @@ describe("LiveControlPage", () => {
     localStorage.setItem("recitation_emit_token", "tok-123");
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
-    await screen.findByText(/2 more editions following/);
+    await screen.findByText(/following_other count=2/);
 
-    await user.click(screen.getByRole("button", { name: "Open Refuge" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: "studio.live_control.setup.open_aria title=Refuge",
+      }),
+    );
     expect(await screen.findByText("other line 1")).toBeInTheDocument();
     expect(
-      screen.queryByRole("checkbox", { name: "Follow Praise (en)" }),
+      screen.queryByRole("checkbox", {
+        name: "studio.live_control.editions.follow_aria title=Praise (en)",
+      }),
     ).not.toBeInTheDocument();
     publishPosition.mockClear();
 
@@ -1208,7 +1400,7 @@ describe("LiveControlPage", () => {
 
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
-    await screen.findByText(/2 more editions following/);
+    await screen.findByText(/following_other count=2/);
     publishPosition.mockClear();
 
     await pressKey("Space");
@@ -1259,7 +1451,11 @@ describe("LiveControlPage", () => {
     await pressKey("Space");
     await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(1));
 
-    await user.click(screen.getByRole("button", { name: "Open Refuge" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: "studio.live_control.setup.open_aria title=Refuge",
+      }),
+    );
     await pressKey("Space");
     await pressKey("ArrowRight");
 
@@ -1280,7 +1476,7 @@ describe("LiveControlPage", () => {
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
-    expect(await screen.findByText(/does not line up/)).toBeInTheDocument();
+    expect(await screen.findByText(/lines_misaligned/)).toBeInTheDocument();
   });
 
   it("publishes with the pasted token and remembers it for next time", async () => {
@@ -1288,13 +1484,24 @@ describe("LiveControlPage", () => {
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
-    await user.type(await screen.findByLabelText("Emit token"), "tok-123");
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.type(
+      await screen.findByLabelText("studio.live_control.token.label"),
+      "tok-123",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "studio.common.save" }),
+    );
 
-    expect(screen.queryByLabelText("Emit token")).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("studio.live_control.token.label"),
+    ).not.toBeInTheDocument();
     expect(localStorage.getItem("recitation_emit_token")).toBe("tok-123");
 
-    await user.click(screen.getByRole("button", { name: "Next →" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: "studio.live_control.controls.next →",
+      }),
+    );
 
     await waitFor(() =>
       expect(publishPosition).toHaveBeenCalledWith(
@@ -1345,7 +1552,9 @@ describe("LiveControlPage", () => {
       document.querySelector('[data-line="2"] [data-yigchung]'),
     ).toHaveTextContent("root");
 
-    const next = screen.getByRole("button", { name: "Next →" });
+    const next = screen.getByRole("button", {
+      name: "studio.live_control.controls.next →",
+    });
     await user.click(next);
     await user.click(next);
     await waitFor(() =>
@@ -1403,8 +1612,12 @@ describe("LiveControlPage", () => {
       ),
     );
     // Held, not dropped: nothing moves until the marks say what line 2 is.
-    await user.click(screen.getByRole("button", { name: "Next →" }));
-    expect(screen.getByText(/line 1\/3/)).toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", {
+        name: "studio.live_control.controls.next →",
+      }),
+    );
+    expect(screen.getByText(/line_of line=1 total=3/)).toBeInTheDocument();
 
     await act(async () => {
       deliver({
@@ -1446,13 +1659,17 @@ describe("LiveControlPage", () => {
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
     // Next is held; then the operator picks line 3 themselves.
-    await user.click(screen.getByRole("button", { name: "Next →" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: "studio.live_control.controls.next →",
+      }),
+    );
     await user.click(screen.getByText("root line 3"));
     await act(async () => {
       deliver({});
     });
 
-    expect(screen.getByText(/line 3\/4/)).toBeInTheDocument();
+    expect(screen.getByText(/line_of line=3 total=4/)).toBeInTheDocument();
     expect(publishPosition).toHaveBeenLastCalledWith(
       "e1",
       "tok-123",
@@ -1472,14 +1689,18 @@ describe("LiveControlPage", () => {
     renderPage();
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Next →" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: "studio.live_control.controls.next →",
+      }),
+    );
 
     expect(publishPosition).not.toHaveBeenCalled();
     expect(
-      await screen.findByText(/paste the emit token/i),
+      await screen.findByText(/publisher\.token_needed/),
     ).toBeInTheDocument();
-    expect(screen.getByTestId("publish-state")).toHaveTextContent(
-      "no emit token",
+    expect(publishState()).toHaveTextContent(
+      "studio.live_control.status.no_token",
     );
   });
 
@@ -1489,7 +1710,11 @@ describe("LiveControlPage", () => {
     renderPage();
 
     const alert = await screen.findByRole("alert");
-    await user.click(screen.getByRole("button", { name: "Dismiss message" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: "studio.live_control.dismiss_message",
+      }),
+    );
 
     expect(alert).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
@@ -1509,7 +1734,11 @@ describe("LiveControlPage", () => {
     expect(
       await screen.findByText(/emit token was rejected/),
     ).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Dismiss message" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: "studio.live_control.dismiss_message",
+      }),
+    );
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
 
     publishPosition.mockResolvedValue({
@@ -1635,7 +1864,9 @@ describe("LiveControlPage", () => {
     expect(publishPosition).not.toHaveBeenCalled();
 
     // Space on a control does what that control does, not what the room does.
-    const next = screen.getByRole("button", { name: "Next →" });
+    const next = screen.getByRole("button", {
+      name: "studio.live_control.controls.next →",
+    });
     next.focus();
     const notSwallowed = next.dispatchEvent(
       new KeyboardEvent("keydown", {
@@ -1660,12 +1891,16 @@ describe("LiveControlPage", () => {
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
     await followNone(user);
 
-    await user.click(screen.getByRole("button", { name: "Next →" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: "studio.live_control.controls.next →",
+      }),
+    );
     expect(
       await screen.findByText(/emit token was rejected/i),
     ).toBeInTheDocument();
-    expect(screen.getByTestId("publish-state")).toHaveTextContent(
-      "not publishing",
+    expect(publishState()).toHaveTextContent(
+      "studio.live_control.status.not_publishing",
     );
 
     // The room never took line 1, so re-tapping it publishes again rather than
@@ -1690,6 +1925,49 @@ describe("LiveControlPage", () => {
         await screen.findByRole("button", { name: "Praises" }),
       ).toBeInTheDocument();
       expect(fetchEditionSections).toHaveBeenCalledWith("root", "bo");
+    });
+
+    it("draws the sections in the order dragged before, and resets it", async () => {
+      const user = userEvent.setup();
+      localStorage.setItem(
+        "live-control-section-order:root",
+        JSON.stringify(["s2", "s1"]),
+      );
+      fetchEditionSections.mockResolvedValue(outline);
+      renderPage();
+
+      const titles = () =>
+        [...document.querySelectorAll("[data-section-active]")].map(
+          (button) => button.textContent,
+        );
+      await screen.findByRole("button", { name: "Praises" });
+      expect(titles()).toEqual(["Praises", "Going for Refuge"]);
+      // Each row is dragged by its own handle.
+      expect(
+        screen.getByRole("button", {
+          name: "studio.live_control.section.reorder_aria title=Praises",
+        }),
+      ).toBeInTheDocument();
+      // The section being recited still goes by the lines.
+      await user.click(screen.getByText("root line 1"));
+      expect(
+        screen.getByRole("button", { name: "Going for Refuge" }),
+      ).toHaveAttribute("data-section-active", "true");
+
+      await user.click(
+        screen.getByRole("button", {
+          name: "studio.live_control.section.reset_order",
+        }),
+      );
+      expect(titles()).toEqual(["Going for Refuge", "Praises"]);
+      expect(
+        localStorage.getItem("live-control-section-order:root"),
+      ).toBeNull();
+      expect(
+        screen.queryByRole("button", {
+          name: "studio.live_control.section.reset_order",
+        }),
+      ).not.toBeInTheDocument();
     });
 
     it("asks for the outline of a translation when that is read instead", async () => {
@@ -1722,20 +2000,28 @@ describe("LiveControlPage", () => {
       expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
       // Two lines into Refuge, then over to Praises.
-      const next = screen.getByRole("button", { name: "Next →" });
+      const next = screen.getByRole("button", {
+        name: "studio.live_control.controls.next →",
+      });
       await user.click(next);
       await user.click(next);
       expect(
-        screen.queryByRole("button", { name: "Resume Going for Refuge" }),
+        screen.queryByRole("button", {
+          name: "studio.live_control.section.resume_aria title=Going for Refuge",
+        }),
       ).not.toBeInTheDocument();
       await user.click(await screen.findByRole("button", { name: "Praises" }));
 
       // Praises was entered at its start, so only Refuge has somewhere to resume.
       expect(
-        screen.queryByRole("button", { name: "Resume Praises" }),
+        screen.queryByRole("button", {
+          name: "studio.live_control.section.resume_aria title=Praises",
+        }),
       ).not.toBeInTheDocument();
       await user.click(
-        screen.getByRole("button", { name: "Resume Going for Refuge" }),
+        screen.getByRole("button", {
+          name: "studio.live_control.section.resume_aria title=Going for Refuge",
+        }),
       );
       await waitFor(() =>
         expect(publishPosition).toHaveBeenLastCalledWith(
@@ -1745,7 +2031,7 @@ describe("LiveControlPage", () => {
           expect.any(String),
         ),
       );
-      expect(screen.getByText(/line 2\/6/)).toBeInTheDocument();
+      expect(screen.getByText(/line_of line=2 total=6/)).toBeInTheDocument();
     });
 
     it("offers no resume for a section taken to its last line", async () => {
@@ -1767,7 +2053,9 @@ describe("LiveControlPage", () => {
       await user.click(await screen.findByRole("button", { name: "Praises" }));
 
       expect(
-        screen.queryByRole("button", { name: "Resume Going for Refuge" }),
+        screen.queryByRole("button", {
+          name: "studio.live_control.section.resume_aria title=Going for Refuge",
+        }),
       ).not.toBeInTheDocument();
     });
 
@@ -1793,7 +2081,46 @@ describe("LiveControlPage", () => {
           expect.any(String),
         ),
       );
-      expect(screen.getByText(/line 3\/3/)).toBeInTheDocument();
+      expect(screen.getByText(/line_of line=3 total=3/)).toBeInTheDocument();
+    });
+
+    it("goes to a section picked from the floating dot's titles", async () => {
+      const user = userEvent.setup();
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      fetchEditionSections.mockResolvedValue([
+        { ...outline[0], icon: "🪷" },
+        outline[1],
+      ]);
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+      // The top right opens the same titles, so the dot is found by its mark.
+      await waitFor(() =>
+        expect(document.querySelector("[data-touch-dot]")).not.toBeNull(),
+      );
+      await user.click(
+        document.querySelector("[data-touch-dot]") as HTMLElement,
+      );
+      const menu = screen.getByRole("dialog", {
+        name: "studio.live_control.toc.title",
+      });
+      // The titles only, each by its icon.
+      expect(
+        [...menu.querySelectorAll("[data-touch-item]")].map(
+          (tile) => tile.textContent,
+        ),
+      ).toEqual(["🪷Going for Refuge", "Praises"]);
+      await user.click(within(menu).getByRole("button", { name: "Praises" }));
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      await waitFor(() =>
+        expect(publishPosition).toHaveBeenCalledWith(
+          "e1",
+          "tok-123",
+          expect.objectContaining({ segmentId: "root-s3", index: 2 }),
+          expect.any(String),
+        ),
+      );
     });
 
     it("passes over yigchung a picked section opens on", async () => {
@@ -1871,7 +2198,7 @@ describe("LiveControlPage", () => {
       );
       expect(
         screen.getByRole("button", { name: "Instructions" }),
-      ).toHaveAttribute("title", "Nothing in this section is recited");
+      ).toHaveAttribute("title", "studio.live_control.section.nothing_recited");
       expect(screen.getByRole("button", { name: "Praises" })).toBeEnabled();
     });
 
@@ -1948,7 +2275,11 @@ describe("LiveControlPage", () => {
       expect(refuge).toHaveAttribute("data-section-active", "true");
       expect(praises).toHaveAttribute("data-section-active", "false");
 
-      await user.click(screen.getByRole("button", { name: "Next →" }));
+      await user.click(
+        screen.getByRole("button", {
+          name: "studio.live_control.controls.next →",
+        }),
+      );
       expect(praises).toHaveAttribute("data-section-active", "true");
       expect(refuge).toHaveAttribute("data-section-active", "false");
     });
@@ -2001,12 +2332,12 @@ describe("LiveControlPage", () => {
 
       expect(await screen.findByText("root mantra line")).toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: /2nd Praises/ }),
+        screen.queryByRole("button", { name: /return_jumps\.praises_2/ }),
       ).not.toBeInTheDocument();
 
       await user.click(
         screen.getByRole("button", {
-          name: "↺ Return to start · 1st Praises to the 21 Tārās, round 1",
+          name: "studio.live_control.return.aria label=studio.live_control.return_jumps.praises_1 round=1",
         }),
       );
 
@@ -2024,10 +2355,14 @@ describe("LiveControlPage", () => {
           expect.any(String),
         ),
       );
-      expect(screen.getByText(/line 1\/3/)).toBeInTheDocument();
+      expect(screen.getByText(/line_of line=1 total=3/)).toBeInTheDocument();
 
       // The rest of the passage is recited in that round too.
-      await user.click(screen.getByRole("button", { name: "Next →" }));
+      await user.click(
+        screen.getByRole("button", {
+          name: "studio.live_control.controls.next →",
+        }),
+      );
       await waitFor(() =>
         expect(publishPosition).toHaveBeenLastCalledWith(
           "e1",
@@ -2073,16 +2408,20 @@ describe("LiveControlPage", () => {
         message: "That emit token was rejected. Check it and paste it again.",
       });
       renderPage();
-      const label = "↺ Return to start · 1st Praises to the 21 Tārās";
+      const label = "studio.live_control.return_jumps.praises_1";
 
       await user.click(
-        await screen.findByRole("button", { name: `${label}, round 1` }),
+        await screen.findByRole("button", {
+          name: `studio.live_control.return.aria label=${label} round=1`,
+        }),
       );
       await screen.findByText(/emit token was rejected/);
 
       // Refused: the badge stays on the round the room has, the new one waits.
       expect(
-        screen.getByRole("button", { name: `${label}, round 1` }),
+        screen.getByRole("button", {
+          name: `studio.live_control.return.aria label=${label} round=1`,
+        }),
       ).toBeInTheDocument();
       expect(document.querySelector("[data-round-pending]")).toHaveTextContent(
         "→ 2",
@@ -2091,9 +2430,15 @@ describe("LiveControlPage", () => {
 
       // Once the room takes a line of that round, the badge moves.
       publishPosition.mockResolvedValue({ ok: true });
-      await user.click(screen.getByRole("button", { name: "Next →" }));
+      await user.click(
+        screen.getByRole("button", {
+          name: "studio.live_control.controls.next →",
+        }),
+      );
       expect(
-        await screen.findByRole("button", { name: `${label}, round 2` }),
+        await screen.findByRole("button", {
+          name: `studio.live_control.return.aria label=${label} round=2`,
+        }),
       ).toBeInTheDocument();
       expect(publishPosition).toHaveBeenLastCalledWith(
         "e1",
@@ -2129,30 +2474,42 @@ describe("LiveControlPage", () => {
               },
       );
       renderPage();
-      const first = "↺ Return to start · 1st Praises to the 21 Tārās";
-      const last = "↺ Return to start · 2nd Praises to the 21 Tārās";
+      const first = "studio.live_control.return_jumps.praises_1";
+      const last = "studio.live_control.return_jumps.praises_2";
 
       await user.click(
-        await screen.findByRole("button", { name: `${first}, round 1` }),
+        await screen.findByRole("button", {
+          name: `studio.live_control.return.aria label=${first} round=1`,
+        }),
       );
       await user.click(
-        await screen.findByRole("button", { name: `${first}, round 2` }),
+        await screen.findByRole("button", {
+          name: `studio.live_control.return.aria label=${first} round=2`,
+        }),
       );
       expect(
-        await screen.findByRole("button", { name: `${first}, round 3` }),
+        await screen.findByRole("button", {
+          name: `studio.live_control.return.aria label=${first} round=3`,
+        }),
       ).toBeInTheDocument();
       publishPosition.mockClear();
 
       await user.click(
-        screen.getByRole("button", { name: `${last}, round 1` }),
+        screen.getByRole("button", {
+          name: `studio.live_control.return.aria label=${last} round=1`,
+        }),
       );
 
       expect(
-        await screen.findByRole("button", { name: `${first}, round 1` }),
+        await screen.findByRole("button", {
+          name: `studio.live_control.return.aria label=${first} round=1`,
+        }),
       ).toBeInTheDocument();
       // Not a round of its own passage: the puja starts over.
       expect(
-        screen.getByRole("button", { name: `${last}, round 1` }),
+        screen.getByRole("button", {
+          name: `studio.live_control.return.aria label=${last} round=1`,
+        }),
       ).toBeInTheDocument();
       expect(
         JSON.parse(
@@ -2197,20 +2554,28 @@ describe("LiveControlPage", () => {
               },
       );
       renderPage();
-      const label = "↺ Return to start · 1st Praises to the 21 Tārās";
+      const label = "studio.live_control.return_jumps.praises_1";
 
       // Nothing pressed yet: the first round, and nothing to reset.
       await user.click(
-        await screen.findByRole("button", { name: `${label}, round 1` }),
+        await screen.findByRole("button", {
+          name: `studio.live_control.return.aria label=${label} round=1`,
+        }),
       );
       expect(
-        screen.getByRole("button", { name: `${label}, round 2` }),
+        screen.getByRole("button", {
+          name: `studio.live_control.return.aria label=${label} round=2`,
+        }),
       ).toBeInTheDocument();
       await user.click(
-        screen.getByRole("button", { name: `${label}, round 2` }),
+        screen.getByRole("button", {
+          name: `studio.live_control.return.aria label=${label} round=2`,
+        }),
       );
       expect(
-        screen.getByRole("button", { name: `${label}, round 3` }),
+        screen.getByRole("button", {
+          name: `studio.live_control.return.aria label=${label} round=3`,
+        }),
       ).toBeInTheDocument();
       expect(
         JSON.parse(
@@ -2219,13 +2584,19 @@ describe("LiveControlPage", () => {
       ).toEqual({ "1-85": 3 });
 
       await user.click(
-        screen.getByRole("button", { name: `Reset count: ${label}` }),
+        screen.getByRole("button", {
+          name: `studio.live_control.return.reset_aria label=${label}`,
+        }),
       );
       expect(
-        screen.getByRole("button", { name: `${label}, round 1` }),
+        screen.getByRole("button", {
+          name: `studio.live_control.return.aria label=${label} round=1`,
+        }),
       ).toBeInTheDocument();
       expect(
-        screen.queryByRole("button", { name: `Reset count: ${label}` }),
+        screen.queryByRole("button", {
+          name: `studio.live_control.return.reset_aria label=${label}`,
+        }),
       ).not.toBeInTheDocument();
       expect(
         JSON.parse(
@@ -2269,7 +2640,7 @@ describe("LiveControlPage", () => {
 
       expect(
         await screen.findByRole("button", {
-          name: "↺ Return to start · 1st Praises to the 21 Tārās, round 4",
+          name: "studio.live_control.return.aria label=studio.live_control.return_jumps.praises_1 round=4",
         }),
       ).toBeInTheDocument();
     });
@@ -2298,14 +2669,18 @@ describe("LiveControlPage", () => {
               },
       );
       renderPage();
-      const label = "↺ Return to start · 1st Praises to the 21 Tārās";
+      const label = "studio.live_control.return_jumps.praises_1";
 
       await user.click(
-        await screen.findByRole("button", { name: `${label}, round 1` }),
+        await screen.findByRole("button", {
+          name: `studio.live_control.return.aria label=${label} round=1`,
+        }),
       );
 
       expect(
-        screen.getByRole("button", { name: `${label}, round 1` }),
+        screen.getByRole("button", {
+          name: `studio.live_control.return.aria label=${label} round=1`,
+        }),
       ).toBeInTheDocument();
       expect(localStorage.getItem("live-control-return-counts:e1")).toBeNull();
     });
@@ -2335,7 +2710,7 @@ describe("LiveControlPage", () => {
               },
       );
       renderPage();
-      return "↺ Return to start · 1st Praises to the 21 Tārās";
+      return "studio.live_control.return_jumps.praises_1";
     };
 
     /** Holds the room's answer to round `round` of the praise until released. */
@@ -2357,7 +2732,9 @@ describe("LiveControlPage", () => {
       const label = await openPraise();
 
       await user.click(
-        await screen.findByRole("button", { name: `${label}, round 1` }),
+        await screen.findByRole("button", {
+          name: `studio.live_control.return.aria label=${label} round=1`,
+        }),
       );
       await waitFor(() =>
         expect(publishPosition).toHaveBeenCalledWith(
@@ -2369,7 +2746,9 @@ describe("LiveControlPage", () => {
       );
       // Still on its way: the next return is the round after it.
       await user.click(
-        screen.getByRole("button", { name: `${label}, round 1` }),
+        screen.getByRole("button", {
+          name: `studio.live_control.return.aria label=${label} round=1`,
+        }),
       );
       await release();
 
@@ -2388,7 +2767,9 @@ describe("LiveControlPage", () => {
         ),
       );
       expect(
-        await screen.findByRole("button", { name: `${label}, round 3` }),
+        await screen.findByRole("button", {
+          name: `studio.live_control.return.aria label=${label} round=3`,
+        }),
       ).toBeInTheDocument();
     });
 
@@ -2402,7 +2783,9 @@ describe("LiveControlPage", () => {
       const label = await openPraise();
 
       await user.click(
-        await screen.findByRole("button", { name: `${label}, round 2` }),
+        await screen.findByRole("button", {
+          name: `studio.live_control.return.aria label=${label} round=2`,
+        }),
       );
       await waitFor(() =>
         expect(publishPosition).toHaveBeenCalledWith(
@@ -2413,16 +2796,24 @@ describe("LiveControlPage", () => {
         ),
       );
       await user.click(
-        screen.getByRole("button", { name: `Reset count: ${label}` }),
+        screen.getByRole("button", {
+          name: `studio.live_control.return.reset_aria label=${label}`,
+        }),
       );
       // The room takes the return only now, after the reset.
       await release();
       await waitFor(() =>
-        expect(screen.getByText(/sent line 1/)).toBeInTheDocument(),
+        expect(
+          screen.getByText(
+            /controls\.sent detail=studio\.live_control\.publisher\.last_sent line=1 /,
+          ),
+        ).toBeInTheDocument(),
       );
 
       expect(
-        screen.getByRole("button", { name: `${label}, round 1` }),
+        screen.getByRole("button", {
+          name: `studio.live_control.return.aria label=${label} round=1`,
+        }),
       ).toBeInTheDocument();
       expect(
         JSON.parse(
@@ -2450,16 +2841,63 @@ describe("LiveControlPage", () => {
       );
       scrollIntoView.mockClear();
 
-      await user.click(screen.getByRole("button", { name: "Show titles" }));
+      await user.click(controlButton("studio.live_control.show_titles"));
 
       expect(scrollIntoView).toHaveBeenCalled();
+    });
+
+    it("opens the titles as a popup from the title, and closes it on a pick", async () => {
+      const user = userEvent.setup();
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      fetchEditionSections.mockResolvedValue(outline);
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+      await user.click(
+        await screen.findByRole("button", {
+          name: "studio.live_control.toc.open",
+        }),
+      );
+      const popup = screen.getByRole("dialog", {
+        name: "studio.live_control.toc.title",
+      });
+      await user.click(within(popup).getByRole("button", { name: "Praises" }));
+
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+      );
+      expect(screen.getByText(/line_of line=3 total=3/)).toBeInTheDocument();
+    });
+
+    it("closes the titles popup without a pick", async () => {
+      const user = userEvent.setup();
+      fetchEditionSections.mockResolvedValue(outline);
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+
+      await user.click(
+        await screen.findByRole("button", {
+          name: "studio.live_control.toc.open",
+        }),
+      );
+      await user.click(
+        within(screen.getByRole("dialog")).getByRole("button", {
+          name: "studio.common.close",
+        }),
+      );
+
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+      );
     });
 
     it("draws no section list for an edition with no outline", async () => {
       renderPage();
 
       expect(await screen.findByText("root line 1")).toBeInTheDocument();
-      expect(screen.queryByText("Sections")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("studio.live_control.sections"),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -2482,10 +2920,10 @@ describe("LiveControlPage", () => {
         screen.queryByRole("button", { name: "Find" }),
       ).not.toBeInTheDocument();
 
-      await user.click(screen.getByRole("button", { name: "Show titles" }));
+      await user.click(controlButton("studio.live_control.show_titles"));
       expect(titlesPanel()).toHaveAttribute("data-titles", "unfolded");
 
-      await user.click(screen.getByRole("button", { name: "Hide titles" }));
+      await user.click(controlButton("studio.live_control.hide_titles"));
       expect(titlesPanel()).toHaveAttribute("data-titles", "folded");
     });
 
@@ -2508,8 +2946,12 @@ describe("LiveControlPage", () => {
       renderPage();
 
       expect(await screen.findByText("root line 1")).toBeInTheDocument();
-      await user.click(screen.getByRole("button", { name: "Show titles" }));
-      await user.click(screen.getByRole("button", { name: "Open Refuge" }));
+      await user.click(controlButton("studio.live_control.show_titles"));
+      await user.click(
+        screen.getByRole("button", {
+          name: "studio.live_control.setup.open_aria title=Refuge",
+        }),
+      );
 
       expect(titlesPanel()).toHaveAttribute("data-titles", "unfolded");
     });
@@ -2518,9 +2960,11 @@ describe("LiveControlPage", () => {
       const user = userEvent.setup();
       renderPage();
       expect(await screen.findByText("root line 1")).toBeInTheDocument();
-      await user.click(screen.getByRole("button", { name: "Show titles" }));
+      await user.click(controlButton("studio.live_control.show_titles"));
 
-      const divider = screen.getByRole("separator", { name: "Resize titles" });
+      const divider = screen.getByRole("separator", {
+        name: "studio.live_control.resize_titles",
+      });
       expect(divider).toHaveAttribute("aria-valuenow", "35");
       // The area the divider splits: 1000px tall, from the top of the screen.
       const area = divider.parentElement as HTMLElement;
@@ -2573,9 +3017,11 @@ describe("LiveControlPage", () => {
       });
       renderPage();
       expect(await screen.findByText("root line 1")).toBeInTheDocument();
-      await user.click(screen.getByRole("button", { name: "Show titles" }));
+      await user.click(controlButton("studio.live_control.show_titles"));
 
-      const divider = screen.getByRole("separator", { name: "Resize titles" });
+      const divider = screen.getByRole("separator", {
+        name: "studio.live_control.resize_titles",
+      });
       const area = divider.parentElement as HTMLElement;
       area.getBoundingClientRect = () => ({ top: 0, height: 1000 }) as DOMRect;
 
@@ -2626,9 +3072,11 @@ describe("LiveControlPage", () => {
       localStorage.setItem("recitation_emit_token", "tok-123");
       renderPage();
       expect(await screen.findByText("root line 1")).toBeInTheDocument();
-      await user.click(screen.getByRole("button", { name: "Show titles" }));
+      await user.click(controlButton("studio.live_control.show_titles"));
 
-      const divider = screen.getByRole("separator", { name: "Resize titles" });
+      const divider = screen.getByRole("separator", {
+        name: "studio.live_control.resize_titles",
+      });
       divider.focus();
       await user.keyboard("{ArrowDown}");
 
@@ -2641,10 +3089,12 @@ describe("LiveControlPage", () => {
       localStorage.setItem("live-control-titles-share", "0.6");
       renderPage();
       expect(await screen.findByText("root line 1")).toBeInTheDocument();
-      await user.click(screen.getByRole("button", { name: "Show titles" }));
+      await user.click(controlButton("studio.live_control.show_titles"));
 
       expect(
-        screen.getByRole("separator", { name: "Resize titles" }),
+        screen.getByRole("separator", {
+          name: "studio.live_control.resize_titles",
+        }),
       ).toHaveAttribute("aria-valuenow", "60");
     });
 
@@ -2660,7 +3110,9 @@ describe("LiveControlPage", () => {
       );
       expect(setupPanel()).toHaveAttribute("data-setup", "unfolded");
       expect(
-        screen.queryByRole("button", { name: /^(Hide )?setup$/i }),
+        screen.queryByRole("button", {
+          name: /^studio.live_control.setup\.(hide|show)$/,
+        }),
       ).toHaveClass("hidden");
 
       await openTextByName(user, "Praise");
@@ -2679,21 +3131,27 @@ describe("LiveControlPage", () => {
 
       expect(setupPanel()).toHaveAttribute("data-setup", "folded");
 
-      await user.click(screen.getByRole("button", { name: "Setup" }));
+      await user.click(
+        screen.getByRole("button", { name: "studio.live_control.setup.show" }),
+      );
       expect(setupPanel()).toHaveAttribute("data-setup", "unfolded");
       expect(
-        screen.getByRole("button", { name: "Hide setup" }),
+        screen.getByRole("button", { name: "studio.live_control.setup.hide" }),
       ).toBeInTheDocument();
 
       // Folded or open, the editions are in the page: the fold is height on a
       // phone, never a second way to reach them.
-      await user.click(screen.getByRole("button", { name: "Hide setup" }));
+      await user.click(
+        screen.getByRole("button", { name: "studio.live_control.setup.hide" }),
+      );
       expect(setupPanel()).toHaveAttribute("data-setup", "folded");
       await user.click(
-        screen.getByRole("checkbox", { name: "Follow Praise (en)" }),
+        screen.getByRole("checkbox", {
+          name: "studio.live_control.editions.follow_aria title=Praise (en)",
+        }),
       );
       expect(
-        await screen.findByText(/1 more edition following/),
+        await screen.findByText(/following_one count=1/),
       ).toBeInTheDocument();
     });
   });
@@ -2703,7 +3161,7 @@ describe("LiveControlPage", () => {
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
     const link = screen.getByRole("link", {
-      name: /Test autoplay without the room/,
+      name: /setup\.test_autoplay/,
     });
     expect(link).toHaveAttribute("href", "/live/e1/autoplay-test?text=root");
     expect(link).toHaveAttribute("target", "_blank");
@@ -2714,7 +3172,7 @@ describe("LiveControlPage", () => {
     );
     expect(await screen.findByText("root-en line 1")).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /Test autoplay without the room/ }),
+      screen.getByRole("link", { name: /setup\.test_autoplay/ }),
     ).toHaveAttribute("href", "/live/e1/autoplay-test?text=root-en");
   });
 
@@ -2748,8 +3206,10 @@ describe("LiveControlPage", () => {
     });
 
     const times = { "root-s1": 1200, "root-s2": 900, "root-s3": 700 };
-    const autoButton = () => screen.getByRole("button", { name: "▶ Auto" });
-    const pauseButton = () => screen.getByRole("button", { name: "❚❚ Pause" });
+    const autoButton = () =>
+      controlButton("▶ studio.live_control.controls.auto");
+    const pauseButton = () =>
+      controlButton("❚❚ studio.live_control.controls.pause");
     /** The plan the backend was handed, `nth` start of this test. */
     const planSent = (nth = 0) => startAutoplay.mock.calls[nth][2];
 
@@ -2777,7 +3237,7 @@ describe("LiveControlPage", () => {
       localStorage.setItem("recitation_emit_token", "tok-123");
       renderPage();
       expect(await screen.findByText("root line 1")).toBeInTheDocument();
-      await screen.findByText(/2 more editions following/);
+      await screen.findByText(/following_other count=2/);
       await waitFor(() => expect(autoButton()).toBeEnabled());
 
       await user.click(autoButton());
@@ -2795,12 +3255,18 @@ describe("LiveControlPage", () => {
       const user = await openForAutoplay();
       await user.click(autoButton());
       await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
-      expect(await screen.findByText(/line 1\/3/)).toBeInTheDocument();
+      expect(
+        await screen.findByText(/line_of line=1 total=3/),
+      ).toBeInTheDocument();
 
       hearAutoplay({ planId: "plan-1", step: 1 });
-      expect(await screen.findByText(/line 2\/3/)).toBeInTheDocument();
+      expect(
+        await screen.findByText(/line_of line=2 total=3/),
+      ).toBeInTheDocument();
       hearAutoplay({ planId: "plan-1", step: 2 });
-      expect(await screen.findByText(/line 3\/3/)).toBeInTheDocument();
+      expect(
+        await screen.findByText(/line_of line=3 total=3/),
+      ).toBeInTheDocument();
 
       hearAutoplay({
         planId: "plan-1",
@@ -2809,9 +3275,11 @@ describe("LiveControlPage", () => {
         reason: "finished",
       });
       expect(
-        await screen.findByRole("button", { name: "▶ Auto" }),
+        await waitFor(() =>
+          controlButton("▶ studio.live_control.controls.auto"),
+        ),
       ).toBeEnabled();
-      expect(screen.queryByText(/Autoplay stopped/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/autoplay\.stopped/)).not.toBeInTheDocument();
     });
 
     it("ignores word of a plan it did not hand over", async () => {
@@ -2822,7 +3290,7 @@ describe("LiveControlPage", () => {
 
       hearAutoplay({ planId: "someone-elses", step: 2 });
 
-      expect(screen.getByText(/line 1\/3/)).toBeInTheDocument();
+      expect(screen.getByText(/line_of line=1 total=3/)).toBeInTheDocument();
     });
 
     it("does not step back when the start's answer arrives after the next step", async () => {
@@ -2848,10 +3316,12 @@ describe("LiveControlPage", () => {
         }),
       );
       hearAutoplay({ planId: "plan-1", step: 1 });
-      expect(await screen.findByText(/line 2\/3/)).toBeInTheDocument();
+      expect(
+        await screen.findByText(/line_of line=2 total=3/),
+      ).toBeInTheDocument();
       hearAutoplay({ planId: "plan-1", step: 0 });
 
-      expect(screen.getByText(/line 2\/3/)).toBeInTheDocument();
+      expect(screen.getByText(/line_of line=2 total=3/)).toBeInTheDocument();
     });
 
     it("stops where a line has no recorded time, and says why", async () => {
@@ -2874,7 +3344,7 @@ describe("LiveControlPage", () => {
       });
 
       expect(
-        await screen.findByText(/Autoplay stopped at line 2/),
+        await screen.findByText(/autoplay\.stopped_no_time line=2/),
       ).toBeInTheDocument();
       expect(autoButton()).toBeInTheDocument();
     });
@@ -2900,7 +3370,7 @@ describe("LiveControlPage", () => {
       await user.click(autoButton());
 
       expect(
-        await screen.findByText(/Autoplay cannot start at line 1/),
+        await screen.findByText(/autoplay\.cannot_start_no_time line=1/),
       ).toBeInTheDocument();
       expect(startAutoplay).not.toHaveBeenCalled();
       expect(autoButton()).toBeInTheDocument();
@@ -2919,7 +3389,7 @@ describe("LiveControlPage", () => {
       await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
       expect(planSent()).toHaveLength(3);
       expect(
-        screen.queryByText(/Autoplay cannot start/),
+        screen.queryByText(/autoplay\.cannot_start_no_time/),
       ).not.toBeInTheDocument();
     });
 
@@ -2937,7 +3407,7 @@ describe("LiveControlPage", () => {
       expect(autoButton()).toBeInTheDocument();
       // Late word of the plan just paused does not bring it back.
       hearAutoplay({ planId: "plan-1", step: 2 });
-      expect(screen.getByText(/line 1\/3/)).toBeInTheDocument();
+      expect(screen.getByText(/line_of line=1 total=3/)).toBeInTheDocument();
     });
 
     it("says so when a pause did not reach the backend, which is still moving the room", async () => {
@@ -2954,7 +3424,7 @@ describe("LiveControlPage", () => {
       await user.click(pauseButton());
 
       expect(
-        await screen.findByText(/Autoplay could not be paused/),
+        await screen.findByText(/autoplay\.could_not_pause/),
       ).toBeInTheDocument();
       // Still running on the server: Pause stays, to be pressed again.
       expect(pauseButton()).toBeInTheDocument();
@@ -2974,7 +3444,7 @@ describe("LiveControlPage", () => {
 
       expect(
         await screen.findByText(
-          /Autoplay could not start: The server could not run autoplay/,
+          /autoplay\.could_not_start message=The server could not run autoplay/,
         ),
       ).toBeInTheDocument();
       expect(autoButton()).toBeInTheDocument();
@@ -2989,7 +3459,7 @@ describe("LiveControlPage", () => {
       hearAutoplay({ planId: "plan-1", status: "stopped", reason: "failed" });
 
       expect(
-        await screen.findByText(/the server could not send a line/),
+        await screen.findByText(/autoplay\.stopped_failed/),
       ).toBeInTheDocument();
       expect(autoButton()).toBeInTheDocument();
     });
@@ -3014,7 +3484,7 @@ describe("LiveControlPage", () => {
       // and the backend - not this page - sends the line.
       expect(startAutoplay).toHaveBeenCalledTimes(1);
       expect(publishPosition).not.toHaveBeenCalled();
-      expect(screen.getByText(/line 3\/3/)).toBeInTheDocument();
+      expect(screen.getByText(/line_of line=3 total=3/)).toBeInTheDocument();
       expect(pauseButton()).toBeInTheDocument();
     });
 
@@ -3024,7 +3494,11 @@ describe("LiveControlPage", () => {
       await user.click(autoButton());
       await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
 
-      await user.click(screen.getByRole("button", { name: "Next →" }));
+      await user.click(
+        screen.getByRole("button", {
+          name: "studio.live_control.controls.next →",
+        }),
+      );
 
       await waitFor(() =>
         expect(sendAutoplayCommand).toHaveBeenCalledWith(
@@ -3033,7 +3507,7 @@ describe("LiveControlPage", () => {
           expect.objectContaining({ type: "seek", step: 1, expectedStep: 0 }),
         ),
       );
-      expect(screen.getByText(/line 2\/3/)).toBeInTheDocument();
+      expect(screen.getByText(/line_of line=2 total=3/)).toBeInTheDocument();
     });
 
     it("sends a step back mid-autoplay as the plan's step before", async () => {
@@ -3041,7 +3515,11 @@ describe("LiveControlPage", () => {
       const user = await openForAutoplay();
       await user.click(autoButton());
       await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
-      await user.click(screen.getByRole("button", { name: "Next →" }));
+      await user.click(
+        screen.getByRole("button", {
+          name: "studio.live_control.controls.next →",
+        }),
+      );
       await waitFor(() => expect(sendAutoplayCommand).toHaveBeenCalledTimes(1));
 
       await pressKey("ArrowLeft");
@@ -3053,7 +3531,7 @@ describe("LiveControlPage", () => {
           expect.objectContaining({ type: "seek", step: 0, expectedStep: 1 }),
         ),
       );
-      expect(screen.getByText(/line 1\/3/)).toBeInTheDocument();
+      expect(screen.getByText(/line_of line=1 total=3/)).toBeInTheDocument();
     });
 
     it("sends the seek over the socket while it is open", async () => {
@@ -3143,8 +3621,16 @@ describe("LiveControlPage", () => {
       });
       const user = await openForAutoplay();
       // Line 1 recited through: the move off it teaches the backend a time.
-      await user.click(screen.getByRole("button", { name: "Next →" }));
-      await user.click(screen.getByRole("button", { name: "Next →" }));
+      await user.click(
+        screen.getByRole("button", {
+          name: "studio.live_control.controls.next →",
+        }),
+      );
+      await user.click(
+        screen.getByRole("button", {
+          name: "studio.live_control.controls.next →",
+        }),
+      );
       await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(2));
       await act(async () => {});
       let answer: (read: Record<string, number>) => void = () => {};
@@ -3195,7 +3681,7 @@ describe("LiveControlPage", () => {
       await act(async () => {});
       expect(viaSocket).toHaveBeenCalledTimes(1);
       expect(startAutoplay).toHaveBeenCalledTimes(1);
-      expect(screen.getByText(/line 3\/3/)).toBeInTheDocument();
+      expect(screen.getByText(/line_of line=3 total=3/)).toBeInTheDocument();
     });
 
     it("does not send the room's own line again once the backend shows it went out", async () => {
@@ -3246,7 +3732,11 @@ describe("LiveControlPage", () => {
       await user.click(autoButton());
       await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
 
-      await user.click(await screen.findByRole("button", { name: "✋ Hold" }));
+      await user.click(
+        await waitFor(() =>
+          controlButton("✋ studio.live_control.controls.hold"),
+        ),
+      );
 
       await waitFor(() =>
         expect(sendAutoplayCommand).toHaveBeenCalledWith("e1", "tok-123", {
@@ -3254,9 +3744,10 @@ describe("LiveControlPage", () => {
           planId: "plan-1",
         }),
       );
-      const goOn = await screen.findByRole("button", { name: "▶ Go on" });
+      const goOn = await waitFor(() =>
+        controlButton("▶ studio.live_control.controls.go_on"),
+      );
       expect(goOn).toHaveAttribute("aria-pressed", "true");
-      expect(screen.getByText("Held")).toBeInTheDocument();
 
       await user.click(goOn);
 
@@ -3267,7 +3758,9 @@ describe("LiveControlPage", () => {
         }),
       );
       expect(
-        await screen.findByRole("button", { name: "✋ Hold" }),
+        await waitFor(() =>
+          controlButton("✋ studio.live_control.controls.hold"),
+        ),
       ).toBeInTheDocument();
     });
 
@@ -3276,7 +3769,9 @@ describe("LiveControlPage", () => {
       const user = await openForAutoplay();
       await user.click(autoButton());
       await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
-      await screen.findByRole("button", { name: "✋ Hold" });
+      await waitFor(() =>
+        controlButton("✋ studio.live_control.controls.hold"),
+      );
       // Shortcuts are the liturgy's, not a focused button's.
       (document.activeElement as HTMLElement | null)?.blur();
 
@@ -3294,7 +3789,7 @@ describe("LiveControlPage", () => {
     it("offers no Hold while autoplay is not running", async () => {
       await openForAutoplay();
       expect(
-        screen.queryByRole("button", { name: "✋ Hold" }),
+        queryControlButton("✋ studio.live_control.controls.hold"),
       ).not.toBeInTheDocument();
     });
 
@@ -3303,22 +3798,30 @@ describe("LiveControlPage", () => {
         autoplayState({ status: "stopped", leadMs: 300, tempo: 0.8 }),
       );
       const user = await openForAutoplay();
-      await user.click(screen.getByRole("button", { name: "Cue" }));
+      await user.click(controlButton("studio.live_control.cue.button"));
 
       const lead = await screen.findByRole("spinbutton", {
-        name: /Phone lead/,
+        name: /settings\.phone_lead/,
       });
       await waitFor(() => expect(lead).toHaveValue(0.3));
-      expect(screen.getByText("25% faster")).toBeInTheDocument();
+      expect(
+        screen.getByText("studio.live_control.settings.pace_faster percent=25"),
+      ).toBeInTheDocument();
 
-      await user.click(screen.getByRole("button", { name: "Reset" }));
+      await user.click(
+        screen.getByRole("button", { name: "studio.common.reset" }),
+      );
       await waitFor(() =>
         expect(sendAutoplayCommand).toHaveBeenCalledWith("e1", "tok-123", {
           type: "settings",
           tempo: 1,
         }),
       );
-      expect(await screen.findByText("as recorded")).toBeInTheDocument();
+      expect(
+        await screen.findByText(
+          "studio.live_control.settings.pace_as_recorded",
+        ),
+      ).toBeInTheDocument();
 
       await user.clear(lead);
       await user.type(lead, "0.45{Enter}");
@@ -3351,7 +3854,9 @@ describe("LiveControlPage", () => {
       await user.click(screen.getByRole("button", { name: /root line 3/ }));
 
       // The second plan waits: it must not pass the first on the way.
-      expect(await screen.findByText(/line 3\/3/)).toBeInTheDocument();
+      expect(
+        await screen.findByText(/line_of line=3 total=3/),
+      ).toBeInTheDocument();
       expect(startAutoplay).toHaveBeenCalledTimes(1);
 
       await act(async () =>
@@ -3364,9 +3869,9 @@ describe("LiveControlPage", () => {
       expect(startAutoplay.mock.calls[1][4]).toBe("plan-1");
 
       // The first plan's word does not move the page off the plan it follows.
-      expect(screen.getByText(/line 3\/3/)).toBeInTheDocument();
+      expect(screen.getByText(/line_of line=3 total=3/)).toBeInTheDocument();
       hearAutoplay({ planId: "plan-1", step: 1 });
-      expect(screen.getByText(/line 3\/3/)).toBeInTheDocument();
+      expect(screen.getByText(/line_of line=3 total=3/)).toBeInTheDocument();
     });
 
     it("keeps Pause until a stop sent before the start answers is confirmed", async () => {
@@ -3400,69 +3905,26 @@ describe("LiveControlPage", () => {
       );
 
       expect(
-        await screen.findByText(/Autoplay could not be paused/),
+        await screen.findByText(/autoplay\.could_not_pause/),
       ).toBeInTheDocument();
       expect(pauseButton()).toBeInTheDocument();
       // The late start is remembered, and its later word does not resume it.
       hearAutoplay({ planId: "plan-1", step: 2 });
-      expect(screen.getByText(/line 1\/3/)).toBeInTheDocument();
+      expect(screen.getByText(/line_of line=1 total=3/)).toBeInTheDocument();
     });
 
-    it("runs a time bar under the live line for the backend's hold", async () => {
+    it("runs no time bar under the live line, by hand or under autoplay", async () => {
       fetchSegmentPlayTimes.mockResolvedValue({
         "root-s1": 60_000,
         "root-s2": 60_000,
       });
       const user = await openForAutoplay();
-      expect(
-        screen.queryByRole("progressbar", { name: /Autoplay/ }),
-      ).not.toBeInTheDocument();
+      await user.click(screen.getByText("root line 1"));
+      expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
 
       await user.click(autoButton());
-
-      const bar = await screen.findByRole("progressbar", { name: /Autoplay/ });
-      expect(bar).toHaveAttribute("aria-valuemax", "60000");
-      expect(
-        screen.getByText("root line 1").closest("[data-line]"),
-      ).toContainElement(bar);
-      expect(bar.parentElement?.textContent).toMatch(/ \/ 1:00$/);
-
-      await user.click(pauseButton());
-      await waitFor(() =>
-        expect(
-          screen.queryByRole("progressbar", { name: /Autoplay/ }),
-        ).not.toBeInTheDocument(),
-      );
-    });
-
-    it("runs a time bar by hand too, its end coloured by the offsets set from the page", async () => {
-      fetchSegmentPlayTimes.mockResolvedValue({ "root-s1": 60_000 });
-      const user = await openForAutoplay();
-      await user.click(screen.getByText("root line 1"));
-
-      const bar = await screen.findByRole("progressbar", {
-        name: /Line time/,
-      });
-      expect(
-        screen.getByText("root line 1").closest("[data-line]"),
-      ).toContainElement(bar);
-      const zone = (kind: string) =>
-        bar.querySelector<HTMLElement>(`[data-cue-zone="${kind}"]`)?.style
-          .width;
-      // 1500 ms and 1000 ms of a minute.
-      expect(zone("next")).toBe("2.5%");
-      expect(zone("autoplay")).toMatch(/^1\.66/);
-      // Not yet near the end, so no cue.
-      expect(bar.parentElement).not.toHaveAttribute("data-cued");
-
-      await user.click(screen.getByRole("button", { name: "Cue" }));
-      const next = screen.getByRole("spinbutton", { name: /Next click/ });
-      await user.clear(next);
-      await user.type(next, "6");
-      expect(zone("next")).toBe("10%");
-      expect(
-        JSON.parse(localStorage.getItem("live-control-cue") ?? "{}"),
-      ).toMatchObject({ nextClickOffsetMs: 6000 });
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+      expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
     });
 
     it("shows autoplay running on the server that it did not start, and can pause it", async () => {
@@ -3471,7 +3933,10 @@ describe("LiveControlPage", () => {
       );
       const user = await openForAutoplay();
 
-      expect(await screen.findByText(/autoplay running/)).toBeInTheDocument();
+      openControls();
+      expect(
+        await screen.findByText(/room\.autoplay_running/),
+      ).toBeInTheDocument();
       await user.click(pauseButton());
 
       await waitFor(() =>
@@ -3489,7 +3954,9 @@ describe("LiveControlPage", () => {
       );
 
       expect(
-        await screen.findByText(/line 2\/3/, undefined, { timeout: 3000 }),
+        await screen.findByText(/line_of line=2 total=3/, undefined, {
+          timeout: 3000,
+        }),
       ).toBeInTheDocument();
     });
 
@@ -3530,9 +3997,9 @@ describe("LiveControlPage", () => {
       });
       await openForAutoplay();
 
-      const room = document.querySelector("[data-room]");
-      expect(room).toHaveTextContent(/line 2 · root line 2/);
-      expect(room).toHaveTextContent(/12 following/);
+      const room = roomStatus();
+      expect(room).toHaveTextContent(/room\.line line=2 · root line 2/);
+      expect(room).toHaveTextContent(/people_following count=12/);
       // Not the line on screen, so it is marked where it sits.
       expect(
         screen.getByText("root line 2").closest("[data-line]"),
@@ -3556,8 +4023,8 @@ describe("LiveControlPage", () => {
       expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
       await waitFor(() =>
-        expect(document.querySelector("[data-room]")).toHaveTextContent(
-          /line 3 · root line 3/,
+        expect(roomStatus()).toHaveTextContent(
+          /room\.line line=3 · root line 3/,
         ),
       );
     });
@@ -3578,15 +4045,22 @@ describe("LiveControlPage", () => {
       const roomLine = () =>
         screen.getByText("root line 2").closest("[data-line]");
       expect(roomLine()).toHaveAttribute("data-room-here");
+      // The room's line is badged Live, and only that one.
+      expect(roomLine()?.querySelector("[data-live-badge]")).not.toBeNull();
+      expect(document.querySelectorAll("[data-live-badge]")).toHaveLength(1);
 
-      await user.click(screen.getByRole("button", { name: "Live" }));
+      await user.click(controlButton("studio.live_control.controls.live"));
 
-      expect(screen.getByText(/line 2\/3/)).toBeInTheDocument();
+      expect(screen.getByText(/line_of line=2 total=3/)).toBeInTheDocument();
       expect(roomLine()).not.toHaveAttribute("data-room-here");
       expect(publishPosition).not.toHaveBeenCalled();
 
       // Next goes on from the room's line, not from where the screen was.
-      await user.click(screen.getByRole("button", { name: "Next →" }));
+      await user.click(
+        screen.getByRole("button", {
+          name: "studio.live_control.controls.next →",
+        }),
+      );
       await waitFor(() =>
         expect(publishPosition).toHaveBeenLastCalledWith(
           "e1",
@@ -3600,7 +4074,7 @@ describe("LiveControlPage", () => {
     it("leaves Live off until the room's line is known", async () => {
       await openForAutoplay();
 
-      expect(screen.getByRole("button", { name: "Live" })).toBeDisabled();
+      expect(controlButton("studio.live_control.controls.live")).toBeDisabled();
     });
 
     it("says why when the server turns the controller's socket away", async () => {
@@ -3610,21 +4084,19 @@ describe("LiveControlPage", () => {
       });
       await openForAutoplay();
 
-      expect(document.querySelector("[data-room]")).toHaveTextContent(
-        /turned the controller away \(Invalid or no token found\) · moves go by HTTP/,
+      expect(roomStatus()).toHaveTextContent(
+        /room\.refused reason=Invalid or no token found/,
       );
     });
 
     it("says moves go by HTTP while the socket is down", async () => {
       await openForAutoplay();
 
-      expect(document.querySelector("[data-room]")).toHaveTextContent(
-        /Room offline · moves go by HTTP/,
-      );
+      expect(roomStatus()).toHaveTextContent(/room\.offline/);
     });
 
     describe("planned rounds", () => {
-      const label = "↺ Return to start · 1st Praises to the 21 Tārās";
+      const label = "studio.live_control.return_jumps.praises_1";
       /** A praise of two lines, whose ending carries a Return. */
       const openPraiseForAutoplay = async () => {
         const user = userEvent.setup();
@@ -3661,14 +4133,52 @@ describe("LiveControlPage", () => {
         return user;
       };
       const planOf = () =>
-        screen.getByRole("group", { name: `Autoplay rounds: ${label}` });
+        screen.getByRole("group", {
+          name: `studio.live_control.return_plan.aria label=${label}`,
+        });
+
+      /** Rounds planned before the page opens, as a reload mid-puja finds them. */
+      const savePlannedRounds = (rounds: number) =>
+        localStorage.setItem(
+          "live-control-planned-rounds:e1",
+          JSON.stringify({ "1-85": rounds }),
+        );
+      const startAuto = async (
+        user: ReturnType<typeof userEvent.setup>,
+        times = 1,
+      ) => {
+        await user.click(controlButton("▶ studio.live_control.controls.auto"));
+        await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(times));
+      };
+      const queryPlan = () =>
+        screen.queryByRole("group", {
+          name: `studio.live_control.return_plan.aria label=${label}`,
+        });
+
+      it("offers the rounds only while autoplay runs", async () => {
+        const user = await openPraiseForAutoplay();
+        expect(queryPlan()).not.toBeInTheDocument();
+
+        await startAuto(user);
+        expect(planOf()).toBeInTheDocument();
+
+        await user.click(
+          controlButton("❚❚ studio.live_control.controls.pause"),
+        );
+        await waitFor(() => expect(queryPlan()).not.toBeInTheDocument());
+      });
 
       it("sets the rounds from 1, without taking the return", async () => {
         const user = await openPraiseForAutoplay();
+        await startAuto(user);
         const more = () =>
-          within(planOf()).getByRole("button", { name: "One round more" });
+          within(planOf()).getByRole("button", {
+            name: "studio.live_control.return_plan.more",
+          });
         const fewer = () =>
-          within(planOf()).getByRole("button", { name: "One round fewer" });
+          within(planOf()).getByRole("button", {
+            name: "studio.live_control.return_plan.fewer",
+          });
 
         // Counted as the Return's badge counts: once through is round 1.
         expect(
@@ -3684,12 +4194,14 @@ describe("LiveControlPage", () => {
           planOf().querySelector("[data-planned-rounds]"),
         ).toHaveTextContent("3");
         expect(planOf().querySelector("[data-returns-left]")).toHaveTextContent(
-          "2 returns left",
+          "studio.live_control.return_plan.returns_left_other count=2",
         );
         // Nothing went to the room, and the round did not move.
         expect(publishPosition).not.toHaveBeenCalled();
         expect(
-          screen.getByRole("button", { name: `${label}, round 1` }),
+          screen.getByRole("button", {
+            name: `studio.live_control.return.aria label=${label} round=1`,
+          }),
         ).toBeInTheDocument();
         // Kept for a reload mid-puja.
         expect(
@@ -3712,13 +4224,14 @@ describe("LiveControlPage", () => {
           "live-control-planned-returns:e1",
           JSON.stringify({ "1-85": 2 }),
         );
-        await openPraiseForAutoplay();
+        const user = await openPraiseForAutoplay();
+        await startAuto(user);
 
         expect(
           planOf().querySelector("[data-planned-rounds]"),
         ).toHaveTextContent("3");
         expect(planOf().querySelector("[data-returns-left]")).toHaveTextContent(
-          "2 returns left",
+          "studio.live_control.return_plan.returns_left_other count=2",
         );
         expect(
           JSON.parse(
@@ -3731,18 +4244,12 @@ describe("LiveControlPage", () => {
       });
 
       it("lays every planned round out in the plan, the Return taken each time", async () => {
+        savePlannedRounds(3);
         const user = await openPraiseForAutoplay();
-        await user.click(
-          within(planOf()).getByRole("button", { name: "One round more" }),
-        );
-        await user.click(
-          within(planOf()).getByRole("button", { name: "One round more" }),
-        );
 
-        await user.click(screen.getByRole("button", { name: "▶ Auto" }));
+        await startAuto(user);
 
         // Three rounds of the praise, then the end of the text.
-        await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
         expect(
           startAutoplay.mock.calls[0][2].map((step) => [
             step.positions[0].segmentId,
@@ -3759,32 +4266,32 @@ describe("LiveControlPage", () => {
       });
 
       it("moves the round badge as the backend takes the room into each round", async () => {
+        savePlannedRounds(2);
         const user = await openPraiseForAutoplay();
-        await user.click(
-          within(planOf()).getByRole("button", { name: "One round more" }),
-        );
-        await user.click(screen.getByRole("button", { name: "▶ Auto" }));
-        await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+        await startAuto(user);
 
         // Step 2 is the praise's start again, in round 2.
         hearAutoplay({ planId: "plan-1", step: 2, totalSteps: 4 });
 
         expect(
-          await screen.findByRole("button", { name: `${label}, round 2` }),
+          await screen.findByRole("button", {
+            name: `studio.live_control.return.aria label=${label} round=2`,
+          }),
         ).toBeInTheDocument();
         expect(planOf().querySelector("[data-returns-left]")).toHaveTextContent(
-          "done",
+          "studio.live_control.return_plan.done",
         );
       });
 
       it("rebuilds the plan when the rounds change mid-line, without sending the line again", async () => {
         const user = await openPraiseForAutoplay();
-        await user.click(screen.getByRole("button", { name: "▶ Auto" }));
-        await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+        await startAuto(user);
         expect(startAutoplay.mock.calls[0][2]).toHaveLength(2);
 
         await user.click(
-          within(planOf()).getByRole("button", { name: "One round more" }),
+          within(planOf()).getByRole("button", {
+            name: "studio.live_control.return_plan.more",
+          }),
         );
 
         await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(2));
@@ -3798,29 +4305,38 @@ describe("LiveControlPage", () => {
       });
 
       it("counts rounds begun by hand toward the plan", async () => {
+        savePlannedRounds(2);
         const user = await openPraiseForAutoplay();
         await user.click(
-          within(planOf()).getByRole("button", { name: "One round more" }),
-        );
-        await user.click(
-          await screen.findByRole("button", { name: `${label}, round 1` }),
+          await screen.findByRole("button", {
+            name: `studio.live_control.return.aria label=${label} round=1`,
+          }),
         );
 
         expect(
-          await screen.findByRole("button", { name: `${label}, round 2` }),
+          await screen.findByRole("button", {
+            name: `studio.live_control.return.aria label=${label} round=2`,
+          }),
         ).toBeInTheDocument();
+        await startAuto(user);
         expect(planOf().querySelector("[data-returns-left]")).toHaveTextContent(
-          "done",
+          "studio.live_control.return_plan.done",
         );
       });
       it("tells the backend a Return from the passage end follows on from it", async () => {
         const user = await openPraiseForAutoplay();
         await user.click(screen.getByRole("button", { name: /homage/ }));
-        await user.click(screen.getByRole("button", { name: "Next →" }));
+        await user.click(
+          screen.getByRole("button", {
+            name: "studio.live_control.controls.next →",
+          }),
+        );
         await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(2));
 
         await user.click(
-          screen.getByRole("button", { name: `${label}, round 1` }),
+          screen.getByRole("button", {
+            name: `studio.live_control.return.aria label=${label} round=1`,
+          }),
         );
 
         // Back to line 1 in round 2, having recited line 2 through: line 2 is
@@ -3860,7 +4376,11 @@ describe("LiveControlPage", () => {
       await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(1));
 
       // Line 2 is instruction: Next lands on line 3, the next line recited.
-      await user.click(screen.getByRole("button", { name: "Next →" }));
+      await user.click(
+        screen.getByRole("button", {
+          name: "studio.live_control.controls.next →",
+        }),
+      );
       await waitFor(() =>
         expect(publishPosition).toHaveBeenLastCalledWith(
           "e1",
@@ -3893,13 +4413,21 @@ describe("LiveControlPage", () => {
       fetchSegmentPlayTimes.mockResolvedValue({ "root-s1": 3100 });
 
       // The first move onto the text carries no time, so teaches nothing.
-      await user.click(screen.getByRole("button", { name: "Next →" }));
+      await user.click(
+        screen.getByRole("button", {
+          name: "studio.live_control.controls.next →",
+        }),
+      );
       await waitFor(() => expect(publishPosition).toHaveBeenCalledTimes(1));
       await new Promise((resolve) => setTimeout(resolve, 1700));
       expect(fetchSegmentPlayTimes).not.toHaveBeenCalled();
 
       // The second reports how long line 1 was held: its new time shows.
-      await user.click(screen.getByRole("button", { name: "Next →" }));
+      await user.click(
+        screen.getByRole("button", {
+          name: "studio.live_control.controls.next →",
+        }),
+      );
       await waitFor(
         () =>
           expect(first?.querySelector("[data-play-time]")?.textContent).toBe(
@@ -3915,7 +4443,9 @@ describe("LiveControlPage", () => {
       renderPage();
       expect(await screen.findByText("root line 1")).toBeInTheDocument();
 
-      expect(screen.getByRole("button", { name: "▶ Auto" })).toBeDisabled();
+      expect(
+        controlButton("▶ studio.live_control.controls.auto"),
+      ).toBeDisabled();
       // The times are public, so they still load and show on the lines.
       await waitFor(() =>
         expect(fetchSegmentPlayTimes).toHaveBeenCalledWith("root"),

@@ -1,3 +1,4 @@
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { IoMdCreate, IoMdTrash } from "react-icons/io";
 import {
@@ -21,10 +22,11 @@ const AccumulatorPresetsTable = ({
   onEdit,
   onDelete,
 }: AccumulatorPresetsTableProps) => {
+  const { t } = useTranslate();
   if (isLoading) {
     return (
       <p className="text-sm text-muted-foreground py-8 text-center">
-        Loading presets...
+        {t("studio.accumulator_presets.loading")}
       </p>
     );
   }
@@ -34,13 +36,19 @@ const AccumulatorPresetsTable = ({
       <Pecha.Table>
         <Pecha.TableHeader>
           <Pecha.TableRow>
-            <Pecha.TableHead>Name</Pecha.TableHead>
-            <Pecha.TableHead>Mantra</Pecha.TableHead>
-            <Pecha.TableHead>Text</Pecha.TableHead>
-            <Pecha.TableHead className="w-28">Target</Pecha.TableHead>
+            <Pecha.TableHead>{t("studio.common.name")}</Pecha.TableHead>
+            <Pecha.TableHead>
+              {t("studio.accumulator_presets.table.mantra")}
+            </Pecha.TableHead>
+            <Pecha.TableHead>
+              {t("studio.accumulator_presets.table.text")}
+            </Pecha.TableHead>
+            <Pecha.TableHead className="w-28">
+              {t("studio.accumulator_presets.table.target")}
+            </Pecha.TableHead>
             {showActionsColumn ? (
               <Pecha.TableHead className="w-28 text-right">
-                Actions
+                {t("studio.common.actions")}
               </Pecha.TableHead>
             ) : null}
           </Pecha.TableRow>
@@ -89,7 +97,12 @@ const AccumulatorPresetsTable = ({
                       type="button"
                       onClick={() => onEdit(preset)}
                       className="p-2 rounded-md border hover:bg-muted/50 transition-colors"
-                      aria-label={`Edit ${presetDisplayName(preset)}`}
+                      aria-label={t(
+                        "studio.accumulator_presets.table.edit_aria",
+                        {
+                          name: presetDisplayName(preset),
+                        },
+                      )}
                     >
                       <IoMdCreate className="w-4 h-4" />
                     </button>
@@ -97,7 +110,12 @@ const AccumulatorPresetsTable = ({
                       type="button"
                       onClick={() => onDelete(preset)}
                       className="p-2 rounded-md border text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                      aria-label={`Delete ${presetDisplayName(preset)}`}
+                      aria-label={t(
+                        "studio.accumulator_presets.table.delete_aria",
+                        {
+                          name: presetDisplayName(preset),
+                        },
+                      )}
                     >
                       <IoMdTrash className="w-4 h-4" />
                     </button>

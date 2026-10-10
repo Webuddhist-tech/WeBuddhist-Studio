@@ -135,6 +135,12 @@ export function canManageAmbientSounds(role?: PlatformRole | string): boolean {
   return isSuperAdmin(role) || isContentAdmin(role);
 }
 
+/** Requests for texts missing from the library are answered by the people who
+ * add texts: Super Admins and Content Admins. Reviewers are not among them. */
+export function canManageTextRequests(role?: PlatformRole | string): boolean {
+  return isSuperAdmin(role) || isContentAdmin(role);
+}
+
 /** The app-wide content and configuration catalogues, none of them tied to a
  * space: staff see them, and so do Content Admins. */
 export function canAccessContentCatalogues(
@@ -153,6 +159,7 @@ export const CONTENT_ADMIN_NO_GROUP_PREFIXES = [
   "/accumulator-presets",
   "/prayer-intentions",
   "/ambient-sounds",
+  "/admin/text-requests",
 ] as const;
 
 export function isContentCataloguePath(pathname: string): boolean {

@@ -8,6 +8,7 @@ import {
   IoMdTrash,
 } from "react-icons/io";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Pagination } from "@/components/ui/molecules/pagination/Pagination";
 import { getApiErrorMessage } from "@/lib/apiErrors";
@@ -15,7 +16,6 @@ import type { GroupOutletContext } from "./GroupLayout";
 import { canWriteEvents } from "./lib/eventPermissions";
 import {
   AUDIO_ACCEPT,
-  FORMAT_HINT,
   TOOLTIP_CLASS,
   deleteGroupAsset,
   formatDuration,
@@ -32,6 +32,7 @@ import {
 } from "./hooks/useGroupAudioAssets";
 
 function AssetsEmptyState({ search }: { readonly search: string }) {
+  const { t } = useTranslate();
   return (
     <div className="flex flex-col items-center justify-center gap-1 text-center">
       <IoMdMusicalNote
@@ -39,12 +40,14 @@ function AssetsEmptyState({ search }: { readonly search: string }) {
         aria-hidden
       />
       <p className="text-sm font-medium">
-        {search ? "No matches" : "No audio yet"}
+        {search
+          ? t("studio.groups.pages.assets.no_matches")
+          : t("studio.groups.pages.assets.no_audio_yet")}
       </p>
       <p className="max-w-xs text-xs text-muted-foreground">
         {search
-          ? "Try a different title or file name."
-          : "Upload recordings here, then link them to chants from a collection."}
+          ? t("studio.groups.pages.assets.no_matches_hint")
+          : t("studio.groups.pages.assets.no_audio_yet_hint")}
       </p>
     </div>
   );
@@ -63,6 +66,7 @@ type PendingDelete = {
  * opening a collection.
  */
 const GroupAssetsPage = () => {
+  const { t } = useTranslate();
   const { groupId, myRole, userInfo, readOnlyPlatform } =
     useOutletContext<GroupOutletContext>();
 
@@ -100,12 +104,12 @@ const GroupAssetsPage = () => {
     mutationFn: ({ assetId, title }: { assetId: string; title: string }) =>
       renameGroupAsset(groupId, assetId, title),
     onSuccess: () => {
-      toast.success("Audio renamed");
+      toast.success(t("studio.groups.pages.assets.renamed"));
       setRenaming(null);
       invalidateAssets();
     },
     onError: (err) =>
-      toast.error("Failed to rename audio", {
+      toast.error(t("studio.groups.pages.assets.rename_failed"), {
         description: getApiErrorMessage(err),
       }),
   });
@@ -114,7 +118,7 @@ const GroupAssetsPage = () => {
     mutationFn: ({ assetId, force }: { assetId: string; force: boolean }) =>
       deleteGroupAsset(groupId, assetId, force),
     onSuccess: () => {
-      toast.success("Audio deleted");
+      toast.success(t("studio.groups.pages.assets.deleted"));
       setPendingDelete(null);
       invalidateAssets();
     },
@@ -133,7 +137,7 @@ const GroupAssetsPage = () => {
         );
         return;
       }
-      toast.error("Failed to delete audio", {
+      toast.error(t("studio.groups.pages.assets.delete_failed"), {
         description: getApiErrorMessage(err),
       });
     },
@@ -177,7 +181,10 @@ const GroupAssetsPage = () => {
       return (
         <Pecha.TableRow>
           <Pecha.TableCell colSpan={columnCount} className="text-destructive">
-            {getApiErrorMessage(error, "Could not load the audio library.")}
+            {getApiErrorMessage(
+              error,
+              t("studio.groups.pages.assets.load_failed"),
+            )}
           </Pecha.TableCell>
         </Pecha.TableRow>
       );
@@ -210,13 +217,15 @@ const GroupAssetsPage = () => {
               preload="none"
               src={asset.asset_url}
               className="h-9 w-full min-w-[18rem]"
-              aria-label={`Play ${asset.title}`}
+              aria-label={t("studio.groups.pages.assets.play_aria", {
+                title: asset.title,
+              })}
             >
               <track kind="captions" />
             </audio>
           ) : (
             <span className="text-xs text-muted-foreground">
-              Preview unavailable
+              {t("studio.groups.pages.assets.preview_unavailable")}
             </span>
           )}
         </Pecha.TableCell>
@@ -228,14 +237,16 @@ const GroupAssetsPage = () => {
                 size="sm"
                 onClick={() => openRename(asset)}
               >
-                Rename
+                {t("studio.groups.pages.assets.rename")}
               </Pecha.Button>
               <Pecha.Button
                 variant="outline"
                 size="sm"
                 className="text-destructive hover:text-destructive"
                 onClick={() => setPendingDelete({ asset, usages: [] })}
-                aria-label={`Delete ${asset.title}`}
+                aria-label={t("studio.groups.pages.assets.delete_aria", {
+                  title: asset.title,
+                })}
               >
                 <IoMdTrash className="h-4 w-4" />
               </Pecha.Button>
@@ -251,7 +262,7 @@ const GroupAssetsPage = () => {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold">
-            {"Assets"}
+            {t("studio.groups.pages.assets.title")}
             {total > 0 ? (
               <span className="ml-2 text-sm font-normal tabular-nums text-muted-foreground">
                 {total}
@@ -259,7 +270,7 @@ const GroupAssetsPage = () => {
             ) : null}
           </h2>
           <p className="text-sm text-muted-foreground">
-            Audio owned by this group, linked to chants from a collection.
+            {t("studio.groups.pages.assets.subtitle")}
           </p>
         </div>
         {canWrite ? (
@@ -281,7 +292,9 @@ const GroupAssetsPage = () => {
                     onClick={() => fileInputRef.current?.click()}
                   >
                     <IoMdCloudUpload className="h-4 w-4" />
-                    {isUploading ? "Uploading…" : "Upload"}
+                    {isUploading
+                      ? t("studio.common.uploading")
+                      : t("studio.common.upload")}
                   </Pecha.Button>
                 </Pecha.TooltipTrigger>
                 <Pecha.TooltipContent
@@ -289,7 +302,7 @@ const GroupAssetsPage = () => {
                   collisionPadding={12}
                   className={TOOLTIP_CLASS}
                 >
-                  {FORMAT_HINT}
+                  {t("studio.groups.pages.assets.format_hint")}
                 </Pecha.TooltipContent>
               </Pecha.Tooltip>
             </Pecha.TooltipProvider>
@@ -305,9 +318,9 @@ const GroupAssetsPage = () => {
         <Pecha.Input
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Search title or file name…"
+          placeholder={t("studio.groups.pages.assets.search_placeholder")}
           className="pl-8"
-          aria-label="Search audio library"
+          aria-label={t("studio.groups.pages.assets.search_aria")}
         />
       </div>
 
@@ -315,12 +328,16 @@ const GroupAssetsPage = () => {
         <Pecha.Table containerClassName="show-scrollbar">
           <Pecha.TableHeader>
             <Pecha.TableRow>
-              <Pecha.TableHead>Title</Pecha.TableHead>
-              <Pecha.TableHead>Details</Pecha.TableHead>
-              <Pecha.TableHead>Preview</Pecha.TableHead>
+              <Pecha.TableHead>{t("studio.common.title")}</Pecha.TableHead>
+              <Pecha.TableHead>
+                {t("studio.groups.pages.assets.details_column")}
+              </Pecha.TableHead>
+              <Pecha.TableHead>
+                {t("studio.groups.pages.assets.preview_column")}
+              </Pecha.TableHead>
               {canWrite ? (
                 <Pecha.TableHead className="text-right">
-                  Actions
+                  {t("studio.common.actions")}
                 </Pecha.TableHead>
               ) : null}
             </Pecha.TableRow>
@@ -345,11 +362,13 @@ const GroupAssetsPage = () => {
       >
         <Pecha.DialogContent>
           <Pecha.DialogHeader>
-            <Pecha.DialogTitle>Rename audio</Pecha.DialogTitle>
+            <Pecha.DialogTitle>
+              {t("studio.groups.pages.assets.rename_title")}
+            </Pecha.DialogTitle>
           </Pecha.DialogHeader>
           <div className="space-y-2">
             <label htmlFor="asset-rename" className="text-sm font-medium">
-              Title
+              {t("studio.common.title")}
             </label>
             <Pecha.Input
               id="asset-rename"
@@ -364,7 +383,7 @@ const GroupAssetsPage = () => {
               onClick={() => setRenaming(null)}
               disabled={renameMutation.isPending}
             >
-              Cancel
+              {t("studio.common.cancel")}
             </Pecha.Button>
             <Pecha.Button
               className="bg-[#A51C21] text-white hover:bg-[#A51C21]/90"
@@ -377,7 +396,9 @@ const GroupAssetsPage = () => {
                 });
               }}
             >
-              {renameMutation.isPending ? "Saving…" : "Save"}
+              {renameMutation.isPending
+                ? t("studio.common.saving")
+                : t("studio.common.save")}
             </Pecha.Button>
           </div>
         </Pecha.DialogContent>
@@ -392,12 +413,18 @@ const GroupAssetsPage = () => {
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
             <Pecha.AlertDialogTitle>
-              {isConflict ? "This audio is in use" : "Delete audio?"}
+              {isConflict
+                ? t("studio.groups.pages.assets.in_use_title")
+                : t("studio.groups.pages.assets.delete_title")}
             </Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
               {isConflict
-                ? `${pendingDelete?.conflictMessage} Deleting it anyway removes it from these chants.`
-                : `This will permanently remove “${pendingDelete?.asset.title ?? ""}” from the group library.`}
+                ? t("studio.groups.pages.assets.in_use_description", {
+                    message: pendingDelete?.conflictMessage ?? "",
+                  })
+                : t("studio.groups.pages.assets.delete_description", {
+                    title: pendingDelete?.asset.title ?? "",
+                  })}
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
 
@@ -408,7 +435,8 @@ const GroupAssetsPage = () => {
                   <span className="font-medium">{usage.collection_name}</span>
                   <span className="text-muted-foreground">
                     {" — "}
-                    {usage.text_title ?? "Untitled chant"}
+                    {usage.text_title ??
+                      t("studio.groups.pages.assets.untitled_chant")}
                   </span>
                 </li>
               ))}
@@ -417,7 +445,7 @@ const GroupAssetsPage = () => {
 
           <Pecha.AlertDialogFooter>
             <Pecha.AlertDialogCancel disabled={deleteMutation.isPending}>
-              Cancel
+              {t("studio.common.cancel")}
             </Pecha.AlertDialogCancel>
             <Pecha.AlertDialogAction
               className="bg-destructive text-white hover:bg-destructive/90"
@@ -431,9 +459,13 @@ const GroupAssetsPage = () => {
                 });
               }}
             >
-              {deleteMutation.isPending ? "Deleting…" : null}
-              {!deleteMutation.isPending && isConflict ? "Delete anyway" : null}
-              {!deleteMutation.isPending && !isConflict ? "Delete" : null}
+              {deleteMutation.isPending ? t("studio.common.deleting") : null}
+              {!deleteMutation.isPending && isConflict
+                ? t("studio.groups.pages.assets.delete_anyway")
+                : null}
+              {!deleteMutation.isPending && !isConflict
+                ? t("studio.common.delete")
+                : null}
             </Pecha.AlertDialogAction>
           </Pecha.AlertDialogFooter>
         </Pecha.AlertDialogContent>

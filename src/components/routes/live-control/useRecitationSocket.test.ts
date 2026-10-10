@@ -245,7 +245,7 @@ describe("useRecitationSocket", () => {
 
     await expect(refused).resolves.toEqual({
       ok: false,
-      message: expect.stringMatching(/slow down/),
+      message: "studio.live_control.errors.positions_throttled",
     });
     await expect(lost).resolves.toMatchObject({ ok: false, lost: true });
   });
@@ -321,7 +321,7 @@ describe("useRecitationSocket", () => {
 
     await expect(answer).resolves.toEqual({
       ok: false,
-      message: "Autoplay is no longer running that plan.",
+      message: "studio.live_control.errors.autoplay_not_running",
     });
   });
 

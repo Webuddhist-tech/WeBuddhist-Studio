@@ -160,7 +160,7 @@ describe("getPrayerPdfErrorMessage", () => {
       },
     };
     expect(await getPrayerPdfErrorMessage(error)).toBe(
-      "There are no prayer requests on this day.",
+      "studio.groups.shared.prayer_pdf_no_requests",
     );
   });
 
@@ -172,14 +172,14 @@ describe("getPrayerPdfErrorMessage", () => {
       },
     };
     expect(await getPrayerPdfErrorMessage(error)).toBe(
-      "You are not a member of this content's group.",
+      "studio.errors.no_group_membership",
     );
   });
 
   it("falls back when the body is not JSON", async () => {
     const error = { response: { status: 500, data: new Blob(["oops"]) } };
     expect(await getPrayerPdfErrorMessage(error)).toBe(
-      "Could not generate the prayer PDF.",
+      "studio.groups.shared.prayer_pdf_error",
     );
   });
 });

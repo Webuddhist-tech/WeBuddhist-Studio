@@ -2,6 +2,7 @@ import { useState } from "react";
 import { IoMdAdd } from "react-icons/io";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Button } from "@/components/ui/atoms/button";
 import AuthButton from "@/components/ui/molecules/auth-button/AuthButton";
 import { getApiErrorMessage } from "@/lib/apiErrors";
@@ -19,6 +20,7 @@ import PrayerIntentionsTable from "./PrayerIntentionsTable";
 import PrayerIntentionFormDialog from "./PrayerIntentionFormDialog";
 
 const PrayerIntentionsPage = () => {
+  const { t } = useTranslate();
   const { data: userInfo } = useUserInfo();
   const showActionsColumn =
     !!userInfo && shouldShowCmsActionsColumn(userInfo.platform_role);
@@ -40,7 +42,7 @@ const PrayerIntentionsPage = () => {
   const createMutation = useMutation({
     mutationFn: createPrayerIntention,
     onSuccess: () => {
-      toast.success("Prayer intention created");
+      toast.success(t("studio.prayer_intentions.toast.created"));
       setFormOpen(false);
       invalidate();
     },
@@ -56,7 +58,7 @@ const PrayerIntentionsPage = () => {
       payload: PatchPrayerIntentionPayload;
     }) => patchPrayerIntention(id, payload),
     onSuccess: () => {
-      toast.success("Prayer intention updated");
+      toast.success(t("studio.prayer_intentions.toast.updated"));
       setFormOpen(false);
       setEditing(null);
       invalidate();
@@ -91,17 +93,18 @@ const PrayerIntentionsPage = () => {
     <div className="space-y-6 p-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Prayer intentions</h1>
+          <h1 className="text-2xl font-bold">
+            {t("studio.prayer_intentions.title")}
+          </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Catalog used for event prayer requests. Events can restrict which
-            intentions appear in the picker.
+            {t("studio.prayer_intentions.subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-2">
           {showActionsColumn ? (
             <Button type="button" onClick={handleOpenCreate}>
               <IoMdAdd className="mr-1 h-4 w-4" />
-              Add intention
+              {t("studio.prayer_intentions.add_intention")}
             </Button>
           ) : null}
           <AuthButton />

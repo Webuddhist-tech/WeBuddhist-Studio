@@ -2,6 +2,7 @@ import {
   AUTHOR_NOT_ACTIVE_DETAIL,
   isAuthorNotActiveDetail,
 } from "@/lib/platformAccess";
+import { tolgee } from "@/i18n/tolgee";
 
 export function getApiErrorDetail(error: unknown): string | undefined {
   const err = error as { response?: { data?: { detail?: unknown } } };
@@ -34,30 +35,30 @@ export function isTransientApiError(error: unknown): boolean {
   );
 }
 
+/** Backend detail -> translation key of the message shown to the user. */
 const FRIENDLY_MESSAGES: Record<string, string> = {
-  [AUTHOR_NOT_ACTIVE_DETAIL]: AUTHOR_NOT_ACTIVE_DETAIL,
-  CONTENT_PUBLISHED_READ_ONLY:
-    "Published content is read-only for your role in this group.",
-  STATUS_CHANGE_FORBIDDEN:
-    "You cannot change the status of this content with your current role.",
-  NO_GROUP_MEMBERSHIP: "You are not a member of this content's group.",
+  [AUTHOR_NOT_ACTIVE_DETAIL]: "studio.errors.author_not_active",
+  CONTENT_PUBLISHED_READ_ONLY: "studio.errors.content_published_read_only",
+  STATUS_CHANGE_FORBIDDEN: "studio.errors.status_change_forbidden",
+  NO_GROUP_MEMBERSHIP: "studio.errors.no_group_membership",
   "Target group must differ from the current group":
-    "Choose a different group than the content's current group.",
-  "Target group not found": "That group could not be found.",
+    "studio.errors.transfer_same_group",
+  "Target group not found": "studio.errors.transfer_group_not_found",
   "A pending transfer request already exists for this content":
-    "A transfer request is already pending for this content.",
+    "studio.errors.transfer_already_pending",
   "Plan is attached to a series; transfer the series or detach the plan first":
-    "Transfer the series instead, or detach the plan from the series first.",
+    "studio.errors.transfer_plan_in_series",
 };
 
 export function getApiErrorMessage(
   error: unknown,
-  fallback = "Something went wrong",
+  fallback = tolgee.t("studio.errors.generic"),
 ): string {
   const detail = getApiErrorDetail(error);
   if (detail) {
-    if (FRIENDLY_MESSAGES[detail]) return FRIENDLY_MESSAGES[detail];
-    if (isAuthorNotActiveDetail(detail)) return AUTHOR_NOT_ACTIVE_DETAIL;
+    if (FRIENDLY_MESSAGES[detail]) return tolgee.t(FRIENDLY_MESSAGES[detail]);
+    if (isAuthorNotActiveDetail(detail))
+      return tolgee.t("studio.errors.author_not_active");
     return detail;
   }
   const err = error as { response?: { data?: { detail?: unknown } } };

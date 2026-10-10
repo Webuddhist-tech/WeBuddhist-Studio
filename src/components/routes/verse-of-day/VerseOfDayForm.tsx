@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import VisibleNewlineTextarea from "./VisibleNewlineTextarea";
 import { Input } from "@/components/ui/atoms/input";
@@ -44,6 +45,7 @@ const VerseOfDayForm = ({
   onCancel,
   existingVerses,
 }: VerseOfDayFormProps) => {
+  const { t } = useTranslate();
   const { languageOptions, getLanguageLabel } = useLanguages();
   const languageCodes = languageOptions.map((l) => l.value);
   const [activeLanguage, setActiveLanguage] = useState<LanguageCode>("EN");
@@ -91,7 +93,7 @@ const VerseOfDayForm = ({
   const createMutation = useMutation({
     mutationFn: createVerseOfDay,
     onSuccess: () => {
-      toast.success("Verse of Day created successfully!");
+      toast.success(t("studio.verse_of_day.toast.created"));
       onSuccess();
     },
     onError: (err) => {
@@ -103,7 +105,7 @@ const VerseOfDayForm = ({
     mutationFn: ({ id, payload }: { id: string; payload: VerseOfDayPayload }) =>
       updateVerseOfDay(id, payload),
     onSuccess: () => {
-      toast.success("Verse of Day updated successfully!");
+      toast.success(t("studio.verse_of_day.toast.updated"));
       onSuccess();
     },
     onError: (err) => {
@@ -118,14 +120,14 @@ const VerseOfDayForm = ({
       setImagePreview(image.original);
       setImageKey(key);
       setIsImageDialogOpen(false);
-      toast.success("Image uploaded successfully!");
+      toast.success(t("studio.verse_of_day.toast.image_uploaded"));
     } catch (error: any) {
       if (error?.response?.status === 413) {
-        toast.error("Failed to upload image", {
-          description: "File exceeds the maximum size of 1MB",
+        toast.error(t("studio.verse_of_day.toast.image_upload_failed"), {
+          description: t("studio.verse_of_day.toast.image_too_large"),
         });
       } else {
-        toast.error("Failed to upload image");
+        toast.error(t("studio.verse_of_day.toast.image_upload_failed"));
       }
     } finally {
       setIsImageUploading(false);
@@ -141,17 +143,17 @@ const VerseOfDayForm = ({
     e.preventDefault();
 
     if (!Object.values(verses).some((v) => v.trim())) {
-      toast.error("At least one verse content is required");
+      toast.error(t("studio.verse_of_day.validation.content_required"));
       return;
     }
 
     if (!groupId.trim()) {
-      toast.error("Please select a page");
+      toast.error(t("studio.verse_of_day.validation.page_required"));
       return;
     }
 
     if (!date) {
-      toast.error("Date is required");
+      toast.error(t("studio.verse_of_day.validation.date_required"));
       return;
     }
 
@@ -167,7 +169,9 @@ const VerseOfDayForm = ({
 
     if (isDuplicateDate) {
       toast.error(
-        `A verse already exists for ${format(date, "PPP")}. Please choose a different date.`,
+        t("studio.verse_of_day.validation.duplicate_date", {
+          date: format(date, "PPP"),
+        }),
       );
       return;
     }
@@ -237,7 +241,9 @@ const VerseOfDayForm = ({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="space-y-2">
-        <label className="text-sm font-bold">Verse Content</label>
+        <label className="text-sm font-bold">
+          {t("studio.verse_of_day.form.content_label")}
+        </label>
         <div className="flex gap-2 border-b">
           {languageOptions.map((lang) => (
             <button
@@ -257,14 +263,16 @@ const VerseOfDayForm = ({
         <VisibleNewlineTextarea
           value={verses[activeLanguage.toLowerCase()] ?? ""}
           onValueChange={handleVerseChange}
-          placeholder={`Enter verse content in ${getLanguageLabel(activeLanguage)}`}
+          placeholder={t("studio.verse_of_day.form.content_placeholder", {
+            language: getLanguageLabel(activeLanguage),
+          })}
           className="min-h-[120px] resize-none"
         />
       </div>
 
       <div className="space-y-2">
         <label htmlFor="verse-source" className="text-sm font-bold">
-          Source / Reference
+          {t("studio.verse_of_day.form.source_label")}
         </label>
         <Input
           id="verse-source"
@@ -275,14 +283,14 @@ const VerseOfDayForm = ({
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-bold">Image</label>
+        <label className="text-sm font-bold">{t("studio.common.image")}</label>
         <div className="flex gap-4 items-start">
           {!imagePreview && (
             <button
               type="button"
               onClick={() => setIsImageDialogOpen(true)}
               className="border w-32 h-24 border-dashed border-gray-300 rounded-lg flex items-center justify-center hover:border-gray-400 transition-colors"
-              aria-label="Upload verse image"
+              aria-label={t("studio.verse_of_day.form.upload_image_aria")}
             >
               <IoMdAdd className="h-8 w-8 text-gray-400" />
             </button>
@@ -291,14 +299,14 @@ const VerseOfDayForm = ({
             <div className="relative">
               <img
                 src={imagePreview}
-                alt="Verse preview"
+                alt={t("studio.verse_of_day.form.image_preview_alt")}
                 className="w-32 h-24 object-cover rounded-lg border"
               />
               <button
                 type="button"
                 onClick={handleRemoveImage}
                 className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1"
-                aria-label="Remove image"
+                aria-label={t("studio.verse_of_day.form.remove_image_aria")}
               >
                 <IoMdClose className="h-4 w-4" />
               </button>
@@ -314,7 +322,7 @@ const VerseOfDayForm = ({
       />
 
       <div className="space-y-2">
-        <label className="text-sm font-bold">Date</label>
+        <label className="text-sm font-bold">{t("studio.common.date")}</label>
         <Pecha.Popover open={showCalendar} onOpenChange={setShowCalendar}>
           <Pecha.PopoverTrigger asChild>
             <Button
@@ -322,7 +330,9 @@ const VerseOfDayForm = ({
               variant="outline"
               className="w-full justify-start text-left font-normal"
             >
-              {date ? format(date, "PPP") : "Pick a date"}
+              {date
+                ? format(date, "PPP")
+                : t("studio.verse_of_day.form.pick_date")}
             </Button>
           </Pecha.PopoverTrigger>
           <Pecha.PopoverContent className="w-auto p-0" align="start">
@@ -346,7 +356,7 @@ const VerseOfDayForm = ({
           onClick={onCancel}
           disabled={isPending}
         >
-          Cancel
+          {t("studio.common.cancel")}
         </Button>
         <Button
           type="submit"
@@ -355,11 +365,11 @@ const VerseOfDayForm = ({
         >
           {isPending
             ? mode === "edit"
-              ? "Updating..."
-              : "Creating..."
+              ? t("studio.verse_of_day.form.updating")
+              : t("studio.common.creating")
             : mode === "edit"
-              ? "Update"
-              : "Create"}
+              ? t("studio.common.update")
+              : t("studio.common.create")}
         </Button>
       </div>
 
@@ -369,7 +379,9 @@ const VerseOfDayForm = ({
       >
         <Pecha.DialogContent showCloseButton>
           <Pecha.DialogHeader>
-            <Pecha.DialogTitle>Upload & Crop Image</Pecha.DialogTitle>
+            <Pecha.DialogTitle>
+              {t("studio.verse_of_day.form.upload_crop_image")}
+            </Pecha.DialogTitle>
           </Pecha.DialogHeader>
           <ImageContentData
             onUpload={handleImageUpload}
@@ -397,6 +409,7 @@ const PageSelectField = ({
   setPageId,
   fallbackTitle,
 }: PageSelectFieldProps) => {
+  const { t } = useTranslate();
   const [open, setOpen] = useState(false);
 
   const { data: pagesData, isLoading: isLoadingPages } = useQuery({
@@ -408,14 +421,19 @@ const PageSelectField = ({
   const pages = pagesData?.groups ?? [];
   const selectedPage = pages.find((g) => g.id === pageId);
   const selectedTitle = selectedPage
-    ? pickGroupTitle(selectedPage.metadata, "Untitled page")
+    ? pickGroupTitle(
+        selectedPage.metadata,
+        t("studio.verse_of_day.untitled_page"),
+      )
     : pageId && fallbackTitle
       ? fallbackTitle
       : null;
 
   return (
     <div className="space-y-2">
-      <label className="text-sm font-bold">Page</label>
+      <label className="text-sm font-bold">
+        {t("studio.verse_of_day.form.page_label")}
+      </label>
       <Pecha.Popover open={open} onOpenChange={setOpen}>
         <Pecha.PopoverTrigger asChild>
           <Button
@@ -426,8 +444,8 @@ const PageSelectField = ({
             className="w-full justify-between font-normal"
           >
             {isLoadingPages
-              ? "Loading pages..."
-              : (selectedTitle ?? "Select a page...")}
+              ? t("studio.verse_of_day.form.loading_pages")
+              : (selectedTitle ?? t("studio.verse_of_day.form.select_page"))}
             <FaChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
           </Button>
         </Pecha.PopoverTrigger>
@@ -436,12 +454,19 @@ const PageSelectField = ({
           align="start"
         >
           <Pecha.Command>
-            <Pecha.CommandInput placeholder="Search pages..." />
+            <Pecha.CommandInput
+              placeholder={t("studio.verse_of_day.form.search_pages")}
+            />
             <Pecha.CommandList>
-              <Pecha.CommandEmpty>No pages found.</Pecha.CommandEmpty>
+              <Pecha.CommandEmpty>
+                {t("studio.verse_of_day.form.no_pages")}
+              </Pecha.CommandEmpty>
               <Pecha.CommandGroup>
                 {pages.map((page) => {
-                  const title = pickGroupTitle(page.metadata, "Untitled page");
+                  const title = pickGroupTitle(
+                    page.metadata,
+                    t("studio.verse_of_day.untitled_page"),
+                  );
                   return (
                     <Pecha.CommandItem
                       key={page.id}

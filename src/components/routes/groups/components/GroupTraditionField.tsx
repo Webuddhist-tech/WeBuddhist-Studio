@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import type { UseFormReturn } from "react-hook-form";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { fetchTraditionOptions } from "@/components/routes/traditions/api/traditionsApi";
 import type { GroupCoreFormData } from "@/schema/GroupSchema";
@@ -16,6 +17,7 @@ const GroupTraditionField = ({
   form,
   currentTradition,
 }: GroupTraditionFieldProps) => {
+  const { t } = useTranslate();
   // Under "cms-traditions" so the Traditions page's invalidation refreshes it.
   const { data: options = [], isError } = useQuery({
     queryKey: ["cms-traditions", "options"],
@@ -31,7 +33,7 @@ const GroupTraditionField = ({
       render={({ field }) => (
         <Pecha.FormItem>
           <Pecha.FormLabel className="text-sm font-bold">
-            Tradition
+            {t("studio.groups.components.tradition.label")}
           </Pecha.FormLabel>
           <Pecha.Select
             value={field.value || NO_TRADITION}
@@ -41,12 +43,16 @@ const GroupTraditionField = ({
           >
             <Pecha.FormControl>
               <Pecha.SelectTrigger className="h-12 w-full bg-white dark:bg-[#262626]">
-                <Pecha.SelectValue placeholder="Select a tradition" />
+                <Pecha.SelectValue
+                  placeholder={t(
+                    "studio.groups.components.tradition.placeholder",
+                  )}
+                />
               </Pecha.SelectTrigger>
             </Pecha.FormControl>
             <Pecha.SelectContent>
               <Pecha.SelectItem value={NO_TRADITION}>
-                No tradition
+                {t("studio.groups.components.tradition.none")}
               </Pecha.SelectItem>
               {choices.map((option) => (
                 <Pecha.SelectItem key={option.code} value={option.code}>
@@ -57,8 +63,8 @@ const GroupTraditionField = ({
           </Pecha.Select>
           <p className="text-xs text-muted-foreground">
             {isError
-              ? "Couldn't load the traditions list. Try again later."
-              : "The Buddhist tradition this group practises in."}
+              ? t("studio.groups.components.tradition.load_error")
+              : t("studio.groups.components.tradition.help")}
           </p>
           <Pecha.FormMessage />
         </Pecha.FormItem>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslate } from "@tolgee/react";
 import { IoMdAdd, IoMdSearch } from "react-icons/io";
 import { useDebounce } from "use-debounce";
 import { useInfiniteQuery } from "@tanstack/react-query";
@@ -16,36 +17,72 @@ import { GROUP_KINDS } from "./lib/groupKind";
 
 const PAGE_SIZE = 10;
 
+/** Translation keys for the list text that names the kind of group. */
+const LIST_TEXT_KEYS: Record<
+  AuthorGroupType,
+  {
+    allLoaded: string;
+    loadFailed: string;
+    empty: string;
+    create: string;
+    loading: string;
+    searchPlaceholder: string;
+    new: string;
+  }
+> = {
+  COMMUNITY: {
+    allLoaded: "studio.groups.pages.list.all_loaded_community",
+    loadFailed: "studio.groups.pages.list.load_failed_community",
+    empty: "studio.groups.pages.list.empty_community",
+    create: "studio.groups.pages.list.create_community",
+    loading: "studio.groups.pages.list.loading_community",
+    searchPlaceholder: "studio.groups.pages.list.search_placeholder_community",
+    new: "studio.groups.pages.list.new_community",
+  },
+  PAGE: {
+    allLoaded: "studio.groups.pages.list.all_loaded_page",
+    loadFailed: "studio.groups.pages.list.load_failed_page",
+    empty: "studio.groups.pages.list.empty_page",
+    create: "studio.groups.pages.list.create_page",
+    loading: "studio.groups.pages.list.loading_page",
+    searchPlaceholder: "studio.groups.pages.list.search_placeholder_page",
+    new: "studio.groups.pages.list.new_page",
+  },
+};
+
 function GroupsLoadMoreStatus({
   isFetchingNextPage,
   hasNextPage,
   hasGroups,
-  plural,
+  allLoadedLabel,
 }: Readonly<{
   isFetchingNextPage: boolean;
   hasNextPage: boolean;
   hasGroups: boolean;
-  plural: string;
+  allLoadedLabel: string;
 }>) {
+  const { t } = useTranslate();
   if (isFetchingNextPage) {
-    return <p className="text-sm text-muted-foreground">Loading more…</p>;
+    return (
+      <p className="text-sm text-muted-foreground">
+        {t("studio.groups.pages.list.loading_more")}
+      </p>
+    );
   }
   if (hasNextPage) {
     return <span className="h-4" aria-hidden />;
   }
   if (hasGroups) {
-    return (
-      <p className="text-sm text-muted-foreground">
-        All {plural.toLowerCase()} loaded
-      </p>
-    );
+    return <p className="text-sm text-muted-foreground">{allLoadedLabel}</p>;
   }
   return null;
 }
 
 /** Lists one type of group: practice spaces (communities) or pages. */
 const Groups = ({ groupType }: Readonly<{ groupType: AuthorGroupType }>) => {
+  const { t } = useTranslate();
   const kind = GROUP_KINDS[groupType];
+  const textKeys = LIST_TEXT_KEYS[groupType];
   const [search, setSearch] = useState("");
   const [debouncedSearch] = useDebounce(search, 500);
 
@@ -95,18 +132,16 @@ const Groups = ({ groupType }: Readonly<{ groupType: AuthorGroupType }>) => {
   if (error) {
     listContent = (
       <p className="text-sm text-red-500 py-8">
-        Failed to load {kind.plural.toLowerCase()}. {getApiErrorMessage(error)}
+        {t(textKeys.loadFailed, { error: getApiErrorMessage(error) })}
       </p>
     );
   } else if (isEmpty) {
     listContent = (
       <div className="flex flex-col h-full items-center justify-center">
-        <p className="text-base text-muted-foreground">
-          No {kind.plural.toLowerCase()} found
-        </p>
+        <p className="text-base text-muted-foreground">{t(textKeys.empty)}</p>
         <Button variant="outline" className="mt-2" asChild>
           <Link to={kind.newPath}>
-            <IoMdAdd /> Create {kind.singular.toLowerCase()}
+            <IoMdAdd /> {t(textKeys.create)}
           </Link>
         </Button>
       </div>
@@ -117,14 +152,14 @@ const Groups = ({ groupType }: Readonly<{ groupType: AuthorGroupType }>) => {
         <GroupsList
           groups={groups}
           isLoading={isLoading}
-          loadingLabel={`Loading ${kind.plural.toLowerCase()}…`}
+          loadingLabel={t(textKeys.loading)}
         />
         <div ref={sentinelRef} className="w-full py-4 flex justify-center">
           <GroupsLoadMoreStatus
             isFetchingNextPage={isFetchingNextPage}
             hasNextPage={Boolean(hasNextPage)}
             hasGroups={groups.length > 0}
-            plural={kind.plural}
+            allLoadedLabel={t(textKeys.allLoaded)}
           />
         </div>
       </>
@@ -139,7 +174,7 @@ const Groups = ({ groupType }: Readonly<{ groupType: AuthorGroupType }>) => {
             <div className="border w-fit px-2 bg-white dark:bg-input/30 rounded-md border-gray-200 dark:border-[#313132] flex items-center">
               <IoMdSearch className="w-4 h-4" />
               <Pecha.Input
-                placeholder={`Search ${kind.plural.toLowerCase()}…`}
+                placeholder={t(textKeys.searchPlaceholder)}
                 className="rounded-md border-none dark:bg-transparent px-4 shadow-none py-2"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -152,7 +187,7 @@ const Groups = ({ groupType }: Readonly<{ groupType: AuthorGroupType }>) => {
               asChild
             >
               <Link to={kind.newPath}>
-                <IoMdAdd /> New {kind.singular.toLowerCase()}
+                <IoMdAdd /> {t(textKeys.new)}
               </Link>
             </Button>
           </div>

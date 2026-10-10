@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { LuCopy, LuDownload, LuHandHeart, LuSettings2 } from "react-icons/lu";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Pagination } from "@/components/ui/molecules/pagination/Pagination";
 import { getApiErrorMessage } from "@/lib/apiErrors";
@@ -63,7 +64,9 @@ const PrayerRequestCard = ({
   timeZone: string;
   withDate: boolean;
 }) => {
-  const name = request.posted_by || "WeBuddhist Member";
+  const { t } = useTranslate();
+  const name =
+    request.posted_by || t("studio.groups.prayer_pdf.default_member_name");
   return (
     <li className="flex gap-3 border border-gray-300 dark:border-[#313132] rounded-md p-3">
       <Pecha.Avatar className="h-9 w-9 shrink-0">
@@ -84,7 +87,9 @@ const PrayerRequestCard = ({
           ) : null}
           <span className="text-xs text-muted-foreground ml-auto">
             {formatPostedAt(request.created_at, timeZone, withDate)}
-            {request.is_edited ? " · edited" : ""}
+            {request.is_edited
+              ? ` · ${t("studio.groups.prayer_pdf.edited")}`
+              : ""}
           </span>
         </div>
         <p className="text-sm whitespace-pre-wrap break-words">
@@ -104,6 +109,7 @@ const PrayerRequestCard = ({
  * the server enforces too.
  */
 const PrayerPdfActions = ({ scope }: PrayerPdfActionsProps) => {
+  const { t } = useTranslate();
   const [open, setOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [day, setDay] = useState("");
@@ -171,8 +177,12 @@ const PrayerPdfActions = ({ scope }: PrayerPdfActionsProps) => {
       saveBlobAs(blob, filename);
       toast.success(
         prayerCount != null
-          ? `Downloaded ${prayerCount} prayer request${prayerCount === 1 ? "" : "s"}`
-          : "Prayer PDF downloaded",
+          ? prayerCount === 1
+            ? t("studio.groups.prayer_pdf.downloaded_one")
+            : t("studio.groups.prayer_pdf.downloaded_other", {
+                count: prayerCount,
+              })
+          : t("studio.groups.prayer_pdf.downloaded"),
       );
     },
     onError: async (err) => toast.error(await getPrayerPdfErrorMessage(err)),
@@ -187,17 +197,31 @@ const PrayerPdfActions = ({ scope }: PrayerPdfActionsProps) => {
     },
     onSuccess: (count) =>
       toast.success(
-        `Copied ${count} prayer request${count === 1 ? "" : "s"} as CSV`,
+        count === 1
+          ? t("studio.groups.prayer_pdf.copied_one")
+          : t("studio.groups.prayer_pdf.copied_other", { count }),
       ),
     onError: (err) =>
-      toast.error(getApiErrorMessage(err, "Could not copy the prayer list.")),
+      toast.error(
+        getApiErrorMessage(err, t("studio.groups.prayer_pdf.copy_error")),
+      ),
   });
 
   const summary = isLoading
-    ? "Loading…"
-    : `${total} request${total === 1 ? "" : "s"} ${
-        day ? "that day" : "on all days, newest first"
-      } (${timeZone})`;
+    ? t("studio.common.loading")
+    : day
+      ? total === 1
+        ? t("studio.groups.prayer_pdf.summary_day_one", { timezone: timeZone })
+        : t("studio.groups.prayer_pdf.summary_day_other", {
+            count: total,
+            timezone: timeZone,
+          })
+      : total === 1
+        ? t("studio.groups.prayer_pdf.summary_all_one", { timezone: timeZone })
+        : t("studio.groups.prayer_pdf.summary_all_other", {
+            count: total,
+            timezone: timeZone,
+          });
 
   const renderBody = () => {
     if (isLoading) {
@@ -212,7 +236,7 @@ const PrayerPdfActions = ({ scope }: PrayerPdfActionsProps) => {
     if (isError) {
       return (
         <p className="text-sm text-red-500 py-8 text-center">
-          {getApiErrorMessage(error, "Could not load prayer requests.")}
+          {getApiErrorMessage(error, t("studio.groups.prayer_pdf.load_error"))}
         </p>
       );
     }
@@ -220,8 +244,8 @@ const PrayerPdfActions = ({ scope }: PrayerPdfActionsProps) => {
       return (
         <p className="text-sm text-muted-foreground py-12 text-center">
           {day
-            ? "There are no prayer requests on this day."
-            : "There are no prayer requests yet."}
+            ? t("studio.groups.prayer_pdf.empty_day")
+            : t("studio.groups.prayer_pdf.empty")}
         </p>
       );
     }
@@ -250,7 +274,7 @@ const PrayerPdfActions = ({ scope }: PrayerPdfActionsProps) => {
         onClick={openSidebar}
       >
         <LuHandHeart className="h-4 w-4" />
-        Prayers
+        {t("studio.groups.prayer_pdf.prayers")}
       </Pecha.Button>
 
       <Pecha.Sheet open={open} onOpenChange={setOpen}>
@@ -259,7 +283,9 @@ const PrayerPdfActions = ({ scope }: PrayerPdfActionsProps) => {
           className="w-full sm:max-w-xl flex flex-col gap-0"
         >
           <Pecha.SheetHeader>
-            <Pecha.SheetTitle>Prayer requests</Pecha.SheetTitle>
+            <Pecha.SheetTitle>
+              {t("studio.groups.prayer_pdf.title")}
+            </Pecha.SheetTitle>
             <Pecha.SheetDescription>{summary}</Pecha.SheetDescription>
           </Pecha.SheetHeader>
 
@@ -270,7 +296,7 @@ const PrayerPdfActions = ({ scope }: PrayerPdfActionsProps) => {
                   htmlFor="prayer-requests-day"
                   className="text-sm font-bold"
                 >
-                  Day
+                  {t("studio.groups.prayer_pdf.day")}
                 </label>
                 <Pecha.Input
                   id="prayer-requests-day"
@@ -286,7 +312,7 @@ const PrayerPdfActions = ({ scope }: PrayerPdfActionsProps) => {
                   size="sm"
                   onClick={() => chooseDay("")}
                 >
-                  All days
+                  {t("studio.groups.prayer_pdf.all_days")}
                 </Pecha.Button>
               ) : null}
             </div>
@@ -298,35 +324,41 @@ const PrayerPdfActions = ({ scope }: PrayerPdfActionsProps) => {
                 onClick={() => setSettingsOpen(true)}
               >
                 <LuSettings2 className="h-4 w-4" />
-                Prayer PDF
+                {t("studio.groups.prayer_pdf.prayer_pdf")}
               </Pecha.Button>
               <Pecha.Button
                 size="sm"
                 className="gap-1.5"
                 disabled={!day || downloadMutation.isPending}
-                title={day ? undefined : "Choose a day to download its PDF"}
+                title={
+                  day
+                    ? undefined
+                    : t("studio.groups.prayer_pdf.choose_day_to_download")
+                }
                 onClick={() => day && downloadMutation.mutate(day)}
               >
                 <LuDownload className="h-4 w-4" />
                 {downloadMutation.isPending
-                  ? "Generating PDF…"
-                  : "Download prayers"}
+                  ? t("studio.groups.prayer_pdf.generating")
+                  : t("studio.groups.prayer_pdf.download")}
               </Pecha.Button>
               <Pecha.Button
                 variant="outline"
                 size="sm"
                 className="gap-1.5"
                 disabled={total === 0 || copyMutation.isPending}
-                title="Copy every listed request (name, request) as CSV"
+                title={t("studio.groups.prayer_pdf.copy_csv_title")}
                 onClick={() => copyMutation.mutate(day || null)}
               >
                 <LuCopy className="h-4 w-4" />
-                {copyMutation.isPending ? "Copying…" : "Copy as CSV"}
+                {copyMutation.isPending
+                  ? t("studio.groups.prayer_pdf.copying")
+                  : t("studio.groups.prayer_pdf.copy_csv")}
               </Pecha.Button>
             </div>
             {!day ? (
               <p className="text-xs text-muted-foreground">
-                Choose a day to see only its requests and download its PDF.
+                {t("studio.groups.prayer_pdf.choose_day_hint")}
               </p>
             ) : null}
           </div>

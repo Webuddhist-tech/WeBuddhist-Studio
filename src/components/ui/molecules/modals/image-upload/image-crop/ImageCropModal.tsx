@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/atoms/button";
 import { Input } from "@/components/ui/atoms/input";
 import { useState, useCallback } from "react";
 import Cropper from "react-easy-crop";
+import { useTranslate } from "@tolgee/react";
 
 interface ImageCropContentProps {
   imageSrc: string;
@@ -30,14 +31,37 @@ const createImage = (url: string) =>
 type CropFit = "horizontal-cover" | "vertical-cover" | "contain";
 type AspectOption = "original" | "1:1" | "4:3" | "3:4" | "16:9";
 
-const FIT_OPTIONS: { value: CropFit; label: string }[] = [
-  { value: "contain", label: "Whole" },
-  { value: "horizontal-cover", label: "Width" },
-  { value: "vertical-cover", label: "Height" },
+/** `labelKey` options are translated; ratios like "4:3" read the same everywhere. */
+type CropOption<T extends string> = {
+  value: T;
+  label: string;
+  labelKey?: string;
+};
+
+const FIT_OPTIONS: CropOption<CropFit>[] = [
+  {
+    value: "contain",
+    label: "Whole",
+    labelKey: "studio.modals.image_crop.fit_whole",
+  },
+  {
+    value: "horizontal-cover",
+    label: "Width",
+    labelKey: "studio.modals.image_crop.fit_width",
+  },
+  {
+    value: "vertical-cover",
+    label: "Height",
+    labelKey: "studio.modals.image_crop.fit_height",
+  },
 ];
 
-const ASPECT_OPTIONS: { value: AspectOption; label: string }[] = [
-  { value: "original", label: "Original" },
+const ASPECT_OPTIONS: CropOption<AspectOption>[] = [
+  {
+    value: "original",
+    label: "Original",
+    labelKey: "studio.modals.image_crop.ratio_original",
+  },
   { value: "1:1", label: "1:1" },
   { value: "4:3", label: "4:3" },
   { value: "3:4", label: "3:4" },
@@ -86,30 +110,33 @@ const OptionGroup = <T extends string>({
   onChange,
 }: {
   label: string;
-  options: { value: T; label: string }[];
+  options: CropOption<T>[];
   value: T;
   onChange: (value: T) => void;
-}) => (
-  <div className="flex items-center gap-2 flex-wrap">
-    <span className="text-sm font-bold text-[#666] dark:text-[#d4d4d4] w-12">
-      {label}
-    </span>
-    {options.map((option) => (
-      <Button
-        key={option.value}
-        type="button"
-        size="sm"
-        variant={option.value === value ? "default" : "outline"}
-        className={
-          option.value === value ? "bg-[#A51C21] text-white" : undefined
-        }
-        onClick={() => onChange(option.value)}
-      >
-        {option.label}
-      </Button>
-    ))}
-  </div>
-);
+}) => {
+  const { t } = useTranslate();
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      <span className="text-sm font-bold text-[#666] dark:text-[#d4d4d4] w-12">
+        {label}
+      </span>
+      {options.map((option) => (
+        <Button
+          key={option.value}
+          type="button"
+          size="sm"
+          variant={option.value === value ? "default" : "outline"}
+          className={
+            option.value === value ? "bg-[#A51C21] text-white" : undefined
+          }
+          onClick={() => onChange(option.value)}
+        >
+          {option.labelKey ? t(option.labelKey) : option.label}
+        </Button>
+      ))}
+    </div>
+  );
+};
 
 const CropContainer = ({
   imageSrc,
@@ -171,36 +198,41 @@ const CropControls = ({
   onFitChange: (fit: CropFit) => void;
   aspectOption: AspectOption;
   onAspectChange: (aspect: AspectOption) => void;
-}) => (
-  <div className="p-4 border-t border-[#eee] dark:bg-[#111111] dark:border-[#222222] bg-[#fafafa] space-y-3">
-    <OptionGroup
-      label="Fit"
-      options={FIT_OPTIONS}
-      value={fit}
-      onChange={onFitChange}
-    />
-    <OptionGroup
-      label="Ratio"
-      options={ASPECT_OPTIONS}
-      value={aspectOption}
-      onChange={onAspectChange}
-    />
-    <div className="mb-4 last:mb-0">
-      <label className="block text-sm mb-2 text-[#666] dark:text-[#d4d4d4] font-bold">
-        Zoom: {Math.round(zoom * 100)}%
-      </label>
-      <Input
-        type="range"
-        value={zoom}
-        min={0.5}
-        max={3}
-        step={0.1}
-        onChange={onZoomChange}
-        className="w-full h-2 rounded-sm outline-none bg-[#ddd] opacity-70 transition-opacity appearance-none hover:opacity-100"
+}) => {
+  const { t } = useTranslate();
+  return (
+    <div className="p-4 border-t border-[#eee] dark:bg-[#111111] dark:border-[#222222] bg-[#fafafa] space-y-3">
+      <OptionGroup
+        label={t("studio.modals.image_crop.fit")}
+        options={FIT_OPTIONS}
+        value={fit}
+        onChange={onFitChange}
       />
+      <OptionGroup
+        label={t("studio.modals.image_crop.ratio")}
+        options={ASPECT_OPTIONS}
+        value={aspectOption}
+        onChange={onAspectChange}
+      />
+      <div className="mb-4 last:mb-0">
+        <label className="block text-sm mb-2 text-[#666] dark:text-[#d4d4d4] font-bold">
+          {t("studio.modals.image_crop.zoom", {
+            percent: Math.round(zoom * 100),
+          })}
+        </label>
+        <Input
+          type="range"
+          value={zoom}
+          min={0.5}
+          max={3}
+          step={0.1}
+          onChange={onZoomChange}
+          className="w-full h-2 rounded-sm outline-none bg-[#ddd] opacity-70 transition-opacity appearance-none hover:opacity-100"
+        />
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 const CropActions = ({
   onBack,
@@ -210,22 +242,30 @@ const CropActions = ({
   onBack: () => void;
   onCropConfirm: () => void;
   disabled: boolean;
-}) => (
-  <div className="flex float-end gap-4 p-4 border-t border-[#eee] dark:border-[#222222]">
-    <Button type="button" className="flex-1" variant="outline" onClick={onBack}>
-      Skip
-    </Button>
-    <Button
-      type="button"
-      variant="default"
-      className="bg-[#A51C21] hover:bg-[#A51C21]/90 flex-1 text-white"
-      onClick={onCropConfirm}
-      disabled={disabled}
-    >
-      Apply Crop
-    </Button>
-  </div>
-);
+}) => {
+  const { t } = useTranslate();
+  return (
+    <div className="flex float-end gap-4 p-4 border-t border-[#eee] dark:border-[#222222]">
+      <Button
+        type="button"
+        className="flex-1"
+        variant="outline"
+        onClick={onBack}
+      >
+        {t("studio.modals.image_crop.skip")}
+      </Button>
+      <Button
+        type="button"
+        variant="default"
+        className="bg-[#A51C21] hover:bg-[#A51C21]/90 flex-1 text-white"
+        onClick={onCropConfirm}
+        disabled={disabled}
+      >
+        {t("studio.modals.image_crop.apply_crop")}
+      </Button>
+    </div>
+  );
+};
 
 const ImageCropContent = ({
   imageSrc,

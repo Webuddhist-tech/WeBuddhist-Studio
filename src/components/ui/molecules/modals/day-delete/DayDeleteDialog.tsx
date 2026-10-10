@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { FiTrash } from "react-icons/fi";
 
@@ -7,6 +8,7 @@ interface DayDeleteDialogProps {
 }
 
 const DayDeleteDialog = ({ onDelete }: DayDeleteDialogProps) => {
+  const { t } = useTranslate();
   const [open, setOpen] = useState(false);
   return (
     <Pecha.AlertDialog open={open} onOpenChange={setOpen}>
@@ -18,20 +20,21 @@ const DayDeleteDialog = ({ onDelete }: DayDeleteDialogProps) => {
           }}
           className="flex items-center gap-2 cursor-pointer w-full"
         >
-          <FiTrash className="w-4 h-4" /> Delete
+          <FiTrash className="w-4 h-4" /> {t("studio.common.delete")}
         </span>
       </Pecha.AlertDialogTrigger>
       <Pecha.AlertDialogContent>
         <Pecha.AlertDialogHeader>
-          <Pecha.AlertDialogTitle>Are you sure?</Pecha.AlertDialogTitle>
+          <Pecha.AlertDialogTitle>
+            {t("studio.common.are_you_sure")}
+          </Pecha.AlertDialogTitle>
           <Pecha.AlertDialogDescription>
-            This action cannot be undone. This will permanently delete this day
-            and its tasks.
+            {t("studio.modals.day_delete.description")}
           </Pecha.AlertDialogDescription>
         </Pecha.AlertDialogHeader>
         <Pecha.AlertDialogFooter>
           <Pecha.AlertDialogCancel onClick={() => setOpen(false)}>
-            Cancel
+            {t("studio.common.cancel")}
           </Pecha.AlertDialogCancel>
           <Pecha.AlertDialogAction
             className="bg-[#AD1B21] dark:text-white hover:bg-[#AD1B21]/90"
@@ -40,7 +43,7 @@ const DayDeleteDialog = ({ onDelete }: DayDeleteDialogProps) => {
               setOpen(false);
             }}
           >
-            Delete Day
+            {t("studio.modals.delete_day")}
           </Pecha.AlertDialogAction>
         </Pecha.AlertDialogFooter>
       </Pecha.AlertDialogContent>

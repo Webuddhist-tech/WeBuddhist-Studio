@@ -50,9 +50,7 @@ describe("Signup Component", () => {
     renderWithProviders(<Signup />);
 
     expect(screen.getByText("Webuddhist Studio")).toBeDefined();
-    expect(
-      screen.getByText("Learn, live and share Buddhist wisdom daily"),
-    ).toBeDefined();
+    expect(screen.getByText("studio.ui.auth_card.tagline")).toBeDefined();
   });
 
   it("shows login link", () => {
@@ -100,7 +98,9 @@ describe("Signup Component", () => {
     await user.type(passwordFields[1], "differentPassword");
     await user.click(screen.getByText("common.button.submit"));
     await waitFor(() => {
-      expect(screen.getByText("Passwords do not match")).toBeInTheDocument();
+      expect(
+        screen.getByText("studio.validation.passwords_do_not_match"),
+      ).toBeInTheDocument();
     });
   });
 

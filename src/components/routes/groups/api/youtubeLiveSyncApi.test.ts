@@ -115,10 +115,10 @@ describe("describeRunResult", () => {
   it("says how many links were added", () => {
     expect(
       describeRunResult({ ...base, live_streams_found: 1, links_added: 2 }),
-    ).toBe("Live stream added 2 links.");
+    ).toBe("studio.groups.shared.live_sync.added_other");
     expect(
       describeRunResult({ ...base, live_streams_found: 1, links_added: 1 }),
-    ).toBe("Live stream added 1 link.");
+    ).toBe("studio.groups.shared.live_sync.added_one");
   });
 
   it("says how many links were replaced", () => {
@@ -128,14 +128,14 @@ describe("describeRunResult", () => {
         live_streams_found: 1,
         links_replaced: 1,
       }),
-    ).toBe("Live stream replaced 1 link.");
+    ).toBe("studio.groups.shared.live_sync.replaced_one");
     expect(
       describeRunResult({
         ...base,
         live_streams_found: 1,
         links_replaced: 3,
       }),
-    ).toBe("Live stream replaced 3 links.");
+    ).toBe("studio.groups.shared.live_sync.replaced_other");
   });
 
   it("says when some links were added and some replaced", () => {
@@ -146,20 +146,28 @@ describe("describeRunResult", () => {
         links_added: 1,
         links_replaced: 2,
       }),
-    ).toBe("Live stream added 1 link and replaced 2 links.");
+    ).toBe("studio.groups.shared.live_sync.added_and_replaced");
   });
 
   it("says when nothing is live", () => {
-    expect(describeRunResult(base)).toMatch(/no stream is live/i);
+    expect(describeRunResult(base)).toBe(
+      "studio.groups.shared.live_sync.none_live",
+    );
   });
 
   it("says when the language was unclear", () => {
     expect(
-      describeRunResult({ ...base, live_streams_found: 1, skipped_unknown_language: 1 }),
-    ).toMatch(/language/i);
+      describeRunResult({
+        ...base,
+        live_streams_found: 1,
+        skipped_unknown_language: 1,
+      }),
+    ).toBe("studio.groups.shared.live_sync.unknown_language");
   });
 
   it("says when the events already have it", () => {
-    expect(describeRunResult({ ...base, live_streams_found: 1 })).toMatch(/already have/i);
+    expect(describeRunResult({ ...base, live_streams_found: 1 })).toBe(
+      "studio.groups.shared.live_sync.already_linked",
+    );
   });
 });

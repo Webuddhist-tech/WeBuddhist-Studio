@@ -1,4 +1,5 @@
 import axiosInstance from "@/config/axios-config";
+import { tolgee } from "@/i18n/tolgee";
 import type { FkOption } from "../components/FkMultiSearchSelector";
 
 interface PresetMantraDTO {
@@ -33,7 +34,7 @@ function presetLabel(preset: PublicAccumulatorDTO): string {
   if (mantraText) {
     return mantraText.length > 60 ? `${mantraText.slice(0, 57)}…` : mantraText;
   }
-  return "Untitled preset";
+  return tolgee.t("studio.groups.shared.untitled_preset");
 }
 
 export async function searchAccumulatorPresets(params: {

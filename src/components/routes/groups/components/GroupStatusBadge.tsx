@@ -1,3 +1,4 @@
+import { useTranslate } from "@tolgee/react";
 import type { AuthorGroupStatus } from "../api/groupsApi";
 
 /** Mirrors the plan/series status chip palette. */
@@ -9,9 +10,9 @@ const STATUS_STYLES: Record<AuthorGroupStatus, string> = {
 };
 
 const STATUS_LABELS: Record<AuthorGroupStatus, string> = {
-  PUBLISHED: "Published",
-  UNPUBLISHED: "Unpublished",
-  DRAFT: "Draft",
+  PUBLISHED: "studio.common.published",
+  UNPUBLISHED: "studio.groups.components.status.unpublished",
+  DRAFT: "studio.common.draft",
 };
 
 type GroupStatusBadgeProps = {
@@ -20,12 +21,13 @@ type GroupStatusBadgeProps = {
 };
 
 const GroupStatusBadge = ({ status, className }: GroupStatusBadgeProps) => {
+  const { t } = useTranslate();
   if (!status) return null;
   return (
     <span
       className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[status]} ${className ?? ""}`}
     >
-      {STATUS_LABELS[status]}
+      {t(STATUS_LABELS[status])}
     </span>
   );
 };

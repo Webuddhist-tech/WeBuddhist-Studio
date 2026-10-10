@@ -47,31 +47,31 @@ export function DashBoardTable({
       case "PUBLISHED":
         return (
           <Pecha.Badge className="bg-green-100  dark:bg-green-900 text-green-500 px-3 py-1.5 text-sm font-bold">
-            Published
+            {t("studio.common.published")}
           </Pecha.Badge>
         );
       case "UNPUBLISHED":
         return (
           <Pecha.Badge className="bg-red-100  dark:bg-red-900 text-red-500 px-3 py-1.5 text-sm font-bold">
-            Unpublished
+            {t("studio.molecules.dashboard_table.status_unpublished")}
           </Pecha.Badge>
         );
       case "DRAFT":
         return (
           <Pecha.Badge className="px-3 py-1.5 text-sm font-bold dark:bg-pending/10 bg-[#E1F0FF] text-[#008DFF] dark:text-pending">
-            Draft
+            {t("studio.common.draft")}
           </Pecha.Badge>
         );
       case "ARCHIVED":
         return (
           <Pecha.Badge className="px-3 py-1.5 text-sm font-bold bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400">
-            Archived
+            {t("studio.molecules.dashboard_table.status_archived")}
           </Pecha.Badge>
         );
       default:
         return (
           <Pecha.Badge className="px-3 py-1.5 text-sm font-bold dark:bg-pending/10 bg-[#E1F0FF] text-[#008DFF] dark:text-pending">
-            Draft
+            {t("studio.common.draft")}
           </Pecha.Badge>
         );
     }
@@ -117,7 +117,7 @@ export function DashBoardTable({
             colSpan={6}
             className="text-center py-6 text-muted-foreground"
           >
-            Loading...
+            {t("studio.common.loading")}
           </Pecha.TableCell>
         </Pecha.TableRow>
       );
@@ -144,7 +144,7 @@ export function DashBoardTable({
             onError={(e) => {
               e.currentTarget.src = defaultCover;
             }}
-            alt="Plan Cover Image"
+            alt={t("studio.molecules.dashboard_table.cover_image_alt")}
             className="w-32 rounded border-2 h-12 object-cover"
           />
         </Pecha.TableCell>
@@ -157,8 +157,16 @@ export function DashBoardTable({
             {plan.description}
           </div>
         </Pecha.TableCell>
-        <Pecha.TableCell>{plan.total_days} Days</Pecha.TableCell>
-        <Pecha.TableCell>{plan.subscription_count} Used</Pecha.TableCell>
+        <Pecha.TableCell>
+          {t("studio.molecules.dashboard_table.days_count", {
+            count: plan.total_days,
+          })}
+        </Pecha.TableCell>
+        <Pecha.TableCell>
+          {t("studio.molecules.dashboard_table.used_count", {
+            count: plan.subscription_count,
+          })}
+        </Pecha.TableCell>
         <Pecha.TableCell>{getStatusBadge(plan.status)}</Pecha.TableCell>
         <Pecha.TableCell>{getLanguage(plan.language)}</Pecha.TableCell>
         <Pecha.TableCell>
@@ -172,7 +180,9 @@ export function DashBoardTable({
               <FaStar
                 className={`${plan.featured ? "text-yellow-500" : "text-gray-500"}`}
               />{" "}
-              {plan.featured ? "Featured" : "Not Featured"}
+              {plan.featured
+                ? t("studio.molecules.dashboard_table.featured")
+                : t("studio.molecules.dashboard_table.not_featured")}
             </Pecha.Button>
           </div>
         </Pecha.TableCell>
@@ -213,13 +223,13 @@ export function DashBoardTable({
             {t("studio.dashboard.plan_used")}
           </Pecha.TableHead>
           <Pecha.TableHead className="w-[100px] font-bold">
-            Status
+            {t("studio.common.status")}
           </Pecha.TableHead>
           <Pecha.TableHead className="w-[100px] font-bold">
             {t("studio.plan.form_field.language")}
           </Pecha.TableHead>
           <Pecha.TableHead className="w-[150px] font-bold">
-            Feature
+            {t("studio.molecules.dashboard_table.feature_header")}
           </Pecha.TableHead>
           <Pecha.TableHead className="w-[150px] font-bold">
             {t("studio.dashboard.actions")}

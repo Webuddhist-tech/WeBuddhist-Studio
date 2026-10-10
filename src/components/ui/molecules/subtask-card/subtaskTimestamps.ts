@@ -1,5 +1,6 @@
 import type { SubTask } from "./SubTaskCard";
 import { formatMs } from "@/lib/utils";
+import { tolgee } from "@/i18n/tolgee";
 
 export function buildSubTaskTimestampFields(
   subTask: SubTask,
@@ -24,14 +25,16 @@ export function validateSubTaskTimestamps(
     const hasStart = st.start_ms != null;
     const hasEnd = st.end_ms != null;
     if (hasStart !== hasEnd) {
-      return `Subtask ${i + 1}: provide both start and end times, or clear both.`;
+      return tolgee.t("studio.subtask.timestamps.need_both", { number: i + 1 });
     }
     if (
       hasStart &&
       hasEnd &&
       (st.start_ms as number) >= (st.end_ms as number)
     ) {
-      return `Subtask ${i + 1}: start must be before end.`;
+      return tolgee.t("studio.subtask.timestamps.start_before_end", {
+        number: i + 1,
+      });
     }
     if (
       hasStart &&
@@ -39,7 +42,10 @@ export function validateSubTaskTimestamps(
       maxDurationMs != null &&
       (st.end_ms as number) > maxDurationMs
     ) {
-      return `Subtask ${i + 1}: end time must be ≤ day audio (${formatMs(maxDurationMs)}).`;
+      return tolgee.t("studio.subtask.timestamps.end_exceeds_audio", {
+        number: i + 1,
+        duration: formatMs(maxDurationMs),
+      });
     }
   }
   return null;

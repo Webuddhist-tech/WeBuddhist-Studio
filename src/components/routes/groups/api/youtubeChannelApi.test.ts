@@ -167,7 +167,7 @@ describe("fetchYoutubeChannelLiveVideos", () => {
     fetchMock.mockImplementation(() => respond({ items: [] }));
     await expect(
       fetchYoutubeChannelLiveVideos("https://www.youtube.com/c/SomeName"),
-    ).rejects.toThrow("Could not find this YouTube channel");
+    ).rejects.toThrow("studio.groups.shared.youtube_channel_lookup_failed");
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(String(fetchMock.mock.calls[0][0])).toContain(
       "forHandle=%40SomeName",
@@ -179,7 +179,7 @@ describe("fetchYoutubeChannelLiveVideos", () => {
       fetchYoutubeChannelLiveVideos(
         "https://www.youtube.com/watch?v=abcdefghijk",
       ),
-    ).rejects.toThrow("not a channel URL");
+    ).rejects.toThrow("studio.groups.shared.youtube_not_channel_url");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });

@@ -65,7 +65,7 @@ const CoverImageField = ({
             type="button"
             onClick={onOpenDialog}
             className="border w-56 h-40 border-dashed border-gray-300 dark:border-gray-600 rounded-lg flex items-center justify-center hover:border-gray-400 transition-colors cursor-pointer focus:outline-none bg-#C7C7C7 dark:bg-[#262626]"
-            aria-label="Upload cover image"
+            aria-label={t("studio.series.form.upload_cover_aria")}
           >
             <IoMdAdd className="h-10 w-10 text-gray-400" />
           </button>
@@ -74,7 +74,7 @@ const CoverImageField = ({
           <div className="relative">
             <img
               src={imagePreview}
-              alt="Cover preview"
+              alt={t("studio.series.form.cover_preview_alt")}
               className="w-48 h-48 object-cover rounded-lg border"
             />
             <div className="flex items-center justify-between absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent rounded-b-lg p-2">
@@ -84,7 +84,7 @@ const CoverImageField = ({
                 </p>
               )}
               <button
-                aria-label="Remove image"
+                aria-label={t("studio.series.form.remove_image_aria")}
                 type="button"
                 onClick={onRemove}
                 className="text-white cursor-pointer rounded-full p-1 transition-colors ml-auto"
@@ -99,7 +99,7 @@ const CoverImageField = ({
       <input type="hidden" {...form.register("image_url")} />
       {form.formState.errors.image_url && (
         <p className="text-sm text-destructive">
-          {form.formState.errors.image_url.message}
+          {t(String(form.formState.errors.image_url.message))}
         </p>
       )}
     </div>

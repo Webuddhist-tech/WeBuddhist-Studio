@@ -6,6 +6,7 @@ import {
 } from "@/lib/ttsConstants";
 
 import { getAuthHeaders } from "@/lib/auth-storage";
+import { tolgee } from "@/i18n/tolgee";
 interface CreateTaskPayload {
   plan_id: string;
   day_id: string;
@@ -291,7 +292,7 @@ const abortError = () =>
   new DOMException("Audio job polling aborted", "AbortError");
 
 const pollTimeoutError = () =>
-  new Error("Audio generation is taking longer than expected");
+  new Error(tolgee.t("studio.task.audio.generation_timeout"));
 
 const isAbortError = (error: unknown): boolean => {
   if (!error || typeof error !== "object") {

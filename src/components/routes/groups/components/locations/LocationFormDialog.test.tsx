@@ -59,7 +59,9 @@ describe("LocationFormDialog localized names", () => {
   it("seeds the stored names when editing", () => {
     renderDialog({ location: existingLocation });
 
-    const nameInputs = screen.getAllByPlaceholderText("Name in this language");
+    const nameInputs = screen.getAllByPlaceholderText(
+      "studio.groups.locations.form.translation_name_placeholder",
+    );
     expect(nameInputs).toHaveLength(2);
     expect((nameInputs[0] as HTMLInputElement).value).toBe("Bodh Gaya");
     expect((nameInputs[1] as HTMLInputElement).value).toBe("རྡོ་རྗེ་གདན།");
@@ -69,19 +71,31 @@ describe("LocationFormDialog localized names", () => {
     renderDialog();
 
     expect(
-      screen.queryByPlaceholderText("Name in this language"),
+      screen.queryByPlaceholderText(
+        "studio.groups.locations.form.translation_name_placeholder",
+      ),
     ).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /add language/i }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "studio.groups.locations.form.add_language",
+      }),
+    );
     expect(
-      screen.getAllByPlaceholderText("Name in this language"),
+      screen.getAllByPlaceholderText(
+        "studio.groups.locations.form.translation_name_placeholder",
+      ),
     ).toHaveLength(1);
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Remove localized name" }),
+      screen.getByRole("button", {
+        name: "studio.groups.locations.form.remove_localized_name",
+      }),
     );
     expect(
-      screen.queryByPlaceholderText("Name in this language"),
+      screen.queryByPlaceholderText(
+        "studio.groups.locations.form.translation_name_placeholder",
+      ),
     ).not.toBeInTheDocument();
   });
 
@@ -90,22 +104,42 @@ describe("LocationFormDialog localized names", () => {
 
     // Both configured languages are taken, so there is nothing left to add.
     expect(
-      screen.queryByRole("button", { name: /add language/i }),
+      screen.queryByRole("button", {
+        name: "studio.groups.locations.form.add_language",
+      }),
     ).not.toBeInTheDocument();
   });
 
   it("submits the localized names alongside the canonical one", async () => {
     const { onSubmit } = renderDialog();
 
-    fireEvent.change(screen.getByPlaceholderText("Enter a location name"), {
-      target: { value: "Bodh Gaya" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /add language/i }));
-    fireEvent.change(screen.getByPlaceholderText("Name in this language"), {
-      target: { value: "Bodhgaya" },
-    });
+    fireEvent.change(
+      screen.getByPlaceholderText(
+        "studio.groups.locations.form.name_placeholder",
+      ),
+      {
+        target: { value: "Bodh Gaya" },
+      },
+    );
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "studio.groups.locations.form.add_language",
+      }),
+    );
+    fireEvent.change(
+      screen.getByPlaceholderText(
+        "studio.groups.locations.form.translation_name_placeholder",
+      ),
+      {
+        target: { value: "Bodhgaya" },
+      },
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: "Create location" }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "studio.groups.locations.form.create_submit",
+      }),
+    );
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalled());
     expect(onSubmit.mock.calls[0][0]).toMatchObject({
@@ -117,15 +151,30 @@ describe("LocationFormDialog localized names", () => {
   it("refuses a localized row with no name", async () => {
     const { onSubmit } = renderDialog();
 
-    fireEvent.change(screen.getByPlaceholderText("Enter a location name"), {
-      target: { value: "Bodh Gaya" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /add language/i }));
+    fireEvent.change(
+      screen.getByPlaceholderText(
+        "studio.groups.locations.form.name_placeholder",
+      ),
+      {
+        target: { value: "Bodh Gaya" },
+      },
+    );
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "studio.groups.locations.form.add_language",
+      }),
+    );
 
-    fireEvent.click(screen.getByRole("button", { name: "Create location" }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "studio.groups.locations.form.create_submit",
+      }),
+    );
 
     await waitFor(() =>
-      expect(screen.getByText("Name is required")).toBeInTheDocument(),
+      expect(
+        screen.getByText("studio.validation.name_required"),
+      ).toBeInTheDocument(),
     );
     expect(onSubmit).not.toHaveBeenCalled();
   });

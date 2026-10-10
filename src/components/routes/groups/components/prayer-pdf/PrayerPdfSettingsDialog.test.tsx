@@ -80,10 +80,14 @@ describe("PrayerPdfSettingsDialog", () => {
     vi.mocked(fetchPrayerPdfSettings).mockResolvedValue(settings());
     renderDialog();
 
-    expect(await screen.findByTitle("Prayer PDF preview")).toBeTruthy();
-    expect(screen.getByText("2 prayer requests on this day.")).toBeTruthy();
+    expect(
+      await screen.findByTitle("studio.groups.prayer_pdf.preview.frame_title"),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("studio.groups.prayer_pdf.preview.count_other"),
+    ).toBeTruthy();
 
-    const title = screen.getByLabelText("Title");
+    const title = screen.getByLabelText("studio.common.title");
     await user.clear(title);
     await user.type(title, "Live title");
 
@@ -117,10 +121,14 @@ describe("PrayerPdfSettingsDialog", () => {
 
     expect(await screen.findByDisplayValue("Prayer Requests")).toBeTruthy();
     expect(screen.getByDisplayValue("迴向祈願名單")).toBeTruthy();
-    expect(screen.getByText(/Using the group's PDF settings/)).toBeTruthy();
+    expect(
+      screen.getByText("studio.groups.prayer_pdf.settings.source_event_group"),
+    ).toBeTruthy();
     // Nothing of its own to reset yet.
     expect(
-      screen.queryByRole("button", { name: "Use group settings" }),
+      screen.queryByRole("button", {
+        name: "studio.groups.prayer_pdf.settings.use_group_settings",
+      }),
     ).toBeNull();
   });
 
@@ -132,10 +140,22 @@ describe("PrayerPdfSettingsDialog", () => {
     );
     const { onOpenChange } = renderDialog();
 
-    await user.clear(await screen.findByLabelText("Chinese title"));
-    await user.type(screen.getByLabelText("Mantra"), "  ཨོཾ་ཏཱ་རེ།  ");
-    await user.type(screen.getByLabelText("Day 1 date"), "2026-09-25");
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.clear(
+      await screen.findByLabelText(
+        "studio.groups.prayer_pdf.settings.chinese_title",
+      ),
+    );
+    await user.type(
+      screen.getByLabelText("studio.groups.prayer_pdf.settings.mantra"),
+      "  ཨོཾ་ཏཱ་རེ།  ",
+    );
+    await user.type(
+      screen.getByLabelText("studio.groups.prayer_pdf.settings.day_one"),
+      "2026-09-25",
+    );
+    await user.click(
+      screen.getByRole("button", { name: "studio.common.save" }),
+    );
 
     await waitFor(() => expect(updatePrayerPdfSettings).toHaveBeenCalled());
     const [scope, payload] = vi.mocked(updatePrayerPdfSettings).mock.calls[0];
@@ -156,9 +176,13 @@ describe("PrayerPdfSettingsDialog", () => {
     renderDialog();
 
     await user.click(
-      await screen.findByRole("button", { name: "Fill Zabtik Drolchok text" }),
+      await screen.findByRole("button", {
+        name: "studio.groups.prayer_pdf.settings.fill_template",
+      }),
     );
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(
+      screen.getByRole("button", { name: "studio.common.save" }),
+    );
 
     await waitFor(() => expect(updatePrayerPdfSettings).toHaveBeenCalled());
     const [, payload] = vi.mocked(updatePrayerPdfSettings).mock.calls[0];
@@ -171,13 +195,17 @@ describe("PrayerPdfSettingsDialog", () => {
     vi.mocked(fetchPrayerPdfSettings).mockResolvedValue(settings());
     renderDialog();
 
-    const color = await screen.findByLabelText("Accent color");
+    const color = await screen.findByLabelText(
+      "studio.groups.prayer_pdf.settings.accent_color",
+    );
     await user.clear(color);
     await user.type(color, "gold");
-    await user.click(screen.getByRole("button", { name: "Save" }));
+    await user.click(
+      screen.getByRole("button", { name: "studio.common.save" }),
+    );
 
     expect(toast.error).toHaveBeenCalledWith(
-      "Accent color must be a hex color like #7a1f1f",
+      "studio.groups.prayer_pdf.settings.color_invalid",
     );
     expect(updatePrayerPdfSettings).not.toHaveBeenCalled();
   });
@@ -193,7 +221,9 @@ describe("PrayerPdfSettingsDialog", () => {
     renderDialog();
 
     await user.click(
-      await screen.findByRole("button", { name: "Use group settings" }),
+      await screen.findByRole("button", {
+        name: "studio.groups.prayer_pdf.settings.use_group_settings",
+      }),
     );
 
     await waitFor(() =>
@@ -209,10 +239,12 @@ describe("PrayerPdfSettingsDialog", () => {
     renderDialog({ kind: "group", groupId: "g1" });
 
     expect(
-      await screen.findByRole("button", { name: "Reset to defaults" }),
+      await screen.findByRole("button", {
+        name: "studio.groups.prayer_pdf.settings.reset_to_defaults",
+      }),
     ).toBeTruthy();
     expect(
-      screen.getByText("Events without their own settings use these too."),
+      screen.getByText("studio.groups.prayer_pdf.settings.source_group_own"),
     ).toBeTruthy();
   });
 });

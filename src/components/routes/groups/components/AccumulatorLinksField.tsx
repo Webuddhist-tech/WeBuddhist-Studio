@@ -24,6 +24,7 @@ import {
   IoLogoYoutube,
 } from "react-icons/io5";
 import { PiDotsSixVertical } from "react-icons/pi";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import { cn, reorderArray } from "@/lib/utils";
@@ -35,6 +36,10 @@ import {
   type AccumulatorLinkRow,
   type LinkPlatform,
 } from "./accumulatorLinkRows";
+import {
+  GROUP_ACCUMULATOR_LINK_TITLE_MAX,
+  isValidLinkUrl,
+} from "../api/groupAccumulatorsApi";
 
 const PLATFORM_ICON: Record<LinkPlatform, typeof IoLinkOutline> = {
   YOUTUBE: IoLogoYoutube,
@@ -71,6 +76,7 @@ function SortableLinkRow({
   readonly onChange: (patch: Partial<AccumulatorLinkRow>) => void;
   readonly onRemove: () => void;
 }) {
+  const { t } = useTranslate();
   const {
     attributes,
     listeners,
@@ -109,7 +115,12 @@ function SortableLinkRow({
         <button
           type="button"
           className="mt-2.5 shrink-0 cursor-grab rounded p-1 text-muted-foreground hover:text-foreground touch-none active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-30"
-          aria-label={`Reorder link ${index + 1}`}
+          aria-label={t(
+            "studio.groups.components.accumulator_links.reorder_link",
+            {
+              index: index + 1,
+            },
+          )}
           disabled={!canReorder}
           {...listeners}
         >
@@ -141,22 +152,45 @@ function SortableLinkRow({
             value={row.url}
             onChange={(e) => onChange({ url: e.target.value })}
             placeholder="https://www.youtube.com/watch?v=…"
-            aria-label={`Link ${index + 1} URL`}
+            aria-label={t(
+              "studio.groups.components.accumulator_links.link_url",
+              {
+                index: index + 1,
+              },
+            )}
             aria-invalid={error ? true : undefined}
             className="h-9 bg-white dark:bg-[#262626]"
           />
           <Pecha.Input
             value={row.title}
             onChange={(e) => onChange({ title: e.target.value })}
-            placeholder="Title (optional)"
-            aria-label={`Link ${index + 1} title`}
+            placeholder={t(
+              "studio.groups.components.accumulator_links.title_placeholder",
+            )}
+            aria-label={t(
+              "studio.groups.components.accumulator_links.link_title",
+              {
+                index: index + 1,
+              },
+            )}
             className="h-9 bg-white dark:bg-[#262626]"
           />
           {error ? (
-            <p className="text-xs text-destructive">{error}</p>
+            <p className="text-xs text-destructive">
+              {isValidLinkUrl(row.url)
+                ? t(
+                    "studio.groups.components.accumulator_links.title_too_long",
+                    {
+                      max: GROUP_ACCUMULATOR_LINK_TITLE_MAX,
+                    },
+                  )
+                : t("studio.groups.components.accumulator_links.invalid_url")}
+            </p>
           ) : hasUrl && platform ? (
             <p className="text-xs text-muted-foreground">
-              {PLATFORM_LABEL[platform]}
+              {platform === "OTHER"
+                ? t("studio.groups.components.accumulator_links.platform_other")
+                : PLATFORM_LABEL[platform]}
             </p>
           ) : null}
         </div>
@@ -167,7 +201,12 @@ function SortableLinkRow({
           size="sm"
           className="mt-0.5 shrink-0 text-muted-foreground hover:text-destructive"
           onClick={onRemove}
-          aria-label={`Remove link ${index + 1}`}
+          aria-label={t(
+            "studio.groups.components.accumulator_links.remove_link",
+            {
+              index: index + 1,
+            },
+          )}
         >
           <IoMdTrash className="h-4 w-4" />
         </Button>
@@ -187,6 +226,7 @@ const AccumulatorLinksField = ({
   errors,
   onChange,
 }: AccumulatorLinksFieldProps) => {
+  const { t } = useTranslate();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
@@ -216,9 +256,13 @@ const AccumulatorLinksField = ({
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-sm font-bold">Links</p>
+          <p className="text-sm font-bold">
+            {t("studio.groups.components.accumulator_links.heading")}
+          </p>
           <p className="text-xs text-muted-foreground">
-            {canReorder ? "Drag to reorder" : "Videos and other links"}
+            {canReorder
+              ? t("studio.groups.components.accumulator_links.drag_to_reorder")
+              : t("studio.groups.components.accumulator_links.subheading")}
           </p>
         </div>
         <Button
@@ -228,7 +272,8 @@ const AccumulatorLinksField = ({
           className="shrink-0"
           onClick={addRow}
         >
-          <IoMdAdd className="h-4 w-4" /> Add link
+          <IoMdAdd className="h-4 w-4" />{" "}
+          {t("studio.groups.components.social_links.add_link")}
         </Button>
       </div>
 
@@ -238,7 +283,7 @@ const AccumulatorLinksField = ({
           onClick={addRow}
           className="w-full rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
         >
-          Add a video or link
+          {t("studio.groups.components.accumulator_links.empty")}
         </button>
       ) : (
         <DndContext

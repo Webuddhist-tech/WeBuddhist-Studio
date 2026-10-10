@@ -4,9 +4,21 @@ export const POST_STATUSES = ["PUBLISHED", "HIDDEN"] as const;
 export type PostStatus = (typeof POST_STATUSES)[number];
 
 export const POST_LINK_TYPES = [
-  { value: "EXTERNAL", label: "External" },
-  { value: "YOUTUBE", label: "YouTube" },
-  { value: "WEBSITE", label: "Website" },
+  {
+    value: "EXTERNAL",
+    label: "External",
+    labelKey: "studio.ui.options.post_link_type.external",
+  },
+  {
+    value: "YOUTUBE",
+    label: "YouTube",
+    labelKey: "studio.ui.options.post_link_type.youtube",
+  },
+  {
+    value: "WEBSITE",
+    label: "Website",
+    labelKey: "studio.ui.options.post_link_type.website",
+  },
 ] as const;
 
 export const POST_MEDIA_TYPES = ["IMAGE", "VIDEO", "AUDIO"] as const;
@@ -18,18 +30,18 @@ export const postLinkRowSchema = z.object({
   type: z
     .string()
     .trim()
-    .min(1, "Type is required")
-    .max(50, "Type must be at most 50 characters"),
+    .min(1, "studio.validation.type_required")
+    .max(50, "studio.validation.type_max_50"),
   url: z
     .string()
     .trim()
-    .min(1, "URL is required")
-    .max(2000, "URL must be at most 2000 characters")
+    .min(1, "studio.validation.url_required")
+    .max(2000, "studio.validation.url_max_2000")
     .refine(
       (value) => value.toLowerCase().startsWith("https://"),
-      "URL must start with https://",
+      "studio.validation.url_https_prefix",
     ),
-  label: z.string().trim().max(255, "Label must be at most 255 characters"),
+  label: z.string().trim().max(255, "studio.validation.label_max_255"),
 });
 
 export type PostLinkRow = z.infer<typeof postLinkRowSchema>;
@@ -49,7 +61,7 @@ export type PostMediaRow = z.infer<typeof postMediaRowSchema>;
 
 export const postSchema = z
   .object({
-    caption: z.string().trim().max(5000, "Caption is too long"),
+    caption: z.string().trim().max(5000, "studio.validation.caption_too_long"),
     status: z.enum(POST_STATUSES),
     media: z.array(postMediaRowSchema).max(MAX_POST_MEDIA_ITEMS),
     links: z.array(postLinkRowSchema),
@@ -66,7 +78,7 @@ export const postSchema = z
     if (!hasCaption && !hasLinks && mediaCount === 0) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Add a caption, at least one image, or a link",
+        message: "studio.validation.post_content_required",
         path: ["caption"],
       });
     }
@@ -76,7 +88,7 @@ export const postSchema = z
         if (!row.media_key.trim()) {
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: "Upload is incomplete",
+            message: "studio.validation.upload_incomplete",
             path: ["media", index, "media_key"],
           });
         }

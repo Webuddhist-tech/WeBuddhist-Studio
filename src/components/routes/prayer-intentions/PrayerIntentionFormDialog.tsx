@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import { Textarea } from "@/components/ui/atoms/textarea";
@@ -26,6 +27,7 @@ const PrayerIntentionFormDialog = ({
   isSubmitting,
   onSubmit,
 }: PrayerIntentionFormDialogProps) => {
+  const { t } = useTranslate();
   const isEdit = !!intention;
   const [slug, setSlug] = useState("");
   const [label, setLabel] = useState("");
@@ -50,24 +52,26 @@ const PrayerIntentionFormDialog = ({
     const trimmedOrder = displayOrder.trim();
 
     if (!trimmedLabel) {
-      toast.error("Label is required");
+      toast.error(t("studio.prayer_intentions.validation.label_required"));
       return;
     }
     if (!trimmedDescription) {
-      toast.error("Description is required");
+      toast.error(
+        t("studio.prayer_intentions.validation.description_required"),
+      );
       return;
     }
     if (!trimmedColor) {
-      toast.error("Color is required");
+      toast.error(t("studio.prayer_intentions.validation.color_required"));
       return;
     }
     if (!trimmedOrder) {
-      toast.error("Display order is required");
+      toast.error(t("studio.prayer_intentions.validation.order_required"));
       return;
     }
     const parsedOrder = Number(trimmedOrder);
     if (!Number.isFinite(parsedOrder)) {
-      toast.error("Display order must be a number");
+      toast.error(t("studio.prayer_intentions.validation.order_number"));
       return;
     }
 
@@ -83,7 +87,7 @@ const PrayerIntentionFormDialog = ({
 
     const trimmedSlug = slug.trim().toLowerCase();
     if (!trimmedSlug) {
-      toast.error("Slug is required");
+      toast.error(t("studio.prayer_intentions.validation.slug_required"));
       return;
     }
     onSubmit({
@@ -100,36 +104,41 @@ const PrayerIntentionFormDialog = ({
       <Pecha.DialogContent className="max-w-lg">
         <Pecha.DialogHeader>
           <Pecha.DialogTitle>
-            {isEdit ? "Edit prayer intention" : "New prayer intention"}
+            {isEdit
+              ? t("studio.prayer_intentions.form.edit_title")
+              : t("studio.prayer_intentions.form.create_title")}
           </Pecha.DialogTitle>
         </Pecha.DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           {!isEdit ? (
             <div className="space-y-2">
               <label htmlFor="intention-slug" className="text-sm font-bold">
-                Slug
+                {t("studio.prayer_intentions.table.slug")}
               </label>
               <Pecha.Input
                 id="intention-slug"
                 value={slug}
                 onChange={(e) => setSlug(e.target.value)}
-                placeholder="healing"
+                placeholder={t(
+                  "studio.prayer_intentions.form.slug_placeholder",
+                )}
                 maxLength={32}
               />
               <p className="text-xs text-muted-foreground">
-                Lowercase identifier stored on prayer messages; cannot be
-                changed later.
+                {t("studio.prayer_intentions.form.slug_help")}
               </p>
             </div>
           ) : (
             <div className="space-y-1">
-              <span className="text-sm font-bold">Slug</span>
+              <span className="text-sm font-bold">
+                {t("studio.prayer_intentions.table.slug")}
+              </span>
               <code className="text-sm">{intention?.slug}</code>
             </div>
           )}
           <div className="space-y-2">
             <label htmlFor="intention-label" className="text-sm font-bold">
-              Label
+              {t("studio.prayer_intentions.table.label")}
             </label>
             <Pecha.Input
               id="intention-label"
@@ -139,7 +148,7 @@ const PrayerIntentionFormDialog = ({
           </div>
           <div className="space-y-2">
             <label htmlFor="intention-color" className="text-sm font-bold">
-              Color
+              {t("studio.prayer_intentions.table.color")}
             </label>
             <div className="flex items-center gap-2">
               <Pecha.Input
@@ -157,7 +166,7 @@ const PrayerIntentionFormDialog = ({
           </div>
           <div className="space-y-2">
             <label htmlFor="intention-order" className="text-sm font-bold">
-              Display order
+              {t("studio.prayer_intentions.form.display_order")}
             </label>
             <Pecha.Input
               id="intention-order"
@@ -171,7 +180,7 @@ const PrayerIntentionFormDialog = ({
               htmlFor="intention-description"
               className="text-sm font-bold"
             >
-              Description
+              {t("studio.common.description")}
             </label>
             <Textarea
               id="intention-description"
@@ -187,10 +196,14 @@ const PrayerIntentionFormDialog = ({
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >
-              Cancel
+              {t("studio.common.cancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? "Saving…" : isEdit ? "Save changes" : "Create"}
+              {isSubmitting
+                ? t("studio.common.saving")
+                : isEdit
+                  ? t("studio.prayer_intentions.form.save_changes")
+                  : t("studio.common.create")}
             </Button>
           </div>
         </form>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FaMagnifyingGlass } from "react-icons/fa6";
 import { IoMdClose } from "react-icons/io";
 import { MdLocationOn } from "react-icons/md";
+import { useTranslate } from "@tolgee/react";
 import {
   isPlaceSearchEnabled,
   searchPlaces,
@@ -10,8 +11,8 @@ import {
   type PlaceResult,
 } from "../../api/placeSearchApi";
 
-const SEARCH_ERROR =
-  "Could not reach place search. Click the map to set a pin.";
+// Translation key; rendered through t().
+const SEARCH_ERROR = "studio.groups.locations.place_search.error";
 
 type PlaceSearchProps = {
   onSelect: (place: PlaceResult) => void;
@@ -19,6 +20,7 @@ type PlaceSearchProps = {
 };
 
 const PlaceSearch = ({ onSelect, disabled = false }: PlaceSearchProps) => {
+  const { t } = useTranslate();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<PlaceResult[]>([]);
   const [isSearching, setSearching] = useState(false);
@@ -117,7 +119,7 @@ const PlaceSearch = ({ onSelect, disabled = false }: PlaceSearchProps) => {
           type="text"
           value={query}
           disabled={disabled}
-          placeholder="Search for a place"
+          placeholder={t("studio.groups.locations.place_search.placeholder")}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
@@ -131,7 +133,7 @@ const PlaceSearch = ({ onSelect, disabled = false }: PlaceSearchProps) => {
           <button
             type="button"
             onClick={reset}
-            aria-label="Clear place search"
+            aria-label={t("studio.groups.locations.place_search.clear_aria")}
             className="absolute right-2 top-1/2 -translate-y-1/2 cursor-pointer p-1 text-muted-foreground hover:text-foreground"
           >
             <IoMdClose className="h-4 w-4" />
@@ -142,7 +144,7 @@ const PlaceSearch = ({ onSelect, disabled = false }: PlaceSearchProps) => {
           <div className="absolute z-[1000] mt-1 max-h-52 w-full overflow-auto rounded-md border border-input bg-background shadow-md dark:bg-[#262626]">
             {isSearching && results.length === 0 ? (
               <div className="px-3 py-2 text-sm text-muted-foreground">
-                Searching…
+                {t("studio.groups.shared.searching")}
               </div>
             ) : null}
 
@@ -172,17 +174,17 @@ const PlaceSearch = ({ onSelect, disabled = false }: PlaceSearchProps) => {
 
             {showNoResults ? (
               <div className="px-3 py-2 text-sm text-muted-foreground">
-                No places found. Click the map to set the pin.
+                {t("studio.groups.locations.place_search.no_results")}
               </div>
             ) : null}
           </div>
         ) : null}
       </div>
 
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      {error ? <p className="text-xs text-destructive">{t(error)}</p> : null}
 
       <p className="text-right text-[10px] text-muted-foreground">
-        Search by{" "}
+        {t("studio.groups.locations.place_search.attribution")}{" "}
         <a
           href="https://locationiq.com"
           target="_blank"

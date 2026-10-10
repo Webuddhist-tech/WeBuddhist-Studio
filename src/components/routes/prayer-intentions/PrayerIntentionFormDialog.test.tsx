@@ -43,12 +43,28 @@ describe("PrayerIntentionFormDialog", () => {
   it("creates an intention with a lowercased slug", async () => {
     const onSubmit = renderDialog(null);
 
-    await userEvent.type(screen.getByLabelText("Slug"), "Healing");
-    await userEvent.type(screen.getByLabelText("Label"), "Healing");
-    await userEvent.clear(screen.getByLabelText("Color"));
-    await userEvent.type(screen.getByLabelText("Color"), "#4A78C2");
-    await userEvent.type(screen.getByLabelText("Description"), "Recovery");
-    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+    await userEvent.type(
+      screen.getByLabelText("studio.prayer_intentions.table.slug"),
+      "Healing",
+    );
+    await userEvent.type(
+      screen.getByLabelText("studio.prayer_intentions.table.label"),
+      "Healing",
+    );
+    await userEvent.clear(
+      screen.getByLabelText("studio.prayer_intentions.table.color"),
+    );
+    await userEvent.type(
+      screen.getByLabelText("studio.prayer_intentions.table.color"),
+      "#4A78C2",
+    );
+    await userEvent.type(
+      screen.getByLabelText("studio.common.description"),
+      "Recovery",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.common.create" }),
+    );
 
     expect(onSubmit).toHaveBeenCalledWith({
       slug: "healing",
@@ -62,9 +78,18 @@ describe("PrayerIntentionFormDialog", () => {
   it("patches label and copy without sending the slug", async () => {
     const onSubmit = renderDialog(existing);
 
-    await userEvent.clear(screen.getByLabelText("Label"));
-    await userEvent.type(screen.getByLabelText("Label"), "Recovery");
-    await userEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await userEvent.clear(
+      screen.getByLabelText("studio.prayer_intentions.table.label"),
+    );
+    await userEvent.type(
+      screen.getByLabelText("studio.prayer_intentions.table.label"),
+      "Recovery",
+    );
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "studio.prayer_intentions.form.save_changes",
+      }),
+    );
 
     expect(onSubmit).toHaveBeenCalledWith({
       label: "Recovery",
@@ -78,24 +103,49 @@ describe("PrayerIntentionFormDialog", () => {
   it("does not submit when the label is blank", async () => {
     const onSubmit = renderDialog(null);
 
-    await userEvent.type(screen.getByLabelText("Slug"), "healing");
-    await userEvent.type(screen.getByLabelText("Description"), "Recovery");
-    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+    await userEvent.type(
+      screen.getByLabelText("studio.prayer_intentions.table.slug"),
+      "healing",
+    );
+    await userEvent.type(
+      screen.getByLabelText("studio.common.description"),
+      "Recovery",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.common.create" }),
+    );
 
     expect(onSubmit).not.toHaveBeenCalled();
-    expect(toast.error).toHaveBeenCalledWith("Label is required");
+    expect(toast.error).toHaveBeenCalledWith(
+      "studio.prayer_intentions.validation.label_required",
+    );
   });
 
   it("does not submit when display order is cleared", async () => {
     const onSubmit = renderDialog(null);
 
-    await userEvent.type(screen.getByLabelText("Slug"), "healing");
-    await userEvent.type(screen.getByLabelText("Label"), "Healing");
-    await userEvent.type(screen.getByLabelText("Description"), "Recovery");
-    await userEvent.clear(screen.getByLabelText("Display order"));
-    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+    await userEvent.type(
+      screen.getByLabelText("studio.prayer_intentions.table.slug"),
+      "healing",
+    );
+    await userEvent.type(
+      screen.getByLabelText("studio.prayer_intentions.table.label"),
+      "Healing",
+    );
+    await userEvent.type(
+      screen.getByLabelText("studio.common.description"),
+      "Recovery",
+    );
+    await userEvent.clear(
+      screen.getByLabelText("studio.prayer_intentions.form.display_order"),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.common.create" }),
+    );
 
     expect(onSubmit).not.toHaveBeenCalled();
-    expect(toast.error).toHaveBeenCalledWith("Display order is required");
+    expect(toast.error).toHaveBeenCalledWith(
+      "studio.prayer_intentions.validation.order_required",
+    );
   });
 });

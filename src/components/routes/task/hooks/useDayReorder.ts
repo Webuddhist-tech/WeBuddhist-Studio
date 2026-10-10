@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import type { UniqueIdentifier } from "@dnd-kit/core";
 import { reorderDays } from "../api/planApi";
 import { reorderArray } from "@/lib/utils";
@@ -22,6 +23,7 @@ export const useDayReorder = (
 ) => {
   const [optimisticDays, setOptimisticDays] = useState<Day[]>([]);
   const queryClient = useQueryClient();
+  const { t } = useTranslate();
 
   useEffect(() => {
     if (currentPlan?.days) {
@@ -50,8 +52,8 @@ export const useDayReorder = (
         );
         setOptimisticDays(originalDays);
       }
-      toast.error("Failed to reorder days", {
-        description: "Something went wrong",
+      toast.error(t("studio.task.mutations.reorder_days_failed"), {
+        description: t("studio.common.something_went_wrong"),
       });
       queryClient.refetchQueries({ queryKey: ["planDetails", plan_id] });
     },

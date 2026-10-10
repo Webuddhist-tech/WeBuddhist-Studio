@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useDebounce } from "use-debounce";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import { getApiErrorMessage } from "@/lib/apiErrors";
@@ -34,6 +35,7 @@ const ContentTransferDialog = ({
   contentTitle,
   onSuccess,
 }: ContentTransferDialogProps) => {
+  const { t } = useTranslate();
   const [search, setSearch] = useState("");
   const [debouncedSearch] = useDebounce(search, 400);
   const [groups, setGroups] = useState<AuthorGroupListItem[]>([]);
@@ -76,8 +78,8 @@ const ContentTransferDialog = ({
         ? createSeriesTransferRequest(contentId, targetGroupId)
         : createPlanTransferRequest(contentId, targetGroupId),
     onSuccess: () => {
-      toast.success("Transfer request sent", {
-        description: "The target group can accept or reject the request.",
+      toast.success(t("studio.content_transfer.toast.sent"), {
+        description: t("studio.content_transfer.toast.sent_description"),
       });
       onOpenChange(false);
       onSuccess?.();
@@ -85,23 +87,31 @@ const ContentTransferDialog = ({
     onError: (err) => toast.error(getApiErrorMessage(err)),
   });
 
-  const entityLabel = contentType === "series" ? "series" : "plan";
+  const isSeries = contentType === "series";
 
   return (
     <Pecha.Dialog open={open} onOpenChange={onOpenChange}>
       <Pecha.DialogContent className="max-w-md">
         <Pecha.DialogHeader>
-          <Pecha.DialogTitle>Transfer {entityLabel}</Pecha.DialogTitle>
+          <Pecha.DialogTitle>
+            {isSeries
+              ? t("studio.content_transfer.title_series")
+              : t("studio.content_transfer.title_plan")}
+          </Pecha.DialogTitle>
         </Pecha.DialogHeader>
         <p className="text-sm text-muted-foreground">
           {contentTitle
-            ? `Send "${contentTitle}" to another group for approval.`
-            : `Choose a target group for this ${entityLabel}.`}
+            ? t("studio.content_transfer.description_with_title", {
+                title: contentTitle,
+              })
+            : isSeries
+              ? t("studio.content_transfer.description_series")
+              : t("studio.content_transfer.description_plan")}
         </p>
 
         <div className="space-y-3 py-2">
           <Pecha.Input
-            placeholder="Search groups…"
+            placeholder={t("studio.content_transfer.search_groups")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -109,11 +119,11 @@ const ContentTransferDialog = ({
           <div className="max-h-52 overflow-y-auto rounded-md border border-input">
             {isLoadingGroups ? (
               <p className="px-3 py-4 text-sm text-muted-foreground">
-                Loading groups…
+                {t("studio.content_transfer.loading_groups")}
               </p>
             ) : groups.length === 0 ? (
               <p className="px-3 py-4 text-sm text-muted-foreground">
-                No other groups found.
+                {t("studio.content_transfer.no_groups")}
               </p>
             ) : (
               <ul>
@@ -145,7 +155,7 @@ const ContentTransferDialog = ({
             variant="outline"
             onClick={() => onOpenChange(false)}
           >
-            Cancel
+            {t("studio.common.cancel")}
           </Button>
           <Button
             type="button"
@@ -157,7 +167,9 @@ const ContentTransferDialog = ({
               }
             }}
           >
-            {transferMutation.isPending ? "Sending…" : "Send request"}
+            {transferMutation.isPending
+              ? t("studio.content_transfer.sending")
+              : t("studio.content_transfer.send_request")}
           </Button>
         </div>
       </Pecha.DialogContent>

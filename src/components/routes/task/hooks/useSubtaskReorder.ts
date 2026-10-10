@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import type { UniqueIdentifier } from "@dnd-kit/core";
 import { reorderSubtasks } from "../api/taskApi";
 import { reorderArray } from "@/lib/utils";
@@ -22,6 +23,7 @@ export const useSubtaskReorder = (
 ) => {
   const [optimisticSubtasks, setOptimisticSubtasks] = useState<Subtask[]>([]);
   const queryClient = useQueryClient();
+  const { t } = useTranslate();
 
   useEffect(() => {
     if (taskDetails?.subtasks) {
@@ -50,8 +52,8 @@ export const useSubtaskReorder = (
         );
         setOptimisticSubtasks(originalSubtasks);
       }
-      toast.error("Failed to reorder subtasks", {
-        description: "Something went wrong",
+      toast.error(t("studio.task.mutations.reorder_subtasks_failed"), {
+        description: t("studio.common.something_went_wrong"),
       });
       queryClient.refetchQueries({ queryKey: ["taskDetails", task_id] });
     },

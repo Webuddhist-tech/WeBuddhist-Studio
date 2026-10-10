@@ -10,6 +10,7 @@ import { IoMdAdd, IoMdClose, IoMdCreate } from "react-icons/io";
 import { FaMagnifyingGlass } from "react-icons/fa6";
 import { MdLocationOn } from "react-icons/md";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import {
   parseCoordinates,
@@ -45,11 +46,16 @@ function translationsPayload(data: LocationFormData): LocationTranslation[] {
   }));
 }
 
-function locationSubtitle(location: LocationDetail): string {
+type TranslateFn = ReturnType<typeof useTranslate>["t"];
+
+function locationSubtitle(location: LocationDetail, t: TranslateFn): string {
   const coords = formatCoordinates(location, 4);
-  const uses = `used by ${location.event_count} event${
-    location.event_count === 1 ? "" : "s"
-  }`;
+  const uses =
+    location.event_count === 1
+      ? t("studio.groups.locations.picker.used_by_one")
+      : t("studio.groups.locations.picker.used_by_other", {
+          count: location.event_count,
+        });
   return coords ? `${coords} · ${uses}` : uses;
 }
 
@@ -60,6 +66,7 @@ const LocationPicker = ({
   readOnly = false,
   canCreate = true,
 }: LocationPickerProps) => {
+  const { t } = useTranslate();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -114,7 +121,7 @@ const LocationPicker = ({
       });
     },
     onSuccess: (created) => {
-      toast.success("Location created");
+      toast.success(t("studio.groups.locations.picker.created_toast"));
       queryClient.invalidateQueries({ queryKey: ["group-locations", groupId] });
       onChange(created);
       setCreateOpen(false);
@@ -143,7 +150,7 @@ const LocationPicker = ({
       });
     },
     onSuccess: (updated) => {
-      toast.success("Location updated");
+      toast.success(t("studio.groups.locations.picker.updated_toast"));
       queryClient.invalidateQueries({ queryKey: ["group-locations", groupId] });
       queryClient.invalidateQueries({
         queryKey: ["group-location", groupId, updated.id],
@@ -187,7 +194,9 @@ const LocationPicker = ({
     const coords = formatCoordinates(value, 4);
     return (
       <div className="space-y-2">
-        <p className="text-sm font-medium">Location</p>
+        <p className="text-sm font-medium">
+          {t("studio.groups.locations.picker.label")}
+        </p>
         <div className="flex items-center gap-2 rounded-md border border-input bg-white p-2 dark:bg-[#262626]">
           <MdLocationOn className="h-5 w-5 shrink-0 text-muted-foreground" />
           <span className="min-w-0 flex-1">
@@ -204,7 +213,9 @@ const LocationPicker = ({
                 <button
                   type="button"
                   onClick={() => setEditLocationId(value.id)}
-                  aria-label={`Edit ${value.name}`}
+                  aria-label={t("studio.groups.locations.picker.edit_aria", {
+                    name: value.name,
+                  })}
                   className="shrink-0 cursor-pointer p-1 text-muted-foreground hover:text-foreground"
                 >
                   <IoMdCreate className="h-4 w-4" />
@@ -213,7 +224,9 @@ const LocationPicker = ({
               <button
                 type="button"
                 onClick={() => onChange(null)}
-                aria-label={`Remove ${value.name}`}
+                aria-label={t("studio.groups.locations.picker.remove_aria", {
+                  name: value.name,
+                })}
                 className="shrink-0 cursor-pointer p-1 text-muted-foreground hover:text-foreground"
               >
                 <IoMdClose className="h-4 w-4" />
@@ -229,13 +242,15 @@ const LocationPicker = ({
 
   return (
     <div className="space-y-2">
-      <p className="text-sm font-medium">Location</p>
+      <p className="text-sm font-medium">
+        {t("studio.groups.locations.picker.label")}
+      </p>
 
       <div className="relative">
         <FaMagnifyingGlass className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <input
           type="text"
-          placeholder="Search saved locations…"
+          placeholder={t("studio.groups.locations.picker.search_placeholder")}
           value={searchQuery}
           disabled={readOnly}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -248,7 +263,7 @@ const LocationPicker = ({
           <div className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-md border border-input bg-background shadow-md dark:bg-[#262626]">
             {isLoading && results.length === 0 && (
               <div className="px-3 py-2 text-sm text-muted-foreground">
-                Searching…
+                {t("studio.groups.shared.searching")}
               </div>
             )}
 
@@ -269,7 +284,7 @@ const LocationPicker = ({
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm">{item.name}</span>
                     <span className="block truncate text-xs text-muted-foreground">
-                      {locationSubtitle(item)}
+                      {locationSubtitle(item, t)}
                     </span>
                   </span>
                 </button>
@@ -281,7 +296,9 @@ const LocationPicker = ({
                       setEditLocationId(item.id);
                       setIsDropdownOpen(false);
                     }}
-                    aria-label={`Edit ${item.name}`}
+                    aria-label={t("studio.groups.locations.picker.edit_aria", {
+                      name: item.name,
+                    })}
                     className="shrink-0 cursor-pointer px-3 py-2 text-muted-foreground hover:text-foreground"
                   >
                     <IoMdCreate className="h-4 w-4" />
@@ -295,15 +312,17 @@ const LocationPicker = ({
                 ref={sentinelRef}
                 className="px-3 py-2 text-center text-xs text-muted-foreground"
               >
-                {isFetchingNextPage ? "Loading more…" : ""}
+                {isFetchingNextPage
+                  ? t("studio.groups.shared.loading_more")
+                  : ""}
               </div>
             )}
 
             {!isLoading && results.length === 0 && (
               <div className="px-3 py-2 text-sm text-muted-foreground">
                 {debouncedQuery
-                  ? "No saved locations match."
-                  : "No saved locations yet."}
+                  ? t("studio.groups.locations.picker.no_match")
+                  : t("studio.groups.locations.picker.empty")}
               </div>
             )}
 
@@ -320,8 +339,10 @@ const LocationPicker = ({
                 <IoMdAdd className="h-4 w-4 shrink-0" />
                 <span className="truncate">
                   {trimmedQuery
-                    ? `Create “${trimmedQuery}”`
-                    : "Create a new location"}
+                    ? t("studio.groups.locations.picker.create_named", {
+                        name: trimmedQuery,
+                      })
+                    : t("studio.groups.locations.picker.create_new")}
                 </span>
               </button>
             )}
@@ -331,14 +352,16 @@ const LocationPicker = ({
 
       {nearMatch && canCreate ? (
         <p className="text-xs text-muted-foreground">
-          There is already a location called “{nearMatch.name}” (
-          {locationSubtitle(nearMatch)}).{" "}
+          {t("studio.groups.locations.picker.near_match", {
+            name: nearMatch.name,
+            details: locationSubtitle(nearMatch, t),
+          })}{" "}
           <button
             type="button"
             onClick={() => handleSelect(nearMatch)}
             className="cursor-pointer underline hover:text-foreground"
           >
-            Use it instead
+            {t("studio.groups.locations.picker.use_instead")}
           </button>
         </p>
       ) : null}

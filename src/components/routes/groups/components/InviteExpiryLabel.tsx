@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
+import { useTranslate } from "@tolgee/react";
 import type { GroupInviteDTO } from "../api/groupsApi";
 import { isGroupInviteExpired } from "../api/groupsApi";
 
@@ -8,6 +9,7 @@ type InviteExpiryLabelProps = {
 };
 
 const InviteExpiryLabel = ({ invite }: InviteExpiryLabelProps) => {
+  const { t } = useTranslate();
   const [, setTick] = useState(0);
 
   useEffect(() => {
@@ -17,13 +19,20 @@ const InviteExpiryLabel = ({ invite }: InviteExpiryLabelProps) => {
   }, [invite.expires_at, invite.status]);
 
   if (isGroupInviteExpired(invite)) {
-    return <span className="text-muted-foreground">Expired</span>;
+    return (
+      <span className="text-muted-foreground">
+        {t("studio.groups.components.status.expired")}
+      </span>
+    );
   }
 
   return (
     <span className="text-muted-foreground">
-      {formatDistanceToNow(new Date(invite.expires_at), { addSuffix: false })}{" "}
-      left
+      {t("studio.groups.components.invite.time_left", {
+        time: formatDistanceToNow(new Date(invite.expires_at), {
+          addSuffix: false,
+        }),
+      })}
     </span>
   );
 };

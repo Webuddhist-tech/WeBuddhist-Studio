@@ -4,25 +4,27 @@ export const signupSchema = z
   .object({
     email: z
       .string()
-      .min(1, "Email is required")
+      .min(1, "studio.validation.email_required")
       .refine((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), {
-        message: "Please enter a valid email address",
+        message: "studio.validation.email_invalid",
       }),
     first_name: z
       .string()
-      .min(1, "First name is required")
-      .min(2, "First name must be at least 2 characters"),
+      .min(1, "studio.validation.first_name_required")
+      .min(2, "studio.validation.first_name_min_2"),
     last_name: z
       .string()
-      .min(1, "Last name is required")
-      .min(2, "Last name must be at least 2 characters"),
+      .min(1, "studio.validation.last_name_required")
+      .min(2, "studio.validation.last_name_min_2"),
     password: z
       .string()
-      .min(1, "Password is required")
-      .min(6, "Password must be at least 6 characters"),
-    confirmPassword: z.string().min(1, "Please confirm your password"),
+      .min(1, "studio.validation.password_required")
+      .min(6, "studio.validation.password_min_6"),
+    confirmPassword: z
+      .string()
+      .min(1, "studio.validation.confirm_password_required"),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match",
+    message: "studio.validation.passwords_do_not_match",
     path: ["confirmPassword"],
   });

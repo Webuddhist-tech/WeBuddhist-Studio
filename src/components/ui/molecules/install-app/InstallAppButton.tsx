@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
+import { useTranslate } from "@tolgee/react";
 import { LuDownload, LuShare, LuSquarePlus } from "react-icons/lu";
 import { toast } from "sonner";
 import { Pecha } from "@/components/ui/shadimport";
@@ -12,7 +13,20 @@ import { promptInstall, useInstallMode } from "@/lib/pwaInstall";
  * already runs as the installed app; menus check `useInstallMode` to leave out
  * its row.
  */
+/** Swaps each `{name}` in a translated sentence for its bold label. */
+const withBold = (sentence: string, labels: Record<string, string>) =>
+  sentence
+    .split(/\{(\w+)\}/)
+    .map<ReactNode>((part, index) =>
+      index % 2 === 1 ? (
+        <strong key={index}>{labels[part] ?? part}</strong>
+      ) : (
+        part
+      ),
+    );
+
 export function InstallAppButton() {
+  const { t } = useTranslate();
   const mode = useInstallMode();
   const [iosHelpOpen, setIosHelpOpen] = useState(false);
 
@@ -24,9 +38,9 @@ export function InstallAppButton() {
       return;
     }
     try {
-      if (await promptInstall()) toast.success("Studio installed");
+      if (await promptInstall()) toast.success(t("studio.pwa.installed"));
     } catch {
-      toast.error("Could not open the install prompt");
+      toast.error(t("studio.pwa.install_prompt_failed"));
     }
   };
 
@@ -34,15 +48,17 @@ export function InstallAppButton() {
     <>
       <Button variant="outline" size="icon" onClick={install}>
         <LuDownload className="size-4.5" />
-        <span className="sr-only">Install app</span>
+        <span className="sr-only">{t("studio.nav.install_app")}</span>
       </Button>
 
       <Pecha.AlertDialog open={iosHelpOpen} onOpenChange={setIosHelpOpen}>
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
-            <Pecha.AlertDialogTitle>Install Studio</Pecha.AlertDialogTitle>
+            <Pecha.AlertDialogTitle>
+              {t("studio.pwa.ios_title")}
+            </Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
-              Add the Studio to your Home Screen to open it like an app.
+              {t("studio.pwa.ios_description")}
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <ol className="space-y-3 text-sm">
@@ -51,7 +67,12 @@ export function InstallAppButton() {
                 <LuShare className="h-4 w-4" />
               </span>
               <span>
-                Tap <strong>Share</strong> in the browser&apos;s toolbar.
+                {withBold(
+                  t("studio.pwa.ios_step_share", { share: "{share}" }),
+                  {
+                    share: t("studio.pwa.ios_share"),
+                  },
+                )}
               </span>
             </li>
             <li className="flex items-center gap-3">
@@ -59,13 +80,23 @@ export function InstallAppButton() {
                 <LuSquarePlus className="h-4 w-4" />
               </span>
               <span>
-                Choose <strong>Add to Home Screen</strong>, then tap{" "}
-                <strong>Add</strong>.
+                {withBold(
+                  t("studio.pwa.ios_step_add", {
+                    add_to_home_screen: "{add_to_home_screen}",
+                    add: "{add}",
+                  }),
+                  {
+                    add_to_home_screen: t("studio.pwa.ios_add_to_home_screen"),
+                    add: t("studio.pwa.ios_add"),
+                  },
+                )}
               </span>
             </li>
           </ol>
           <Pecha.AlertDialogFooter>
-            <Pecha.AlertDialogAction>Got it</Pecha.AlertDialogAction>
+            <Pecha.AlertDialogAction>
+              {t("studio.pwa.got_it")}
+            </Pecha.AlertDialogAction>
           </Pecha.AlertDialogFooter>
         </Pecha.AlertDialogContent>
       </Pecha.AlertDialog>

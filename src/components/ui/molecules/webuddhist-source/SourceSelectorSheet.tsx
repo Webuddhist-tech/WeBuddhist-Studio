@@ -291,12 +291,12 @@ export const SourceSelectorSheet = ({
         <div className="text-center min-h-[400px] flex items-center justify-center flex-col">
           <img
             src={pechaIcon}
-            alt="no data found"
+            alt={t("studio.source.no_data_found")}
             className="w-15 h-15 opacity-80"
           />
-          <p>No data found</p>
+          <p>{t("studio.source.no_data_found")}</p>
           <span className="dark:text-[#b1b1b1] text-gray-600">
-            Try adjusting your search terms
+            {t("studio.source.try_adjusting_search")}
           </span>
         </div>
       );
@@ -320,7 +320,11 @@ export const SourceSelectorSheet = ({
                   <p className="font-bold text-[#801A1E] dark:text-[#b0b0b0]">
                     {source.title}
                   </p>
-                  <img src={pechaIcon} alt="source icon" className="w-8 h-8" />
+                  <img
+                    src={pechaIcon}
+                    alt={t("studio.source.source_icon_alt")}
+                    className="w-8 h-8"
+                  />
                 </button>
 
                 {isSelected && (
@@ -370,9 +374,9 @@ export const SourceSelectorSheet = ({
     >
       <Pecha.SheetContent side="right" className="w-full sm:max-w-md">
         <Pecha.SheetHeader>
-          <Pecha.SheetTitle>Add Source</Pecha.SheetTitle>
+          <Pecha.SheetTitle>{t("studio.source.add_source")}</Pecha.SheetTitle>
           <Pecha.SheetDescription>
-            Search for a source to add to your task
+            {t("studio.source.sheet_description")}
           </Pecha.SheetDescription>
         </Pecha.SheetHeader>
         <div className="border-b w-full border-dashed border-gray-300 dark:border-input" />
@@ -398,14 +402,16 @@ export const SourceSelectorSheet = ({
               }}
               className="data-[state=checked]:bg-transparent data-[state=checked]:text-primary"
             />
-            <span className="text-sm select-none">Search only titles</span>
+            <span className="text-sm select-none">
+              {t("studio.source.search_only_titles")}
+            </span>
           </label>
         </div>
         <div className="h-[calc(100vh-200px)] overflow-hidden flex flex-col">
           <div className="px-4 pb-4 pt-2 flex-1 min-h-0 overflow-y-auto space-y-4 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
             {isLoading ? (
               <div className="w-full flex items-center justify-center h-full">
-                <p>Loading segments...</p>
+                <p>{t("studio.source.loading_segments")}</p>
               </div>
             ) : (
               renderSegmentList()

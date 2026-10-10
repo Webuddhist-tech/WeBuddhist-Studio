@@ -50,11 +50,20 @@ describe("DayCreateDialog", () => {
 
     renderDialog();
 
-    fireEvent.click(screen.getByText("Add New Day"));
-    fireEvent.focus(screen.getByPlaceholderText("Search plans…"));
-    fireEvent.change(screen.getByPlaceholderText("Search plans…"), {
-      target: { value: "Source" },
-    });
+    fireEvent.click(screen.getByText("studio.modals.day_add.add_new_day"));
+    fireEvent.focus(
+      screen.getByPlaceholderText(
+        "studio.modals.day_create.search_plans_placeholder",
+      ),
+    );
+    fireEvent.change(
+      screen.getByPlaceholderText(
+        "studio.modals.day_create.search_plans_placeholder",
+      ),
+      {
+        target: { value: "Source" },
+      },
+    );
 
     await waitFor(() => {
       expect(screen.getByText("Source Plan")).toBeInTheDocument();
@@ -63,7 +72,9 @@ describe("DayCreateDialog", () => {
     fireEvent.click(screen.getByText("Source Plan"));
 
     await waitFor(() => {
-      expect(screen.getByText("No days in this plan")).toBeInTheDocument();
+      expect(
+        screen.getByText("studio.modals.day_create.no_days"),
+      ).toBeInTheDocument();
     });
   });
 
@@ -76,11 +87,20 @@ describe("DayCreateDialog", () => {
 
     renderDialog();
 
-    fireEvent.click(screen.getByText("Add New Day"));
-    fireEvent.focus(screen.getByPlaceholderText("Search plans…"));
-    fireEvent.change(screen.getByPlaceholderText("Search plans…"), {
-      target: { value: "Source" },
-    });
+    fireEvent.click(screen.getByText("studio.modals.day_add.add_new_day"));
+    fireEvent.focus(
+      screen.getByPlaceholderText(
+        "studio.modals.day_create.search_plans_placeholder",
+      ),
+    );
+    fireEvent.change(
+      screen.getByPlaceholderText(
+        "studio.modals.day_create.search_plans_placeholder",
+      ),
+      {
+        target: { value: "Source" },
+      },
+    );
 
     await waitFor(() => {
       expect(screen.getByText("Source Plan")).toBeInTheDocument();
@@ -90,7 +110,9 @@ describe("DayCreateDialog", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("combobox")).toBeInTheDocument();
-      expect(screen.getByText("Select a day…")).toBeInTheDocument();
+      expect(
+        screen.getByText("studio.modals.day_create.select_day_placeholder"),
+      ).toBeInTheDocument();
     });
   });
 });

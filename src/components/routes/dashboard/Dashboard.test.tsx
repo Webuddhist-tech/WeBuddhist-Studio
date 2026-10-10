@@ -78,7 +78,7 @@ describe("Dashboard Component", () => {
     expect(screen.getByText("studio.dashboard.title")).toBeDefined();
     expect(screen.getByText("studio.dashboard.plan_used")).toBeDefined();
     expect(screen.getByText("Date Modified")).toBeDefined();
-    expect(screen.getByText("Featured")).toBeDefined();
+    expect(screen.getByText("studio.dashboard.featured")).toBeDefined();
     expect(screen.getByText("studio.dashboard.actions")).toBeDefined();
   });
 
@@ -173,7 +173,9 @@ describe("Dashboard Component", () => {
       expect(getSpy).toHaveBeenCalled();
     });
 
-    await user.click(screen.getByRole("button", { name: "Plans" }));
+    await user.click(
+      screen.getByRole("button", { name: "studio.dashboard.tab.plans" }),
+    );
 
     await waitFor(() => {
       expect(getSpy).toHaveBeenCalledWith(
@@ -220,7 +222,9 @@ describe("Dashboard Component", () => {
       expect(screen.getByText("Test Series")).toBeInTheDocument();
     });
 
-    expect(screen.getByLabelText("Series, 10 plans")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("studio.dashboard.series_plans_count_aria"),
+    ).toBeInTheDocument();
   });
 
   it("shows same published actions for series as plans (Edit + Unpublish)", async () => {
@@ -260,27 +264,27 @@ describe("Dashboard Component", () => {
     });
 
     const seriesActions = screen.getByRole("button", {
-      name: "Series actions",
+      name: "studio.shell.content_actions.series_actions",
     });
     await user.click(seriesActions);
 
     expect(
-      await screen.findByRole("menuitem", { name: "Unpublish" }),
+      await screen.findByRole("menuitem", { name: "studio.common.unpublish" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("menuitem", { name: "Edit Series" }),
+      screen.getByRole("menuitem", { name: "studio.shell.content_actions.edit_series" }),
     ).toBeInTheDocument();
 
     await user.keyboard("{Escape}");
 
-    const planActions = screen.getByRole("button", { name: "Plan actions" });
+    const planActions = screen.getByRole("button", { name: "studio.shell.content_actions.plan_actions" });
     await user.click(planActions);
 
     expect(
-      await screen.findByRole("menuitem", { name: "Unpublish" }),
+      await screen.findByRole("menuitem", { name: "studio.common.unpublish" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("menuitem", { name: "Edit Plan" }),
+      screen.getByRole("menuitem", { name: "studio.shell.content_actions.edit_plan" }),
     ).toBeInTheDocument();
   });
 
@@ -312,7 +316,9 @@ describe("Dashboard Component", () => {
       expect(screen.getByText("Test Plan")).toBeInTheDocument();
     });
 
-    const featuredButton = screen.getByRole("button", { name: "Not featured" });
+    const featuredButton = screen.getByRole("button", {
+      name: "studio.dashboard.not_featured",
+    });
     fireEvent.click(featuredButton);
 
     await waitFor(() => {
@@ -357,7 +363,9 @@ describe("Dashboard Component", () => {
       expect(screen.getByText("Test Series")).toBeInTheDocument();
     });
 
-    const featuredButton = screen.getByRole("button", { name: "Not featured" });
+    const featuredButton = screen.getByRole("button", {
+      name: "studio.dashboard.not_featured",
+    });
     fireEvent.click(featuredButton);
 
     await waitFor(() => {

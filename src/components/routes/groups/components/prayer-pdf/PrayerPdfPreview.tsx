@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useDebounce } from "use-debounce";
 import { LuLoaderCircle } from "react-icons/lu";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import {
@@ -33,6 +34,7 @@ const PrayerPdfPreview = ({
   settings,
   valid,
 }: PrayerPdfPreviewProps) => {
+  const { t } = useTranslate();
   const [day, setDay] = useState(() => todayInTimeZone(settings.timezone));
   const [debounced] = useDebounce(settings, PREVIEW_DEBOUNCE_MS);
   // Both must hold: `debounced` lags the form, so it may still be a value
@@ -78,7 +80,7 @@ const PrayerPdfPreview = ({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <label htmlFor="prayer-pdf-preview-day" className="text-sm font-bold">
-            Preview
+            {t("studio.groups.prayer_pdf.preview.label")}
           </label>
           <Pecha.Input
             id="prayer-pdf-preview-day"
@@ -86,22 +88,26 @@ const PrayerPdfPreview = ({
             value={day}
             onChange={(e) => e.target.value && setDay(e.target.value)}
             className="h-8 w-40"
-            aria-label="Preview day"
+            aria-label={t("studio.groups.prayer_pdf.preview.day_label")}
           />
           {isFetching ? (
             <LuLoaderCircle
               className="h-4 w-4 animate-spin text-muted-foreground"
-              aria-label="Updating preview"
+              aria-label={t("studio.groups.prayer_pdf.preview.updating")}
             />
           ) : null}
         </div>
         <p className="text-xs text-muted-foreground" aria-live="polite">
           {!valid
-            ? "Fix the highlighted values to update the preview."
+            ? t("studio.groups.prayer_pdf.preview.fix_values")
             : data?.is_sample
-              ? "No prayer requests on this day — showing sample requests."
+              ? t("studio.groups.prayer_pdf.preview.sample")
               : data
-                ? `${data.prayer_count} prayer request${data.prayer_count === 1 ? "" : "s"} on this day.`
+                ? data.prayer_count === 1
+                  ? t("studio.groups.prayer_pdf.preview.count_one")
+                  : t("studio.groups.prayer_pdf.preview.count_other", {
+                      count: data.prayer_count,
+                    })
                 : null}
         </p>
       </div>
@@ -110,7 +116,7 @@ const PrayerPdfPreview = ({
         {srcDoc ? (
           <iframe
             ref={frameRef}
-            title="Prayer PDF preview"
+            title={t("studio.groups.prayer_pdf.preview.frame_title")}
             // Scripts lay the page out; no same-origin, so the frame cannot
             // reach Studio's session or storage.
             sandbox="allow-scripts"
@@ -120,13 +126,19 @@ const PrayerPdfPreview = ({
         ) : (
           <div className="flex h-full items-center justify-center p-6 text-center text-sm text-muted-foreground">
             {isError
-              ? getApiErrorMessage(error, "Could not load the preview.")
-              : "Loading preview…"}
+              ? getApiErrorMessage(
+                  error,
+                  t("studio.groups.prayer_pdf.preview.load_error"),
+                )
+              : t("studio.groups.prayer_pdf.preview.loading")}
           </div>
         )}
         {isError && srcDoc ? (
           <div className="absolute inset-x-0 bottom-0 bg-destructive/90 px-3 py-1.5 text-xs text-white">
-            {getApiErrorMessage(error, "Could not update the preview.")}
+            {getApiErrorMessage(
+              error,
+              t("studio.groups.prayer_pdf.preview.update_error"),
+            )}
           </div>
         ) : null}
       </div>

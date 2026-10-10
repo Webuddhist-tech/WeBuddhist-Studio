@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import {
   createNewDays,
   deleteDays,
@@ -12,19 +13,21 @@ export const PLAN_DAYS_OVERLAP_NEXT_PLAN_CODE = "PLAN_DAYS_OVERLAP_NEXT_PLAN";
 
 export const usePlanMutations = (plan_id: string | undefined) => {
   const queryClient = useQueryClient();
+  const { t } = useTranslate();
 
   const deleteTaskMutation = useMutation({
     mutationFn: (task_id: string) => deleteTask(task_id),
     onSuccess: () => {
-      toast.success("Task deleted successfully!", {
-        description: "The task has been deleted.",
+      toast.success(t("studio.task.mutations.task_deleted"), {
+        description: t("studio.task.mutations.task_deleted_description"),
       });
       queryClient.refetchQueries({ queryKey: ["planDetails", plan_id] });
     },
     onError: (error: any) => {
-      toast.error("Failed to delete task", {
+      toast.error(t("studio.task.mutations.task_delete_failed"), {
         description:
-          error.response?.data?.detail?.message || "Something went wrong",
+          error.response?.data?.detail?.message ||
+          t("studio.common.something_went_wrong"),
       });
     },
   });
@@ -34,13 +37,15 @@ export const usePlanMutations = (plan_id: string | undefined) => {
     onSuccess: (_data, day_ids) => {
       const count = day_ids.length;
       toast.success(
-        count === 1 ? "Day deleted successfully!" : `${count} days deleted.`,
-        { description: "Remaining days have been renumbered." },
+        count === 1
+          ? t("studio.task.mutations.day_deleted_one")
+          : t("studio.task.mutations.day_deleted_other", { count }),
+        { description: t("studio.task.mutations.days_renumbered") },
       );
       queryClient.refetchQueries({ queryKey: ["planDetails", plan_id] });
     },
     onError: (error: any) => {
-      toast.error("Failed to delete day(s)", {
+      toast.error(t("studio.task.mutations.day_delete_failed"), {
         description: getApiErrorMessage(error),
       });
     },
@@ -56,7 +61,7 @@ export const usePlanMutations = (plan_id: string | undefined) => {
       ) {
         return;
       }
-      toast.error("Failed to create days", {
+      toast.error(t("studio.task.mutations.days_create_failed"), {
         description: getApiErrorMessage(error),
       });
     },

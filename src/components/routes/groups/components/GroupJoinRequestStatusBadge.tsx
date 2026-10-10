@@ -1,3 +1,4 @@
+import { useTranslate } from "@tolgee/react";
 import type { GroupJoinRequestStatus } from "../api/groupJoinRequestsApi";
 
 const STATUS_STYLES: Record<GroupJoinRequestStatus, string> = {
@@ -15,12 +16,15 @@ type GroupJoinRequestStatusBadgeProps = {
 
 const GroupJoinRequestStatusBadge = ({
   status,
-}: GroupJoinRequestStatusBadgeProps) => (
-  <span
-    className={`inline-flex rounded border px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[status]}`}
-  >
-    {status}
-  </span>
-);
+}: GroupJoinRequestStatusBadgeProps) => {
+  const { t } = useTranslate();
+  return (
+    <span
+      className={`inline-flex rounded border px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[status]}`}
+    >
+      {t(`studio.groups.components.status.${status.toLowerCase()}`)}
+    </span>
+  );
+};
 
 export default GroupJoinRequestStatusBadge;

@@ -8,6 +8,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IoMdArrowBack } from "react-icons/io";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { useLanguages } from "@/hooks/useLanguages";
 import type { LanguageCode } from "@/schema/SeriesSchema";
@@ -45,6 +46,7 @@ import {
 const SeriesDetailsPage = () => {
   const { seriesId } = useParams<{ seriesId: string }>();
   const navigate = useNavigate();
+  const { t } = useTranslate();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const [plansByLang, setPlansByLang] = useState<PlansByLanguage>({});
@@ -89,6 +91,7 @@ const SeriesDetailsPage = () => {
   const headerTitle = getSeriesTitleForLanguage(
     seriesData?.metadata,
     activeLanguage,
+    t("studio.dashboard.untitled_series"),
   );
 
   const activePlans = plansByLang[activeLanguage] ?? [];
@@ -137,7 +140,8 @@ const SeriesDetailsPage = () => {
     onError: (err: unknown) => {
       const message =
         (err as { response?: { data?: { detail?: { message?: string } } } })
-          ?.response?.data?.detail?.message ?? "Could not update series plans";
+          ?.response?.data?.detail?.message ??
+        t("studio.series.plans_update_failed");
       toast.error(message);
     },
   });
@@ -179,7 +183,7 @@ const SeriesDetailsPage = () => {
   if (isLoading) {
     return (
       <div className="flex h-[calc(100vh-40px)] items-center justify-center max-md:h-full">
-        <p className="text-muted-foreground">Loading…</p>
+        <p className="text-muted-foreground">{t("studio.common.loading")}</p>
       </div>
     );
   }
@@ -187,12 +191,14 @@ const SeriesDetailsPage = () => {
   if (isError) {
     return (
       <div className="flex h-[calc(100vh-40px)] flex-col items-center justify-center gap-4 max-md:h-full">
-        <p className="text-destructive">{String(error?.message ?? "Error")}</p>
+        <p className="text-destructive">
+          {String(error?.message ?? t("studio.common.error"))}
+        </p>
         <Pecha.Button
           variant="outline"
           onClick={() => navigate(ROUTES.dashboard)}
         >
-          Back to dashboard
+          {t("studio.series.back_to_dashboard")}
         </Pecha.Button>
       </div>
     );
@@ -205,7 +211,7 @@ const SeriesDetailsPage = () => {
           type="button"
           variant="ghost"
           size="icon"
-          aria-label="Back to dashboard"
+          aria-label={t("studio.series.back_to_dashboard")}
           onClick={() => navigate("-1")}
         >
           <IoMdArrowBack className="h-4 w-4" />
@@ -216,7 +222,7 @@ const SeriesDetailsPage = () => {
             to={ROUTES.seriesEdit(seriesId)}
             className="text-sm text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
           >
-            Edit series
+            {t("studio.series.edit_series")}
           </Link>
         ) : null}
         {canTransferSeries && seriesGroupId && !platformReadOnly ? (
@@ -235,12 +241,12 @@ const SeriesDetailsPage = () => {
 
       {platformReadOnly && (
         <p className="mx-4 mt-2 text-sm text-muted-foreground">
-          You have read-only access to this series.
+          {t("studio.series.read_only_notice")}
         </p>
       )}
       {!platformReadOnly && !canEditSeries && (
         <p className="mx-4 mt-2 text-sm text-muted-foreground">
-          This series cannot be edited with your current role.
+          {t("studio.series.cannot_edit_notice")}
         </p>
       )}
 
@@ -269,7 +275,7 @@ const SeriesDetailsPage = () => {
               searchLanguage={activeLanguage}
               groupId={seriesGroupId}
               hideSelectedList
-              searchPlaceholder="Find Plans to add to series"
+              searchPlaceholder={t("studio.series.find_plans_placeholder")}
             />
           </div>
         ) : null}

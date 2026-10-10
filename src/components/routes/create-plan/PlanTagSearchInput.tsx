@@ -3,6 +3,7 @@ import { IoMdAdd, IoMdClose } from "react-icons/io";
 import { useDebounce } from "use-debounce";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Input } from "@/components/ui/atoms/input";
 import { Textarea } from "@/components/ui/atoms/textarea";
 import { Button } from "@/components/ui/atoms/button";
@@ -42,6 +43,7 @@ const PlanTagSearchInput = ({
   planId,
   hideLabel = false,
 }: PlanTagSearchInputProps) => {
+  const { t } = useTranslate();
   const queryClient = useQueryClient();
   const containerRef = useRef<HTMLDivElement>(null);
   const { languageOptions, getLanguageLabel } = useLanguages();
@@ -91,10 +93,10 @@ const PlanTagSearchInput = ({
       setShowSuggestions(false);
       setShowCreateDialog(false);
       resetCreateForm();
-      toast.success(`Tag "${tag.name}" created`);
+      toast.success(t("studio.plan.tags.created", { name: tag.name }));
     },
     onError: () => {
-      toast.error("Failed to create tag");
+      toast.error(t("studio.plan.tags.create_failed"));
     },
   });
 
@@ -150,7 +152,11 @@ const PlanTagSearchInput = ({
     for (const lang of activeLanguages) {
       const data = languageData[lang] ?? { name: "", description: "" };
       if (!data.name.trim()) {
-        toast.error(`Name is required for ${getLanguageLabel(lang)}`);
+        toast.error(
+          t("studio.plan.tags.name_required_for", {
+            language: getLanguageLabel(lang),
+          }),
+        );
         return;
       }
       metadata.push({
@@ -172,7 +178,7 @@ const PlanTagSearchInput = ({
 
   const removeLanguage = (langCode: LanguageCode) => {
     if (activeLanguages.length === 1) {
-      toast.error("At least one language is required");
+      toast.error(t("studio.plan.tags.language_required"));
       return;
     }
     setActiveLanguages(activeLanguages.filter((l) => l !== langCode));
@@ -236,7 +242,9 @@ const PlanTagSearchInput = ({
       ref={containerRef}
       className="w-full space-y-2 h-full font-dynamic flex flex-col"
     >
-      {!hideLabel ? <p className="text-sm font-bold">Tags</p> : null}
+      {!hideLabel ? (
+        <p className="text-sm font-bold">{t("studio.plan.tags.label")}</p>
+      ) : null}
 
       {value.length > 0 && (
         <div className="flex flex-wrap items-center justify-start h-fit gap-2">
@@ -250,7 +258,9 @@ const PlanTagSearchInput = ({
               </p>
               <button
                 type="button"
-                aria-label={`Remove ${tagLabels[tagId] ?? "tag"}`}
+                aria-label={t("studio.plan.tags.remove_aria", {
+                  name: tagLabels[tagId] ?? t("studio.plan.tags.tag_fallback"),
+                })}
                 onClick={() => removeTag(tagId)}
                 className="cursor-pointer"
               >
@@ -263,7 +273,7 @@ const PlanTagSearchInput = ({
 
       <div className="relative w-full">
         <Input
-          placeholder="Search or add tags..."
+          placeholder={t("studio.plan.tags.search_placeholder")}
           className="border shadow-none bg-white"
           value={inputValue}
           onChange={(e) => {
@@ -293,14 +303,16 @@ const PlanTagSearchInput = ({
                   disabled={createTagMutation.isPending}
                 >
                   {createTagMutation.isPending
-                    ? "Creating tag..."
-                    : `Create "${trimmedInput}"`}
+                    ? t("studio.plan.tags.creating_tag")
+                    : t("studio.plan.tags.create_option", {
+                        name: trimmedInput,
+                      })}
                 </button>
               </li>
             )}
             {isFetching && suggestions.length === 0 && (
               <li className="px-3 py-2 text-sm text-muted-foreground">
-                Searching...
+                {t("studio.plan.tags.searching")}
               </li>
             )}
             {suggestions.map((tag) => (
@@ -317,7 +329,7 @@ const PlanTagSearchInput = ({
             ))}
             {!isFetching && suggestions.length === 0 && !showCreateOption && (
               <li className="px-3 py-2 text-sm text-muted-foreground">
-                No tags found
+                {t("studio.plan.tags.no_tags_found")}
               </li>
             )}
           </ul>
@@ -328,12 +340,16 @@ const PlanTagSearchInput = ({
       <Pecha.Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <Pecha.DialogContent className="flex max-h-[min(90dvh,90vh)] w-[calc(100%-2rem)] max-w-lg flex-col gap-0 overflow-hidden p-0 sm:w-full">
           <Pecha.DialogHeader className="shrink-0 border-b px-6 py-4">
-            <Pecha.DialogTitle>Create New Tag</Pecha.DialogTitle>
+            <Pecha.DialogTitle>
+              {t("studio.plan.tags.create_dialog_title")}
+            </Pecha.DialogTitle>
           </Pecha.DialogHeader>
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-bold">Languages</label>
+                <label className="text-sm font-bold">
+                  {t("studio.plan.tags.languages")}
+                </label>
                 {languageOptions.filter(
                   (lang) => !activeLanguages.includes(lang.value),
                 ).length > 0 && (
@@ -346,7 +362,7 @@ const PlanTagSearchInput = ({
                         className="h-7 text-xs"
                       >
                         <IoMdAdd className="h-3 w-3 mr-1" />
-                        Add Language
+                        {t("studio.plan.tags.add_language")}
                       </Button>
                     </Pecha.DropdownMenuTrigger>
                     <Pecha.DropdownMenuContent>
@@ -376,7 +392,9 @@ const PlanTagSearchInput = ({
                         type="button"
                         onClick={() => removeLanguage(lang)}
                         className="absolute top-2 right-2 text-muted-foreground hover:text-foreground p-1 rounded"
-                        aria-label={`Remove ${langLabel}`}
+                        aria-label={t("studio.plan.tags.remove_language_aria", {
+                          language: langLabel,
+                        })}
                       >
                         <IoMdClose className="h-4 w-4" />
                       </button>
@@ -385,19 +403,23 @@ const PlanTagSearchInput = ({
                       {langLabel}
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-bold">Name</label>
+                      <label className="text-sm font-bold">
+                        {t("studio.common.name")}
+                      </label>
                       <Input
                         value={languageData[lang]?.name ?? ""}
                         onChange={(e) =>
                           updateLanguageField(lang, "name", e.target.value)
                         }
-                        placeholder="Tag name"
+                        placeholder={t("studio.plan.tags.name_placeholder")}
                         required
                         className="bg-white dark:bg-[#181818]"
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-bold">Description</label>
+                      <label className="text-sm font-bold">
+                        {t("studio.common.description")}
+                      </label>
                       <Textarea
                         value={languageData[lang]?.description ?? ""}
                         onChange={(e) =>
@@ -407,7 +429,9 @@ const PlanTagSearchInput = ({
                             e.target.value,
                           )
                         }
-                        placeholder="Optional description"
+                        placeholder={t(
+                          "studio.plan.tags.description_placeholder",
+                        )}
                         className="field-sizing-fixed min-h-[80px] max-h-32 resize-none bg-white dark:bg-[#181818]"
                       />
                     </div>
@@ -423,7 +447,7 @@ const PlanTagSearchInput = ({
               onClick={() => setShowCreateDialog(false)}
               disabled={createTagMutation.isPending}
             >
-              Cancel
+              {t("studio.common.cancel")}
             </Button>
             <Button
               type="button"
@@ -431,7 +455,9 @@ const PlanTagSearchInput = ({
               onClick={handleCreateTag}
               disabled={createTagMutation.isPending}
             >
-              {createTagMutation.isPending ? "Creating..." : "Create Tag"}
+              {createTagMutation.isPending
+                ? t("studio.common.creating")
+                : t("studio.plan.tags.create_tag")}
             </Button>
           </div>
         </Pecha.DialogContent>

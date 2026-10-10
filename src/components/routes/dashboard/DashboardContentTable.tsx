@@ -57,14 +57,17 @@ export function DashboardContentTable({
       return (
         <Pecha.TableRow>
           <Pecha.TableCell colSpan={6} className="text-center py-6">
-            Loading...
+            {t("studio.common.loading")}
           </Pecha.TableCell>
         </Pecha.TableRow>
       );
     return rows.map((row) => {
       const groupRole = resolveDashboardRowGroupRole(row, rolesMap, userInfo);
       const canFeature = canChangeContentStatus(groupRole, platformRole);
-      const daysLabel = `${row.total_days} ${row.total_days === 1 ? "Day" : "Days"}`;
+      const daysLabel =
+        row.total_days === 1
+          ? t("studio.dashboard.days_count_one", { count: row.total_days })
+          : t("studio.dashboard.days_count_other", { count: row.total_days });
       const titleHref =
         row.kind === "plan" ? ROUTES.plan(row.id) : ROUTES.series(row.id);
       const canOpenTitle =
@@ -92,7 +95,9 @@ export function DashboardContentTable({
               {row.kind === "series" ? (
                 <span
                   className="absolute left-1 top-1 flex items-center gap-0.5 rounded-full bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white shadow-sm"
-                  aria-label={`Series, ${row.plans_count ?? 0} plans`}
+                  aria-label={t("studio.dashboard.series_plans_count_aria", {
+                    count: row.plans_count ?? 0,
+                  })}
                 >
                   <LuLayers className="h-3 w-3 shrink-0" aria-hidden />
                   {row.plans_count ?? 0}
@@ -112,7 +117,7 @@ export function DashboardContentTable({
                   {row.languages?.map((code: DashboardLanguageCode) => (
                     <span key={`${row.id}-${code}`}>{languageChip(code)}</span>
                   ))}
-                  {statusChip(row.status)}
+                  {statusChip(row.status, t)}
                   {row.kind === "plan" && (
                     <span className="rounded-full bg-[#DEAD2D4D] px-2.5 py-0.5 text-xs font-medium text-[#020C1D] dark:bg-[#DEAD2D4D] dark:text-white">
                       {daysLabel}
@@ -127,7 +132,7 @@ export function DashboardContentTable({
                   {row.languages?.map((code: DashboardLanguageCode) => (
                     <span key={`${row.id}-${code}`}>{languageChip(code)}</span>
                   ))}
-                  {statusChip(row.status)}
+                  {statusChip(row.status, t)}
                   {row.kind === "plan" && (
                     <span className="rounded-full bg-[#DEAD2D4D] px-2.5 py-0.5 text-xs font-medium text-[#020C1D] dark:bg-[#DEAD2D4D] dark:text-white">
                       {daysLabel}
@@ -149,7 +154,11 @@ export function DashboardContentTable({
                 size="icon"
                 className={`${DASHBOARD_TABLE_ICON_BTN} disabled:bg-[#F3F4F6] disabled:hover:bg-[#F3F4F6] dark:disabled:bg-[#2a2a2a] dark:disabled:hover:bg-[#2a2a2a]`}
                 disabled={featuredDisabled}
-                aria-label={row.featured ? "Featured" : "Not featured"}
+                aria-label={
+                  row.featured
+                    ? t("studio.dashboard.featured")
+                    : t("studio.dashboard.not_featured")
+                }
                 onClick={() => handleFeatured(row.id, row.kind, row.featured)}
               >
                 <FeaturedStar
@@ -174,7 +183,7 @@ export function DashboardContentTable({
                     <Pecha.Button
                       variant="outline"
                       size="icon"
-                      aria-label="Actions"
+                      aria-label={t("studio.common.actions")}
                     >
                       <BsThreeDotsVertical />
                     </Pecha.Button>
@@ -184,7 +193,7 @@ export function DashboardContentTable({
                     className="[--radius:1rem]"
                   >
                     <Pecha.DropdownMenuItem disabled>
-                      Preview (mock)
+                      {t("studio.dashboard.preview_mock")}
                     </Pecha.DropdownMenuItem>
                   </Pecha.DropdownMenuContent>
                 </Pecha.DropdownMenu>
@@ -223,7 +232,7 @@ export function DashboardContentTable({
           </Pecha.TableHead>
 
           <Pecha.TableHead className="w-[72px] font-bold text-center">
-            Featured
+            {t("studio.dashboard.featured")}
           </Pecha.TableHead>
           {showActionsColumn ? (
             <Pecha.TableHead className="w-[100px] font-bold text-center">

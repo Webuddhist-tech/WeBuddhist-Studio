@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { IoMdAdd } from "react-icons/io";
 
@@ -9,6 +10,7 @@ interface DayAddDialogProps {
 }
 
 const DayAddDialog = ({ onAdd, isPending, disabled }: DayAddDialogProps) => {
+  const { t } = useTranslate();
   const [open, setOpen] = useState(false);
 
   const handleAdd = () => {
@@ -33,28 +35,33 @@ const DayAddDialog = ({ onAdd, isPending, disabled }: DayAddDialogProps) => {
         >
           <IoMdAdd className="w-4 h-4" />
           <span className="text-sm font-medium">
-            {isPending ? "Adding..." : "Add New Day"}
+            {isPending
+              ? t("studio.modals.day_add.adding")
+              : t("studio.modals.day_add.add_new_day")}
           </span>
         </Pecha.Button>
       </Pecha.AlertDialogTrigger>
       <Pecha.AlertDialogContent>
         <Pecha.AlertDialogHeader>
-          <Pecha.AlertDialogTitle>Add New Day</Pecha.AlertDialogTitle>
+          <Pecha.AlertDialogTitle>
+            {t("studio.modals.day_add.add_new_day")}
+          </Pecha.AlertDialogTitle>
           <Pecha.AlertDialogDescription>
-            This will create a new day in your plan. You can start adding tasks
-            to it right away.
+            {t("studio.modals.day_add.description")}
           </Pecha.AlertDialogDescription>
         </Pecha.AlertDialogHeader>
         <Pecha.AlertDialogFooter>
           <Pecha.AlertDialogCancel onClick={() => setOpen(false)}>
-            Cancel
+            {t("studio.common.cancel")}
           </Pecha.AlertDialogCancel>
           <Pecha.AlertDialogAction
             onClick={handleAdd}
             disabled={isPending}
             className="bg-[#AD1B21] dark:text-white hover:bg-[#AD1B21]/90"
           >
-            {isPending ? "Adding..." : "Add Day"}
+            {isPending
+              ? t("studio.modals.day_add.adding")
+              : t("studio.modals.day_add.add_day")}
           </Pecha.AlertDialogAction>
         </Pecha.AlertDialogFooter>
       </Pecha.AlertDialogContent>

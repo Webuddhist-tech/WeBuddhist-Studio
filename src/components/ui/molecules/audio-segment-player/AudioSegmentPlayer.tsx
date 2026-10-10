@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { formatMs } from "@/lib/utils";
+import { useTranslate } from "@tolgee/react";
 
 interface AudioSegmentPlayerProps {
   audioUrl: string;
@@ -12,6 +13,7 @@ export const AudioSegmentPlayer = ({
   startMs,
   endMs,
 }: AudioSegmentPlayerProps) => {
+  const { t } = useTranslate();
   const audioRef = useRef<HTMLAudioElement>(null);
 
   useEffect(() => {
@@ -43,7 +45,10 @@ export const AudioSegmentPlayer = ({
   return (
     <div className="border-t border-dashed pt-2 space-y-2">
       <p className="text-xs text-muted-foreground">
-        Segment: {formatMs(startMs)} – {formatMs(endMs)}
+        {t("studio.molecules.audio_segment.range", {
+          start: formatMs(startMs),
+          end: formatMs(endMs),
+        })}
       </p>
       <audio
         ref={audioRef}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { tolgee } from "@/i18n/tolgee";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import { reorderArray } from "@/lib/utils";
 import {
@@ -42,7 +43,7 @@ export const useChantItemReorder = (
       if (items) {
         setOrderedItems(sortByDisplayOrder(items));
       }
-      toast.error("Failed to reorder chants", {
+      toast.error(tolgee.t("studio.groups.shared.chant_reorder_error"), {
         description: getApiErrorMessage(err),
       });
     },

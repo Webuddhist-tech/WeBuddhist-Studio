@@ -1,6 +1,7 @@
 import axiosInstance from "@/config/axios-config";
 import { AUTHOR_NOT_ACTIVE_DETAIL } from "@/lib/platformAccess";
 import { getApiErrorDetail } from "@/lib/apiErrors";
+import { tolgee } from "@/i18n/tolgee";
 
 export type PhoneAuthorStatus = "ACTIVE" | "INACTIVE" | "PENDING_VERIFICATION";
 
@@ -75,7 +76,7 @@ export async function linkPhoneToken(
 
 export function getPhoneAuthErrorMessage(
   error: unknown,
-  fallback = "Phone authentication failed",
+  fallback = tolgee.t("studio.auth.errors.phone_auth_failed"),
 ): string {
   return getApiErrorDetail(error) ?? fallback;
 }

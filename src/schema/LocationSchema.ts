@@ -1,12 +1,12 @@
 import { z } from "zod";
 
 const localizedNameSchema = z.object({
-  language: z.string().min(1, "Language is required"),
+  language: z.string().min(1, "studio.validation.language_required"),
   name: z
     .string()
     .trim()
-    .min(1, "Name is required")
-    .max(255, "Name must be at most 255 characters"),
+    .min(1, "studio.validation.name_required")
+    .max(255, "studio.validation.name_max_255"),
 });
 
 export const locationSchema = z
@@ -14,8 +14,8 @@ export const locationSchema = z
     name: z
       .string()
       .trim()
-      .min(1, "Name is required")
-      .max(255, "Name must be at most 255 characters"),
+      .min(1, "studio.validation.name_required")
+      .max(255, "studio.validation.name_max_255"),
     latitude: z.string().trim(),
     longitude: z.string().trim(),
     /** Per-language names. `name` above stays the canonical one, shown when a
@@ -28,7 +28,7 @@ export const locationSchema = z
       if (seen.has(entry.language)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "This language already has a name",
+          message: "studio.validation.language_name_duplicate",
           path: ["translations", index, "language"],
         });
       }
@@ -41,7 +41,7 @@ export const locationSchema = z
     if (hasLat !== hasLng) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Set both latitude and longitude, or leave both empty",
+        message: "studio.validation.coordinates_both_or_none",
         path: [hasLat ? "longitude" : "latitude"],
       });
       return;
@@ -55,13 +55,13 @@ export const locationSchema = z
     if (!Number.isFinite(lat)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Latitude must be a number",
+        message: "studio.validation.latitude_number",
         path: ["latitude"],
       });
     } else if (lat < -90 || lat > 90) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Latitude must be between -90 and 90",
+        message: "studio.validation.latitude_range",
         path: ["latitude"],
       });
     }
@@ -69,13 +69,13 @@ export const locationSchema = z
     if (!Number.isFinite(lng)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Longitude must be a number",
+        message: "studio.validation.longitude_number",
         path: ["longitude"],
       });
     } else if (lng < -180 || lng > 180) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Longitude must be between -180 and 180",
+        message: "studio.validation.longitude_range",
         path: ["longitude"],
       });
     }

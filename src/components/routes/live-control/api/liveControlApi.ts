@@ -1,5 +1,6 @@
 import axios from "axios";
 import axiosInstance from "@/config/axios-config";
+import { tolgee } from "@/i18n/tolgee";
 import { fetchTextLanguages, searchTitles } from "@/components/api/searchApi";
 
 /**
@@ -132,12 +133,12 @@ export function toOperatorSegments(
     .filter((segment) => Boolean(segment.id));
 }
 
-/** The event's public record: readable without a session, unlike the CMS one. */
+/** The event's CMS record, read with the operator's Studio session. */
 export const fetchLiveControlEvent = async (
   eventId: string,
 ): Promise<LiveControlEvent> => {
   const { data } = await axiosInstance.get(
-    `/api/v1/events/${encodeURIComponent(eventId)}`,
+    `/api/v1/cms/events/${encodeURIComponent(eventId)}`,
   );
   const rows = Array.isArray(data?.metadata)
     ? data.metadata
@@ -149,7 +150,8 @@ export const fetchLiveControlEvent = async (
       (row: { language?: string }) => row.language?.toUpperCase() === "EN",
     ) ?? rows[0];
   return {
-    title: preferred?.name?.trim() || "Untitled event",
+    title:
+      preferred?.name?.trim() || tolgee.t("studio.live_control.untitled_event"),
     collectionId: data?.group_recitation_collection_id ?? null,
   };
 };
@@ -194,7 +196,9 @@ export const fetchTextEditions = async (
     language?: string;
   }): TextEdition => ({
     textId: row?.id ?? "",
-    title: row?.title?.trim() || (row?.id ?? "Untitled"),
+    title:
+      row?.title?.trim() ||
+      (row?.id ?? tolgee.t("studio.live_control.untitled")),
     language: (row?.language ?? "").trim().toLowerCase(),
   });
   const text = asEdition(data?.text ?? { id: textId });
@@ -260,18 +264,18 @@ const emitClient = axios.create({
 
 const emitFailure = (status: number | undefined): string => {
   if (status === 401 || status === 403) {
-    return "That emit token was rejected. Check it and paste it again.";
+    return tolgee.t("studio.live_control.errors.token_rejected");
   }
   if (status === 503) {
-    return "The server has no emit token configured, so nothing can be published.";
+    return tolgee.t("studio.live_control.errors.token_not_configured");
   }
   if (status === 404) {
-    return "This event is not live, so positions cannot be published to it.";
+    return tolgee.t("studio.live_control.errors.event_not_live");
   }
   if (status === 429) {
-    return "The room is taking positions as fast as it can; slow down a little.";
+    return tolgee.t("studio.live_control.errors.positions_throttled");
   }
-  return "Could not reach the room. The last line will be sent again on the next move.";
+  return tolgee.t("studio.live_control.errors.room_unreachable_resend");
 };
 
 /**
@@ -467,13 +471,13 @@ export const commandRefused = (
   status?: number,
 ): string => {
   if (code === "THROTTLED" || status === 429) {
-    return "The room is taking lines as fast as it can; slow down a little.";
+    return tolgee.t("studio.live_control.errors.lines_throttled");
   }
   if (code === "NOT_RUNNING" || status === 409) {
-    return "Autoplay is no longer running that plan.";
+    return tolgee.t("studio.live_control.errors.autoplay_not_running");
   }
   if (typeof message === "string" && message) return message;
-  return "The server could not do that just now. Try again.";
+  return tolgee.t("studio.live_control.errors.server_try_again");
 };
 
 /** A command by HTTP, for when the socket is not open. */
@@ -491,7 +495,10 @@ export const sendAutoplayCommand = async (
     const state = toAutoplayState(data);
     return state
       ? { ok: true, state }
-      : { ok: false, message: "The server's answer could not be read." };
+      : {
+          ok: false,
+          message: tolgee.t("studio.live_control.errors.unreadable_answer"),
+        };
   } catch (error) {
     const status = axios.isAxiosError(error)
       ? error.response?.status
@@ -518,7 +525,7 @@ const autoplayFailure = (error: unknown): AutoplayResult => {
   if (status === 503) {
     return {
       ok: false,
-      message: "The server could not run autoplay just now. Try again.",
+      message: tolgee.t("studio.live_control.errors.autoplay_unavailable"),
     };
   }
   return {
@@ -590,7 +597,7 @@ export const startAutoplay = async (
         ? ({ ok: true, state } as const)
         : ({
             ok: false,
-            message: "The server's answer could not be read.",
+            message: tolgee.t("studio.live_control.errors.unreadable_answer"),
           } as const);
     })
     .catch((error: unknown) => autoplayFailure(error));
@@ -630,7 +637,10 @@ export const stopAutoplay = async (
     const state = toAutoplayState(data);
     return state
       ? { ok: true, state }
-      : { ok: false, message: "The server's answer could not be read." };
+      : {
+          ok: false,
+          message: tolgee.t("studio.live_control.errors.unreadable_answer"),
+        };
   } catch (error) {
     return autoplayFailure(error);
   }

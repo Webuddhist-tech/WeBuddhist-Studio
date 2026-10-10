@@ -3,6 +3,7 @@ import { IoMdAdd, IoMdSearch } from "react-icons/io";
 import { useDebounce } from "use-debounce";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import AuthButton from "@/components/ui/molecules/auth-button/AuthButton";
@@ -20,6 +21,7 @@ import VerseOfDayFormDialog from "./VerseOfDayFormDialog";
 const PAGE_SIZE = 10;
 
 const VerseOfDay = () => {
+  const { t } = useTranslate();
   const [search, setSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
@@ -50,7 +52,7 @@ const VerseOfDay = () => {
   const deleteMutation = useMutation({
     mutationFn: deleteVerseOfDay,
     onSuccess: () => {
-      toast.success("Verse of Day deleted successfully!");
+      toast.success(t("studio.verse_of_day.toast.deleted"));
       setDeleteTarget(null);
       if (data?.verses.length === 1 && currentPage > 1) {
         setCurrentPage(currentPage - 1);
@@ -96,7 +98,7 @@ const VerseOfDay = () => {
           <div className="border w-fit px-2 bg-white dark:bg-input/30 rounded-md border-gray-200 dark:border-[#313132] flex items-center">
             <IoMdSearch className="w-4 h-4" />
             <Pecha.Input
-              placeholder="Search verses..."
+              placeholder={t("studio.verse_of_day.search_placeholder")}
               className="rounded-md border-none dark:bg-transparent px-4 shadow-none py-2"
               value={search}
               onChange={(e) => {
@@ -110,7 +112,7 @@ const VerseOfDay = () => {
             className="bg-gray-100 hover:bg-gray-200"
             onClick={handleOpenCreate}
           >
-            <IoMdAdd /> Add Verse
+            <IoMdAdd /> {t("studio.verse_of_day.add_verse")}
           </Button>
         </div>
         <AuthButton />
@@ -119,17 +121,19 @@ const VerseOfDay = () => {
       <div className="flex-1 overflow-hidden px-6 py-4">
         {error ? (
           <p className="text-sm text-red-500 py-8">
-            Failed to load verses. {getApiErrorMessage(error)}
+            {t("studio.verse_of_day.load_failed")} {getApiErrorMessage(error)}
           </p>
         ) : verses.length === 0 && !isLoading ? (
           <div className="flex flex-col h-full items-center justify-center">
-            <p className="text-base text-muted-foreground">No verses found</p>
+            <p className="text-base text-muted-foreground">
+              {t("studio.verse_of_day.empty")}
+            </p>
             <Button
               variant="outline"
               className="mt-2"
               onClick={handleOpenCreate}
             >
-              <IoMdAdd /> Add Verse
+              <IoMdAdd /> {t("studio.verse_of_day.add_verse")}
             </Button>
           </div>
         ) : (
@@ -173,15 +177,16 @@ const VerseOfDay = () => {
       >
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
-            <Pecha.AlertDialogTitle>Delete Verse of Day</Pecha.AlertDialogTitle>
+            <Pecha.AlertDialogTitle>
+              {t("studio.verse_of_day.delete_dialog.title")}
+            </Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
-              Are you sure you want to delete this verse? This action cannot be
-              undone.
+              {t("studio.verse_of_day.delete_dialog.description")}
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <Pecha.AlertDialogFooter>
             <Pecha.AlertDialogCancel disabled={deleteMutation.isPending}>
-              Cancel
+              {t("studio.common.cancel")}
             </Pecha.AlertDialogCancel>
             <Pecha.AlertDialogAction
               className="bg-[#AD1B21] dark:text-white hover:bg-[#AD1B21]/90"
@@ -190,7 +195,9 @@ const VerseOfDay = () => {
                 deleteTarget && deleteMutation.mutate(deleteTarget.id)
               }
             >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              {deleteMutation.isPending
+                ? t("studio.common.deleting")
+                : t("studio.common.delete")}
             </Pecha.AlertDialogAction>
           </Pecha.AlertDialogFooter>
         </Pecha.AlertDialogContent>

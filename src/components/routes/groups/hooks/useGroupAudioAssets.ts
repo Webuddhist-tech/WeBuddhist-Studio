@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { tolgee } from "@/i18n/tolgee";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import {
   AUDIO_TOO_LARGE_MESSAGE,
@@ -64,7 +65,7 @@ export const useGroupAudioAssets = ({
       return uploadGroupAsset(groupId!, file, { durationMs });
     },
     onSuccess: (asset) => {
-      toast.success("Audio added to the library");
+      toast.success(tolgee.t("studio.groups.shared.audio_uploaded"));
       invalidateAssets();
       onUploaded?.(asset);
     },
@@ -72,12 +73,12 @@ export const useGroupAudioAssets = ({
       const status = (err as { response?: { status?: number } })?.response
         ?.status;
       if (status === 413) {
-        toast.error("Failed to upload audio", {
-          description: AUDIO_TOO_LARGE_MESSAGE,
+        toast.error(tolgee.t("studio.groups.shared.audio_upload_error"), {
+          description: tolgee.t(AUDIO_TOO_LARGE_MESSAGE),
         });
         return;
       }
-      toast.error("Failed to upload audio", {
+      toast.error(tolgee.t("studio.groups.shared.audio_upload_error"), {
         description: getApiErrorMessage(err),
       });
     },
@@ -89,7 +90,7 @@ export const useGroupAudioAssets = ({
     (file: File) => {
       const validationError = validateAudioFile(file);
       if (validationError) {
-        toast.error("Failed to upload audio", {
+        toast.error(tolgee.t("studio.groups.shared.audio_upload_error"), {
           description: validationError,
         });
         return;

@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useTranslate } from "@tolgee/react";
 import {
   Avatar,
   AvatarFallback,
@@ -26,6 +27,7 @@ const Stat = ({ label, value }: { label: string; value: string | number }) => (
 );
 
 const GroupsList = ({ groups, isLoading, loadingLabel }: GroupsListProps) => {
+  const { t } = useTranslate();
   const navigate = useNavigate();
 
   if (isLoading) {
@@ -65,10 +67,12 @@ const GroupsList = ({ groups, isLoading, loadingLabel }: GroupsListProps) => {
                 <div className="flex flex-wrap items-center gap-2 text-sm">
                   {group.is_public ? (
                     <span className="text-green-600 dark:text-green-400">
-                      Public
+                      {t("studio.groups.pages.visibility.public")}
                     </span>
                   ) : (
-                    <span className="text-muted-foreground">Private</span>
+                    <span className="text-muted-foreground">
+                      {t("studio.groups.pages.visibility.private")}
+                    </span>
                   )}
                 </div>
               </div>
@@ -76,9 +80,15 @@ const GroupsList = ({ groups, isLoading, loadingLabel }: GroupsListProps) => {
 
             <div className="border-t border-dashed border-gray-200 dark:border-input pt-3">
               {group.group_type === "COMMUNITY" ? (
-                <Stat label="Joiners" value={group.joiner_count ?? "—"} />
+                <Stat
+                  label={t("studio.groups.pages.list.joiners")}
+                  value={group.joiner_count ?? "—"}
+                />
               ) : (
-                <Stat label="Followers" value={group.follower_count} />
+                <Stat
+                  label={t("studio.groups.pages.list.followers")}
+                  value={group.follower_count}
+                />
               )}
             </div>
           </button>

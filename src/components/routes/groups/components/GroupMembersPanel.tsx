@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import { getApiErrorMessage } from "@/lib/apiErrors";
@@ -40,6 +41,7 @@ const GroupMembersPanel = ({
   groupType,
   members,
 }: GroupMembersPanelProps) => {
+  const { t } = useTranslate();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const { data: userInfo } = useUserInfo();
@@ -79,7 +81,7 @@ const GroupMembersPanel = ({
       role: AuthorGroupMemberRole;
     }) => updateGroupMemberRole(groupId, authorId, { role }),
     onSuccess: () => {
-      toast.success("Member role updated");
+      toast.success(t("studio.groups.components.members.role_updated_toast"));
       invalidate();
     },
     onError: (err) => toast.error(getApiErrorMessage(err)),
@@ -91,12 +93,12 @@ const GroupMembersPanel = ({
     onSuccess: (_data, { isSelf }) => {
       setRemoveTarget(null);
       if (isSelf) {
-        toast.success("You left the group");
+        toast.success(t("studio.groups.components.members.left_toast"));
         queryClient.invalidateQueries({ queryKey: ["cms-groups"] });
         navigate(groupKindOf(groupType).listPath);
         return;
       }
-      toast.success("Member removed");
+      toast.success(t("studio.groups.components.members.removed_toast"));
       invalidate();
     },
     onError: (err) => toast.error(getApiErrorMessage(err)),
@@ -106,7 +108,9 @@ const GroupMembersPanel = ({
     <div className="space-y-8">
       <div className="space-y-4">
         <GroupSectionHeader
-          title={`Members (${members.length})`}
+          title={t("studio.groups.components.members.title_count", {
+            count: members.length,
+          })}
           action={
             showTransferOwnership ? (
               <Button
@@ -115,7 +119,7 @@ const GroupMembersPanel = ({
                 variant="outline"
                 onClick={() => setTransferOpen(true)}
               >
-                Transfer ownership
+                {t("studio.groups.components.transfer.title")}
               </Button>
             ) : undefined
           }
@@ -125,12 +129,16 @@ const GroupMembersPanel = ({
           <Pecha.Table>
             <Pecha.TableHeader>
               <Pecha.TableRow>
-                <Pecha.TableHead>Name</Pecha.TableHead>
-                <Pecha.TableHead>Email</Pecha.TableHead>
-                <Pecha.TableHead>Role</Pecha.TableHead>
+                <Pecha.TableHead>{t("studio.common.name")}</Pecha.TableHead>
+                <Pecha.TableHead>
+                  {t("studio.groups.components.members.email")}
+                </Pecha.TableHead>
+                <Pecha.TableHead>
+                  {t("studio.groups.components.members.role")}
+                </Pecha.TableHead>
                 {showActionsColumn ? (
                   <Pecha.TableHead className="text-right">
-                    Actions
+                    {t("studio.common.actions")}
                   </Pecha.TableHead>
                 ) : null}
               </Pecha.TableRow>
@@ -177,13 +185,19 @@ const GroupMembersPanel = ({
                           <Pecha.SelectContent>
                             {assignableRoles.map((role) => (
                               <Pecha.SelectItem key={role} value={role}>
-                                {role}
+                                {t(
+                                  `studio.groups.components.role.${role.toLowerCase()}`,
+                                )}
                               </Pecha.SelectItem>
                             ))}
                           </Pecha.SelectContent>
                         </Pecha.Select>
                       ) : (
-                        <span className="text-sm">{displayRole}</span>
+                        <span className="text-sm">
+                          {t(
+                            `studio.groups.components.role.${displayRole.toLowerCase()}`,
+                          )}
+                        </span>
                       )}
                     </Pecha.TableCell>
                     {showActionsColumn ? (
@@ -196,7 +210,9 @@ const GroupMembersPanel = ({
                             className="text-red-600 hover:text-red-700"
                             onClick={() => setRemoveTarget(member)}
                           >
-                            {isSelf ? "Leave" : "Remove"}
+                            {isSelf
+                              ? t("studio.groups.components.members.leave")
+                              : t("studio.common.remove")}
                           </Button>
                         )}
                       </Pecha.TableCell>
@@ -233,17 +249,21 @@ const GroupMembersPanel = ({
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
             <Pecha.AlertDialogTitle>
-              {leavingSelf ? "Leave group?" : "Remove member?"}
+              {leavingSelf
+                ? t("studio.groups.components.members.leave_title")
+                : t("studio.groups.components.members.remove_title")}
             </Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
               {leavingSelf
-                ? "You will lose access to this group. You can rejoin only if invited again."
-                : `Remove ${removeTarget?.firstname} ${removeTarget?.lastname} from this group?`}
+                ? t("studio.groups.components.members.leave_description")
+                : t("studio.groups.components.members.remove_description", {
+                    name: `${removeTarget?.firstname} ${removeTarget?.lastname}`,
+                  })}
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <Pecha.AlertDialogFooter>
             <Pecha.AlertDialogCancel disabled={removeMutation.isPending}>
-              Cancel
+              {t("studio.common.cancel")}
             </Pecha.AlertDialogCancel>
             <Pecha.AlertDialogAction
               className="bg-[#AD1B21] dark:text-white hover:bg-[#AD1B21]/90"
@@ -258,11 +278,11 @@ const GroupMembersPanel = ({
             >
               {removeMutation.isPending
                 ? leavingSelf
-                  ? "Leaving…"
-                  : "Removing…"
+                  ? t("studio.groups.components.members.leaving")
+                  : t("studio.groups.components.remove_user.removing")
                 : leavingSelf
-                  ? "Leave"
-                  : "Remove"}
+                  ? t("studio.groups.components.members.leave")
+                  : t("studio.common.remove")}
             </Pecha.AlertDialogAction>
           </Pecha.AlertDialogFooter>
         </Pecha.AlertDialogContent>

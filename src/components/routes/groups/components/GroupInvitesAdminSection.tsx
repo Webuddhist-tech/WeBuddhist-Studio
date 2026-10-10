@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import { getApiErrorMessage } from "@/lib/apiErrors";
@@ -27,12 +28,15 @@ const STATUS_FILTER_OPTIONS: {
   value: "all" | AuthorGroupInviteStatus;
   label: string;
 }[] = [
-  { value: "all", label: "All statuses" },
-  { value: "PENDING", label: "Pending" },
-  { value: "ACCEPTED", label: "Accepted" },
-  { value: "REJECTED", label: "Rejected" },
-  { value: "REVOKED", label: "Revoked" },
-  { value: "EXPIRED", label: "Expired" },
+  {
+    value: "all",
+    label: "studio.groups.components.invites_admin.all_statuses",
+  },
+  { value: "PENDING", label: "studio.groups.components.status.pending" },
+  { value: "ACCEPTED", label: "studio.groups.components.status.accepted" },
+  { value: "REJECTED", label: "studio.groups.components.status.rejected" },
+  { value: "REVOKED", label: "studio.groups.components.status.revoked" },
+  { value: "EXPIRED", label: "studio.groups.components.status.expired" },
 ];
 
 type GroupInvitesAdminSectionProps = {
@@ -44,6 +48,7 @@ const GroupInvitesAdminSection = ({
   groupId,
   myRole,
 }: GroupInvitesAdminSectionProps) => {
+  const { t } = useTranslate();
   const { data: userInfo } = useUserInfo();
   const showActionsColumn = shouldShowCmsActionsColumn(userInfo?.platform_role);
   const inviteTableColSpan = showActionsColumn ? 6 : 5;
@@ -82,7 +87,7 @@ const GroupInvitesAdminSection = ({
         role: inviteRole,
       }),
     onSuccess: () => {
-      toast.success("Invitation sent");
+      toast.success(t("studio.groups.components.invites_admin.sent_toast"));
       setInviteOpen(false);
       setTargetEmail("");
       setInviteRole(availableInviteRoles[0] ?? "AUTHOR");
@@ -94,7 +99,7 @@ const GroupInvitesAdminSection = ({
   const revokeMutation = useMutation({
     mutationFn: (inviteId: string) => revokeGroupInvite(groupId, inviteId),
     onSuccess: () => {
-      toast.success("Invitation revoked");
+      toast.success(t("studio.groups.components.invites_admin.revoked_toast"));
       invalidate();
     },
     onError: (err) => toast.error(getApiErrorMessage(err)),
@@ -105,7 +110,7 @@ const GroupInvitesAdminSection = ({
   return (
     <div className="space-y-4 border-t border-dashed border-gray-300 dark:border-input pt-8">
       <GroupSectionHeader
-        title="Invitations"
+        title={t("studio.groups.components.invites_admin.title")}
         action={
           availableInviteRoles.length > 0 ? (
             <Button
@@ -114,14 +119,16 @@ const GroupInvitesAdminSection = ({
               size="sm"
               onClick={() => setInviteOpen(true)}
             >
-              Invite member
+              {t("studio.groups.components.invites_admin.invite_member")}
             </Button>
           ) : undefined
         }
       />
 
       <div className="flex flex-wrap items-center gap-2">
-        <label className="text-sm text-muted-foreground">Status</label>
+        <label className="text-sm text-muted-foreground">
+          {t("studio.common.status")}
+        </label>
         <Pecha.Select
           value={statusFilter}
           onValueChange={(v) =>
@@ -134,7 +141,7 @@ const GroupInvitesAdminSection = ({
           <Pecha.SelectContent>
             {STATUS_FILTER_OPTIONS.map((opt) => (
               <Pecha.SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
+                {t(opt.label)}
               </Pecha.SelectItem>
             ))}
           </Pecha.SelectContent>
@@ -145,14 +152,22 @@ const GroupInvitesAdminSection = ({
         <Pecha.Table>
           <Pecha.TableHeader>
             <Pecha.TableRow>
-              <Pecha.TableHead>Email</Pecha.TableHead>
-              <Pecha.TableHead>Role</Pecha.TableHead>
-              <Pecha.TableHead>Status</Pecha.TableHead>
-              <Pecha.TableHead>Expires</Pecha.TableHead>
-              <Pecha.TableHead>Invited by</Pecha.TableHead>
+              <Pecha.TableHead>
+                {t("studio.groups.components.members.email")}
+              </Pecha.TableHead>
+              <Pecha.TableHead>
+                {t("studio.groups.components.members.role")}
+              </Pecha.TableHead>
+              <Pecha.TableHead>{t("studio.common.status")}</Pecha.TableHead>
+              <Pecha.TableHead>
+                {t("studio.groups.components.invites_admin.expires")}
+              </Pecha.TableHead>
+              <Pecha.TableHead>
+                {t("studio.groups.components.invites_admin.invited_by")}
+              </Pecha.TableHead>
               {showActionsColumn ? (
                 <Pecha.TableHead className="text-right">
-                  Actions
+                  {t("studio.common.actions")}
                 </Pecha.TableHead>
               ) : null}
             </Pecha.TableRow>
@@ -164,7 +179,7 @@ const GroupInvitesAdminSection = ({
                   colSpan={inviteTableColSpan}
                   className="text-muted-foreground"
                 >
-                  Loading invitations…
+                  {t("studio.groups.components.invites_admin.loading")}
                 </Pecha.TableCell>
               </Pecha.TableRow>
             ) : invites.length === 0 ? (
@@ -173,7 +188,7 @@ const GroupInvitesAdminSection = ({
                   colSpan={inviteTableColSpan}
                   className="text-muted-foreground"
                 >
-                  No invitations found
+                  {t("studio.groups.components.invites_admin.empty")}
                 </Pecha.TableCell>
               </Pecha.TableRow>
             ) : (
@@ -181,7 +196,9 @@ const GroupInvitesAdminSection = ({
                 <Pecha.TableRow key={invite.id}>
                   <Pecha.TableCell>{invite.target_email}</Pecha.TableCell>
                   <Pecha.TableCell>
-                    {normalizeMemberRole(invite.role)}
+                    {t(
+                      `studio.groups.components.role.${normalizeMemberRole(invite.role).toLowerCase()}`,
+                    )}
                   </Pecha.TableCell>
                   <Pecha.TableCell>
                     <GroupInviteStatusBadge status={invite.status} />
@@ -210,7 +227,7 @@ const GroupInvitesAdminSection = ({
                             disabled={revokeMutation.isPending}
                             onClick={() => revokeMutation.mutate(invite.id)}
                           >
-                            Revoke
+                            {t("studio.groups.components.invites_admin.revoke")}
                           </Button>
                         )}
                     </Pecha.TableCell>
@@ -225,29 +242,31 @@ const GroupInvitesAdminSection = ({
       <Pecha.Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
         <Pecha.DialogContent>
           <Pecha.DialogHeader>
-            <Pecha.DialogTitle>Invite member</Pecha.DialogTitle>
+            <Pecha.DialogTitle>
+              {t("studio.groups.components.invites_admin.invite_member")}
+            </Pecha.DialogTitle>
           </Pecha.DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              The invitee does not need a Studio account yet — they&apos;ll get
-              an email invite either way. If they&apos;re already registered
-              they&apos;ll also get an in-app notification now; otherwise it
-              appears once they sign up and verify their email (valid for about
-              30 minutes). Authors who previously left can be invited again if
-              they are not currently members and have no pending invite for this
-              email.
+              {t("studio.groups.components.invites_admin.dialog_description")}
             </p>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Email</label>
+              <label className="text-sm font-medium">
+                {t("studio.groups.components.members.email")}
+              </label>
               <Pecha.Input
                 type="email"
                 value={targetEmail}
                 onChange={(e) => setTargetEmail(e.target.value)}
-                placeholder="author@example.org"
+                placeholder={t(
+                  "studio.groups.components.invites_admin.email_placeholder",
+                )}
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Role</label>
+              <label className="text-sm font-medium">
+                {t("studio.groups.components.members.role")}
+              </label>
               <Pecha.Select
                 value={inviteRole}
                 onValueChange={(v) => setInviteRole(v as AuthorGroupMemberRole)}
@@ -258,7 +277,7 @@ const GroupInvitesAdminSection = ({
                 <Pecha.SelectContent>
                   {availableInviteRoles.map((role) => (
                     <Pecha.SelectItem key={role} value={role}>
-                      {role}
+                      {t(`studio.groups.components.role.${role.toLowerCase()}`)}
                     </Pecha.SelectItem>
                   ))}
                 </Pecha.SelectContent>
@@ -270,14 +289,16 @@ const GroupInvitesAdminSection = ({
                 variant="outline"
                 onClick={() => setInviteOpen(false)}
               >
-                Cancel
+                {t("studio.common.cancel")}
               </Button>
               <Button
                 type="button"
                 disabled={!targetEmail.trim() || inviteMutation.isPending}
                 onClick={() => inviteMutation.mutate()}
               >
-                {inviteMutation.isPending ? "Sending…" : "Send invite"}
+                {inviteMutation.isPending
+                  ? t("studio.groups.components.invites_admin.sending")
+                  : t("studio.groups.components.invites_admin.send_invite")}
               </Button>
             </div>
           </div>

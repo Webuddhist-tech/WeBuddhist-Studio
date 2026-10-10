@@ -84,28 +84,28 @@ describe("Navbar", () => {
     renderNavbar();
 
     expect(
-      screen.getByRole("link", { name: /manage practice spaces/i }),
+      screen.getByRole("link", { name: "studio.nav.practice_spaces_tooltip" }),
     ).toHaveAttribute("href", "/groups");
     expect(
-      screen.queryByRole("link", { name: /manage pages/i }),
+      screen.queryByRole("link", { name: "studio.nav.pages_tooltip" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: /go to dashboard/i }),
+      screen.queryByRole("link", { name: "studio.nav.dashboard_tooltip" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: /view analytics/i }),
+      screen.queryByRole("link", { name: "studio.nav.analytics_tooltip" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: /manage tags/i }),
+      screen.queryByRole("link", { name: "studio.nav.tags_tooltip" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: /manage traditions/i }),
+      screen.queryByRole("link", { name: "studio.nav.traditions_tooltip" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: /manage accumulator presets/i }),
+      screen.queryByRole("link", { name: "studio.nav.presets_tooltip" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: /manage text audio/i }),
+      screen.queryByRole("link", { name: "studio.nav.text_audio_tooltip" }),
     ).not.toBeInTheDocument();
   });
 
@@ -118,7 +118,7 @@ describe("Navbar", () => {
     renderNavbar();
 
     expect(
-      screen.getByRole("link", { name: /webuddhist studio logo/i }),
+      screen.getByRole("link", { name: /studio.nav.logo_alt/ }),
     ).toHaveAttribute("href", "/groups");
   });
 
@@ -132,22 +132,25 @@ describe("Navbar", () => {
     renderNavbar();
 
     expect(
-      screen.getByRole("link", { name: /go to dashboard/i }),
+      screen.getByRole("link", { name: "studio.nav.dashboard_tooltip" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /view analytics/i }),
+      screen.getByRole("link", { name: "studio.nav.analytics_tooltip" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /manage tags/i }),
+      screen.getByRole("link", { name: "studio.nav.tags_tooltip" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /manage practice spaces/i }),
+      screen.getByRole("link", { name: "studio.nav.practice_spaces_tooltip" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /author administration/i }),
+      screen.getByRole("link", { name: "studio.nav.authors_tooltip" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /manage ambient sound catalog/i }),
+      screen.getByRole("link", { name: "studio.nav.ambient_sounds_tooltip" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "studio.nav.text_requests_tooltip" }),
     ).toBeInTheDocument();
   });
 
@@ -163,10 +166,14 @@ describe("Navbar", () => {
     renderNavbar();
 
     expect(
-      screen.getByRole("link", { name: /author administration/i }),
+      screen.getByRole("link", { name: "studio.nav.authors_tooltip" }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: /manage ambient sound catalog/i }),
+      screen.queryByRole("link", { name: "studio.nav.ambient_sounds_tooltip" }),
+    ).not.toBeInTheDocument();
+    // Text requests are answered by Super Admins and Content Admins only.
+    expect(
+      screen.queryByRole("link", { name: "studio.nav.text_requests_tooltip" }),
     ).not.toBeInTheDocument();
   });
 
@@ -179,10 +186,10 @@ describe("Navbar", () => {
     renderNavbar();
 
     expect(
-      screen.getByRole("link", { name: /go to dashboard/i }),
+      screen.getByRole("link", { name: "studio.nav.dashboard_tooltip" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /manage practice spaces/i }),
+      screen.getByRole("link", { name: "studio.nav.practice_spaces_tooltip" }),
     ).toBeInTheDocument();
   });
 
@@ -195,7 +202,7 @@ describe("Navbar", () => {
     renderNavbar();
 
     expect(
-      screen.getByRole("link", { name: /go to dashboard/i }),
+      screen.getByRole("link", { name: "studio.nav.dashboard_tooltip" }),
     ).toBeInTheDocument();
   });
 
@@ -209,9 +216,9 @@ describe("Navbar", () => {
     renderNavbar();
 
     expect(
-      screen.getByRole("button", { name: /expand sidebar/i }),
+      screen.getByRole("button", { name: "studio.nav.expand_sidebar" }),
     ).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
+    expect(screen.queryByText("studio.nav.dashboard")).not.toBeInTheDocument();
   });
 
   it("honours a saved expanded preference even on a narrow viewport", () => {
@@ -224,7 +231,7 @@ describe("Navbar", () => {
 
     renderNavbar();
 
-    expect(screen.getByText("Dashboard")).toBeInTheDocument();
+    expect(screen.getByText("studio.nav.dashboard")).toBeInTheDocument();
   });
 
   it("starts expanded and shows the labels", () => {
@@ -236,11 +243,11 @@ describe("Navbar", () => {
     renderNavbar();
 
     expect(
-      screen.getByRole("button", { name: /collapse sidebar/i }),
+      screen.getByRole("button", { name: "studio.nav.collapse_sidebar" }),
     ).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("Dashboard")).toBeInTheDocument();
-    expect(screen.getByText("Content")).toBeInTheDocument();
-    expect(screen.getByText("Logout")).toBeInTheDocument();
+    expect(screen.getByText("studio.nav.dashboard")).toBeInTheDocument();
+    expect(screen.getByText("studio.nav.section_content")).toBeInTheDocument();
+    expect(screen.getByText("studio.nav.logout")).toBeInTheDocument();
   });
 
   it("hides the labels once collapsed", async () => {
@@ -251,14 +258,16 @@ describe("Navbar", () => {
 
     renderNavbar();
     await userEvent.click(
-      screen.getByRole("button", { name: /collapse sidebar/i }),
+      screen.getByRole("button", { name: "studio.nav.collapse_sidebar" }),
     );
 
     expect(
-      screen.getByRole("button", { name: /expand sidebar/i }),
+      screen.getByRole("button", { name: "studio.nav.expand_sidebar" }),
     ).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
-    expect(screen.queryByText("Content")).not.toBeInTheDocument();
+    expect(screen.queryByText("studio.nav.dashboard")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("studio.nav.section_content"),
+    ).not.toBeInTheDocument();
   });
 
   it("remembers the collapsed state across mounts", async () => {
@@ -269,15 +278,15 @@ describe("Navbar", () => {
 
     const { unmount } = renderNavbar();
     await userEvent.click(
-      screen.getByRole("button", { name: /collapse sidebar/i }),
+      screen.getByRole("button", { name: "studio.nav.collapse_sidebar" }),
     );
     unmount();
     renderNavbar();
 
     expect(
-      screen.getByRole("button", { name: /expand sidebar/i }),
+      screen.getByRole("button", { name: "studio.nav.expand_sidebar" }),
     ).toBeInTheDocument();
-    expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
+    expect(screen.queryByText("studio.nav.dashboard")).not.toBeInTheDocument();
   });
 
   it("keeps Verse of Day out of a CREATOR account's nav", () => {
@@ -290,7 +299,7 @@ describe("Navbar", () => {
     renderNavbar();
 
     expect(
-      screen.queryByRole("link", { name: /verse of day/i }),
+      screen.queryByRole("link", { name: "studio.nav.verse_of_day" }),
     ).not.toBeInTheDocument();
   });
 
@@ -303,16 +312,20 @@ describe("Navbar", () => {
     renderNavbar();
 
     // Pinned items stand alone; the rest wait behind a header.
-    expect(screen.getByText("Practice spaces")).toBeInTheDocument();
-    expect(screen.getByText("Pages")).toBeInTheDocument();
-    expect(screen.queryByText("Verse of Day")).not.toBeInTheDocument();
+    expect(screen.getByText("studio.nav.practice_spaces")).toBeInTheDocument();
+    expect(screen.getByText("studio.nav.pages")).toBeInTheDocument();
+    expect(
+      screen.queryByText("studio.nav.verse_of_day"),
+    ).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: /^content$/i }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.nav.section_content" }),
+    );
 
-    expect(screen.getByText("Verse of Day")).toBeInTheDocument();
-    expect(screen.getByText("Poems")).toBeInTheDocument();
-    expect(screen.getByText("Ambient Sounds")).toBeInTheDocument();
-    expect(screen.queryByText("Tags")).not.toBeInTheDocument();
+    expect(screen.getByText("studio.nav.verse_of_day")).toBeInTheDocument();
+    expect(screen.getByText("studio.nav.poems")).toBeInTheDocument();
+    expect(screen.getByText("studio.nav.ambient_sounds")).toBeInTheDocument();
+    expect(screen.queryByText("studio.nav.tags")).not.toBeInTheDocument();
   });
 
   it("remembers which sections are open across mounts", async () => {
@@ -323,12 +336,12 @@ describe("Navbar", () => {
 
     const { unmount } = renderNavbar();
     await userEvent.click(
-      screen.getByRole("button", { name: /^configuration$/i }),
+      screen.getByRole("button", { name: "studio.nav.section_configuration" }),
     );
     unmount();
     renderNavbar();
 
-    expect(screen.getByText("Tags")).toBeInTheDocument();
+    expect(screen.getByText("studio.nav.tags")).toBeInTheDocument();
   });
 
   it("gives a CONTENT_ADMIN the catalogues but not the all-plans views", () => {
@@ -342,34 +355,40 @@ describe("Navbar", () => {
 
     // Content and configuration, none of it tied to a space.
     for (const name of [
-      /verse of day/i,
-      /^poems$/i,
-      /manage text audio/i,
-      /manage ambient sound catalog/i,
-      /manage tags/i,
-      /manage traditions/i,
-      /manage accumulator presets/i,
-      /prayer intentions catalog/i,
+      "studio.nav.verse_of_day",
+      "studio.nav.poems",
+      "studio.nav.text_audio_tooltip",
+      "studio.nav.ambient_sounds_tooltip",
+      "studio.nav.tags_tooltip",
+      "studio.nav.traditions_tooltip",
+      "studio.nav.presets_tooltip",
+      "studio.nav.prayer_intentions_tooltip",
     ]) {
       expect(screen.getByRole("link", { name })).toBeInTheDocument();
     }
     // Like a creator: own spaces only.
     expect(
-      screen.getByRole("link", { name: /manage practice spaces/i }),
+      screen.getByRole("link", { name: "studio.nav.practice_spaces_tooltip" }),
     ).toHaveAttribute("href", "/groups");
     for (const name of [
-      /go to dashboard/i,
-      /view analytics/i,
-      /manage pages/i,
-      /author administration/i,
-      /china content restrictions/i,
-      /chat moderation reports/i,
+      "studio.nav.dashboard_tooltip",
+      "studio.nav.analytics_tooltip",
+      "studio.nav.pages_tooltip",
+      "studio.nav.authors_tooltip",
+      "studio.nav.china_tooltip",
+      "studio.nav.chat_reports_tooltip",
     ]) {
       expect(screen.queryByRole("link", { name })).not.toBeInTheDocument();
     }
+    // Administration holds only the text requests they answer.
     expect(
-      screen.queryByRole("button", { name: /^administration$/i }),
-    ).not.toBeInTheDocument();
+      screen.getByRole("button", {
+        name: "studio.nav.section_administration",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "studio.nav.text_requests_tooltip" }),
+    ).toHaveAttribute("href", "/admin/text-requests");
   });
 
   it("points a CONTENT_ADMIN's logo link to Practice spaces", () => {
@@ -381,7 +400,7 @@ describe("Navbar", () => {
     renderNavbar();
 
     expect(
-      screen.getByRole("link", { name: /webuddhist studio logo/i }),
+      screen.getByRole("link", { name: /studio.nav.logo_alt/ }),
     ).toHaveAttribute("href", "/groups");
   });
 
@@ -394,10 +413,12 @@ describe("Navbar", () => {
     renderNavbar();
 
     expect(
-      screen.queryByRole("button", { name: /^administration$/i }),
+      screen.queryByRole("button", {
+        name: "studio.nav.section_administration",
+      }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /^content$/i }),
+      screen.queryByRole("button", { name: "studio.nav.section_content" }),
     ).not.toBeInTheDocument();
   });
 
@@ -419,18 +440,18 @@ describe("Navbar", () => {
     );
 
     // The section holding the current page opens itself.
-    expect(screen.getByText("Tags")).toBeInTheDocument();
+    expect(screen.getByText("studio.nav.tags")).toBeInTheDocument();
 
     await userEvent.click(
-      screen.getByRole("button", { name: /^configuration$/i }),
+      screen.getByRole("button", { name: "studio.nav.section_configuration" }),
     );
-    expect(screen.queryByText("Tags")).not.toBeInTheDocument();
+    expect(screen.queryByText("studio.nav.tags")).not.toBeInTheDocument();
 
     await userEvent.click(
       screen.getByRole("button", { name: /go elsewhere/i }),
     );
 
-    expect(screen.getByText("Traditions")).toBeInTheDocument();
+    expect(screen.getByText("studio.nav.traditions")).toBeInTheDocument();
   });
 
   it("keeps every link reachable while collapsed to icons", async () => {
@@ -442,17 +463,17 @@ describe("Navbar", () => {
 
     renderNavbar();
     await userEvent.click(
-      screen.getByRole("button", { name: /collapse sidebar/i }),
+      screen.getByRole("button", { name: "studio.nav.collapse_sidebar" }),
     );
 
     expect(
-      screen.getByRole("link", { name: /verse of day/i }),
+      screen.getByRole("link", { name: "studio.nav.verse_of_day" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /manage tags/i }),
+      screen.getByRole("link", { name: "studio.nav.tags_tooltip" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /author administration/i }),
+      screen.getByRole("link", { name: "studio.nav.authors_tooltip" }),
     ).toBeInTheDocument();
   });
 
@@ -464,12 +485,11 @@ describe("Navbar", () => {
 
     renderNavbarAt("/pages/new");
 
-    expect(screen.getByRole("link", { name: /manage pages/i })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
     expect(
-      screen.getByRole("link", { name: /manage practice spaces/i }),
+      screen.getByRole("link", { name: "studio.nav.pages_tooltip" }),
+    ).toHaveAttribute("aria-current", "page");
+    expect(
+      screen.getByRole("link", { name: "studio.nav.practice_spaces_tooltip" }),
     ).not.toHaveAttribute("aria-current");
   });
 
@@ -488,12 +508,12 @@ describe("Navbar", () => {
 
     expect(
       await screen.findByRole("link", {
-        name: /manage pages/i,
+        name: "studio.nav.pages_tooltip",
         current: "page",
       }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /manage practice spaces/i }),
+      screen.getByRole("link", { name: "studio.nav.practice_spaces_tooltip" }),
     ).not.toHaveAttribute("aria-current");
   });
 
@@ -511,12 +531,12 @@ describe("Navbar", () => {
 
     expect(
       await screen.findByRole("link", {
-        name: /manage practice spaces/i,
+        name: "studio.nav.practice_spaces_tooltip",
         current: "page",
       }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /manage pages/i }),
+      screen.getByRole("link", { name: "studio.nav.pages_tooltip" }),
     ).not.toHaveAttribute("aria-current");
   });
 });

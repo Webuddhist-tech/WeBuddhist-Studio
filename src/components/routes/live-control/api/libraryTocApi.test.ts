@@ -85,8 +85,20 @@ describe("fetchEditionSections", () => {
     });
 
     await expect(fetchEditionSections("ed-1", "bo")).resolves.toEqual([
-      { id: "s1", title: "སྐྱབས་འགྲོ", depth: 0, segmentId: "seg-1" },
-      { id: "s2", title: "བསྟོད་པ", depth: 0, segmentId: "seg-3" },
+      {
+        id: "s1",
+        title: "སྐྱབས་འགྲོ",
+        fullTitle: "སྐྱབས་འགྲོ",
+        depth: 0,
+        segmentId: "seg-1",
+      },
+      {
+        id: "s2",
+        title: "བསྟོད་པ",
+        fullTitle: "བསྟོད་པ",
+        depth: 0,
+        segmentId: "seg-3",
+      },
     ]);
   });
 
@@ -157,9 +169,27 @@ describe("fetchEditionSections", () => {
     });
 
     await expect(fetchEditionSections("ed-1")).resolves.toEqual([
-      { id: "s1", title: "Praises", depth: 0, segmentId: "seg-1" },
-      { id: "s1a", title: "First Tārā", depth: 1, segmentId: "seg-2" },
-      { id: "s1b", title: "Second Tārā", depth: 1, segmentId: "seg-3" },
+      {
+        id: "s1",
+        title: "Praises",
+        fullTitle: "Praises",
+        depth: 0,
+        segmentId: "seg-1",
+      },
+      {
+        id: "s1a",
+        title: "First Tārā",
+        fullTitle: "First Tārā",
+        depth: 1,
+        segmentId: "seg-2",
+      },
+      {
+        id: "s1b",
+        title: "Second Tārā",
+        fullTitle: "Second Tārā",
+        depth: 1,
+        segmentId: "seg-3",
+      },
     ]);
   });
 
@@ -226,7 +256,13 @@ describe("fetchEditionSections", () => {
     });
 
     await expect(fetchEditionSections("ed-1")).resolves.toEqual([
-      { id: "s1", title: "Colophon", depth: 0, segmentId: undefined },
+      {
+        id: "s1",
+        title: "Colophon",
+        fullTitle: "Colophon",
+        depth: 0,
+        segmentId: undefined,
+      },
     ]);
   });
 
@@ -251,7 +287,43 @@ describe("fetchEditionSections", () => {
     });
 
     await expect(fetchEditionSections("ed-1")).resolves.toEqual([
-      { id: "s1a", title: "Refuge", depth: 0, segmentId: "seg-1" },
+      {
+        id: "s1a",
+        title: "Refuge",
+        fullTitle: "Refuge",
+        depth: 0,
+        segmentId: "seg-1",
+      },
+    ]);
+  });
+
+  it("shows a section's short title and icon, keeping the library's full title", async () => {
+    serve({
+      toc: [
+        {
+          id: "toc-1",
+          sections: [
+            {
+              // The Praise to the Twenty-One Tārās, as tocShortTitles.json has it.
+              id: "nvwOb8PXhakah1vqbAhj6",
+              title: { bo: "༄༅། །སྒྲོལ་མ་ཉེར་གཅིག་ལ་བསྟོད་པ།" },
+              span: { start: 0, end: 10 },
+            },
+          ],
+        },
+      ],
+      pages: [{ items: spans(1), has_more: false }],
+    });
+
+    await expect(fetchEditionSections("ed-1", "bo")).resolves.toEqual([
+      {
+        id: "nvwOb8PXhakah1vqbAhj6",
+        title: "ཉེར་གཅིག་བསྟོད་པ",
+        fullTitle: "༄༅། །སྒྲོལ་མ་ཉེར་གཅིག་ལ་བསྟོད་པ།",
+        icon: "🌿",
+        depth: 0,
+        segmentId: "seg-1",
+      },
     ]);
   });
 

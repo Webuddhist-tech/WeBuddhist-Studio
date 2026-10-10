@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { IoMdAdd, IoMdClose } from "react-icons/io";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Textarea } from "@/components/ui/atoms/textarea";
 import { Button } from "@/components/ui/atoms/button";
@@ -51,6 +52,7 @@ const PresetFormDialog = ({
   isSubmitting,
   onSubmit,
 }: PresetFormDialogProps) => {
+  const { t } = useTranslate();
   const isEdit = !!preset;
   const { languageOptions, getLanguageLabel } = useLanguages();
   const [activeLanguages, setActiveLanguages] = useState<LanguageCode[]>([
@@ -207,7 +209,7 @@ const PresetFormDialog = ({
       setDeityImageOverride({ url: image.original });
       patchDeityImageInCache(mantraOption.id, updated.deity_image ?? null);
       setIsDeityImageDialogOpen(false);
-      toast.success("Deity image uploaded");
+      toast.success(t("studio.accumulator_presets.toast.deity_image_uploaded"));
     } catch (err) {
       toast.error(getApiErrorMessage(err));
     } finally {
@@ -222,7 +224,7 @@ const PresetFormDialog = ({
       await updateMantra(mantraOption.id, { deity_image_key: null });
       setDeityImageOverride({ url: null });
       patchDeityImageInCache(mantraOption.id, null);
-      toast.success("Deity image removed");
+      toast.success(t("studio.accumulator_presets.toast.deity_image_removed"));
     } catch (err) {
       toast.error(getApiErrorMessage(err));
     } finally {
@@ -243,7 +245,7 @@ const PresetFormDialog = ({
       setNewMantraTitle("");
       setNewMantraText("");
       setNewMantraPronunciation("");
-      toast.success("Mantra created");
+      toast.success(t("studio.accumulator_presets.toast.mantra_created"));
     },
     onError: (err) => toast.error(getApiErrorMessage(err)),
   });
@@ -262,7 +264,7 @@ const PresetFormDialog = ({
 
   const removeLanguage = (langCode: LanguageCode) => {
     if (activeLanguages.length === 1) {
-      toast.error("At least one language is required");
+      toast.error(t("studio.accumulator_presets.validation.language_required"));
       return;
     }
     setActiveLanguages(activeLanguages.filter((l) => l !== langCode));
@@ -281,7 +283,9 @@ const PresetFormDialog = ({
 
   const handleCreateMantra = () => {
     if (!newMantraText.trim()) {
-      toast.error("Mantra text is required");
+      toast.error(
+        t("studio.accumulator_presets.validation.mantra_text_required"),
+      );
       return;
     }
     createMantraMutation.mutate({
@@ -307,7 +311,7 @@ const PresetFormDialog = ({
       .filter((entry) => entry.name.length > 0);
 
     if (metadata.length === 0) {
-      toast.error("At least one language name is required");
+      toast.error(t("studio.accumulator_presets.validation.name_required"));
       return;
     }
 
@@ -316,7 +320,7 @@ const PresetFormDialog = ({
       targetCount.trim() &&
       (!Number.isFinite(parsedTarget) || (parsedTarget ?? 0) < 1)
     ) {
-      toast.error("Target count must be a positive number");
+      toast.error(t("studio.accumulator_presets.validation.target_positive"));
       return;
     }
 
@@ -329,8 +333,12 @@ const PresetFormDialog = ({
     onSubmit(payload);
   };
 
-  const idleLabel = isEdit ? "Save changes" : "Create preset";
-  const pendingLabel = isEdit ? "Saving…" : "Creating…";
+  const idleLabel = isEdit
+    ? t("studio.accumulator_presets.form.save_changes")
+    : t("studio.accumulator_presets.form.create_preset");
+  const pendingLabel = isEdit
+    ? t("studio.common.saving")
+    : t("studio.common.creating");
   const submitLabel = isSubmitting ? pendingLabel : idleLabel;
 
   return (
@@ -339,25 +347,32 @@ const PresetFormDialog = ({
         <Pecha.DialogHeader>
           <Pecha.DialogTitle>
             {isEdit
-              ? `Edit preset — ${presetDisplayName(preset)}`
-              : "Create accumulator preset"}
+              ? t("studio.accumulator_presets.form.edit_title", {
+                  name: presetDisplayName(preset),
+                })
+              : t("studio.accumulator_presets.form.create_title")}
           </Pecha.DialogTitle>
           <p className="text-sm text-muted-foreground">
-            Link an optional text and mantra. At least one language name is
-            required.
+            {t("studio.accumulator_presets.form.subtitle")}
           </p>
         </Pecha.DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6 pt-2">
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-bold">Names</p>
+              <p className="text-sm font-bold">
+                {t("studio.accumulator_presets.form.names")}
+              </p>
               {availableLanguages.length > 0 ? (
                 <Pecha.Select
                   onValueChange={(v) => addLanguage(v as LanguageCode)}
                 >
                   <Pecha.SelectTrigger className="w-[160px] h-9">
-                    <Pecha.SelectValue placeholder="Add language" />
+                    <Pecha.SelectValue
+                      placeholder={t(
+                        "studio.accumulator_presets.form.add_language",
+                      )}
+                    />
                   </Pecha.SelectTrigger>
                   <Pecha.SelectContent>
                     {availableLanguages.map((lang) => (
@@ -386,13 +401,18 @@ const PresetFormDialog = ({
                     type="button"
                     onClick={() => removeLanguage(lang)}
                     className="text-muted-foreground hover:text-foreground"
-                    aria-label={`Remove ${lang}`}
+                    aria-label={t(
+                      "studio.accumulator_presets.form.remove_language_aria",
+                      {
+                        language: lang,
+                      },
+                    )}
                   >
                     <IoMdClose className="w-4 h-4" />
                   </button>
                 </div>
                 <Pecha.Input
-                  placeholder="Name"
+                  placeholder={t("studio.common.name")}
                   className="h-12 bg-white dark:bg-[#262626]"
                   value={languageData[lang]?.name ?? ""}
                   onChange={(e) =>
@@ -400,7 +420,9 @@ const PresetFormDialog = ({
                   }
                 />
                 <Textarea
-                  placeholder="Description (optional)"
+                  placeholder={t(
+                    "studio.accumulator_presets.form.description_optional",
+                  )}
                   className="min-h-[72px] bg-white dark:bg-[#262626]"
                   value={languageData[lang]?.description ?? ""}
                   onChange={(e) =>
@@ -412,11 +434,15 @@ const PresetFormDialog = ({
           </div>
 
           <div className="space-y-2">
-            <p className="text-sm font-bold">Target count</p>
+            <p className="text-sm font-bold">
+              {t("studio.accumulator_presets.form.target_count")}
+            </p>
             <Pecha.Input
               type="number"
               min={1}
-              placeholder="e.g. 100000"
+              placeholder={t(
+                "studio.accumulator_presets.form.target_placeholder",
+              )}
               className="h-12 bg-white dark:bg-[#262626]"
               value={targetCount}
               onChange={(e) => setTargetCount(e.target.value)}
@@ -424,23 +450,27 @@ const PresetFormDialog = ({
           </div>
 
           <EventLinkPicker
-            label="Linked text (optional)"
+            label={t("studio.accumulator_presets.form.linked_text")}
             value={textOption}
             onChange={setTextOption}
             searchFn={searchTextsForPicker}
             queryKeyPrefix="preset-text-picker"
-            searchPlaceholder="Search texts by title…"
+            searchPlaceholder={t(
+              "studio.accumulator_presets.form.search_texts",
+            )}
             disabled={isSubmitting}
           />
 
           <div className="space-y-3">
             <EventLinkPicker
-              label="Linked mantra (optional)"
+              label={t("studio.accumulator_presets.form.linked_mantra")}
               value={mantraOption}
               onChange={setMantraOption}
               searchFn={searchMantrasForPicker}
               queryKeyPrefix="preset-mantra-picker"
-              searchPlaceholder="Search mantras…"
+              searchPlaceholder={t(
+                "studio.accumulator_presets.form.search_mantras",
+              )}
               disabled={isSubmitting || createMantraMutation.isPending}
             />
 
@@ -453,12 +483,14 @@ const PresetFormDialog = ({
                 disabled={isSubmitting}
               >
                 <IoMdAdd className="w-4 h-4" />
-                Create new mantra
+                {t("studio.accumulator_presets.form.create_new_mantra")}
               </Button>
             ) : (
               <div className="space-y-3 rounded-md border p-3 bg-muted/30">
                 <div className="flex items-center justify-between">
-                  <p className="text-sm font-bold">New mantra</p>
+                  <p className="text-sm font-bold">
+                    {t("studio.accumulator_presets.form.new_mantra")}
+                  </p>
                   <button
                     type="button"
                     onClick={() => setShowCreateMantra(false)}
@@ -483,19 +515,23 @@ const PresetFormDialog = ({
                   </Pecha.SelectContent>
                 </Pecha.Select>
                 <Pecha.Input
-                  placeholder="Title (optional)"
+                  placeholder={t(
+                    "studio.accumulator_presets.form.title_optional",
+                  )}
                   className="h-12 bg-white dark:bg-[#262626]"
                   value={newMantraTitle}
                   onChange={(e) => setNewMantraTitle(e.target.value)}
                 />
                 <Textarea
-                  placeholder="Mantra text"
+                  placeholder={t("studio.accumulator_presets.form.mantra_text")}
                   className="min-h-[72px] bg-white dark:bg-[#262626]"
                   value={newMantraText}
                   onChange={(e) => setNewMantraText(e.target.value)}
                 />
                 <Pecha.Input
-                  placeholder="Pronunciation (optional)"
+                  placeholder={t(
+                    "studio.accumulator_presets.form.pronunciation_optional",
+                  )}
                   className="h-12 bg-white dark:bg-[#262626]"
                   value={newMantraPronunciation}
                   onChange={(e) => setNewMantraPronunciation(e.target.value)}
@@ -507,8 +543,8 @@ const PresetFormDialog = ({
                   disabled={createMantraMutation.isPending}
                 >
                   {createMantraMutation.isPending
-                    ? "Creating…"
-                    : "Create mantra"}
+                    ? t("studio.common.creating")
+                    : t("studio.accumulator_presets.form.create_mantra")}
                 </Button>
               </div>
             )}
@@ -516,14 +552,18 @@ const PresetFormDialog = ({
 
           {mantraOption?.id ? (
             <div className="space-y-2">
-              <p className="text-sm font-bold">Deity image (optional)</p>
+              <p className="text-sm font-bold">
+                {t("studio.accumulator_presets.form.deity_image")}
+              </p>
               <div className="flex items-start gap-4">
                 {!displayedDeityImageUrl && (
                   <button
                     type="button"
                     onClick={() => setIsDeityImageDialogOpen(true)}
                     className="flex h-24 w-32 items-center justify-center rounded-lg border border-dashed border-gray-300 transition-colors hover:border-gray-400"
-                    aria-label="Upload deity image"
+                    aria-label={t(
+                      "studio.accumulator_presets.form.upload_deity_image_aria",
+                    )}
                     disabled={isSubmitting}
                   >
                     <IoMdAdd className="h-8 w-8 text-gray-400" />
@@ -533,7 +573,9 @@ const PresetFormDialog = ({
                   <div className="relative">
                     <img
                       src={displayedDeityImageUrl}
-                      alt="Deity preview"
+                      alt={t(
+                        "studio.accumulator_presets.form.deity_preview_alt",
+                      )}
                       className="h-24 w-32 rounded-lg border object-cover"
                     />
                     <button
@@ -541,7 +583,9 @@ const PresetFormDialog = ({
                       onClick={handleRemoveDeityImage}
                       disabled={isSubmitting || isRemovingDeityImage}
                       className="absolute top-1 right-1 rounded-full bg-black/60 p-1 text-white"
-                      aria-label="Remove deity image"
+                      aria-label={t(
+                        "studio.accumulator_presets.form.remove_deity_image_aria",
+                      )}
                     >
                       <IoMdClose className="h-4 w-4" />
                     </button>
@@ -556,7 +600,9 @@ const PresetFormDialog = ({
                 <Pecha.DialogContent showCloseButton>
                   <Pecha.DialogHeader>
                     <Pecha.DialogTitle>
-                      Upload & Crop Deity Image
+                      {t(
+                        "studio.accumulator_presets.form.upload_crop_deity_image",
+                      )}
                     </Pecha.DialogTitle>
                   </Pecha.DialogHeader>
                   <ImageContentData
@@ -575,7 +621,7 @@ const PresetFormDialog = ({
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >
-              Cancel
+              {t("studio.common.cancel")}
             </Button>
             <Button
               type="submit"

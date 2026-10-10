@@ -1,4 +1,5 @@
 import axiosInstance from "@/config/axios-config";
+import { tolgee } from "@/i18n/tolgee";
 import type { LanguageCode } from "@/lib/languageCodes";
 
 import { getAuthHeaders } from "@/lib/auth-storage";
@@ -131,7 +132,9 @@ export const makeGroupAccumulatorSearchFn =
     return {
       items: data.accumulators.map((accumulator) => ({
         id: accumulator.id,
-        title: accumulator.title?.trim() || "Untitled accumulator",
+        title:
+          accumulator.title?.trim() ||
+          tolgee.t("studio.groups.shared.untitled_accumulator"),
         image_url: resolveGroupAccumulatorImageUrl(accumulator) ?? undefined,
       })),
       skip: data.skip,

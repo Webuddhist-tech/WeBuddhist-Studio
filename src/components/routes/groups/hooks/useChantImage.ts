@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
+import { tolgee } from "@/i18n/tolgee";
 import { uploadChantImage } from "@/components/routes/groups/api/chantsApi";
 
 type UseChantImageParams = {
@@ -38,16 +39,16 @@ export const useChantImage = ({
         setSelectedImage(file);
         setImageUrl(key);
         setImageDialogOpen(false);
-        toast.success("Image uploaded successfully!");
+        toast.success(tolgee.t("studio.groups.shared.image_uploaded"));
       } catch (error: unknown) {
         const err = error as { response?: { status?: number } };
         if (err?.response?.status === 413) {
-          toast.error("Failed to upload image", {
-            description: "File exceeds the maximum size of 1MB",
+          toast.error(tolgee.t("studio.groups.shared.image_upload_error"), {
+            description: tolgee.t("studio.groups.shared.image_too_large"),
           });
         } else {
           console.error("Image upload failed:", error);
-          toast.error("Failed to upload image");
+          toast.error(tolgee.t("studio.groups.shared.image_upload_error"));
         }
       } finally {
         setIsImageUploading(false);

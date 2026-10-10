@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslate } from "@tolgee/react";
 import type { UseFormReturn } from "react-hook-form";
 import { IoCalendarClearOutline } from "react-icons/io5";
 import { format } from "date-fns";
@@ -34,6 +35,7 @@ const DatePickerButton = ({
   disablePastDates?: boolean;
   onSelect: (dateOnly: string) => void;
 }) => {
+  const { t } = useTranslate();
   const [open, setOpen] = useState(false);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -51,7 +53,7 @@ const DatePickerButton = ({
           <span className={value ? "text-foreground" : "text-muted-foreground"}>
             {value
               ? format(dateOnlyToDate(value), "MMM d, yyyy")
-              : "Choose date"}
+              : t("studio.groups.events.date.choose_date")}
           </span>
         </Pecha.Button>
       </Pecha.PopoverTrigger>
@@ -92,11 +94,14 @@ const EventDateSection = ({
   const timezone = form.watch("timezone");
   const isRecurring = form.watch("is_recurring");
   const { errors } = form.formState;
+  const { t } = useTranslate();
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold">Event Type</h3>
+        <h3 className="text-sm font-bold">
+          {t("studio.groups.events.date.event_type")}
+        </h3>
       </div>
 
       <div className="flex gap-4">
@@ -108,7 +113,7 @@ const EventDateSection = ({
               if (checked) onIsRecurringChange(false);
             }}
           />
-          One-time event
+          {t("studio.groups.events.date.one_time")}
         </label>
         <label className="flex items-center gap-2 text-sm cursor-pointer">
           <Pecha.Checkbox
@@ -118,19 +123,23 @@ const EventDateSection = ({
               if (checked) onIsRecurringChange(true);
             }}
           />
-          Recurring event
+          {t("studio.groups.events.date.recurring")}
         </label>
       </div>
 
       <div className="space-y-1">
-        <span className="text-sm font-medium">Timezone</span>
+        <span className="text-sm font-medium">
+          {t("studio.groups.events.date.timezone")}
+        </span>
         <Pecha.Select
           value={timezone}
           disabled={readOnly}
           onValueChange={onTimezoneChange}
         >
           <Pecha.SelectTrigger className="h-12">
-            <Pecha.SelectValue placeholder="Select timezone" />
+            <Pecha.SelectValue
+              placeholder={t("studio.groups.events.date.timezone_placeholder")}
+            />
           </Pecha.SelectTrigger>
           <Pecha.SelectContent>
             {TIMEZONE_OPTIONS.map((tz) => (
@@ -141,27 +150,33 @@ const EventDateSection = ({
           </Pecha.SelectContent>
         </Pecha.Select>
         {errors.timezone ? (
-          <p className="text-sm text-destructive">{errors.timezone.message}</p>
+          <p className="text-sm text-destructive">
+            {t(String(errors.timezone.message))}
+          </p>
         ) : null}
       </div>
 
       {!isRecurring ? (
         <>
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold">Dates</h3>
+            <h3 className="text-sm font-bold">
+              {t("studio.groups.events.date.dates")}
+            </h3>
             <label className="flex items-center gap-2 text-sm">
               <Pecha.Checkbox
                 checked={isOneDay}
                 disabled={readOnly}
                 onCheckedChange={(checked) => onOneDayChange(checked === true)}
               />
-              One-day event
+              {t("studio.groups.events.date.one_day")}
             </label>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1">
-              <span className="text-sm font-medium">Start date</span>
+              <span className="text-sm font-medium">
+                {t("studio.groups.events.date.start_date")}
+              </span>
               <DatePickerButton
                 value={startDate}
                 disabled={readOnly}
@@ -170,13 +185,15 @@ const EventDateSection = ({
               />
               {errors.start_date ? (
                 <p className="text-sm text-destructive">
-                  {errors.start_date.message}
+                  {t(String(errors.start_date.message))}
                 </p>
               ) : null}
             </div>
 
             <div className="space-y-1">
-              <span className="text-sm font-medium">End date</span>
+              <span className="text-sm font-medium">
+                {t("studio.groups.events.date.end_date")}
+              </span>
               <DatePickerButton
                 value={endDate}
                 disabled={readOnly || isOneDay}
@@ -185,7 +202,7 @@ const EventDateSection = ({
               />
               {errors.end_date ? (
                 <p className="text-sm text-destructive">
-                  {errors.end_date.message}
+                  {t(String(errors.end_date.message))}
                 </p>
               ) : null}
             </div>
@@ -194,7 +211,9 @@ const EventDateSection = ({
       ) : (
         <>
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold">Recurrence Settings</h3>
+            <h3 className="text-sm font-bold">
+              {t("studio.groups.events.date.recurrence_settings")}
+            </h3>
           </div>
           <EventRecurrenceSection
             form={form}
@@ -206,7 +225,9 @@ const EventDateSection = ({
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1">
-          <span className="text-sm font-medium">Start time</span>
+          <span className="text-sm font-medium">
+            {t("studio.groups.events.date.start_time")}
+          </span>
           <Pecha.Input
             type="time"
             step="60"
@@ -217,18 +238,20 @@ const EventDateSection = ({
           />
           <p className="text-xs text-muted-foreground">
             {isRecurring
-              ? "Applies to every occurrence. Defaults to 6:00 AM if left blank."
-              : "Defaults to 6:00 AM if left blank."}
+              ? t("studio.groups.events.date.start_time_help_recurring")
+              : t("studio.groups.events.date.start_time_help")}
           </p>
           {errors.start_time ? (
             <p className="text-sm text-destructive">
-              {errors.start_time.message}
+              {t(String(errors.start_time.message))}
             </p>
           ) : null}
         </div>
 
         <div className="space-y-1">
-          <span className="text-sm font-medium">End time</span>
+          <span className="text-sm font-medium">
+            {t("studio.groups.events.date.end_time")}
+          </span>
           <Pecha.Input
             type="time"
             step="60"
@@ -239,12 +262,12 @@ const EventDateSection = ({
           />
           <p className="text-xs text-muted-foreground">
             {isRecurring
-              ? "Applies to every occurrence. Defaults to 11:59 PM if left blank."
-              : "Defaults to 11:59 PM if left blank."}
+              ? t("studio.groups.events.date.end_time_help_recurring")
+              : t("studio.groups.events.date.end_time_help")}
           </p>
           {errors.end_time ? (
             <p className="text-sm text-destructive">
-              {errors.end_time.message}
+              {t(String(errors.end_time.message))}
             </p>
           ) : null}
         </div>

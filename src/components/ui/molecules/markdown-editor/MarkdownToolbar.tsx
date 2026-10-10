@@ -1,4 +1,5 @@
 import { Button } from "@/components/ui/atoms/button";
+import { useTranslate } from "@tolgee/react";
 import { cn } from "@/lib/utils";
 import {
   LuBold,
@@ -29,80 +30,83 @@ const MarkdownToolbar = ({
   onNumberedList,
   onLink,
   className,
-}: MarkdownToolbarProps) => (
-  <div
-    className={cn(
-      "flex flex-wrap items-center gap-1 border-b border-input px-2 py-1.5",
-      className,
-    )}
-  >
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      className="size-8"
-      disabled={disabled}
-      onClick={onBold}
-      aria-label="Bold"
+}: MarkdownToolbarProps) => {
+  const { t } = useTranslate();
+  return (
+    <div
+      className={cn(
+        "flex flex-wrap items-center gap-1 border-b border-input px-2 py-1.5",
+        className,
+      )}
     >
-      <LuBold />
-    </Button>
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      className="size-8"
-      disabled={disabled}
-      onClick={onItalic}
-      aria-label="Italic"
-    >
-      <LuItalic />
-    </Button>
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      className="size-8"
-      disabled={disabled}
-      onClick={onHeading}
-      aria-label="Heading"
-    >
-      <LuHeading2 />
-    </Button>
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      className="size-8"
-      disabled={disabled}
-      onClick={onBulletList}
-      aria-label="Bullet list"
-    >
-      <LuList />
-    </Button>
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      className="size-8"
-      disabled={disabled}
-      onClick={onNumberedList}
-      aria-label="Numbered list"
-    >
-      <LuListOrdered />
-    </Button>
-    <Button
-      type="button"
-      variant="ghost"
-      size="icon"
-      className="size-8"
-      disabled={disabled}
-      onClick={onLink}
-      aria-label="Insert link"
-    >
-      <LuLink />
-    </Button>
-  </div>
-);
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="size-8"
+        disabled={disabled}
+        onClick={onBold}
+        aria-label={t("studio.editor.toolbar.bold")}
+      >
+        <LuBold />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="size-8"
+        disabled={disabled}
+        onClick={onItalic}
+        aria-label={t("studio.editor.toolbar.italic")}
+      >
+        <LuItalic />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="size-8"
+        disabled={disabled}
+        onClick={onHeading}
+        aria-label={t("studio.editor.toolbar.heading")}
+      >
+        <LuHeading2 />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="size-8"
+        disabled={disabled}
+        onClick={onBulletList}
+        aria-label={t("studio.editor.toolbar.bullet_list")}
+      >
+        <LuList />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="size-8"
+        disabled={disabled}
+        onClick={onNumberedList}
+        aria-label={t("studio.editor.toolbar.numbered_list")}
+      >
+        <LuListOrdered />
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        className="size-8"
+        disabled={disabled}
+        onClick={onLink}
+        aria-label={t("studio.editor.link.insert")}
+      >
+        <LuLink />
+      </Button>
+    </div>
+  );
+};
 
 export { MarkdownToolbar };

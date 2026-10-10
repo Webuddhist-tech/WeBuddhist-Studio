@@ -5,17 +5,18 @@ import { IoMdAdd, IoMdTrash } from "react-icons/io";
 import { IoPeopleOutline } from "react-icons/io5";
 import { SiYoutube } from "react-icons/si";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Checkbox } from "@/components/ui/atoms/checkbox";
 import { Pagination } from "@/components/ui/molecules/pagination/Pagination";
 import { getApiErrorMessage } from "@/lib/apiErrors";
-import { eventFormatLabel, eventRecurrenceLabel } from "@/schema/EventSchema";
 import { ROUTES } from "@/routes/paths";
 import { FeaturedStar } from "@/components/routes/dashboard/dashboardTableUi";
 import type { GroupOutletContext } from "./GroupLayout";
 import { canWriteEvents } from "./lib/eventPermissions";
 import { canEditGroupSettings } from "./lib/groupPermissions";
 import { formatEventScheduleRange } from "./lib/eventSchedule";
+import { eventFormatLabelKey, eventRecurrenceLabelKey } from "./eventLabelKeys";
 import {
   deleteCmsEvent,
   eventName,
@@ -47,7 +48,9 @@ const LiveSyncBadge = ({
 }: {
   schedule: YoutubeLiveSyncSchedule | undefined;
 }) => {
-  if (!schedule) return <span className="text-muted-foreground">{"\u2014"}</span>;
+  const { t } = useTranslate();
+  if (!schedule)
+    return <span className="text-muted-foreground">{"\u2014"}</span>;
   const times = schedule.run_times.map(formatRunTime).join(", ");
   return (
     <div className="flex flex-col gap-0.5 text-sm">
@@ -55,7 +58,9 @@ const LiveSyncBadge = ({
         variant={schedule.enabled ? "default" : "secondary"}
         className="w-fit text-xs"
       >
-        {schedule.enabled ? "On" : "Paused"}
+        {schedule.enabled
+          ? t("studio.groups.pages.events.live_sync_on")
+          : t("studio.groups.pages.events.live_sync_paused")}
       </Pecha.Badge>
       <span className="text-muted-foreground">
         {times} ({schedule.timezone})
@@ -65,7 +70,9 @@ const LiveSyncBadge = ({
           className="max-w-48 truncate text-xs text-destructive"
           title={schedule.last_run_error}
         >
-          Last run failed: {schedule.last_run_error}
+          {t("studio.groups.pages.events.last_run_failed", {
+            error: schedule.last_run_error,
+          })}
         </span>
       ) : null}
     </div>
@@ -73,6 +80,7 @@ const LiveSyncBadge = ({
 };
 
 const GroupEventsPage = () => {
+  const { t } = useTranslate();
   const { groupId, myRole, userInfo, readOnlyPlatform } =
     useOutletContext<GroupOutletContext>();
   const navigate = useNavigate();
@@ -132,7 +140,7 @@ const GroupEventsPage = () => {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteCmsEvent(id),
     onSuccess: (_data, id) => {
-      toast.success("Event deleted");
+      toast.success(t("studio.groups.pages.events.deleted"));
       setPendingDelete(null);
       setSelected((current) => {
         if (!current.has(id)) return current;
@@ -154,7 +162,12 @@ const GroupEventsPage = () => {
       queryClient.invalidateQueries({ queryKey: ["cms-events", groupId] });
     },
     onError: (err) =>
-      toast.error(getApiErrorMessage(err, "Could not update featured")),
+      toast.error(
+        getApiErrorMessage(
+          err,
+          t("studio.groups.pages.events.featured_update_failed"),
+        ),
+      ),
   });
 
   const toggleSelected = (event: EventDTO, checked: boolean) =>
@@ -184,7 +197,9 @@ const GroupEventsPage = () => {
     if (isLoading) {
       return (
         <Pecha.TableRow>
-          <Pecha.TableCell colSpan={columnCount}>Loading…</Pecha.TableCell>
+          <Pecha.TableCell colSpan={columnCount}>
+            {t("studio.common.loading")}
+          </Pecha.TableCell>
         </Pecha.TableRow>
       );
     }
@@ -192,7 +207,10 @@ const GroupEventsPage = () => {
       return (
         <Pecha.TableRow>
           <Pecha.TableCell colSpan={columnCount} className="text-destructive">
-            {getApiErrorMessage(error, "Could not load events.")}
+            {getApiErrorMessage(
+              error,
+              t("studio.groups.pages.events.load_failed"),
+            )}
           </Pecha.TableCell>
         </Pecha.TableRow>
       );
@@ -204,14 +222,14 @@ const GroupEventsPage = () => {
             colSpan={columnCount}
             className="text-muted-foreground"
           >
-            No events yet.
+            {t("studio.groups.pages.events.empty")}
           </Pecha.TableCell>
         </Pecha.TableRow>
       );
     }
     return events.map((event) => {
       const thumbnail = eventThumbnail(event);
-      const formatLabel = eventFormatLabel(event.event_format);
+      const formatLabelKey = eventFormatLabelKey(event.event_format);
       const schedule = formatEventScheduleRange(event);
       return (
         <Pecha.TableRow key={event.id}>
@@ -222,7 +240,12 @@ const GroupEventsPage = () => {
                 onCheckedChange={(value) =>
                   toggleSelected(event, value === true)
                 }
-                aria-label={`Select ${eventName(event)} for live sync`}
+                aria-label={t(
+                  "studio.groups.pages.events.select_for_live_sync_aria",
+                  {
+                    name: eventName(event),
+                  },
+                )}
               />
             </Pecha.TableCell>
           ) : null}
@@ -247,11 +270,15 @@ const GroupEventsPage = () => {
             <div className="flex flex-col gap-1.5">
               <div className="flex flex-col gap-0.5 text-sm">
                 <span>
-                  <span className="text-muted-foreground">Start </span>
+                  <span className="text-muted-foreground">
+                    {t("studio.groups.pages.events.start_label")}{" "}
+                  </span>
                   {schedule.start}
                 </span>
                 <span>
-                  <span className="text-muted-foreground">End </span>
+                  <span className="text-muted-foreground">
+                    {t("studio.groups.pages.events.end_label")}{" "}
+                  </span>
                   {schedule.end}
                 </span>
               </div>
@@ -260,14 +287,16 @@ const GroupEventsPage = () => {
                   variant={event.is_recurring ? "default" : "secondary"}
                   className="text-xs"
                 >
-                  {eventRecurrenceLabel(
-                    event.is_recurring,
-                    event.recurrence?.frequency,
+                  {t(
+                    eventRecurrenceLabelKey(
+                      event.is_recurring,
+                      event.recurrence?.frequency,
+                    ),
                   )}
                 </Pecha.Badge>
-                {formatLabel ? (
+                {formatLabelKey ? (
                   <Pecha.Badge variant="secondary" className="text-xs">
-                    {formatLabel}
+                    {t(formatLabelKey)}
                   </Pecha.Badge>
                 ) : null}
               </span>
@@ -289,7 +318,11 @@ const GroupEventsPage = () => {
                   variant="outline"
                   size="sm"
                   disabled={featuredMutation.isPending}
-                  aria-label={event.featured ? "Featured" : "Not featured"}
+                  aria-label={
+                    event.featured
+                      ? t("studio.groups.pages.events.featured")
+                      : t("studio.groups.pages.events.not_featured")
+                  }
                   onClick={() => featuredMutation.mutate(event.id)}
                 >
                   <FeaturedStar featured={event.featured} />
@@ -301,14 +334,16 @@ const GroupEventsPage = () => {
                     navigate(ROUTES.groupEventEdit(groupId, event.id))
                   }
                 >
-                  Edit
+                  {t("studio.common.edit")}
                 </Pecha.Button>
                 <Pecha.Button
                   variant="outline"
                   size="sm"
                   className="text-destructive hover:text-destructive"
                   onClick={() => setPendingDelete(event)}
-                  aria-label={`Delete ${eventName(event)}`}
+                  aria-label={t("studio.groups.pages.events.delete_aria", {
+                    name: eventName(event),
+                  })}
                 >
                   <IoMdTrash className="h-4 w-4" />
                 </Pecha.Button>
@@ -331,12 +366,15 @@ const GroupEventsPage = () => {
     groupId,
     navigate,
     featuredMutation,
+    t,
   ]);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold">Events</h2>
+        <h2 className="text-lg font-bold">
+          {t("studio.groups.pages.events.title")}
+        </h2>
         <div className="flex items-center gap-2">
           {canSchedule ? (
             <>
@@ -346,7 +384,7 @@ const GroupEventsPage = () => {
                   size="sm"
                   onClick={() => setSelected(new Map())}
                 >
-                  Clear selection
+                  {t("studio.groups.pages.events.clear_selection")}
                 </Pecha.Button>
               ) : null}
               <Pecha.Button
@@ -355,8 +393,12 @@ const GroupEventsPage = () => {
                 disabled={selected.size === 0}
                 onClick={() => setSyncOpen(true)}
               >
-                <SiYoutube className="h-4 w-4 text-[#FF0000]" /> YouTube live
-                sync{selected.size > 0 ? ` (${selected.size})` : ""}
+                <SiYoutube className="h-4 w-4 text-[#FF0000]" />{" "}
+                {selected.size > 0
+                  ? t("studio.groups.pages.events.youtube_live_sync_count", {
+                      count: selected.size,
+                    })
+                  : t("studio.groups.pages.events.youtube_live_sync")}
               </Pecha.Button>
             </>
           ) : null}
@@ -365,15 +407,15 @@ const GroupEventsPage = () => {
               className="gap-1 bg-[#A51C21] text-white hover:bg-[#A51C21]/90"
               onClick={() => navigate(ROUTES.groupEventNew(groupId))}
             >
-              <IoMdAdd className="h-4 w-4" /> New event
+              <IoMdAdd className="h-4 w-4" />{" "}
+              {t("studio.groups.pages.events.new_event")}
             </Pecha.Button>
           ) : null}
         </div>
       </div>
       {canSchedule ? (
         <p className="text-xs text-muted-foreground">
-          Tick events to add the group&rsquo;s live YouTube stream to them at
-          set times. Only ticked events are changed.
+          {t("studio.groups.pages.events.live_sync_hint")}
         </p>
       ) : null}
 
@@ -387,17 +429,23 @@ const GroupEventsPage = () => {
                     checked={allOnPageSelected}
                     onCheckedChange={(value) => togglePage(value === true)}
                     disabled={events.length === 0}
-                    aria-label="Select all events on this page"
+                    aria-label={t("studio.groups.pages.events.select_all_aria")}
                   />
                 </Pecha.TableHead>
               ) : null}
-              <Pecha.TableHead>Name</Pecha.TableHead>
-              <Pecha.TableHead>Dates</Pecha.TableHead>
-              <Pecha.TableHead>Participants</Pecha.TableHead>
-              <Pecha.TableHead>Live sync</Pecha.TableHead>
+              <Pecha.TableHead>{t("studio.common.name")}</Pecha.TableHead>
+              <Pecha.TableHead>
+                {t("studio.groups.pages.events.dates_column")}
+              </Pecha.TableHead>
+              <Pecha.TableHead>
+                {t("studio.groups.pages.events.participants_column")}
+              </Pecha.TableHead>
+              <Pecha.TableHead>
+                {t("studio.groups.pages.events.live_sync_column")}
+              </Pecha.TableHead>
               {canWrite ? (
                 <Pecha.TableHead className="text-right">
-                  Actions
+                  {t("studio.common.actions")}
                 </Pecha.TableHead>
               ) : null}
             </Pecha.TableRow>
@@ -433,16 +481,18 @@ const GroupEventsPage = () => {
       >
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
-            <Pecha.AlertDialogTitle>Delete event?</Pecha.AlertDialogTitle>
+            <Pecha.AlertDialogTitle>
+              {t("studio.groups.pages.events.delete_title")}
+            </Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
-              This will permanently remove &ldquo;
-              {pendingDelete ? eventName(pendingDelete) : ""}&rdquo;. This
-              action cannot be undone.
+              {t("studio.groups.pages.events.delete_description", {
+                name: pendingDelete ? eventName(pendingDelete) : "",
+              })}
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <Pecha.AlertDialogFooter>
             <Pecha.AlertDialogCancel disabled={deleteMutation.isPending}>
-              Cancel
+              {t("studio.common.cancel")}
             </Pecha.AlertDialogCancel>
             <Pecha.AlertDialogAction
               className="bg-destructive text-white hover:bg-destructive/90"
@@ -452,7 +502,9 @@ const GroupEventsPage = () => {
                 if (pendingDelete) deleteMutation.mutate(pendingDelete.id);
               }}
             >
-              {deleteMutation.isPending ? "Deleting…" : "Delete"}
+              {deleteMutation.isPending
+                ? t("studio.common.deleting")
+                : t("studio.common.delete")}
             </Pecha.AlertDialogAction>
           </Pecha.AlertDialogFooter>
         </Pecha.AlertDialogContent>

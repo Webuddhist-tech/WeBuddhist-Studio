@@ -177,7 +177,8 @@ const Dashboard = () => {
     onError: (err: unknown) => {
       const message =
         (err as { response?: { data?: { detail?: { message?: string } } } })
-          ?.response?.data?.detail?.message ?? "Could not update featured";
+          ?.response?.data?.detail?.message ??
+        t("studio.dashboard.featured_update_failed");
       toast.error(message);
     },
   });
@@ -255,15 +256,15 @@ const Dashboard = () => {
     urlState.tab === "plans"
       ? t("studio.dashboard.no_plan_found")
       : urlState.tab === "series"
-        ? "No series found."
-        : "Nothing to show yet";
+        ? t("studio.dashboard.no_series_found")
+        : t("studio.dashboard.nothing_to_show");
 
   const emptyDescription =
     urlState.tab === "plans"
-      ? "Create a plan to see it listed here."
+      ? t("studio.dashboard.empty_plans_description")
       : urlState.tab === "series"
-        ? "Create a series to see it listed here."
-        : "Try clearing search or add new plans and series.";
+        ? t("studio.dashboard.empty_series_description")
+        : t("studio.dashboard.empty_all_description");
 
   const groupFilterValue = urlState.groupId ?? "all";
 
@@ -272,7 +273,7 @@ const Dashboard = () => {
       {showGroupFilter ? (
         <div className="flex min-w-[200px] flex-col gap-1">
           <span className="text-xs font-medium text-muted-foreground">
-            Spaces
+            {t("studio.dashboard.filter.spaces")}
           </span>
           <Pecha.Select
             value={groupFilterValue}
@@ -287,12 +288,16 @@ const Dashboard = () => {
             <Pecha.SelectTrigger className="h-9 w-[220px] bg-white dark:bg-input/30">
               <Pecha.SelectValue
                 placeholder={
-                  isGroupFilterLoading ? "Loading spaces…" : "All spaces"
+                  isGroupFilterLoading
+                    ? t("studio.dashboard.filter.loading_spaces")
+                    : t("studio.dashboard.filter.all_spaces")
                 }
               />
             </Pecha.SelectTrigger>
             <Pecha.SelectContent>
-              <Pecha.SelectItem value="all">All spaces</Pecha.SelectItem>
+              <Pecha.SelectItem value="all">
+                {t("studio.dashboard.filter.all_spaces")}
+              </Pecha.SelectItem>
               {groupFilterOptions.map((group) => (
                 <Pecha.SelectItem key={group.id} value={group.id}>
                   {group.label}
@@ -305,7 +310,7 @@ const Dashboard = () => {
 
       <div className="flex min-w-[160px] flex-col gap-1">
         <span className="text-xs font-medium text-muted-foreground">
-          Language
+          {t("studio.common.language")}
         </span>
         <Pecha.Select
           value={urlState.language || "all"}
@@ -317,10 +322,12 @@ const Dashboard = () => {
           }}
         >
           <Pecha.SelectTrigger className="h-9 w-[180px] bg-white dark:bg-input/30">
-            <Pecha.SelectValue placeholder="Language" />
+            <Pecha.SelectValue placeholder={t("studio.common.language")} />
           </Pecha.SelectTrigger>
           <Pecha.SelectContent>
-            <Pecha.SelectItem value="all">All languages</Pecha.SelectItem>
+            <Pecha.SelectItem value="all">
+              {t("studio.dashboard.filter.all_languages")}
+            </Pecha.SelectItem>
             {languageOptions.map((lang) => (
               <Pecha.SelectItem key={lang.value} value={lang.value}>
                 {lang.label}
@@ -331,7 +338,7 @@ const Dashboard = () => {
       </div>
       <div className="flex min-w-[160px] flex-col gap-1">
         <span className="text-xs font-medium text-muted-foreground">
-          Status
+          {t("studio.common.status")}
         </span>
         <Pecha.Select
           value={urlState.status || "all"}
@@ -343,14 +350,24 @@ const Dashboard = () => {
           }}
         >
           <Pecha.SelectTrigger className="h-9 w-[200px] bg-white dark:bg-input/30">
-            <Pecha.SelectValue placeholder="Status" />
+            <Pecha.SelectValue placeholder={t("studio.common.status")} />
           </Pecha.SelectTrigger>
           <Pecha.SelectContent>
-            <Pecha.SelectItem value="all">All statuses</Pecha.SelectItem>
-            <Pecha.SelectItem value="DRAFT">Draft</Pecha.SelectItem>
-            <Pecha.SelectItem value="PUBLISHED">Published</Pecha.SelectItem>
-            <Pecha.SelectItem value="UNPUBLISHED">Unpublished</Pecha.SelectItem>
-            <Pecha.SelectItem value="ARCHIVED">Archived</Pecha.SelectItem>
+            <Pecha.SelectItem value="all">
+              {t("studio.dashboard.filter.all_statuses")}
+            </Pecha.SelectItem>
+            <Pecha.SelectItem value="DRAFT">
+              {t("studio.common.draft")}
+            </Pecha.SelectItem>
+            <Pecha.SelectItem value="PUBLISHED">
+              {t("studio.common.published")}
+            </Pecha.SelectItem>
+            <Pecha.SelectItem value="UNPUBLISHED">
+              {t("studio.dashboard.status.unpublished")}
+            </Pecha.SelectItem>
+            <Pecha.SelectItem value="ARCHIVED">
+              {t("studio.dashboard.status.archived")}
+            </Pecha.SelectItem>
           </Pecha.SelectContent>
         </Pecha.Select>
       </div>
@@ -377,21 +394,21 @@ const Dashboard = () => {
               className={chipClass(urlState.tab === "all")}
               onClick={() => setTab("all")}
             >
-              All
+              {t("studio.common.all")}
             </button>
             <button
               type="button"
               className={chipClass(urlState.tab === "plans")}
               onClick={() => setTab("plans")}
             >
-              Plans
+              {t("studio.dashboard.tab.plans")}
             </button>
             <button
               type="button"
               className={chipClass(urlState.tab === "series")}
               onClick={() => setTab("series")}
             >
-              Series
+              {t("studio.dashboard.tab.series")}
             </button>
           </div>
         </div>
@@ -403,7 +420,7 @@ const Dashboard = () => {
       <div className="flex flex-1 flex-col items-center px-4 pb-6 pt-2">
         {isError && error && (
           <DashboardListPlaceholder
-            title="Unable to load dashboard"
+            title={t("studio.dashboard.load_failed")}
             description={String(error.message)}
           />
         )}
@@ -412,12 +429,13 @@ const Dashboard = () => {
           <DashboardListPlaceholder
             title={emptyTitle}
             description={
-              emptyDescription ?? "Create plans and series from a group page."
+              emptyDescription ??
+              t("studio.dashboard.empty_default_description")
             }
           >
             <Link to={ROUTES.groups}>
               <Pecha.Button variant="outline" size="sm">
-                Go to groups
+                {t("studio.dashboard.go_to_groups")}
               </Pecha.Button>
             </Link>
           </DashboardListPlaceholder>

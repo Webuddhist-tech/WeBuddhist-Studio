@@ -1,4 +1,5 @@
 import type { UseFormReturn } from "react-hook-form";
+import { useTranslate } from "@tolgee/react";
 import PlanSearchSelector from "@/components/routes/create-series/components/PlanSearchSelector";
 import type { LanguageCode, SeriesFormData } from "@/schema/SeriesSchema";
 import { getNativeLanguageLabel } from "@/components/routes/create-series/utils/language";
@@ -22,10 +23,11 @@ const IncludedPlansPanel = ({
   groupId,
   onSelectLanguage,
 }: IncludedPlansPanelProps) => {
+  const { t } = useTranslate();
   if (orderedLanguages.length === 0) {
     return (
       <div className="flex-1 rounded-md border border-dashed border-muted-foreground/40 p-8 text-center text-sm text-muted-foreground">
-        Add at least one language on the left to attach plans.
+        {t("studio.series.form.add_language_first")}
       </div>
     );
   }

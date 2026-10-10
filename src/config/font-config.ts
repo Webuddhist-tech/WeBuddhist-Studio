@@ -9,6 +9,12 @@ const fontConfig = {
       fontFamily: "MonlamUniOuChan2",
     },
   },
+  zh: {
+    "font-dynamic": {
+      fontFamily:
+        '"PingFang SC", "Microsoft YaHei", "Noto Sans SC", "InterRegular", sans-serif',
+    },
+  },
 };
 
 export const setFontVariables = (language: string) => {
@@ -20,6 +26,7 @@ export const setFontVariables = (language: string) => {
     const cssVarName = `--${key}-font-family`;
     root?.style.setProperty(cssVarName, styles.fontFamily);
   });
+  document.documentElement.lang = language;
 };
 
 export default fontConfig;

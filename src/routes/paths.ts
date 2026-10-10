@@ -60,6 +60,7 @@ export const ROUTES = {
   adminAuthors: "/admin/authors",
   adminChinaRestrictions: "/admin/china-restrictions",
   adminChatReports: "/admin/chat-reports",
+  adminTextRequests: "/admin/text-requests",
   accumulatorPresets: "/accumulator-presets",
   textAudio: "/text-audio",
   ambientSounds: "/ambient-sounds",

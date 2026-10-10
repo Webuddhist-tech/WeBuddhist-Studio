@@ -16,6 +16,7 @@ import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
 import { IoMdCreate, IoMdTrash } from "react-icons/io";
 import { PiDotsSixVertical } from "react-icons/pi";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import type { AmbientSound } from "./api/ambientSoundsApi";
 
@@ -32,6 +33,7 @@ function SortableAmbientSoundRow({
   readonly onEdit: (sound: AmbientSound) => void;
   readonly onDelete: (sound: AmbientSound) => void;
 }) {
+  const { t } = useTranslate();
   const {
     attributes,
     listeners,
@@ -61,7 +63,9 @@ function SortableAmbientSoundRow({
           <button
             type="button"
             className="shrink-0 rounded p-1 text-muted-foreground hover:text-foreground touch-none disabled:cursor-not-allowed disabled:opacity-30"
-            aria-label={`Reorder ${sound.name}`}
+            aria-label={t("studio.ambient_sounds.table.reorder_aria", {
+              name: sound.name,
+            })}
             disabled={!canReorder}
             {...listeners}
           >
@@ -80,7 +84,9 @@ function SortableAmbientSoundRow({
         ) : (
           <div
             className="h-10 w-10 rounded bg-muted"
-            aria-label={`${sound.name} has no cover image`}
+            aria-label={t("studio.ambient_sounds.table.no_cover_aria", {
+              name: sound.name,
+            })}
           />
         )}
       </Pecha.TableCell>
@@ -88,7 +94,7 @@ function SortableAmbientSoundRow({
       <Pecha.TableCell>
         {sound.is_default ? (
           <span className="text-xs px-1.5 py-0.5 rounded bg-[#A51C21]/10 text-[#A51C21]">
-            Default
+            {t("studio.ambient_sounds.table.default")}
           </span>
         ) : null}
       </Pecha.TableCell>
@@ -113,7 +119,9 @@ function SortableAmbientSoundRow({
               type="button"
               onClick={() => onEdit(sound)}
               className="p-2 rounded-md border hover:bg-muted/50 transition-colors"
-              aria-label={`Edit ${sound.name}`}
+              aria-label={t("studio.ambient_sounds.table.edit_aria", {
+                name: sound.name,
+              })}
             >
               <IoMdCreate className="w-4 h-4" />
             </button>
@@ -121,7 +129,9 @@ function SortableAmbientSoundRow({
               type="button"
               onClick={() => onDelete(sound)}
               className="p-2 rounded-md border text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-              aria-label={`Delete ${sound.name}`}
+              aria-label={t("studio.ambient_sounds.table.delete_aria", {
+                name: sound.name,
+              })}
             >
               <IoMdTrash className="w-4 h-4" />
             </button>
@@ -151,6 +161,7 @@ const AmbientSoundsTable = ({
   onEdit,
   onDelete,
 }: AmbientSoundsTableProps) => {
+  const { t } = useTranslate();
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
@@ -165,7 +176,7 @@ const AmbientSoundsTable = ({
   if (isLoading) {
     return (
       <p className="text-sm text-muted-foreground py-8 text-center">
-        Loading ambient sounds...
+        {t("studio.ambient_sounds.table.loading")}
       </p>
     );
   }
@@ -182,13 +193,19 @@ const AmbientSoundsTable = ({
           <Pecha.TableHeader>
             <Pecha.TableRow>
               {canManage ? <Pecha.TableHead className="w-10" /> : null}
-              <Pecha.TableHead className="w-16">Cover</Pecha.TableHead>
-              <Pecha.TableHead>Name</Pecha.TableHead>
-              <Pecha.TableHead>Default</Pecha.TableHead>
-              <Pecha.TableHead>Preview</Pecha.TableHead>
+              <Pecha.TableHead className="w-16">
+                {t("studio.ambient_sounds.table.cover")}
+              </Pecha.TableHead>
+              <Pecha.TableHead>{t("studio.common.name")}</Pecha.TableHead>
+              <Pecha.TableHead>
+                {t("studio.ambient_sounds.table.default")}
+              </Pecha.TableHead>
+              <Pecha.TableHead>
+                {t("studio.ambient_sounds.table.preview")}
+              </Pecha.TableHead>
               {canManage ? (
                 <Pecha.TableHead className="w-28 text-right">
-                  Actions
+                  {t("studio.common.actions")}
                 </Pecha.TableHead>
               ) : null}
             </Pecha.TableRow>

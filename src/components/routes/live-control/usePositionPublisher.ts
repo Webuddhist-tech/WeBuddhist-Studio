@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { tolgee } from "@/i18n/tolgee";
 import {
   endRecitationSession,
   publishMove,
@@ -194,7 +195,10 @@ export function usePositionPublisher(
             ordered.map((cue) => ({ position: cue, run: runs[cue.textId] })),
           );
         } catch {
-          result = { ok: false, message: "Could not reach the room." };
+          result = {
+            ok: false,
+            message: tolgee.t("studio.live_control.errors.room_unreachable"),
+          };
         }
         const sent = ordered.map((cue) => ({ cue, result }));
         if (!mountedRef.current) return;
@@ -219,9 +223,17 @@ export function usePositionPublisher(
           setState("live");
           setNotice(null);
           const line = cues[0]?.index ?? 0;
-          const editions = published > 1 ? ` · ${published} editions` : "";
+          const editions =
+            published > 1
+              ? tolgee.t("studio.live_control.publisher.editions_suffix", {
+                  count: published,
+                })
+              : "";
           setLastSent(
-            `line ${line + 1} at ${new Date().toLocaleTimeString()}${editions}`,
+            tolgee.t("studio.live_control.publisher.last_sent", {
+              line: line + 1,
+              time: new Date().toLocaleTimeString(),
+            }) + editions,
           );
         }
 
@@ -241,7 +253,7 @@ export function usePositionPublisher(
     (cues: PositionToPublish[]) => {
       if (cues.length === 0) return;
       if (!tokenRef.current) {
-        setNotice("Paste the emit token before driving the room.");
+        setNotice(tolgee.t("studio.live_control.publisher.token_needed"));
         return;
       }
       // The operator has closed the session: a move made while the end request
@@ -267,7 +279,7 @@ export function usePositionPublisher(
 
   const endSession = useCallback(async () => {
     if (!eventId || !tokenRef.current) {
-      setNotice("Paste the emit token before driving the room.");
+      setNotice(tolgee.t("studio.live_control.publisher.token_needed"));
       return;
     }
     // Drop whatever is queued, take no further move, and let the one already on
@@ -286,7 +298,7 @@ export function usePositionPublisher(
       if (!mountedRef.current) return;
       if (result.ok) {
         setState("idle");
-        setNotice("This recitation session has ended.");
+        setNotice(tolgee.t("studio.live_control.publisher.session_ended"));
         setLastSent(null);
         sentKeysRef.current = {};
         runsRef.current = {};

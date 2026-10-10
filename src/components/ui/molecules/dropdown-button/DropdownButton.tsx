@@ -8,6 +8,7 @@ import { IoEyeOffSharp } from "react-icons/io5";
 import { RiDraftLine } from "react-icons/ri";
 import { MdSwapHoriz } from "react-icons/md";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Link } from "react-router-dom";
 import { ROUTES } from "@/routes/paths";
 import PlanDeleteDialog from "@/components/ui/molecules/modals/plan-delete/PlanDeleteDialog";
@@ -28,6 +29,22 @@ import {
 export type DropdownAdditionalMenuItem = {
   label: string;
   onClick: () => void;
+};
+
+/** Menu labels for the status transitions, keyed by the backend value. */
+const STATUS_TRANSITION_LABEL_KEYS: Record<string, string> = {
+  DRAFT: "studio.common.draft",
+  PUBLISHED: "studio.common.publish",
+  UNPUBLISHED: "studio.common.unpublish",
+  ARCHIVED: "studio.shell.content_actions.archive",
+};
+
+/** Names of the resulting statuses, keyed by the backend value. */
+const STATUS_NAME_KEYS: Record<string, string> = {
+  DRAFT: "studio.common.draft",
+  PUBLISHED: "studio.common.published",
+  UNPUBLISHED: "studio.shell.content_actions.status_unpublished",
+  ARCHIVED: "studio.shell.content_actions.status_archived",
 };
 
 const STATUS_ICONS = {
@@ -68,14 +85,18 @@ export function DropdownButton({
   sourceGroupId?: string | null;
   contentTitle?: string;
 }) {
+  const { t } = useTranslate();
   const queryClient = useQueryClient();
   const [transferOpen, setTransferOpen] = useState(false);
   const isSeries = entityType === "series";
   const apiBase = isSeries ? "/api/v1/cms/series" : "/api/v1/cms/plans";
   const editHref = isSeries ? ROUTES.seriesEdit(id) : ROUTES.planEdit(id);
-  const editLabel = isSeries ? "Edit Series" : "Edit Plan";
-  const deleteLabel = isSeries ? "Delete Series" : "Delete Plan";
-  const entityName = isSeries ? "Series" : "Plan";
+  const editLabel = isSeries
+    ? t("studio.shell.content_actions.edit_series")
+    : t("studio.shell.content_actions.edit_plan");
+  const deleteLabel = isSeries
+    ? t("studio.modals.delete_series")
+    : t("studio.modals.delete_plan");
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -83,9 +104,16 @@ export function DropdownButton({
       return data;
     },
     onSuccess: () => {
-      toast.success(`${entityName} deleted successfully!`, {
-        description: `The ${entityName.toLowerCase()} has been deleted.`,
-      });
+      toast.success(
+        isSeries
+          ? t("studio.shell.content_actions.series_deleted")
+          : t("studio.shell.content_actions.plan_deleted"),
+        {
+          description: isSeries
+            ? t("studio.shell.content_actions.series_deleted_description")
+            : t("studio.shell.content_actions.plan_deleted_description"),
+        },
+      );
       queryClient.invalidateQueries({ queryKey: ["dashboard-items"] });
       if (invalidateSeriesId) {
         queryClient.invalidateQueries({
@@ -96,9 +124,14 @@ export function DropdownButton({
     onError: (error: {
       response?: { data?: { detail?: { message?: string } } };
     }) => {
-      toast.error(`Failed to delete ${entityName.toLowerCase()}`, {
-        description: error.response?.data?.detail?.message,
-      });
+      toast.error(
+        isSeries
+          ? t("studio.shell.content_actions.series_delete_failed")
+          : t("studio.shell.content_actions.plan_delete_failed"),
+        {
+          description: error.response?.data?.detail?.message,
+        },
+      );
     },
   });
 
@@ -112,7 +145,13 @@ export function DropdownButton({
         status: newStatus,
       });
 
-      toast.success(`Status updated to ${newStatus}`);
+      toast.success(
+        t("studio.shell.content_actions.status_updated", {
+          status: STATUS_NAME_KEYS[newStatus]
+            ? t(STATUS_NAME_KEYS[newStatus])
+            : newStatus,
+        }),
+      );
       queryClient.invalidateQueries({ queryKey: ["dashboard-items"] });
       if (isSeries) {
         queryClient.invalidateQueries({ queryKey: ["series", id] });
@@ -128,7 +167,9 @@ export function DropdownButton({
       const message = (
         error as { response?: { data?: { detail?: { message?: string } } } }
       )?.response?.data?.detail?.message;
-      toast.error(message ?? "Status update failed");
+      toast.error(
+        message ?? t("studio.shell.content_actions.status_update_failed"),
+      );
     }
   };
 
@@ -199,13 +240,17 @@ export function DropdownButton({
               variant="outline"
               size="icon"
               className={triggerClassName}
-              aria-label={`${entityName} actions`}
+              aria-label={
+                isSeries
+                  ? t("studio.shell.content_actions.series_actions")
+                  : t("studio.shell.content_actions.plan_actions")
+              }
             >
               <BsThreeDotsVertical className="h-4 w-4" />
             </Pecha.Button>
           ) : (
             <Pecha.Button variant="outline">
-              Status <BsThreeDotsVertical />
+              {t("studio.common.status")} <BsThreeDotsVertical />
             </Pecha.Button>
           )}
         </Pecha.DropdownMenuTrigger>
@@ -223,7 +268,9 @@ export function DropdownButton({
           {allowStatus ? (
             <>
               <Pecha.DropdownMenuSeparator />
-              <Pecha.DropdownMenuItem disabled>Status</Pecha.DropdownMenuItem>
+              <Pecha.DropdownMenuItem disabled>
+                {t("studio.common.status")}
+              </Pecha.DropdownMenuItem>
               <Pecha.DropdownMenuGroup>
                 {availableTransitions.map((status) => {
                   const IconComponent =
@@ -234,7 +281,9 @@ export function DropdownButton({
                       onClick={() => handleStatusChange(status.value)}
                     >
                       <IconComponent className="h-4 w-4" />
-                      {status.label}
+                      {STATUS_TRANSITION_LABEL_KEYS[status.value]
+                        ? t(STATUS_TRANSITION_LABEL_KEYS[status.value])
+                        : status.label}
                     </Pecha.DropdownMenuItem>
                   );
                 })}
@@ -252,7 +301,7 @@ export function DropdownButton({
                   }}
                 >
                   <MdSwapHoriz className="h-4 w-4" />
-                  Transfer to group…
+                  {t("studio.shell.content_actions.transfer_to_group")}
                 </Pecha.DropdownMenuItem>
               </Pecha.DropdownMenuGroup>
             </>
@@ -278,7 +327,7 @@ export function DropdownButton({
               <Pecha.DropdownMenuGroup>
                 <PlanDeleteDialog
                   id={id}
-                  entityLabel={entityName}
+                  entityType={entityType}
                   onDelete={handleDelete}
                   trigger={
                     <Pecha.DropdownMenuItem

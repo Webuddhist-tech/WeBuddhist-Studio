@@ -61,7 +61,9 @@ describe("AmbientSoundFormDialog — cover image", () => {
     const onSubmit = renderDialog(null);
 
     await userEvent.type(
-      screen.getByPlaceholderText(/sea waves/i),
+      screen.getByPlaceholderText(
+        "studio.ambient_sounds.form.name_placeholder",
+      ),
       "Rain trial",
     );
 
@@ -71,7 +73,11 @@ describe("AmbientSoundFormDialog — cover image", () => {
     const cover = imageFile();
     await dropOnCover(cover);
 
-    await userEvent.click(screen.getByRole("button", { name: /add sound/i }));
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "studio.ambient_sounds.form.add_sound",
+      }),
+    );
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     expect(onSubmit).toHaveBeenCalledWith(
@@ -83,7 +89,9 @@ describe("AmbientSoundFormDialog — cover image", () => {
     const onSubmit = renderDialog(existingSound);
 
     await userEvent.click(
-      screen.getByRole("button", { name: /save changes/i }),
+      screen.getByRole("button", {
+        name: "studio.ambient_sounds.form.save_changes",
+      }),
     );
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
@@ -101,7 +109,7 @@ describe("AmbientSoundFormDialog — cover image", () => {
 
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(
-        "Image is too large — maximum 5 MB.",
+        "studio.ambient_sounds.form.error_image_too_large",
       ),
     );
   });
@@ -113,7 +121,7 @@ describe("AmbientSoundFormDialog — cover image", () => {
 
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(
-        "Unsupported image type — use PNG, JPG, or WEBP.",
+        "studio.ambient_sounds.form.error_image_type",
       ),
     );
   });
@@ -136,7 +144,7 @@ describe("AmbientSoundFormDialog — audio rejection stays audio-specific", () =
 
     await waitFor(() =>
       expect(toast.error).toHaveBeenCalledWith(
-        "File is too large — maximum 50 MB.",
+        "studio.ambient_sounds.form.error_audio_too_large",
       ),
     );
   });

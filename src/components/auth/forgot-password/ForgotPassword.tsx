@@ -40,7 +40,7 @@ const ForgotPassword = () => {
       forgotPasswordMutation.mutate({ email: validatedEmail.email });
     } catch (error) {
       if (error instanceof z.ZodError) {
-        setError(error.issues[0].message);
+        setError(t(error.issues[0].message));
       }
     }
   };

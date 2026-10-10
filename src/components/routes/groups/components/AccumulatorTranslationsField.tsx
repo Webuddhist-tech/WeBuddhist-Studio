@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { IoMdAdd, IoMdClose } from "react-icons/io";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { MarkdownEditor } from "@/components/ui/atoms/markdown-editor";
 import { useLanguages } from "@/hooks/useLanguages";
@@ -28,6 +29,7 @@ const AccumulatorTranslationsField = ({
   descriptions,
   onChange,
 }: AccumulatorTranslationsFieldProps) => {
+  const { t } = useTranslate();
   const { languageOptions, getLanguageLabel } = useLanguages();
   const [selected, setSelected] = useState<LanguageCode | null>(
     activeLanguages[0] ?? null,
@@ -95,9 +97,11 @@ const AccumulatorTranslationsField = ({
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
         <div>
-          <p className="text-sm font-bold">Title &amp; About</p>
+          <p className="text-sm font-bold">
+            {t("studio.groups.components.accumulator_translations.heading")}
+          </p>
           <p className="text-xs text-muted-foreground">
-            One per language. Markdown supported in About.
+            {t("studio.groups.components.accumulator_translations.hint")}
           </p>
         </div>
         {availableLanguages.length > 0 ? (
@@ -106,7 +110,11 @@ const AccumulatorTranslationsField = ({
             onValueChange={(v) => addLanguage(v as LanguageCode)}
           >
             <Pecha.SelectTrigger className="w-[150px] h-9 shrink-0">
-              <Pecha.SelectValue placeholder="Add language" />
+              <Pecha.SelectValue
+                placeholder={t(
+                  "studio.groups.components.accumulator_translations.add_language",
+                )}
+              />
             </Pecha.SelectTrigger>
             <Pecha.SelectContent>
               {availableLanguages.map((lang) => (
@@ -125,7 +133,7 @@ const AccumulatorTranslationsField = ({
       {activeLanguages.length === 0 ? (
         <div className="rounded-md border border-dashed p-6 text-center">
           <p className="text-sm text-muted-foreground">
-            No title or About text yet. Add a language to write one.
+            {t("studio.groups.components.accumulator_translations.empty")}
           </p>
         </div>
       ) : (
@@ -148,7 +156,9 @@ const AccumulatorTranslationsField = ({
                   {hasText(lang) ? (
                     <span
                       className="h-1.5 w-1.5 rounded-full bg-muted-foreground/50"
-                      aria-label="has text"
+                      aria-label={t(
+                        "studio.groups.components.accumulator_translations.has_text",
+                      )}
                     />
                   ) : null}
                 </button>
@@ -157,7 +167,10 @@ const AccumulatorTranslationsField = ({
                     type="button"
                     onClick={() => removeLanguage(lang)}
                     className="mr-1 rounded p-0.5 text-muted-foreground hover:text-destructive"
-                    aria-label={`Remove ${getLanguageLabel(lang)}`}
+                    aria-label={t(
+                      "studio.groups.components.accumulator_translations.remove_language",
+                      { language: getLanguageLabel(lang) },
+                    )}
                   >
                     <IoMdClose className="w-3.5 h-3.5" />
                   </button>
@@ -173,24 +186,30 @@ const AccumulatorTranslationsField = ({
                   className="text-sm font-bold"
                   htmlFor={`accumulator-title-${selected}`}
                 >
-                  Title
+                  {t("studio.common.title")}
                 </label>
                 <Pecha.Input
                   id={`accumulator-title-${selected}`}
                   value={titles[selected] ?? ""}
                   onChange={(e) => updateTitle(selected, e.target.value)}
-                  placeholder={`Title in ${getLanguageLabel(selected)}…`}
+                  placeholder={t(
+                    "studio.groups.components.accumulator_translations.title_placeholder",
+                    { language: getLanguageLabel(selected) },
+                  )}
                   className="h-11 bg-white dark:bg-[#262626]"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-bold">About</label>
+                <label className="text-sm font-bold">
+                  {t("studio.groups.components.accumulator_translations.about")}
+                </label>
                 <MarkdownEditor
                   value={descriptions[selected] ?? ""}
                   onChange={(value) => updateDescription(selected, value)}
-                  placeholder={`About this accumulation in ${getLanguageLabel(
-                    selected,
-                  )}…`}
+                  placeholder={t(
+                    "studio.groups.components.accumulator_translations.about_placeholder",
+                    { language: getLanguageLabel(selected) },
+                  )}
                   className="bg-white dark:bg-[#181818]"
                   textareaClassName="bg-white dark:bg-[#181818]"
                 />
@@ -202,8 +221,9 @@ const AccumulatorTranslationsField = ({
 
       {hasAnyText && missingEnglish ? (
         <p className="text-xs text-muted-foreground">
-          Add English too. The app falls back to English when a member&apos;s
-          language is missing.
+          {t(
+            "studio.groups.components.accumulator_translations.missing_english",
+          )}
         </p>
       ) : null}
     </div>

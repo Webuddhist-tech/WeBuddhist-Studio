@@ -1,5 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslate } from "@tolgee/react";
 import { format, subDays, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import {
@@ -30,11 +31,11 @@ import {
 
 type DatePreset = "7d" | "30d" | "90d" | "month" | "custom";
 
-const PRESETS: { id: Exclude<DatePreset, "custom">; label: string }[] = [
-  { id: "7d", label: "7 days" },
-  { id: "30d", label: "30 days" },
-  { id: "90d", label: "90 days" },
-  { id: "month", label: "This month" },
+const PRESETS: { id: Exclude<DatePreset, "custom">; labelKey: string }[] = [
+  { id: "7d", labelKey: "studio.analytics.preset.7d" },
+  { id: "30d", labelKey: "studio.analytics.preset.30d" },
+  { id: "90d", labelKey: "studio.analytics.preset.90d" },
+  { id: "month", labelKey: "studio.analytics.preset.month" },
 ];
 
 const CHART_TOOLTIP_STYLE = {
@@ -66,14 +67,14 @@ function formatAxisDate(value: string): string {
   }
 }
 
-function formatRangeLabel(range: DateRange): string {
+function formatRangeLabel(range: DateRange, emptyLabel: string): string {
   if (range.from && range.to) {
     return `${format(range.from, "MMM d, yyyy")} – ${format(range.to, "MMM d, yyyy")}`;
   }
   if (range.from) {
     return format(range.from, "MMM d, yyyy");
   }
-  return "Select dates";
+  return emptyLabel;
 }
 
 function resolveApiDates(range: DateRange): {
@@ -140,12 +141,15 @@ function ChartPanel({
 }
 
 function TopPlansTable({ plans }: Readonly<{ plans: AnalyticsTopPlan[] }>) {
+  const { t } = useTranslate();
   if (plans.length === 0) {
     return (
       <div className="rounded-2xl border border-dashed border-border bg-card/60 px-6 py-16 text-center">
-        <p className="text-sm font-medium text-foreground">No plan joins yet</p>
+        <p className="text-sm font-medium text-foreground">
+          {t("studio.analytics.top_plans.empty_title")}
+        </p>
         <p className="mt-1 text-sm text-muted-foreground">
-          Joins in this date range will show up here.
+          {t("studio.analytics.top_plans.empty_description")}
         </p>
       </div>
     );
@@ -155,20 +159,28 @@ function TopPlansTable({ plans }: Readonly<{ plans: AnalyticsTopPlan[] }>) {
     <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
       <div className="border-b border-border px-5 py-4">
         <h2 className="text-base font-semibold text-foreground">
-          Top 10 plans
+          {t("studio.analytics.top_plans.title")}
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Ranked by joins in the selected date range
+          {t("studio.analytics.top_plans.description")}
         </p>
       </div>
       <Pecha.Table>
         <Pecha.TableHeader>
           <Pecha.TableRow>
             <Pecha.TableHead className="w-12">#</Pecha.TableHead>
-            <Pecha.TableHead>Plan</Pecha.TableHead>
-            <Pecha.TableHead>Series</Pecha.TableHead>
-            <Pecha.TableHead className="text-right">Joins</Pecha.TableHead>
-            <Pecha.TableHead className="text-right">Completed</Pecha.TableHead>
+            <Pecha.TableHead>
+              {t("studio.analytics.top_plans.col_plan")}
+            </Pecha.TableHead>
+            <Pecha.TableHead>
+              {t("studio.analytics.top_plans.col_series")}
+            </Pecha.TableHead>
+            <Pecha.TableHead className="text-right">
+              {t("studio.analytics.joins")}
+            </Pecha.TableHead>
+            <Pecha.TableHead className="text-right">
+              {t("studio.analytics.top_plans.col_completed")}
+            </Pecha.TableHead>
           </Pecha.TableRow>
         </Pecha.TableHeader>
         <Pecha.TableBody>
@@ -198,6 +210,7 @@ function TopPlansTable({ plans }: Readonly<{ plans: AnalyticsTopPlan[] }>) {
 }
 
 const Analytics = () => {
+  const { t } = useTranslate();
   const { data: userInfo } = useUserInfo();
   const { options: groupOptions, isLoading: isGroupFilterLoading } =
     useDashboardGroupFilterOptions(userInfo);
@@ -208,7 +221,7 @@ const Analytics = () => {
   const [groupId, setGroupId] = useState<string>("all");
 
   const { startDate, endDate } = resolveApiDates(range);
-  const dateLabel = formatRangeLabel(range);
+  const dateLabel = formatRangeLabel(range, t("studio.analytics.select_dates"));
 
   const { data, isLoading, isFetching, error } = useQuery({
     queryKey: ["analytics-overview", startDate, endDate, groupId],
@@ -249,10 +262,10 @@ const Analytics = () => {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-              Analytics
+              {t("studio.analytics.title")}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Users, joins, and plan completion across your content
+              {t("studio.analytics.subtitle")}
             </p>
           </div>
 
@@ -270,7 +283,7 @@ const Analytics = () => {
                       : "text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  {item.label}
+                  {t(item.labelKey)}
                 </button>
               ))}
             </div>
@@ -309,10 +322,14 @@ const Analytics = () => {
                 disabled={isGroupFilterLoading}
               >
                 <Pecha.SelectTrigger className="w-[220px]">
-                  <Pecha.SelectValue placeholder="All groups" />
+                  <Pecha.SelectValue
+                    placeholder={t("studio.analytics.all_groups")}
+                  />
                 </Pecha.SelectTrigger>
                 <Pecha.SelectContent>
-                  <Pecha.SelectItem value="all">All groups</Pecha.SelectItem>
+                  <Pecha.SelectItem value="all">
+                    {t("studio.analytics.all_groups")}
+                  </Pecha.SelectItem>
                   {groupOptions.map((group) => (
                     <Pecha.SelectItem key={group.id} value={group.id}>
                       {group.label}
@@ -332,19 +349,19 @@ const Analytics = () => {
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <StatCard
-            label="Total users"
+            label={t("studio.analytics.stats.total_users")}
             value={totalUsers}
-            hint="All registered app users"
+            hint={t("studio.analytics.stats.total_users_hint")}
             icon={<IoPeopleOutline className="h-5 w-5" />}
           />
           <StatCard
-            label="New users this month"
+            label={t("studio.analytics.stats.new_users_month")}
             value={newUsersThisMonth}
-            hint="Calendar month to date"
+            hint={t("studio.analytics.stats.new_users_month_hint")}
             icon={<HiOutlineUserPlus className="h-5 w-5" />}
           />
           <StatCard
-            label="New users in range"
+            label={t("studio.analytics.stats.new_users_range")}
             value={newUsersInRange}
             hint={dateLabel}
             icon={<MdOutlineTrendingUp className="h-5 w-5" />}
@@ -358,8 +375,8 @@ const Analytics = () => {
           )}
         >
           <ChartPanel
-            title="User growth"
-            description="New registrations per day"
+            title={t("studio.analytics.charts.user_growth_title")}
+            description={t("studio.analytics.charts.user_growth_description")}
           >
             {isLoading ? (
               <Pecha.Skeleton className="h-full w-full rounded-xl" />
@@ -403,7 +420,7 @@ const Analytics = () => {
                   <Area
                     type="monotone"
                     dataKey="new_users"
-                    name="New users"
+                    name={t("studio.analytics.charts.new_users")}
                     stroke="#171717"
                     fill="url(#usersFill)"
                     strokeWidth={2}
@@ -414,8 +431,8 @@ const Analytics = () => {
           </ChartPanel>
 
           <ChartPanel
-            title="Joins & completions"
-            description="Plan enrollments and completions per day"
+            title={t("studio.analytics.charts.joins_title")}
+            description={t("studio.analytics.charts.joins_description")}
           >
             {isLoading ? (
               <Pecha.Skeleton className="h-full w-full rounded-xl" />
@@ -445,14 +462,14 @@ const Analytics = () => {
                   <Legend />
                   <Bar
                     dataKey="joins"
-                    name="Joins"
+                    name={t("studio.analytics.joins")}
                     fill="#525252"
                     radius={[4, 4, 0, 0]}
                     maxBarSize={28}
                   />
                   <Bar
                     dataKey="completions"
-                    name="Completions"
+                    name={t("studio.analytics.charts.completions")}
                     fill="#a3a3a3"
                     radius={[4, 4, 0, 0]}
                     maxBarSize={28}

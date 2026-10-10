@@ -130,8 +130,12 @@ describe("TaskView Component", () => {
       'audio[src="https://example.com/subtask-audio.mp3"]',
     );
     expect(audio).toBeInTheDocument();
-    expect(screen.queryByText(/Segment:/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Timeline:/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("studio.molecules.audio_segment.range"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("studio.task.view.timeline"),
+    ).not.toBeInTheDocument();
   });
 
   it("renders day audio segment player when timestamps and dayAudioUrl are present", async () => {
@@ -159,7 +163,9 @@ describe("TaskView Component", () => {
       />,
     );
     await waitFor(() => {
-      expect(screen.getByText("Segment: 1:00 – 2:30")).toBeInTheDocument();
+      expect(
+        screen.getByText("studio.molecules.audio_segment.range"),
+      ).toBeInTheDocument();
     });
     expect(
       document.querySelector('audio[src="https://example.com/day-audio.mp3"]'),
@@ -187,7 +193,7 @@ describe("TaskView Component", () => {
       <TaskView onEditTask={mockOnEditTask} taskId="task-123" />,
     );
     await waitFor(() => {
-      expect(screen.getByText("Timeline: 0:30 – 1:30")).toBeInTheDocument();
+      expect(screen.getByText("studio.task.view.timeline")).toBeInTheDocument();
     });
     expect(document.querySelector("audio")).not.toBeInTheDocument();
   });
@@ -230,6 +236,8 @@ describe("TaskView Component", () => {
     expect(
       container.querySelector('audio[src="https://example.com/day-audio.mp3"]'),
     ).not.toBeInTheDocument();
-    expect(screen.queryByText(/Segment:/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("studio.molecules.audio_segment.range"),
+    ).not.toBeInTheDocument();
   });
 });

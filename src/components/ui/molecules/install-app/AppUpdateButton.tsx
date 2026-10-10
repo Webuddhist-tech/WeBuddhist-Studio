@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { LuRefreshCw } from "react-icons/lu";
+import { useTranslate } from "@tolgee/react";
 import { cn } from "@/lib/utils";
 import { Button } from "../../atoms/button";
 import {
@@ -13,7 +14,7 @@ import {
 import { useAppUpdate, useUpdateWaiting } from "./appUpdateContext";
 
 interface AppUpdateButtonProps {
-  /** What a reload costs on this screen. */
+  /** What a reload costs on this screen. Defaults to a translated warning. */
   description?: string;
   /** Says "Update" beside the icon; the sidebar labels its rows itself. */
   showLabel?: boolean;
@@ -30,12 +31,13 @@ interface AppUpdateButtonProps {
  * `useUpdateWaiting` to leave out its row.
  */
 export function AppUpdateButton({
-  description = "Save your work first. Changes you haven't saved on this page will be lost.",
+  description,
   showLabel = false,
   labelClassName,
   side = "bottom",
   className,
 }: Readonly<AppUpdateButtonProps>) {
+  const { t } = useTranslate();
   const { reload } = useAppUpdate();
   const waiting = useUpdateWaiting();
   const [open, setOpen] = useState(false);
@@ -51,7 +53,9 @@ export function AppUpdateButton({
           className={cn("relative", className)}
         >
           <LuRefreshCw className="size-4" />
-          <span className={showLabel ? labelClassName : "sr-only"}>Update</span>
+          <span className={showLabel ? labelClassName : "sr-only"}>
+            {t("studio.pwa.update")}
+          </span>
           <span
             aria-hidden="true"
             className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-blue-500"
@@ -66,8 +70,10 @@ export function AppUpdateButton({
         className="w-64"
       >
         <PopoverHeader>
-          <PopoverTitle>New version of the Studio</PopoverTitle>
-          <PopoverDescription>{description}</PopoverDescription>
+          <PopoverTitle>{t("studio.pwa.new_version_title")}</PopoverTitle>
+          <PopoverDescription>
+            {description ?? t("studio.pwa.unsaved_warning")}
+          </PopoverDescription>
         </PopoverHeader>
         <div className="mt-3 flex gap-2">
           <Button
@@ -76,10 +82,10 @@ export function AppUpdateButton({
             className="flex-1"
             onClick={() => setOpen(false)}
           >
-            Later
+            {t("studio.pwa.later")}
           </Button>
           <Button size="sm" className="flex-1" onClick={reload}>
-            Reload now
+            {t("studio.pwa.reload_now")}
           </Button>
         </div>
       </PopoverContent>

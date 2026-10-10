@@ -1,4 +1,5 @@
 import type { UseFormReturn } from "react-hook-form";
+import { useTranslate } from "@tolgee/react";
 import { IoMdAdd, IoMdClose } from "react-icons/io";
 import { PiDotsSixVertical } from "react-icons/pi";
 import { Pecha } from "@/components/ui/shadimport";
@@ -23,6 +24,7 @@ const PostLinksSection = ({
   onRemove,
   onMove,
 }: PostLinksSectionProps) => {
+  const { t } = useTranslate();
   const canReorder = !readOnly && fields.length > 1;
 
   const handleReorder = (activeId: string, overId: string) => {
@@ -36,9 +38,11 @@ const PostLinksSection = ({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-bold">Links (optional)</h3>
+          <h3 className="text-sm font-bold">
+            {t("studio.groups.posts.links.title")}
+          </h3>
           <p className="text-xs text-muted-foreground">
-            External links shown on the post. URLs must use https://
+            {t("studio.groups.posts.links.description")}
           </p>
         </div>
         {!readOnly ? (
@@ -49,13 +53,15 @@ const PostLinksSection = ({
             onClick={onAdd}
             className="gap-1"
           >
-            <IoMdAdd className="h-4 w-4" /> Add link
+            <IoMdAdd className="h-4 w-4" /> {t("studio.groups.posts.links.add")}
           </Pecha.Button>
         ) : null}
       </div>
 
       {fields.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No links added.</p>
+        <p className="text-sm text-muted-foreground">
+          {t("studio.groups.posts.links.empty")}
+        </p>
       ) : null}
 
       <SortableList
@@ -78,7 +84,9 @@ const PostLinksSection = ({
                       {!readOnly ? (
                         <button
                           type="button"
-                          aria-label="Reorder link"
+                          aria-label={t(
+                            "studio.groups.posts.links.reorder_aria",
+                          )}
                           disabled={!canReorder}
                           className="mt-8 shrink-0 cursor-grab touch-none rounded p-1 text-muted-foreground hover:text-foreground active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-30"
                           {...listeners}
@@ -92,7 +100,9 @@ const PostLinksSection = ({
                         name={`links.${index}.type`}
                         render={({ field: typeField }) => (
                           <Pecha.FormItem className="w-48">
-                            <Pecha.FormLabel>Type</Pecha.FormLabel>
+                            <Pecha.FormLabel>
+                              {t("studio.groups.posts.links.type_label")}
+                            </Pecha.FormLabel>
                             <Pecha.Select
                               value={typeField.value}
                               onValueChange={typeField.onChange}
@@ -100,7 +110,11 @@ const PostLinksSection = ({
                             >
                               <Pecha.FormControl>
                                 <Pecha.SelectTrigger className="w-full bg-white dark:bg-[#181818]">
-                                  <Pecha.SelectValue placeholder="Select a type" />
+                                  <Pecha.SelectValue
+                                    placeholder={t(
+                                      "studio.groups.posts.links.type_placeholder",
+                                    )}
+                                  />
                                 </Pecha.SelectTrigger>
                               </Pecha.FormControl>
                               <Pecha.SelectContent>
@@ -109,7 +123,9 @@ const PostLinksSection = ({
                                     key={option.value}
                                     value={option.value}
                                   >
-                                    {option.label}
+                                    {t(
+                                      `studio.groups.posts.links.type.${option.value.toLowerCase()}`,
+                                    )}
                                   </Pecha.SelectItem>
                                 ))}
                               </Pecha.SelectContent>
@@ -123,7 +139,7 @@ const PostLinksSection = ({
                     {!readOnly ? (
                       <button
                         type="button"
-                        aria-label="Remove link"
+                        aria-label={t("studio.groups.posts.links.remove_aria")}
                         onClick={() => onRemove(index)}
                         className="mt-8 text-muted-foreground hover:text-destructive"
                       >
@@ -137,7 +153,9 @@ const PostLinksSection = ({
                     name={`links.${index}.url`}
                     render={({ field: urlField }) => (
                       <Pecha.FormItem>
-                        <Pecha.FormLabel>URL</Pecha.FormLabel>
+                        <Pecha.FormLabel>
+                          {t("studio.groups.posts.links.url_label")}
+                        </Pecha.FormLabel>
                         <Pecha.FormControl>
                           <Pecha.Input
                             {...urlField}
@@ -158,11 +176,15 @@ const PostLinksSection = ({
                     name={`links.${index}.label`}
                     render={({ field: labelField }) => (
                       <Pecha.FormItem>
-                        <Pecha.FormLabel>Label (optional)</Pecha.FormLabel>
+                        <Pecha.FormLabel>
+                          {t("studio.groups.posts.links.label_label")}
+                        </Pecha.FormLabel>
                         <Pecha.FormControl>
                           <Pecha.Input
                             {...labelField}
-                            placeholder="Display text"
+                            placeholder={t(
+                              "studio.groups.posts.links.label_placeholder",
+                            )}
                             disabled={readOnly}
                             className="bg-white dark:bg-[#181818]"
                           />

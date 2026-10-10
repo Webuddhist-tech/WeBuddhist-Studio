@@ -13,6 +13,7 @@ import DayVideosDialog from "@/components/ui/molecules/modals/day-videos/DayVide
 import DayShareableImagesDialog from "@/components/ui/molecules/modals/day-shareable-images/DayShareableImagesDialog";
 import DayCreateDialog from "@/components/ui/molecules/modals/day-create/DayCreateDialog";
 import { useParams } from "react-router-dom";
+import { useTranslate } from "@tolgee/react";
 import { SortableList, SortableItem } from "@/components/ui/atoms/sortable";
 import { PiDotsSixVertical } from "react-icons/pi";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -46,6 +47,7 @@ const SideBar = ({
   const [expandedDay, setExpandedDay] = useState<number>(selectedDay);
   const { planId } = useParams<{ planId: string }>();
   const queryClient = useQueryClient();
+  const { t } = useTranslate();
 
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedDayIds, setSelectedDayIds] = useState<Set<string>>(new Set());
@@ -173,17 +175,21 @@ const SideBar = ({
     isEditable && displayDays.length > 1 && !createNewDay.isPending;
 
   const deleteBtnLabel = (() => {
-    if (deleteDay.isPending) return "Deleting…";
-    if (selectedDayIds.size === 0) return "Select days to delete";
-    const unit = selectedDayIds.size === 1 ? "Day" : "Days";
-    return `Delete ${selectedDayIds.size} ${unit}`;
+    if (deleteDay.isPending) return t("studio.common.deleting");
+    if (selectedDayIds.size === 0)
+      return t("studio.task.sidebar.select_days_to_delete");
+    return selectedDayIds.size === 1
+      ? t("studio.task.sidebar.delete_days_one", { count: selectedDayIds.size })
+      : t("studio.task.sidebar.delete_days_other", {
+          count: selectedDayIds.size,
+        });
   })();
 
   return (
     <div className="w-full md:w-80 lg:w-96 dark:bg-[#161616] border-r border-gray-200 dark:border-border h-screen flex flex-col max-md:h-full max-md:border-r-0">
       <div className="p-4 shrink-0">
         <div className="dark:text-[#bebebe] text-[#4d4d4d] text-md font-bold">
-          Current Plan
+          {t("studio.task.sidebar.current_plan")}
         </div>
         <div className="text-sm text-black dark:text-white overflow-hidden text-ellipsis whitespace-nowrap">
           {isLoading ? (
@@ -197,14 +203,16 @@ const SideBar = ({
       <div className="flex-1 flex flex-col min-h-0">
         <div className="flex p-4 items-center border-b pb-3 gap-2 shrink-0">
           <IoCalendarClearOutline className="w-5 h-5 text-foreground" />
-          <span className="text-sm text-foreground flex-1">Days</span>
+          <span className="text-sm text-foreground flex-1">
+            {t("studio.task.sidebar.days")}
+          </span>
           {canEnterSelectMode && !isSelectMode && (
             <button
               type="button"
               className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1"
               onClick={() => setIsSelectMode(true)}
             >
-              Select
+              {t("studio.task.sidebar.select")}
             </button>
           )}
           {isSelectMode && (
@@ -213,7 +221,7 @@ const SideBar = ({
               className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1"
               onClick={exitSelectMode}
             >
-              Cancel
+              {t("studio.common.cancel")}
             </button>
           )}
         </div>
@@ -287,7 +295,9 @@ const SideBar = ({
                                 : "text-zinc-400 dark:text-zinc-600"
                             }`}
                           >
-                            Day {day.day_number}
+                            {t("studio.task.day_number", {
+                              day: day.day_number,
+                            })}
                           </span>
                         </div>
 
@@ -321,7 +331,7 @@ const SideBar = ({
                                   }}
                                 />
                               </Activity>
-                              {isEditable && currentPlan?.days.length > 1 && (
+                              {isEditable && (
                                 <Pecha.DropdownMenu>
                                   <Pecha.DropdownMenuTrigger asChild>
                                     <BsThreeDots className="w-3 h-3 max-md:w-8 max-md:h-8 max-md:p-2 text-gray-400 dark:text-muted-foreground cursor-pointer" />
@@ -427,7 +437,7 @@ const SideBar = ({
                                         {task.title}
                                         {task.settings?.is_live && (
                                           <span className="ml-2 rounded-sm bg-[#A51C21] px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none text-white">
-                                            Live
+                                            {t("studio.task.sidebar.live")}
                                           </span>
                                         )}
                                       </span>
@@ -481,7 +491,9 @@ const SideBar = ({
                             className="mx-2 mb-2 flex min-h-11 w-[calc(100%-1rem)] items-center justify-center gap-2 rounded-md border border-dashed text-sm text-muted-foreground active:bg-accent"
                           >
                             <IoMdAdd className="h-4 w-4" />
-                            Add task to Day {day.day_number}
+                            {t("studio.task.sidebar.add_task_to_day", {
+                              day: day.day_number,
+                            })}
                           </button>
                         )}
                     </div>
@@ -502,7 +514,7 @@ const SideBar = ({
                 className="w-full"
                 onClick={exitSelectMode}
               >
-                Cancel
+                {t("studio.common.cancel")}
               </Pecha.Button>
               <Pecha.Button
                 type="button"
@@ -532,26 +544,31 @@ const SideBar = ({
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
             <Pecha.AlertDialogTitle>
-              Delete {selectedDayIds.size}{" "}
-              {selectedDayIds.size === 1 ? "day" : "days"}?
+              {selectedDayIds.size === 1
+                ? t("studio.task.sidebar.bulk_delete_title_one", {
+                    count: selectedDayIds.size,
+                  })
+                : t("studio.task.sidebar.bulk_delete_title_other", {
+                    count: selectedDayIds.size,
+                  })}
             </Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
-              This action cannot be undone. All tasks inside the selected{" "}
-              {selectedDayIds.size === 1 ? "day" : "days"} will be permanently
-              deleted and remaining days will be renumbered.
+              {selectedDayIds.size === 1
+                ? t("studio.task.sidebar.bulk_delete_description_one")
+                : t("studio.task.sidebar.bulk_delete_description_other")}
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <Pecha.AlertDialogFooter>
             <Pecha.AlertDialogCancel
               onClick={() => setShowBulkDeleteConfirm(false)}
             >
-              Cancel
+              {t("studio.common.cancel")}
             </Pecha.AlertDialogCancel>
             <Pecha.AlertDialogAction
               className="bg-[#AD1B21] dark:text-white hover:bg-[#AD1B21]/90"
               onClick={handleBulkDelete}
             >
-              Delete
+              {t("studio.common.delete")}
             </Pecha.AlertDialogAction>
           </Pecha.AlertDialogFooter>
         </Pecha.AlertDialogContent>
@@ -565,24 +582,28 @@ const SideBar = ({
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
             <Pecha.AlertDialogTitle>
-              Shift the rest of the series?
+              {t("studio.task.sidebar.shift_title")}
             </Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
-              Adding these days would push past the next plan in this series,
-              which starts on {seriesOverlapPrompt?.nextPlanStartDate}. Shift
-              that plan (and any plans after it) forward by{" "}
-              {seriesOverlapPrompt?.overflowDays} day
-              {seriesOverlapPrompt?.overflowDays === 1 ? "" : "s"} to make room?
+              {seriesOverlapPrompt?.overflowDays === 1
+                ? t("studio.task.sidebar.shift_description_one", {
+                    date: seriesOverlapPrompt?.nextPlanStartDate ?? "",
+                    count: seriesOverlapPrompt?.overflowDays ?? 0,
+                  })
+                : t("studio.task.sidebar.shift_description_other", {
+                    date: seriesOverlapPrompt?.nextPlanStartDate ?? "",
+                    count: seriesOverlapPrompt?.overflowDays ?? 0,
+                  })}
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <Pecha.AlertDialogFooter>
             <Pecha.AlertDialogCancel
               onClick={() => setSeriesOverlapPrompt(null)}
             >
-              Cancel
+              {t("studio.common.cancel")}
             </Pecha.AlertDialogCancel>
             <Pecha.AlertDialogAction onClick={handleConfirmSeriesShift}>
-              Shift schedule &amp; add days
+              {t("studio.task.sidebar.shift_confirm")}
             </Pecha.AlertDialogAction>
           </Pecha.AlertDialogFooter>
         </Pecha.AlertDialogContent>

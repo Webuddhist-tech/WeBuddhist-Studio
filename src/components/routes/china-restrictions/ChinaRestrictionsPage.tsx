@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IoMdAdd } from "react-icons/io";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { format } from "date-fns";
 import { Navigate } from "react-router-dom";
 import { Pecha } from "@/components/ui/shadimport";
@@ -25,8 +26,10 @@ import {
 const PAGE_SIZE = 20;
 const SEARCH_DEBOUNCE_MS = 400;
 
-const formatItemType = (type: RestrictedItemType) =>
-  type.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
+type TFn = ReturnType<typeof useTranslate>["t"];
+
+const formatItemType = (type: RestrictedItemType, t: TFn) =>
+  t(`studio.china_restrictions.item_type.${type.toLowerCase()}`);
 
 type RestrictionRow = {
   id: string;
@@ -44,6 +47,7 @@ const renderTableBody = ({
   writeEnabled,
   isDeleting,
   onRemove,
+  t,
 }: {
   isLoading: boolean;
   items: RestrictionRow[];
@@ -51,11 +55,14 @@ const renderTableBody = ({
   writeEnabled: boolean;
   isDeleting: boolean;
   onRemove: (id: string) => void;
+  t: TFn;
 }) => {
   if (isLoading) {
     return (
       <Pecha.TableRow>
-        <Pecha.TableCell colSpan={tableColumnCount}>Loading…</Pecha.TableCell>
+        <Pecha.TableCell colSpan={tableColumnCount}>
+          {t("studio.common.loading")}
+        </Pecha.TableCell>
       </Pecha.TableRow>
     );
   }
@@ -64,7 +71,7 @@ const renderTableBody = ({
     return (
       <Pecha.TableRow>
         <Pecha.TableCell colSpan={tableColumnCount}>
-          No restricted items found.
+          {t("studio.china_restrictions.empty")}
         </Pecha.TableCell>
       </Pecha.TableRow>
     );
@@ -72,10 +79,12 @@ const renderTableBody = ({
 
   return items.map((item) => (
     <Pecha.TableRow key={item.id}>
-      <Pecha.TableCell>{formatItemType(item.item_type)}</Pecha.TableCell>
+      <Pecha.TableCell>{formatItemType(item.item_type, t)}</Pecha.TableCell>
       <Pecha.TableCell>
         <div className="min-w-[16rem]">
-          <p className="font-medium">{item.title?.trim() || "Untitled item"}</p>
+          <p className="font-medium">
+            {item.title?.trim() || t("studio.china_restrictions.untitled_item")}
+          </p>
           {item.subtitle?.trim() ? (
             <p className="text-xs text-muted-foreground mt-0.5">
               {item.subtitle}
@@ -96,7 +105,7 @@ const renderTableBody = ({
             disabled={isDeleting}
             onClick={() => onRemove(item.id)}
           >
-            Remove
+            {t("studio.common.remove")}
           </Button>
         </Pecha.TableCell>
       ) : null}
@@ -108,15 +117,17 @@ const renderCandidateOptions = ({
   isLoading,
   candidates,
   onSelect,
+  t,
 }: {
   isLoading: boolean;
   candidates: ChinaRestrictionCandidateDTO[];
   onSelect: (candidate: ChinaRestrictionCandidateDTO) => void;
+  t: TFn;
 }) => {
   if (isLoading) {
     return (
       <Pecha.CommandItem disabled value="__loading__">
-        Searching…
+        {t("studio.china_restrictions.searching")}
       </Pecha.CommandItem>
     );
   }
@@ -124,7 +135,7 @@ const renderCandidateOptions = ({
   if (candidates.length === 0) {
     return (
       <Pecha.CommandItem disabled value="__empty__">
-        No matches found.
+        {t("studio.china_restrictions.no_matches")}
       </Pecha.CommandItem>
     );
   }
@@ -148,6 +159,7 @@ const renderCandidateOptions = ({
 };
 
 const ChinaRestrictionsPage = () => {
+  const { t } = useTranslate();
   const { data: userInfo } = useUserInfo();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
@@ -212,7 +224,7 @@ const ChinaRestrictionsPage = () => {
   const createMutation = useMutation({
     mutationFn: createChinaRestrictedItem,
     onSuccess: () => {
-      toast.success("Item added to China restrictions");
+      toast.success(t("studio.china_restrictions.toast.added"));
       setAddOpen(false);
       setSelectedItem(null);
       setSearchQuery("");
@@ -224,7 +236,7 @@ const ChinaRestrictionsPage = () => {
   const deleteMutation = useMutation({
     mutationFn: deleteChinaRestrictedItem,
     onSuccess: () => {
-      toast.success("Restriction removed");
+      toast.success(t("studio.china_restrictions.toast.removed"));
       setDeleteTargetId(null);
       invalidate();
     },
@@ -239,7 +251,7 @@ const ChinaRestrictionsPage = () => {
 
   const handleAdd = () => {
     if (!selectedItem) {
-      toast.error("Search and select an item to restrict");
+      toast.error(t("studio.china_restrictions.validation.select_item"));
       return;
     }
     createMutation.mutate({
@@ -256,9 +268,11 @@ const ChinaRestrictionsPage = () => {
     <div className="font-dynamic border h-[calc(100vh-40px)] overflow-auto bg-[#F5F5F5] dark:bg-[#181818] my-4 rounded-l-2xl max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
       <div className="px-4 pt-10 pb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold">China restrictions</h1>
+          <h1 className="text-xl font-semibold">
+            {t("studio.china_restrictions.title")}
+          </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Items listed here are hidden from users in Chinese timezones.
+            {t("studio.china_restrictions.subtitle")}
           </p>
         </div>
         {writeEnabled ? (
@@ -271,7 +285,7 @@ const ChinaRestrictionsPage = () => {
             }}
           >
             <IoMdAdd className="mr-1 h-4 w-4" />
-            Add item
+            {t("studio.china_restrictions.add_item")}
           </Button>
         ) : null}
       </div>
@@ -285,10 +299,12 @@ const ChinaRestrictionsPage = () => {
             setPage(0);
           }}
         >
-          <option value="ALL">All types</option>
+          <option value="ALL">
+            {t("studio.china_restrictions.all_types")}
+          </option>
           {RESTRICTED_ITEM_TYPES.map((type) => (
             <option key={type} value={type}>
-              {formatItemType(type)}
+              {formatItemType(type, t)}
             </option>
           ))}
         </select>
@@ -304,10 +320,18 @@ const ChinaRestrictionsPage = () => {
         <Pecha.Table>
           <Pecha.TableHeader>
             <Pecha.TableRow>
-              <Pecha.TableHead>Type</Pecha.TableHead>
-              <Pecha.TableHead>Item</Pecha.TableHead>
-              <Pecha.TableHead>Added</Pecha.TableHead>
-              {writeEnabled ? <Pecha.TableHead>Actions</Pecha.TableHead> : null}
+              <Pecha.TableHead>
+                {t("studio.china_restrictions.table.type")}
+              </Pecha.TableHead>
+              <Pecha.TableHead>
+                {t("studio.china_restrictions.table.item")}
+              </Pecha.TableHead>
+              <Pecha.TableHead>
+                {t("studio.china_restrictions.table.added")}
+              </Pecha.TableHead>
+              {writeEnabled ? (
+                <Pecha.TableHead>{t("studio.common.actions")}</Pecha.TableHead>
+              ) : null}
             </Pecha.TableRow>
           </Pecha.TableHeader>
           <Pecha.TableBody>
@@ -318,6 +342,7 @@ const ChinaRestrictionsPage = () => {
               writeEnabled,
               isDeleting: deleteMutation.isPending,
               onRemove: setDeleteTargetId,
+              t,
             })}
           </Pecha.TableBody>
         </Pecha.Table>
@@ -346,15 +371,18 @@ const ChinaRestrictionsPage = () => {
       >
         <Pecha.DialogContent>
           <Pecha.DialogHeader>
-            <Pecha.DialogTitle>Add China restriction</Pecha.DialogTitle>
+            <Pecha.DialogTitle>
+              {t("studio.china_restrictions.add_dialog.title")}
+            </Pecha.DialogTitle>
             <DialogDescription>
-              Choose a content type, search by name, and select the item to hide
-              for users in Chinese timezones.
+              {t("studio.china_restrictions.add_dialog.description")}
             </DialogDescription>
           </Pecha.DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <label className="text-sm font-medium">Type</label>
+              <label className="text-sm font-medium">
+                {t("studio.china_restrictions.table.type")}
+              </label>
               <select
                 className="w-full rounded border bg-background px-3 py-2 text-sm"
                 value={newItemType}
@@ -364,13 +392,15 @@ const ChinaRestrictionsPage = () => {
               >
                 {RESTRICTED_ITEM_TYPES.map((type) => (
                   <option key={type} value={type}>
-                    {formatItemType(type)}
+                    {formatItemType(type, t)}
                   </option>
                 ))}
               </select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">Item</label>
+              <label className="text-sm font-medium">
+                {t("studio.china_restrictions.table.item")}
+              </label>
               <Pecha.Popover open={searchOpen} onOpenChange={setSearchOpen}>
                 <Pecha.PopoverTrigger asChild>
                   <Button
@@ -387,7 +417,12 @@ const ChinaRestrictionsPage = () => {
                     >
                       {selectedItem
                         ? selectedItem.title
-                        : `Search ${formatItemType(newItemType).toLowerCase()}s…`}
+                        : t(
+                            "studio.china_restrictions.add_dialog.search_type",
+                            {
+                              type: formatItemType(newItemType, t),
+                            },
+                          )}
                     </span>
                   </Button>
                 </Pecha.PopoverTrigger>
@@ -397,7 +432,10 @@ const ChinaRestrictionsPage = () => {
                 >
                   <Pecha.Command shouldFilter={false}>
                     <Pecha.CommandInput
-                      placeholder={`Search ${formatItemType(newItemType).toLowerCase()}s…`}
+                      placeholder={t(
+                        "studio.china_restrictions.add_dialog.search_type",
+                        { type: formatItemType(newItemType, t) },
+                      )}
                       value={searchQuery}
                       onValueChange={setSearchQuery}
                     />
@@ -410,6 +448,7 @@ const ChinaRestrictionsPage = () => {
                             setSelectedItem(candidate);
                             setSearchOpen(false);
                           },
+                          t,
                         })}
                       </Pecha.CommandGroup>
                     </Pecha.CommandList>
@@ -420,13 +459,13 @@ const ChinaRestrictionsPage = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAddOpen(false)}>
-              Cancel
+              {t("studio.common.cancel")}
             </Button>
             <Button
               onClick={handleAdd}
               disabled={createMutation.isPending || !selectedItem}
             >
-              Add
+              {t("studio.common.add")}
             </Button>
           </DialogFooter>
         </Pecha.DialogContent>
@@ -438,14 +477,17 @@ const ChinaRestrictionsPage = () => {
       >
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
-            <Pecha.AlertDialogTitle>Remove restriction?</Pecha.AlertDialogTitle>
+            <Pecha.AlertDialogTitle>
+              {t("studio.china_restrictions.remove_dialog.title")}
+            </Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
-              This item will become visible again for users in Chinese
-              timezones.
+              {t("studio.china_restrictions.remove_dialog.description")}
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <Pecha.AlertDialogFooter>
-            <Pecha.AlertDialogCancel>Cancel</Pecha.AlertDialogCancel>
+            <Pecha.AlertDialogCancel>
+              {t("studio.common.cancel")}
+            </Pecha.AlertDialogCancel>
             <Pecha.AlertDialogAction
               onClick={() => {
                 if (deleteTargetId) {
@@ -453,7 +495,7 @@ const ChinaRestrictionsPage = () => {
                 }
               }}
             >
-              Remove
+              {t("studio.common.remove")}
             </Pecha.AlertDialogAction>
           </Pecha.AlertDialogFooter>
         </Pecha.AlertDialogContent>

@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,9 +16,29 @@ import { groupCoreSchema, type GroupCoreFormData } from "@/schema/GroupSchema";
 import { languageLabelForCode } from "../api/groupsApi";
 import GroupLanguageTabs from "./GroupLanguageTabs";
 
+// Like the global mock (the key comes back), but with interpolated values
+// appended so per-language labels stay distinguishable.
+vi.mock("@tolgee/react", () => ({
+  useTranslate: () => ({
+    t: (key: string, params?: Record<string, unknown>) =>
+      params ? `${key} ${Object.values(params).join(" ")}` : key,
+  }),
+}));
+
+const ADD = "studio.groups.components.language_tabs.add_language";
+const fieldLabel = (field: string, code: LanguageCode) =>
+  new RegExp(
+    `studio.groups.components.language_tabs.${field}_label ${label(code)}`,
+  );
+
 const ALL: LanguageCode[] = ["EN", "BO", "ZH"];
 const label = (code: LanguageCode) => languageLabelForCode(code);
-const BLANK = { title: "", sub_title: "", description: "", description_long: "" };
+const BLANK = {
+  title: "",
+  sub_title: "",
+  description: "",
+  description_long: "",
+};
 
 type HarnessProps = {
   initial?: LanguageCode[];
@@ -79,7 +105,7 @@ const selectedTab = () =>
 describe("GroupLanguageTabs", () => {
   it("shows a tab for each language with Add language as the last tab", () => {
     render(<Harness initial={["EN", "BO"]} />);
-    expect(tabNames()).toEqual([label("EN"), label("BO"), "Add language"]);
+    expect(tabNames()).toEqual([label("EN"), label("BO"), ADD]);
   });
 
   it("opens on the first language", () => {
@@ -89,11 +115,11 @@ describe("GroupLanguageTabs", () => {
 
   it("marks only the title as required", () => {
     render(<Harness />);
-    const title = screen.getByText(new RegExp(`${label("EN")} title`));
+    const title = screen.getByText(fieldLabel("title", "EN"));
     expect(title.textContent).toContain("*");
-    for (const field of ["sub-title", "description", "long description"]) {
-      const text = screen.getByText(new RegExp(`${label("EN")} ${field}`));
-      expect(text.textContent).toContain("(optional)");
+    for (const field of ["sub_title", "description", "description_long"]) {
+      const text = screen.getByText(fieldLabel(field, "EN"));
+      expect(text.textContent).toContain("(studio.common.optional)");
       expect(text.textContent).not.toContain("*");
     }
   });
@@ -102,7 +128,7 @@ describe("GroupLanguageTabs", () => {
     const onSubmit = vi.fn();
     render(<Harness onSubmit={onSubmit} />);
     await userEvent.type(
-      screen.getByLabelText(new RegExp(`${label("EN")} title`)),
+      screen.getByLabelText(fieldLabel("title", "EN")),
       "Dharma Circle",
     );
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -119,7 +145,9 @@ describe("GroupLanguageTabs", () => {
     const onSubmit = vi.fn();
     render(<Harness onSubmit={onSubmit} />);
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
-    expect(await screen.findByText("Title is required")).toBeInTheDocument();
+    expect(
+      await screen.findByText("studio.validation.title_required"),
+    ).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
@@ -128,12 +156,15 @@ describe("GroupLanguageTabs", () => {
     render(
       <Harness
         initial={["EN", "BO"]}
-        defaults={{ EN: { title: "Dharma Circle" }, BO: { sub_title: "only this" } }}
+        defaults={{
+          EN: { title: "Dharma Circle" },
+          BO: { sub_title: "only this" },
+        }}
         onSubmit={onSubmit}
       />,
     );
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
-    await screen.findByText("Title is required");
+    await screen.findByText("studio.validation.title_required");
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
@@ -150,49 +181,65 @@ describe("GroupLanguageTabs", () => {
 
     await waitFor(() => expect(selectedTab()).toContain(label("BO")));
     const boTab = screen.getByRole("tab", { name: new RegExp(label("BO")) });
-    expect(within(boTab).getByLabelText("has errors")).toBeInTheDocument();
+    expect(
+      within(boTab).getByLabelText(
+        "studio.groups.components.language_tabs.has_errors",
+      ),
+    ).toBeInTheDocument();
     const enTab = screen.getByRole("tab", { name: new RegExp(label("EN")) });
-    expect(within(enTab).queryByLabelText("has errors")).not.toBeInTheDocument();
+    expect(
+      within(enTab).queryByLabelText(
+        "studio.groups.components.language_tabs.has_errors",
+      ),
+    ).not.toBeInTheDocument();
   });
 
   it("stays where it is when the open tab is the one with the problem", async () => {
-    render(<Harness initial={["EN", "BO"]} defaults={{ BO: { title: "Chos" } }} />);
+    render(
+      <Harness initial={["EN", "BO"]} defaults={{ BO: { title: "Chos" } }} />,
+    );
     await userEvent.click(screen.getByRole("button", { name: "Save" }));
-    await screen.findByText("Title is required");
+    await screen.findByText("studio.validation.title_required");
     expect(selectedTab()).toContain(label("EN"));
   });
 
   it("keeps what was typed when moving between tabs", async () => {
     render(<Harness initial={["EN", "BO"]} />);
-    const enTitle = screen.getByLabelText(new RegExp(`${label("EN")} title`));
+    const enTitle = screen.getByLabelText(fieldLabel("title", "EN"));
     await userEvent.type(enTitle, "Dharma Circle");
 
     await userEvent.click(screen.getByRole("tab", { name: label("BO") }));
     expect(selectedTab()).toBe(label("BO"));
     await userEvent.click(screen.getByRole("tab", { name: label("EN") }));
 
-    expect(screen.getByLabelText(new RegExp(`${label("EN")} title`))).toHaveValue(
+    expect(screen.getByLabelText(fieldLabel("title", "EN"))).toHaveValue(
       "Dharma Circle",
     );
   });
 
   it("adds a language as a new tab before Add language and opens it", async () => {
     render(<Harness />);
-    await userEvent.click(screen.getByRole("tab", { name: /add language/i }));
-    expect(screen.getByText(/only its title is required/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: ADD }));
+    expect(
+      screen.getByText("studio.groups.components.language_tabs.add_hint"),
+    ).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: label("BO") }));
 
-    expect(tabNames()).toEqual([label("EN"), label("BO"), "Add language"]);
+    expect(tabNames()).toEqual([label("EN"), label("BO"), ADD]);
     expect(selectedTab()).toBe(label("BO"));
-    expect(screen.getByLabelText(new RegExp(`${label("BO")} title`))).toBeVisible();
+    expect(screen.getByLabelText(fieldLabel("title", "BO"))).toBeVisible();
   });
 
   it("offers only the languages not added yet", async () => {
     render(<Harness initial={["EN", "BO"]} />);
-    await userEvent.click(screen.getByRole("tab", { name: /add language/i }));
-    expect(screen.getByRole("button", { name: label("ZH") })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: label("BO") })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: ADD }));
+    expect(
+      screen.getByRole("button", { name: label("ZH") }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: label("BO") }),
+    ).not.toBeInTheDocument();
   });
 
   it("drops the Add language tab once every language is added", () => {
@@ -203,16 +250,20 @@ describe("GroupLanguageTabs", () => {
   it("removes a language and falls back to the first tab", async () => {
     render(<Harness initial={["EN", "BO"]} />);
     await userEvent.click(screen.getByRole("tab", { name: label("BO") }));
-    fireEvent.click(screen.getByRole("button", { name: `Remove ${label("BO")}` }));
-
-    await waitFor(() =>
-      expect(tabNames()).toEqual([label("EN"), "Add language"]),
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: `studio.groups.components.language_tabs.remove_language ${label("BO")}`,
+      }),
     );
+
+    await waitFor(() => expect(tabNames()).toEqual([label("EN"), ADD]));
     expect(selectedTab()).toBe(label("EN"));
   });
 
   it("cannot remove the only language", () => {
     render(<Harness />);
-    expect(screen.queryByRole("button", { name: /^remove /i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /remove_language/ }),
+    ).not.toBeInTheDocument();
   });
 });

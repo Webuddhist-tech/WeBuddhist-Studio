@@ -1,3 +1,4 @@
+import { useTranslate } from "@tolgee/react";
 import type { UseFormReturn } from "react-hook-form";
 import { IoMdAdd } from "react-icons/io";
 import { Pecha } from "@/components/ui/shadimport";
@@ -25,6 +26,7 @@ const EventYoutubeSection = ({
   onRemove,
   onMove,
 }: EventYoutubeSectionProps) => {
+  const { t } = useTranslate();
   const canReorder = !readOnly && fields.length > 1;
 
   const handleReorder = (activeId: string, overId: string) => {
@@ -38,11 +40,13 @@ const EventYoutubeSection = ({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-bold">YouTube (optional)</h3>
+          <h3 className="text-sm font-bold">
+            {t("studio.groups.events.youtube.heading")}
+          </h3>
           <p className="text-xs text-muted-foreground">
-            YouTube videos shown on the event.
+            {t("studio.groups.events.youtube.help")}
             {channelUrl && !readOnly
-              ? " Pick a live stream from the group's channel or paste a URL."
+              ? ` ${t("studio.groups.events.youtube.help_channel")}`
               : ""}
           </p>
         </div>
@@ -54,13 +58,16 @@ const EventYoutubeSection = ({
             onClick={onAdd}
             className="gap-1"
           >
-            <IoMdAdd className="h-4 w-4" /> Add YouTube link
+            <IoMdAdd className="h-4 w-4" />{" "}
+            {t("studio.groups.events.youtube.add")}
           </Pecha.Button>
         ) : null}
       </div>
 
       {fields.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No YouTube links added.</p>
+        <p className="text-sm text-muted-foreground">
+          {t("studio.groups.events.youtube.empty_links")}
+        </p>
       ) : null}
 
       <SortableList

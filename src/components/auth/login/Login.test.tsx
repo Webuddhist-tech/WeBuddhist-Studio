@@ -92,17 +92,19 @@ describe("Login Component", () => {
       screen.getByPlaceholderText("studio.login.placeholder.password"),
     ).toBeDefined();
     expect(screen.getByText("common.button.submit")).toBeDefined();
-    expect(screen.getByText("Continue with Google")).toBeDefined();
-    expect(screen.getByText("Continue with phone")).toBeDefined();
+    expect(
+      screen.getByText("studio.auth.login.continue_with_google"),
+    ).toBeDefined();
+    expect(
+      screen.getByText("studio.auth.login.continue_with_phone"),
+    ).toBeDefined();
   });
 
   it("displays the app title and description", () => {
     renderWithProviders(<Login />);
 
     expect(screen.getByText("Webuddhist Studio")).toBeDefined();
-    expect(
-      screen.getByText("Learn, live and share Buddhist wisdom daily"),
-    ).toBeDefined();
+    expect(screen.getByText("studio.ui.auth_card.tagline")).toBeDefined();
   });
 
   it("shows signup link", () => {
@@ -525,7 +527,9 @@ describe("Login Component", () => {
       const user = userEvent.setup();
       renderWithProviders(<Login />);
 
-      await user.click(screen.getByText("Continue with phone"));
+      await user.click(
+        screen.getByText("studio.auth.login.continue_with_phone"),
+      );
 
       expect(mockLoginWithRedirect).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -585,7 +589,9 @@ describe("Login Component", () => {
       renderWithProviders(<Login />);
 
       await waitFor(() => {
-        expect(screen.getByText("Create profile")).toBeInTheDocument();
+        expect(
+          screen.getByText("studio.auth.login.create_profile"),
+        ).toBeInTheDocument();
       });
 
       vi.mocked(axiosInstance.post).mockResolvedValue({
@@ -599,9 +605,12 @@ describe("Login Component", () => {
         },
       });
 
-      await user.type(screen.getByLabelText("First name"), "Ada");
-      await user.type(screen.getByLabelText("Last name"), "Lovelace");
-      await user.click(screen.getByText("Create profile"));
+      await user.type(screen.getByLabelText("sign_up.form.first_name"), "Ada");
+      await user.type(
+        screen.getByLabelText("sign_up.form.last_name"),
+        "Lovelace",
+      );
+      await user.click(screen.getByText("studio.auth.login.create_profile"));
 
       await waitFor(() => {
         expect(axiosInstance.post).toHaveBeenCalledWith(
@@ -612,7 +621,9 @@ describe("Login Component", () => {
             last_name: "Lovelace",
           },
         );
-        expect(screen.getByText("Author not active")).toBeInTheDocument();
+        expect(
+          screen.getByText("studio.errors.author_not_active"),
+        ).toBeInTheDocument();
         expect(sessionStorage.getItem(PENDING_AUTH0_TOKEN_KEY)).toBeNull();
       });
     });
@@ -622,7 +633,9 @@ describe("Login Component", () => {
       renderWithProviders(<Login />);
 
       await waitFor(() => {
-        expect(screen.getByText("Create profile")).toBeInTheDocument();
+        expect(
+          screen.getByText("studio.auth.login.create_profile"),
+        ).toBeInTheDocument();
       });
     });
 
@@ -632,21 +645,28 @@ describe("Login Component", () => {
       renderWithProviders(<Login />);
 
       await waitFor(() => {
-        expect(screen.getByText("Create profile")).toBeInTheDocument();
+        expect(
+          screen.getByText("studio.auth.login.create_profile"),
+        ).toBeInTheDocument();
       });
 
       vi.mocked(axiosInstance.post).mockRejectedValue({
         response: { data: { detail: "Invalid Auth0 SMS token" } },
       });
 
-      await user.type(screen.getByLabelText("First name"), "Ada");
-      await user.type(screen.getByLabelText("Last name"), "Lovelace");
-      await user.click(screen.getByText("Create profile"));
+      await user.type(screen.getByLabelText("sign_up.form.first_name"), "Ada");
+      await user.type(
+        screen.getByLabelText("sign_up.form.last_name"),
+        "Lovelace",
+      );
+      await user.click(screen.getByText("studio.auth.login.create_profile"));
 
       await waitFor(() => {
         expect(screen.getByText("Invalid Auth0 SMS token")).toBeInTheDocument();
       });
-      expect(screen.queryByText("Create profile")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("studio.auth.login.create_profile"),
+      ).not.toBeInTheDocument();
       expect(sessionStorage.getItem(PENDING_AUTH0_TOKEN_KEY)).toBeNull();
     });
 
@@ -656,23 +676,30 @@ describe("Login Component", () => {
       renderWithProviders(<Login />);
 
       await waitFor(() => {
-        expect(screen.getByText("Create profile")).toBeInTheDocument();
+        expect(
+          screen.getByText("studio.auth.login.create_profile"),
+        ).toBeInTheDocument();
       });
 
       vi.mocked(axiosInstance.post).mockRejectedValueOnce(
         new Error("Network Error"),
       );
 
-      await user.type(screen.getByLabelText("First name"), "Ada");
-      await user.type(screen.getByLabelText("Last name"), "Lovelace");
-      await user.click(screen.getByText("Create profile"));
+      await user.type(screen.getByLabelText("sign_up.form.first_name"), "Ada");
+      await user.type(
+        screen.getByLabelText("sign_up.form.last_name"),
+        "Lovelace",
+      );
+      await user.click(screen.getByText("studio.auth.login.create_profile"));
 
       await waitFor(() => {
         expect(
-          screen.getByText("Phone authentication failed"),
+          screen.getByText("studio.auth.errors.phone_auth_failed"),
         ).toBeInTheDocument();
       });
-      expect(screen.getByText("Create profile")).toBeInTheDocument();
+      expect(
+        screen.getByText("studio.auth.login.create_profile"),
+      ).toBeInTheDocument();
       expect(sessionStorage.getItem(PENDING_AUTH0_TOKEN_KEY)).toBe(
         "auth0-access-token",
       );
@@ -692,7 +719,7 @@ describe("Login Component", () => {
         },
       });
 
-      await user.click(screen.getByText("Create profile"));
+      await user.click(screen.getByText("studio.auth.login.create_profile"));
 
       await waitFor(() => {
         expect(mockLogin).toHaveBeenCalledWith(
@@ -708,21 +735,28 @@ describe("Login Component", () => {
       renderWithProviders(<Login />);
 
       await waitFor(() => {
-        expect(screen.getByText("Create profile")).toBeInTheDocument();
+        expect(
+          screen.getByText("studio.auth.login.create_profile"),
+        ).toBeInTheDocument();
       });
 
       vi.mocked(axiosInstance.post).mockRejectedValueOnce({
         response: { status: 502, data: { detail: "Bad gateway" } },
       });
 
-      await user.type(screen.getByLabelText("First name"), "Ada");
-      await user.type(screen.getByLabelText("Last name"), "Lovelace");
-      await user.click(screen.getByText("Create profile"));
+      await user.type(screen.getByLabelText("sign_up.form.first_name"), "Ada");
+      await user.type(
+        screen.getByLabelText("sign_up.form.last_name"),
+        "Lovelace",
+      );
+      await user.click(screen.getByText("studio.auth.login.create_profile"));
 
       await waitFor(() => {
         expect(screen.getByText("Bad gateway")).toBeInTheDocument();
       });
-      expect(screen.getByText("Create profile")).toBeInTheDocument();
+      expect(
+        screen.getByText("studio.auth.login.create_profile"),
+      ).toBeInTheDocument();
       expect(sessionStorage.getItem(PENDING_AUTH0_TOKEN_KEY)).toBe(
         "auth0-access-token",
       );
@@ -745,11 +779,11 @@ describe("Login Component", () => {
       renderWithProviders(<Login />);
 
       await waitFor(() => {
-        expect(screen.getByText("Author not active")).toBeInTheDocument();
         expect(
-          screen.getByText(
-            /activated by a platform administrator before you can sign in/i,
-          ),
+          screen.getByText("studio.errors.author_not_active"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByText("studio.auth.login.inactive_help"),
         ).toBeInTheDocument();
       });
     });
@@ -760,7 +794,9 @@ describe("Login Component", () => {
       const user = userEvent.setup();
       renderWithProviders(<Login />);
 
-      await user.click(screen.getByText("Continue with Google"));
+      await user.click(
+        screen.getByText("studio.auth.login.continue_with_google"),
+      );
 
       expect(mockLoginWithRedirect).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -820,7 +856,9 @@ describe("Login Component", () => {
       renderWithProviders(<Login />);
 
       await waitFor(() => {
-        expect(screen.getByText("Create profile")).toBeInTheDocument();
+        expect(
+          screen.getByText("studio.auth.login.create_profile"),
+        ).toBeInTheDocument();
       });
 
       vi.mocked(axiosInstance.post).mockResolvedValue({
@@ -834,9 +872,12 @@ describe("Login Component", () => {
         },
       });
 
-      await user.type(screen.getByLabelText("First name"), "Ada");
-      await user.type(screen.getByLabelText("Last name"), "Lovelace");
-      await user.click(screen.getByText("Create profile"));
+      await user.type(screen.getByLabelText("sign_up.form.first_name"), "Ada");
+      await user.type(
+        screen.getByLabelText("sign_up.form.last_name"),
+        "Lovelace",
+      );
+      await user.click(screen.getByText("studio.auth.login.create_profile"));
 
       await waitFor(() => {
         expect(axiosInstance.post).toHaveBeenCalledWith(
@@ -847,7 +888,9 @@ describe("Login Component", () => {
             last_name: "Lovelace",
           },
         );
-        expect(screen.getByText("Author not active")).toBeInTheDocument();
+        expect(
+          screen.getByText("studio.errors.author_not_active"),
+        ).toBeInTheDocument();
         expect(sessionStorage.getItem(PENDING_AUTH0_TOKEN_KEY)).toBeNull();
       });
     });
@@ -954,16 +997,21 @@ describe("Login Component", () => {
       renderWithProviders(<Login />);
 
       await waitFor(() => {
-        expect(screen.getByText("Create profile")).toBeInTheDocument();
+        expect(
+          screen.getByText("studio.auth.login.create_profile"),
+        ).toBeInTheDocument();
       });
 
       vi.mocked(axiosInstance.post).mockResolvedValue(
         successResponse({ email: "ada@example.com" }),
       );
 
-      await user.type(screen.getByLabelText("First name"), "Ada");
-      await user.type(screen.getByLabelText("Last name"), "Lovelace");
-      await user.click(screen.getByText("Create profile"));
+      await user.type(screen.getByLabelText("sign_up.form.first_name"), "Ada");
+      await user.type(
+        screen.getByLabelText("sign_up.form.last_name"),
+        "Lovelace",
+      );
+      await user.click(screen.getByText("studio.auth.login.create_profile"));
 
       await waitFor(() => {
         expect(axiosInstance.post).toHaveBeenCalledWith(

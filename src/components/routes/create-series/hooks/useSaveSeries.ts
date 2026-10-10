@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { ROUTES } from "@/routes/paths";
 import type { SeriesFormData } from "@/schema/SeriesSchema";
 import {
@@ -33,6 +34,7 @@ export const useSaveSeries = ({
 }: UseSaveSeriesParams) => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { t } = useTranslate();
 
   return useMutation({
     mutationFn: async ({ data, featured }: SaveSeriesInput) => {
@@ -41,7 +43,7 @@ export const useSaveSeries = ({
         return postSeries(body);
       }
       if (!seriesId || !seriesData) {
-        throw new Error("Missing series data for update");
+        throw new Error(t("studio.series.save.missing_data"));
       }
       const body = buildSeriesUpdateBody(data, featured, {
         original: mapSeriesDetailToFormData(seriesData),
@@ -52,17 +54,19 @@ export const useSaveSeries = ({
     onSuccess: (result) => {
       void queryClient.invalidateQueries({ queryKey: ["dashboard-items"] });
       if (isNew) {
-        toast.success("Series created successfully!");
+        toast.success(t("studio.series.save.created"));
         navigate(ROUTES.series(result.id));
         return;
       }
-      toast.success("Saved");
+      toast.success(t("studio.series.save.saved"));
       queryClient.setQueryData(["series", seriesId], result);
       onUpdated(result);
     },
     onError: (error: Error) => {
       toast.error(
-        isNew ? "Failed to create series" : "Failed to update series",
+        isNew
+          ? t("studio.series.save.create_failed")
+          : t("studio.series.save.update_failed"),
         {
           description: error.message,
         },

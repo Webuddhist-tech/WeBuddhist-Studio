@@ -21,7 +21,10 @@ export const seriesSchema = z
   .object({
     languages: z.record(z.string(), languageBlockSchema),
     plans: z.record(z.string(), z.array(planItemSchema)),
-    image_url: z.string().trim().min(1, "Cover image is required"),
+    image_url: z
+      .string()
+      .trim()
+      .min(1, "studio.validation.cover_image_required"),
   })
   .superRefine((data, ctx) => {
     const present = Object.keys(data.languages).filter(
@@ -30,7 +33,7 @@ export const seriesSchema = z
     if (present.length < 1) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Add at least one language",
+        message: "studio.validation.add_at_least_one_language",
         path: ["languages"],
       });
     }

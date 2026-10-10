@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslate } from "@tolgee/react";
 import { Link } from "react-router-dom";
 import {
   IoChevronBack,
@@ -25,6 +26,7 @@ type AuthButtonProps = {
 
 const AuthButton = ({ variant = "header" }: AuthButtonProps) => {
   const compact = variant === "compact";
+  const { t } = useTranslate();
   const { isLoggedIn } = useAuth();
   const { data: userInfo } = useUserInfo();
   const [open, setOpen] = useState(false);
@@ -47,7 +49,7 @@ const AuthButton = ({ variant = "header" }: AuthButtonProps) => {
           className={`flex items-center font-dynamic gap-2 rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring ${
             compact ? "" : "max-md:hidden"
           }`}
-          aria-label="Account menu"
+          aria-label={t("studio.nav.account_menu")}
         >
           <div className="relative">
             <img
@@ -56,7 +58,7 @@ const AuthButton = ({ variant = "header" }: AuthButtonProps) => {
                 userInfo?.image_url ||
                 NO_PROFILE_IMAGE
               }
-              alt="user"
+              alt={t("studio.nav.user_avatar_alt")}
               className={
                 compact
                   ? "block h-8 w-8 rounded-full object-cover"
@@ -98,7 +100,7 @@ const AuthButton = ({ variant = "header" }: AuthButtonProps) => {
             <Pecha.DropdownMenuItem asChild>
               <Link to={ROUTES.profile} className="cursor-pointer">
                 <IoPersonOutline className="size-4" />
-                Profile
+                {t("studio.nav.profile")}
               </Link>
             </Pecha.DropdownMenuItem>
             <Pecha.DropdownMenuItem
@@ -109,7 +111,7 @@ const AuthButton = ({ variant = "header" }: AuthButtonProps) => {
               }}
             >
               <IoNotificationsOutline className="size-4" />
-              Notifications
+              {t("studio.notifications.title")}
               {unreadCount > 0 ? (
                 <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[#A51C21] px-1.5 text-[10px] font-medium text-white">
                   {unreadCount > 9 ? "9+" : unreadCount}
@@ -125,7 +127,7 @@ const AuthButton = ({ variant = "header" }: AuthButtonProps) => {
               onClick={() => setView("options")}
             >
               <IoChevronBack className="size-4" />
-              Notifications
+              {t("studio.notifications.title")}
             </button>
             <NotificationsPanel
               showHeader={false}

@@ -7,6 +7,7 @@ import {
 } from "@/components/api/searchApi";
 import { createOrUpdatePreset } from "@/components/routes/task/api/presetApi";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 
 interface VersionSelectorModalProps {
   isOpen: boolean;
@@ -23,6 +24,7 @@ export const VersionSelectorModal = ({
   subtaskId,
   onSuccess,
 }: VersionSelectorModalProps) => {
+  const { t } = useTranslate();
   const queryClient = useQueryClient();
   const [selectedLanguage, setSelectedLanguage] = useState<string>("");
   const [selectedVersion, setSelectedVersion] = useState<string>("");
@@ -42,12 +44,12 @@ export const VersionSelectorModal = ({
 
   const handleSave = async () => {
     if (!selectedVersion || !selectedLanguage) {
-      toast.error("Please select both language and version");
+      toast.error(t("studio.molecules.version_selector.select_both"));
       return;
     }
 
     if (!subtaskId || subtaskId.trim() === "") {
-      toast.error("Cannot save preset without subtask ID");
+      toast.error(t("studio.molecules.version_selector.missing_subtask"));
       return;
     }
 
@@ -61,13 +63,16 @@ export const VersionSelectorModal = ({
       // Invalidate preset query to refresh the display
       queryClient.invalidateQueries({ queryKey: ["preset", subtaskId] });
 
-      toast.success("Version preset saved successfully!");
+      toast.success(t("studio.molecules.version_selector.saved"));
       onOpenChange(false);
       if (onSuccess) {
         onSuccess();
       }
     } catch (error: any) {
-      toast.error(error?.response?.data?.detail || "Failed to save preset");
+      toast.error(
+        error?.response?.data?.detail ||
+          t("studio.molecules.version_selector.save_failed"),
+      );
     } finally {
       setIsSaving(false);
     }
@@ -86,21 +91,27 @@ export const VersionSelectorModal = ({
     <Pecha.Sheet open={isOpen} onOpenChange={handleClose}>
       <Pecha.SheetContent className="sm:max-w-md p-6">
         <Pecha.SheetHeader className="mb-6">
-          <Pecha.SheetTitle>Select Text Version</Pecha.SheetTitle>
+          <Pecha.SheetTitle>
+            {t("studio.molecules.version_selector.title")}
+          </Pecha.SheetTitle>
           <Pecha.SheetDescription>
-            Choose a language and version for this text reference
+            {t("studio.molecules.version_selector.description")}
           </Pecha.SheetDescription>
         </Pecha.SheetHeader>
 
         <div className="space-y-6">
           {/* Language Selection */}
           <div className="space-y-4">
-            <label className="text-sm font-medium block">Language</label>
+            <label className="text-sm font-medium block">
+              {t("studio.common.language")}
+            </label>
             {isLoadingLanguages ? (
-              <div className="text-sm text-gray-500">Loading languages...</div>
+              <div className="text-sm text-gray-500">
+                {t("studio.molecules.version_selector.loading_languages")}
+              </div>
             ) : availableLanguages.length === 0 ? (
               <div className="text-sm text-gray-500">
-                No versions available for this text
+                {t("studio.molecules.version_selector.no_versions")}
               </div>
             ) : (
               <Pecha.Select
@@ -111,7 +122,11 @@ export const VersionSelectorModal = ({
                 }}
               >
                 <Pecha.SelectTrigger>
-                  <Pecha.SelectValue placeholder="Select a language" />
+                  <Pecha.SelectValue
+                    placeholder={t(
+                      "studio.molecules.version_selector.language_placeholder",
+                    )}
+                  />
                 </Pecha.SelectTrigger>
                 <Pecha.SelectContent>
                   {availableLanguages.map((lang: any) => (
@@ -119,8 +134,16 @@ export const VersionSelectorModal = ({
                       key={lang.language_code}
                       value={lang.language_code}
                     >
-                      {lang.language} ({lang.version_count} version
-                      {lang.version_count !== 1 ? "s" : ""})
+                      {lang.language} (
+                      {lang.version_count === 1
+                        ? t("studio.molecules.version_selector.versions_one")
+                        : t(
+                            "studio.molecules.version_selector.versions_other",
+                            {
+                              count: lang.version_count,
+                            },
+                          )}
+                      )
                     </Pecha.SelectItem>
                   ))}
                 </Pecha.SelectContent>
@@ -131,16 +154,24 @@ export const VersionSelectorModal = ({
           {/* Version Selection */}
           {selectedLanguage && (
             <div className="space-y-4">
-              <label className="text-sm font-medium block">Version</label>
+              <label className="text-sm font-medium block">
+                {t("studio.molecules.version_selector.version_label")}
+              </label>
               {isLoadingVersions ? (
-                <div className="text-sm text-gray-500">Loading versions...</div>
+                <div className="text-sm text-gray-500">
+                  {t("studio.molecules.version_selector.loading_versions")}
+                </div>
               ) : (
                 <Pecha.Select
                   value={selectedVersion}
                   onValueChange={setSelectedVersion}
                 >
                   <Pecha.SelectTrigger>
-                    <Pecha.SelectValue placeholder="Select a version" />
+                    <Pecha.SelectValue
+                      placeholder={t(
+                        "studio.molecules.version_selector.version_placeholder",
+                      )}
+                    />
                   </Pecha.SelectTrigger>
                   <Pecha.SelectContent>
                     {availableVersions.map((version: any) => (
@@ -163,7 +194,7 @@ export const VersionSelectorModal = ({
             disabled={isSaving}
             className="flex-1"
           >
-            Cancel
+            {t("studio.common.cancel")}
           </Pecha.Button>
           <Pecha.Button
             type="button"
@@ -171,7 +202,7 @@ export const VersionSelectorModal = ({
             disabled={!selectedVersion || isSaving}
             className="flex-1"
           >
-            {isSaving ? "Saving..." : "Save"}
+            {isSaving ? t("studio.common.saving") : t("studio.common.save")}
           </Pecha.Button>
         </div>
       </Pecha.SheetContent>

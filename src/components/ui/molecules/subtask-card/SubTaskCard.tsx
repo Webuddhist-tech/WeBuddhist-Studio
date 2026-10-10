@@ -8,6 +8,7 @@ import { FiLoader } from "react-icons/fi";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import InlineImageUpload from "@/components/ui/molecules/form-upload/InlineImageUpload";
 import {
   VideoContent,
@@ -17,7 +18,8 @@ import {
   LinkedContent,
 } from "../content-sub/ContentComponents";
 import {
-  LINKED_CONTENT_LABELS,
+  LINKED_CONTENT_I18N,
+  isLinkedContentType,
   type LinkedContentType,
   type SubTaskReference,
 } from "../linked-content/linkedContent";
@@ -110,6 +112,17 @@ interface SubTaskCardProps {
   taskId?: string;
 }
 
+const CONTENT_TYPE_LABEL_KEYS: Record<
+  Exclude<SubTask["content_type"], LinkedContentType>,
+  string
+> = {
+  TEXT: "studio.content.type.text",
+  IMAGE: "studio.common.image",
+  AUDIO: "studio.common.audio",
+  VIDEO: "studio.common.video",
+  SOURCE_REFERENCE: "studio.content.type.source",
+};
+
 const VideoSubtask = ({
   subTask,
   index,
@@ -119,6 +132,7 @@ const VideoSubtask = ({
   index: number;
   onUpdate: (index: number, updates: Partial<SubTask>) => void;
 }) => {
+  const { t } = useTranslate();
   const handleUrlChange = async (url: string) => {
     onUpdate(index, { content: url, duration: "" });
 
@@ -138,7 +152,7 @@ const VideoSubtask = ({
     <>
       <Pecha.Input
         type="url"
-        placeholder="Enter YouTube URL"
+        placeholder={t("studio.subtask.youtube_url_placeholder")}
         className="h-12 text-base bg-[#FAFAFA] dark:bg-sidebar-secondary "
         value={subTask.content}
         onChange={(e) => handleUrlChange(e.target.value)}
@@ -157,15 +171,18 @@ const TextSubtask = ({
   subTask: TextSubTask;
   index: number;
   onUpdate: (index: number, updates: Partial<SubTask>) => void;
-}) => (
-  <MarkdownEditor
-    value={subTask.content}
-    onChange={(value) => onUpdate(index, { content: value })}
-    placeholder="Enter your text content"
-    className="bg-[#FAFAFA] dark:bg-sidebar-secondary"
-    textareaClassName="min-h-64 bg-[#FAFAFA] dark:bg-sidebar-secondary"
-  />
-);
+}) => {
+  const { t } = useTranslate();
+  return (
+    <MarkdownEditor
+      value={subTask.content}
+      onChange={(value) => onUpdate(index, { content: value })}
+      placeholder={t("studio.subtask.text_placeholder")}
+      className="bg-[#FAFAFA] dark:bg-sidebar-secondary"
+      textareaClassName="min-h-64 bg-[#FAFAFA] dark:bg-sidebar-secondary"
+    />
+  );
+};
 
 const AudioSubtask = ({
   subTask,
@@ -175,18 +192,21 @@ const AudioSubtask = ({
   subTask: AudioSubTask;
   index: number;
   onUpdate: (index: number, updates: Partial<SubTask>) => void;
-}) => (
-  <>
-    <Pecha.Input
-      type="url"
-      placeholder="Enter Spotify or SoundCloud URL"
-      className="h-12 text-base bg-[#FAFAFA] dark:bg-sidebar-secondary "
-      value={subTask.content}
-      onChange={(e) => onUpdate(index, { content: e.target.value })}
-    />
-    {subTask.content && <AudioContent content={subTask.content} />}
-  </>
-);
+}) => {
+  const { t } = useTranslate();
+  return (
+    <>
+      <Pecha.Input
+        type="url"
+        placeholder={t("studio.subtask.audio_url_placeholder")}
+        className="h-12 text-base bg-[#FAFAFA] dark:bg-sidebar-secondary "
+        value={subTask.content}
+        onChange={(e) => onUpdate(index, { content: e.target.value })}
+      />
+      {subTask.content && <AudioContent content={subTask.content} />}
+    </>
+  );
+};
 
 const ImageSubtask = ({
   subTask,
@@ -198,33 +218,37 @@ const ImageSubtask = ({
   index: number;
   onImageUpload: (index: number, file: File) => void;
   onRemoveImage: (index: number) => void;
-}) => (
-  <>
-    {!subTask.imagePreview && (
-      <InlineImageUpload onUpload={(file) => onImageUpload(index, file)} />
-    )}
-    {subTask.imagePreview && (
-      <div className="mt-4 flex w-full justify-center bg-[#FAFAFA] dark:bg-sidebar-secondary ">
-        <div className="relative">
-          <img
-            src={subTask.imagePreview}
-            alt="Final uploaded image"
-            className="w-full h-48 object-cover rounded-lg border"
-          />
-          <Pecha.Button
-            variant="default"
-            className="absolute top-2 right-2"
-            type="button"
-            onClick={() => onRemoveImage(index)}
-            data-testid="remove-image-button"
-          >
-            <FaMinus className="w-4 h-4" />
-          </Pecha.Button>
+}) => {
+  const { t } = useTranslate();
+  return (
+    <>
+      {!subTask.imagePreview && (
+        <InlineImageUpload onUpload={(file) => onImageUpload(index, file)} />
+      )}
+      {subTask.imagePreview && (
+        <div className="mt-4 flex w-full justify-center bg-[#FAFAFA] dark:bg-sidebar-secondary ">
+          <div className="relative">
+            <img
+              src={subTask.imagePreview}
+              alt={t("studio.subtask.uploaded_image_alt")}
+              className="w-full h-48 object-cover rounded-lg border"
+            />
+            <Pecha.Button
+              variant="default"
+              className="absolute top-2 right-2"
+              type="button"
+              onClick={() => onRemoveImage(index)}
+              data-testid="remove-image-button"
+              aria-label={t("studio.subtask.remove_image")}
+            >
+              <FaMinus className="w-4 h-4" />
+            </Pecha.Button>
+          </div>
         </div>
-      </div>
-    )}
-  </>
-);
+      )}
+    </>
+  );
+};
 
 const SourceSubtask = ({ subTask }: { subTask: SourceSubTask }) => {
   const { data: preset } = useQuery({
@@ -276,6 +300,7 @@ const SubtaskAudioControls = ({
   planLanguage?: string;
   audioUrl?: string | null;
 }) => {
+  const { t } = useTranslate();
   const queryClient = useQueryClient();
   const { planId } = useParams<{ planId: string }>();
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -323,19 +348,20 @@ const SubtaskAudioControls = ({
         { sub_task_id: subTaskId },
         { language: planLanguage, ...options },
       );
-      toast.success("Audio generation started", {
-        description: "Your audio will be ready soon.",
+      toast.success(t("studio.subtask.audio.generation_started"), {
+        description: t("studio.subtask.audio.ready_soon"),
       });
       return waitForAudioJob(accepted.job_id, { signal: controller.signal });
     },
     onSuccess: async (job) => {
       if (job.status === "failed") {
-        toast.error("Failed to generate audio", {
-          description: job.error_message || "Something went wrong",
+        toast.error(t("studio.subtask.audio.generate_failed"), {
+          description:
+            job.error_message || t("studio.common.something_went_wrong"),
         });
         return;
       }
-      toast.success("Audio generated successfully!");
+      toast.success(t("studio.subtask.audio.generated"));
       // Refresh from content tables (sub_tasks.audio_url), not job log result
       await revalidateSubtask();
     },
@@ -343,7 +369,7 @@ const SubtaskAudioControls = ({
       if (error.name === "AbortError") {
         return;
       }
-      toast.error("Failed to generate audio", {
+      toast.error(t("studio.subtask.audio.generate_failed"), {
         description: error.message,
       });
     },
@@ -356,11 +382,11 @@ const SubtaskAudioControls = ({
     },
     onSuccess: async (data) => {
       setPendingFile(null);
-      toast.success("Subtask audio uploaded");
+      toast.success(t("studio.subtask.audio.uploaded"));
       await revalidateSubtask(data.audio_url);
     },
     onError: (error: Error) => {
-      toast.error("Failed to upload subtask audio", {
+      toast.error(t("studio.subtask.audio.upload_failed"), {
         description: error.message,
       });
     },
@@ -370,11 +396,11 @@ const SubtaskAudioControls = ({
     mutationFn: () => deleteSubTaskAudio(subTaskId),
     onSuccess: async () => {
       setPendingFile(null);
-      toast.success("Subtask audio removed");
+      toast.success(t("studio.subtask.audio.removed"));
       await revalidateSubtask(null);
     },
     onError: (error: Error) => {
-      toast.error("Failed to remove subtask audio", {
+      toast.error(t("studio.subtask.audio.remove_failed"), {
         description: error.message,
       });
     },
@@ -387,7 +413,7 @@ const SubtaskAudioControls = ({
 
   return (
     <div className="space-y-3 pt-2 border-t border-dashed border-gray-200 dark:border-input">
-      <p className="text-sm font-medium">Subtask audio</p>
+      <p className="text-sm font-medium">{t("studio.subtask.audio.heading")}</p>
 
       {localAudioUrl && (
         <div className="flex items-center gap-2 min-w-0">
@@ -403,7 +429,7 @@ const SubtaskAudioControls = ({
             size="icon"
             className="shrink-0 h-9 w-9"
             disabled={isBusy}
-            title="Remove audio"
+            title={t("studio.subtask.audio.remove")}
             onClick={() => deleteMutation.mutate()}
           >
             {deleteMutation.isPending ? (
@@ -430,7 +456,7 @@ const SubtaskAudioControls = ({
         </div>
         <div className="relative flex justify-center text-xs uppercase">
           <span className="bg-[#ffffff] dark:bg-[#161616] px-2 text-muted-foreground">
-            or upload
+            {t("studio.subtask.audio.or_upload")}
           </span>
         </div>
       </div>
@@ -450,10 +476,12 @@ const SubtaskAudioControls = ({
           >
             <input {...getInputProps()} />
             {pendingFile
-              ? `Selected: ${pendingFile.name}`
+              ? t("studio.subtask.audio.selected_file", {
+                  name: pendingFile.name,
+                })
               : localAudioUrl
-                ? "Drop or click to replace subtask audio (MP3, etc.)"
-                : "Drop or click to upload subtask audio"}
+                ? t("studio.subtask.audio.drop_replace")
+                : t("studio.subtask.audio.drop_upload")}
           </div>
         )}
       </Dropzone>
@@ -470,7 +498,9 @@ const SubtaskAudioControls = ({
             {uploadMutation.isPending && (
               <FiLoader className="w-4 h-4 animate-spin mr-1" />
             )}
-            {uploadMutation.isPending ? "Uploading..." : "Upload audio"}
+            {uploadMutation.isPending
+              ? t("studio.common.uploading")
+              : t("studio.subtask.audio.upload")}
           </Pecha.Button>
           <Pecha.Button
             type="button"
@@ -478,7 +508,7 @@ const SubtaskAudioControls = ({
             disabled={isBusy}
             onClick={() => setPendingFile(null)}
           >
-            Cancel
+            {t("studio.common.cancel")}
           </Pecha.Button>
         </div>
       )}
@@ -501,6 +531,7 @@ const SubtaskTimestampSection = ({
   dayAudioDurationMs?: number | null;
   taskId?: string;
 }) => {
+  const { t } = useTranslate();
   const queryClient = useQueryClient();
   const { planId } = useParams<{ planId: string }>();
   const hasPersistedTimestamps =
@@ -511,7 +542,7 @@ const SubtaskTimestampSection = ({
   const deleteMutation = useMutation({
     mutationFn: () => deleteSubTaskTimestamp(subTask.id as string),
     onSuccess: async () => {
-      toast.success("Timestamps removed");
+      toast.success(t("studio.subtask.timestamps.removed"));
       onUpdate(index, { start_ms: null, end_ms: null });
       if (taskId) {
         queryClient.invalidateQueries({ queryKey: ["taskDetails", taskId] });
@@ -521,7 +552,7 @@ const SubtaskTimestampSection = ({
       }
     },
     onError: (error: Error) => {
-      toast.error("Failed to remove timestamps", {
+      toast.error(t("studio.subtask.timestamps.remove_failed"), {
         description: error.message,
       });
     },
@@ -537,7 +568,9 @@ const SubtaskTimestampSection = ({
 
   return (
     <div className="space-y-2 pt-2 border-t border-dashed border-gray-200 dark:border-input">
-      <p className="text-sm font-medium">Timeline (day audio)</p>
+      <p className="text-sm font-medium">
+        {t("studio.subtask.timestamps.heading")}
+      </p>
       {hasDayAudio ? (
         <AudioTrimmer
           audioUrl={dayAudioUrl}
@@ -555,7 +588,7 @@ const SubtaskTimestampSection = ({
             {formatMs(subTask.end_ms as number)}
           </p>
           <p className="text-xs text-muted-foreground">
-            Day audio is not available. You can remove these timestamps.
+            {t("studio.subtask.timestamps.no_day_audio")}
           </p>
           <Pecha.Button
             type="button"
@@ -567,7 +600,7 @@ const SubtaskTimestampSection = ({
             {deleteMutation.isPending ? (
               <FiLoader className="w-3 h-3 mr-1 animate-spin" />
             ) : null}
-            Clear timestamps
+            {t("studio.subtask.timestamps.clear")}
           </Pecha.Button>
         </div>
       )}
@@ -587,6 +620,7 @@ export const SubTaskCard = ({
   planLanguage,
   taskId,
 }: SubTaskCardProps) => {
+  const { t } = useTranslate();
   const hasDayAudio =
     !!dayAudioUrl && dayAudioDurationMs != null && dayAudioDurationMs > 0;
   const hasTimestamps = subTask.start_ms != null && subTask.end_ms != null;
@@ -639,13 +673,15 @@ export const SubTaskCard = ({
       <div className="flex items-center justify-between">
         <div className="flex items-center bg-[#F7F7F7] border dark:bg-sidebar-secondary  px-2 py-1 text-sm rounded-md border-dashed gap-2">
           <ContentIcon type={subTask.content_type} />
-          {LINKED_CONTENT_LABELS[subTask.content_type as LinkedContentType] ??
-            subTask.content_type}
+          {isLinkedContentType(subTask.content_type)
+            ? t(LINKED_CONTENT_I18N[subTask.content_type].label)
+            : t(CONTENT_TYPE_LABEL_KEYS[subTask.content_type])}
         </div>
         <Pecha.Button
           variant="outline"
           type="button"
           onClick={() => onRemove(index)}
+          aria-label={t("studio.subtask.remove")}
         >
           <IoMdClose className="w-4 h-4" />
         </Pecha.Button>

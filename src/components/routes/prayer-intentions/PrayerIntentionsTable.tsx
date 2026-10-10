@@ -1,3 +1,4 @@
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { IoMdCreate } from "react-icons/io";
 import type { PrayerIntention } from "./api/prayerIntentionsApi";
@@ -15,10 +16,11 @@ const PrayerIntentionsTable = ({
   showActionsColumn = true,
   onEdit,
 }: PrayerIntentionsTableProps) => {
+  const { t } = useTranslate();
   if (isLoading) {
     return (
       <p className="text-sm text-muted-foreground py-8 text-center">
-        Loading prayer intentions…
+        {t("studio.prayer_intentions.loading")}
       </p>
     );
   }
@@ -26,7 +28,7 @@ const PrayerIntentionsTable = ({
   if (intentions.length === 0) {
     return (
       <p className="text-sm text-muted-foreground py-8 text-center">
-        No prayer intentions yet.
+        {t("studio.prayer_intentions.empty")}
       </p>
     );
   }
@@ -36,14 +38,24 @@ const PrayerIntentionsTable = ({
       <Pecha.Table>
         <Pecha.TableHeader>
           <Pecha.TableRow>
-            <Pecha.TableHead>Order</Pecha.TableHead>
-            <Pecha.TableHead>Slug</Pecha.TableHead>
-            <Pecha.TableHead>Label</Pecha.TableHead>
-            <Pecha.TableHead>Color</Pecha.TableHead>
-            <Pecha.TableHead>Events</Pecha.TableHead>
+            <Pecha.TableHead>
+              {t("studio.prayer_intentions.table.order")}
+            </Pecha.TableHead>
+            <Pecha.TableHead>
+              {t("studio.prayer_intentions.table.slug")}
+            </Pecha.TableHead>
+            <Pecha.TableHead>
+              {t("studio.prayer_intentions.table.label")}
+            </Pecha.TableHead>
+            <Pecha.TableHead>
+              {t("studio.prayer_intentions.table.color")}
+            </Pecha.TableHead>
+            <Pecha.TableHead>
+              {t("studio.prayer_intentions.table.events")}
+            </Pecha.TableHead>
             {showActionsColumn ? (
               <Pecha.TableHead className="w-24 text-right">
-                Actions
+                {t("studio.common.actions")}
               </Pecha.TableHead>
             ) : null}
           </Pecha.TableRow>
@@ -77,7 +89,12 @@ const PrayerIntentionsTable = ({
                       variant="ghost"
                       size="icon"
                       onClick={() => onEdit(intention)}
-                      aria-label={`Edit ${intention.label}`}
+                      aria-label={t(
+                        "studio.prayer_intentions.table.edit_aria",
+                        {
+                          label: intention.label,
+                        },
+                      )}
                     >
                       <IoMdCreate className="h-4 w-4" />
                     </Pecha.Button>

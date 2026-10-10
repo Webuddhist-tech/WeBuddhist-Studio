@@ -94,20 +94,20 @@ describe("Profile Component", () => {
   it("renders profile with user info when data is loaded", async () => {
     renderWithProviders(<Profile />);
     await waitFor(() => {
-      expect(screen.getByText("Profile")).toBeInTheDocument();
+      expect(screen.getByText("studio.profile.title")).toBeInTheDocument();
     });
     expect(screen.getByTestId("user-card")).toBeInTheDocument();
     expect(screen.getByText("Tenzin la")).toBeInTheDocument();
     expect(screen.getByText("test@example.com")).toBeInTheDocument();
-    expect(screen.getByText("Edit")).toBeInTheDocument();
-    expect(screen.getByText("Link phone number")).toBeInTheDocument();
+    expect(screen.getByText("studio.common.edit")).toBeInTheDocument();
+    expect(screen.getByText("studio.profile.link_phone")).toBeInTheDocument();
   });
 
   it("starts Auth0 SMS Universal Login for phone linking", async () => {
     const user = userEvent.setup();
     renderWithProviders(<Profile />);
 
-    await user.click(screen.getByText("Link phone number"));
+    await user.click(screen.getByText("studio.profile.link_phone"));
 
     expect(mockLoginWithRedirect).toHaveBeenCalledWith(
       expect.objectContaining({

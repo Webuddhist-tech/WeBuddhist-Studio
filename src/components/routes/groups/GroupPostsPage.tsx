@@ -3,6 +3,7 @@ import { useNavigate, useOutletContext } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IoMdAdd } from "react-icons/io";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Pagination } from "@/components/ui/molecules/pagination/Pagination";
 import { getApiErrorMessage } from "@/lib/apiErrors";
@@ -21,6 +22,7 @@ import { pickGroupTitle, resolveGroupAvatarUrl } from "./api/groupsApi";
 const PAGE_SIZE = 10;
 
 const GroupPostsPage = () => {
+  const { t } = useTranslate();
   const { group, groupId, myRole, userInfo, readOnlyPlatform } =
     useOutletContext<GroupOutletContext>();
   const navigate = useNavigate();
@@ -48,7 +50,7 @@ const GroupPostsPage = () => {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteGroupPost(groupId, id),
     onSuccess: () => {
-      toast.success("Post deleted");
+      toast.success(t("studio.groups.pages.posts.deleted"));
       setPendingDelete(null);
       queryClient.invalidateQueries({ queryKey: ["cms-group-posts", groupId] });
     },
@@ -79,7 +81,10 @@ const GroupPostsPage = () => {
     if (isError) {
       return (
         <div className="rounded-xl border p-6 text-center text-destructive">
-          {getApiErrorMessage(error, "Could not load posts.")}
+          {getApiErrorMessage(
+            error,
+            t("studio.groups.pages.posts.load_failed"),
+          )}
         </div>
       );
     }
@@ -87,11 +92,11 @@ const GroupPostsPage = () => {
     if (posts.length === 0) {
       return (
         <div className="rounded-xl border border-dashed px-6 py-16 text-center">
-          <p className="font-medium">No posts yet</p>
+          <p className="font-medium">{t("studio.groups.pages.posts.empty")}</p>
           <p className="mt-1 text-sm text-muted-foreground">
             {canWrite
-              ? "Create the first post for this group."
-              : "Posts from this group will appear here."}
+              ? t("studio.groups.pages.posts.empty_hint_writer")
+              : t("studio.groups.pages.posts.empty_hint_reader")}
           </p>
         </div>
       );
@@ -122,9 +127,11 @@ const GroupPostsPage = () => {
     <div className="mx-auto max-w-2xl space-y-5">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold">Posts</h2>
+          <h2 className="text-xl font-bold">
+            {t("studio.groups.pages.posts.title")}
+          </h2>
           <p className="text-sm text-muted-foreground">
-            Share updates and join the conversation.
+            {t("studio.groups.pages.posts.subtitle")}
           </p>
         </div>
         {canWrite ? (
@@ -132,7 +139,8 @@ const GroupPostsPage = () => {
             className="gap-1 bg-[#A51C21] text-white hover:bg-[#A51C21]/90"
             onClick={() => navigate(ROUTES.groupPostNew(groupId))}
           >
-            <IoMdAdd className="h-4 w-4" /> New post
+            <IoMdAdd className="h-4 w-4" />{" "}
+            {t("studio.groups.pages.posts.new_post")}
           </Pecha.Button>
         ) : null}
       </div>
@@ -157,16 +165,18 @@ const GroupPostsPage = () => {
       >
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
-            <Pecha.AlertDialogTitle>Delete post?</Pecha.AlertDialogTitle>
+            <Pecha.AlertDialogTitle>
+              {t("studio.groups.pages.posts.delete_title")}
+            </Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
-              This will remove &ldquo;
-              {pendingDelete ? postCaptionPreview(pendingDelete) : ""}
-              &rdquo;. This action cannot be undone.
+              {t("studio.groups.pages.posts.delete_description", {
+                caption: pendingDelete ? postCaptionPreview(pendingDelete) : "",
+              })}
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <Pecha.AlertDialogFooter>
             <Pecha.AlertDialogCancel disabled={deleteMutation.isPending}>
-              Cancel
+              {t("studio.common.cancel")}
             </Pecha.AlertDialogCancel>
             <Pecha.AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
@@ -176,7 +186,9 @@ const GroupPostsPage = () => {
                 if (pendingDelete) deleteMutation.mutate(pendingDelete.id);
               }}
             >
-              {deleteMutation.isPending ? "Deleting…" : "Delete"}
+              {deleteMutation.isPending
+                ? t("studio.common.deleting")
+                : t("studio.common.delete")}
             </Pecha.AlertDialogAction>
           </Pecha.AlertDialogFooter>
         </Pecha.AlertDialogContent>

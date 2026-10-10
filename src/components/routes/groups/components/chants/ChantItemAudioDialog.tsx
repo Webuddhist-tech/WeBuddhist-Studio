@@ -18,6 +18,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { IoMdClose, IoMdCloudUpload, IoMdSearch } from "react-icons/io";
 import { PiDotsSixVertical } from "react-icons/pi";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Pagination } from "@/components/ui/molecules/pagination/Pagination";
 import { getApiErrorMessage } from "@/lib/apiErrors";
@@ -29,7 +30,7 @@ import {
 } from "../../api/chantsApi";
 import {
   AUDIO_ACCEPT,
-  FORMAT_HINT,
+  FORMAT_HINT_KEY,
   MAX_AUDIO_PER_ITEM,
   TOOLTIP_CLASS,
   formatDuration,
@@ -52,6 +53,7 @@ function SortableSelectedRow({
   readonly index: number;
   readonly onRemove: (assetId: string) => void;
 }) {
+  const { t } = useTranslate();
   const {
     attributes,
     listeners,
@@ -77,7 +79,9 @@ function SortableSelectedRow({
       <button
         type="button"
         className="shrink-0 cursor-grab rounded p-0.5 text-muted-foreground hover:text-foreground touch-none"
-        aria-label={`Reorder ${asset.title}`}
+        aria-label={t("studio.groups.chants.audio_dialog.reorder", {
+          title: asset.title,
+        })}
         {...listeners}
       >
         <PiDotsSixVertical className="h-4 w-4" />
@@ -93,7 +97,12 @@ function SortableSelectedRow({
         type="button"
         className="shrink-0 rounded p-1 text-muted-foreground hover:text-destructive"
         onClick={() => onRemove(asset.id)}
-        aria-label={`Remove ${asset.title} from selection`}
+        aria-label={t(
+          "studio.groups.chants.audio_dialog.remove_from_selection",
+          {
+            title: asset.title,
+          },
+        )}
       >
         <IoMdClose className="h-3.5 w-3.5" />
       </button>
@@ -121,6 +130,7 @@ const ChantItemAudioDialog = ({
   collectionId,
   item,
 }: ChantItemAudioDialogProps) => {
+  const { t } = useTranslate();
   const queryClient = useQueryClient();
 
   const [searchInput, setSearchInput] = useState("");
@@ -141,20 +151,31 @@ const ChantItemAudioDialog = ({
     setPage(1);
   }, [search]);
 
-  const handleUploaded = useCallback((asset: GroupAssetDTO) => {
-    setSelected((prev) => {
-      if (prev.some((a) => a.id === asset.id)) return prev;
-      if (prev.length >= MAX_AUDIO_PER_ITEM) {
-        toast.warning("Added to library, but not selected", {
-          description: `A chant can have at most ${MAX_AUDIO_PER_ITEM} recordings.`,
-        });
-        return prev;
-      }
-      return [...prev, asset];
-    });
-    setSearchInput("");
-    setPage(1);
-  }, []);
+  const handleUploaded = useCallback(
+    (asset: GroupAssetDTO) => {
+      setSelected((prev) => {
+        if (prev.some((a) => a.id === asset.id)) return prev;
+        if (prev.length >= MAX_AUDIO_PER_ITEM) {
+          toast.warning(
+            t("studio.groups.chants.audio_dialog.added_not_selected"),
+            {
+              description: t(
+                "studio.groups.chants.audio_dialog.max_recordings_description",
+                {
+                  max: MAX_AUDIO_PER_ITEM,
+                },
+              ),
+            },
+          );
+          return prev;
+        }
+        return [...prev, asset];
+      });
+      setSearchInput("");
+      setPage(1);
+    },
+    [t],
+  );
 
   const {
     assets,
@@ -192,11 +213,11 @@ const ChantItemAudioDialog = ({
         ["cms-chant-collection", groupId, collectionId],
         updated,
       );
-      toast.success("Audio updated");
+      toast.success(t("studio.groups.chants.audio_dialog.updated_toast"));
       onOpenChange(false);
     },
     onError: (err) =>
-      toast.error("Couldn't save audio", {
+      toast.error(t("studio.groups.chants.audio_dialog.save_failed_toast"), {
         description: getApiErrorMessage(err),
       }),
   });
@@ -207,7 +228,11 @@ const ChantItemAudioDialog = ({
         return prev.filter((a) => a.id !== asset.id);
       }
       if (prev.length >= MAX_AUDIO_PER_ITEM) {
-        toast.error(`At most ${MAX_AUDIO_PER_ITEM} recordings per chant.`);
+        toast.error(
+          t("studio.groups.chants.audio_dialog.max_recordings_error", {
+            max: MAX_AUDIO_PER_ITEM,
+          }),
+        );
         return prev;
       }
       return [...prev, asset];
@@ -243,7 +268,10 @@ const ChantItemAudioDialog = ({
     if (isError) {
       return (
         <p className="px-3 py-8 text-center text-sm text-destructive">
-          {getApiErrorMessage(error, "Couldn't load the library.")}
+          {getApiErrorMessage(
+            error,
+            t("studio.groups.chants.audio_dialog.load_error"),
+          )}
         </p>
       );
     }
@@ -251,11 +279,13 @@ const ChantItemAudioDialog = ({
       return (
         <div className="px-3 py-8 text-center">
           <p className="text-sm text-muted-foreground">
-            {search ? "No matches." : "No audio in this group yet."}
+            {search
+              ? t("studio.groups.chants.audio_dialog.no_matches")
+              : t("studio.groups.chants.audio_dialog.empty_library")}
           </p>
           {!search ? (
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Upload one to get started.
+              {t("studio.groups.chants.audio_dialog.empty_library_hint")}
             </p>
           ) : null}
         </div>
@@ -317,7 +347,7 @@ const ChantItemAudioDialog = ({
       <Pecha.DialogContent className="max-h-[85vh] grid-rows-[auto_1fr_auto] gap-0 overflow-hidden p-0 sm:!max-w-2xl">
         <Pecha.DialogHeader className="border-b px-5 py-3">
           <Pecha.DialogTitle className="truncate pr-6 text-base">
-            {"Audio"}
+            {t("studio.common.audio")}
             <span className="ml-2 font-normal text-muted-foreground">
               {item.title}
             </span>
@@ -335,9 +365,13 @@ const ChantItemAudioDialog = ({
                 <Pecha.Input
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder="Search group library…"
+                  placeholder={t(
+                    "studio.groups.chants.audio_dialog.search_placeholder",
+                  )}
                   className="h-9 pl-8"
-                  aria-label="Search group audio library"
+                  aria-label={t(
+                    "studio.groups.chants.audio_dialog.search_label",
+                  )}
                 />
               </div>
               <input
@@ -364,7 +398,9 @@ const ChantItemAudioDialog = ({
                       onClick={() => fileInputRef.current?.click()}
                     >
                       <IoMdCloudUpload className="mr-1.5 h-4 w-4" />
-                      {isUploading ? "Uploading…" : "Upload"}
+                      {isUploading
+                        ? t("studio.common.uploading")
+                        : t("studio.common.upload")}
                     </Pecha.Button>
                   </Pecha.TooltipTrigger>
                   <Pecha.TooltipContent
@@ -373,7 +409,7 @@ const ChantItemAudioDialog = ({
                     collisionPadding={12}
                     className={TOOLTIP_CLASS}
                   >
-                    {FORMAT_HINT}
+                    {t(FORMAT_HINT_KEY)}
                   </Pecha.TooltipContent>
                 </Pecha.Tooltip>
               </Pecha.TooltipProvider>
@@ -398,21 +434,23 @@ const ChantItemAudioDialog = ({
           <section className="space-y-2">
             <div className="flex items-baseline justify-between">
               <h3 className="text-sm font-medium">
-                {"Selected"}
+                {t("studio.groups.chants.audio_dialog.selected")}
                 <span className="ml-1.5 text-xs tabular-nums text-muted-foreground">
                   {selected.length}/{MAX_AUDIO_PER_ITEM}
                 </span>
               </h3>
               {selected.length > 1 ? (
                 <span className="text-xs text-muted-foreground">
-                  Drag to reorder
+                  {t(
+                    "studio.groups.components.accumulator_links.drag_to_reorder",
+                  )}
                 </span>
               ) : null}
             </div>
 
             {selected.length === 0 ? (
               <p className="rounded-md border border-dashed px-3 py-5 text-center text-sm text-muted-foreground">
-                Pick from the library above
+                {t("studio.groups.chants.audio_dialog.pick_hint")}
               </p>
             ) : (
               <DndContext
@@ -447,7 +485,7 @@ const ChantItemAudioDialog = ({
 
         <div className="flex items-center justify-between gap-3 border-t px-5 py-3">
           <p className="text-xs text-muted-foreground">
-            Removing here unlinks only — files stay in the library.
+            {t("studio.groups.chants.audio_dialog.unlink_hint")}
           </p>
           <div className="flex shrink-0 gap-2">
             <Pecha.Button
@@ -457,7 +495,7 @@ const ChantItemAudioDialog = ({
               onClick={() => onOpenChange(false)}
               disabled={saveMutation.isPending}
             >
-              Cancel
+              {t("studio.common.cancel")}
             </Pecha.Button>
             <Pecha.Button
               type="button"
@@ -468,7 +506,9 @@ const ChantItemAudioDialog = ({
                 saveMutation.mutate(selected.map((asset) => asset.id))
               }
             >
-              {saveMutation.isPending ? "Saving…" : "Save"}
+              {saveMutation.isPending
+                ? t("studio.common.saving")
+                : t("studio.common.save")}
             </Pecha.Button>
           </div>
         </div>

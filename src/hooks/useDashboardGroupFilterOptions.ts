@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTolgee, useTranslate } from "@tolgee/react";
 import {
   fetchAccessibleGroupsForDashboard,
   pickGroupTitle,
@@ -20,14 +21,20 @@ export type DashboardGroupFilterOption = {
   label: string;
 };
 
+type Translate = ReturnType<typeof useTranslate>["t"];
+
 function toFilterOptions(
   groups: AuthorGroupListItem[],
   showMemberRole: boolean,
+  t: Translate,
 ): DashboardGroupFilterOption[] {
   return groups.map((group) => {
     const title = pickGroupTitle(group.metadata);
     const role = group.my_role;
-    const label = showMemberRole && role ? `${title} (${role})` : title;
+    const label =
+      showMemberRole && role
+        ? `${title} (${t(`studio.app.group_role.${role.toLowerCase()}`)})`
+        : title;
     return { id: group.id, title, label };
   });
 }
@@ -47,6 +54,8 @@ export function useDashboardGroupFilterOptions(
   /** Limit the filter options to one group type (roles still cover all groups). */
   groupType?: AuthorGroupType,
 ) {
+  const { t } = useTranslate();
+  const language = useTolgee(["language"]).getLanguage();
   const platformRole = userInfo?.platform_role;
   const isStaffWideList = usesStaffWideDashboardGroupList(platformRole);
   const canLoad = canUseDashboardGroupFilter(userInfo);
@@ -64,8 +73,10 @@ export function useDashboardGroupFilterOptions(
     const filtered = groupType
       ? groups.filter((group) => group.group_type === groupType)
       : groups;
-    return toFilterOptions(filtered, !isStaffWideList);
-  }, [query.data, isStaffWideList, groupType]);
+    return toFilterOptions(filtered, !isStaffWideList, t);
+    // Role labels follow the UI language; `t` itself is not a stable reference.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query.data, isStaffWideList, groupType, language]);
 
   const rolesByGroupId = useMemo(
     () => rolesMapFromGroups(query.data ?? []),

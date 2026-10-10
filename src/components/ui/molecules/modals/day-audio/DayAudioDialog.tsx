@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { AiOutlineSound } from "react-icons/ai";
 import DayAudioSection from "@/components/ui/molecules/day-audio-section/DayAudioSection";
@@ -33,6 +34,7 @@ const DayAudioDialog = ({
   isEditable,
   language,
 }: DayAudioDialogProps) => {
+  const { t } = useTranslate();
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
   const pollAbortRef = useRef<AbortController | null>(null);
@@ -61,27 +63,30 @@ const DayAudioDialog = ({
         { day_id: dayId },
         { language: language || "", ...options },
       );
-      toast.success("Audio generation started", {
-        description: "Your audio will be ready soon.",
+      toast.success(t("studio.modals.day_audio.generation_started"), {
+        description: t(
+          "studio.modals.day_audio.generation_started_description",
+        ),
       });
       return waitForAudioJob(accepted.job_id, { signal: controller.signal });
     },
     onSuccess: (job) => {
       if (job.status === "failed") {
-        toast.error("Failed to generate audio", {
-          description: job.error_message || "Something went wrong",
+        toast.error(t("studio.modals.day_audio.generate_failed"), {
+          description:
+            job.error_message || t("studio.common.something_went_wrong"),
         });
         return;
       }
-      toast.success("Audio generated successfully!");
+      toast.success(t("studio.modals.day_audio.generated"));
       queryClient.invalidateQueries({ queryKey: ["planDetails", planId] });
     },
     onError: (error: any) => {
       if (error?.name === "AbortError") {
         return;
       }
-      toast.error("Failed to generate audio", {
-        description: error?.message || "Something went wrong",
+      toast.error(t("studio.modals.day_audio.generate_failed"), {
+        description: error?.message || t("studio.common.something_went_wrong"),
       });
     },
   });
@@ -95,12 +100,15 @@ const DayAudioDialog = ({
         }}
         className="flex items-center gap-2 cursor-pointer w-full"
       >
-        <AiOutlineSound className="w-4 h-4" /> Narration
+        <AiOutlineSound className="w-4 h-4" />{" "}
+        {t("studio.modals.day_audio.narration")}
       </span>
       <Pecha.Dialog open={open} onOpenChange={handleOpenChange}>
         <Pecha.DialogContent className="sm:max-w-lg">
           <Pecha.DialogHeader>
-            <Pecha.DialogTitle>Day {dayNumber} Narration</Pecha.DialogTitle>
+            <Pecha.DialogTitle>
+              {t("studio.modals.day_audio.title", { day: dayNumber })}
+            </Pecha.DialogTitle>
           </Pecha.DialogHeader>
           <DayAudioSection
             planId={planId}

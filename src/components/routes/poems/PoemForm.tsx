@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Textarea } from "@/components/ui/atoms/textarea";
 import { Button } from "@/components/ui/atoms/button";
@@ -31,6 +32,7 @@ const PoemForm = ({
   onSuccess,
   onCancel,
 }: PoemFormProps) => {
+  const { t } = useTranslate();
   const { languageOptions } = useLanguages();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -68,7 +70,7 @@ const PoemForm = ({
   const createMutation = useMutation({
     mutationFn: createPoem,
     onSuccess: () => {
-      toast.success("Poem created successfully!");
+      toast.success(t("studio.poems.toast.created"));
       onSuccess();
     },
     onError: (err) => {
@@ -80,7 +82,7 @@ const PoemForm = ({
     mutationFn: ({ id, payload }: { id: string; payload: UpdatePoemPayload }) =>
       updatePoem(id, payload),
     onSuccess: () => {
-      toast.success("Poem updated successfully!");
+      toast.success(t("studio.poems.toast.updated"));
       onSuccess();
     },
     onError: (err) => {
@@ -95,14 +97,14 @@ const PoemForm = ({
       setImagePreview(image.original);
       setImageKey(key);
       setIsImageDialogOpen(false);
-      toast.success("Image uploaded successfully!");
+      toast.success(t("studio.poems.toast.image_uploaded"));
     } catch (error: any) {
       if (error?.response?.status === 413) {
-        toast.error("Failed to upload image", {
-          description: "File exceeds the maximum size of 1MB",
+        toast.error(t("studio.poems.toast.image_upload_failed"), {
+          description: t("studio.poems.toast.image_too_large"),
         });
       } else {
-        toast.error("Failed to upload image");
+        toast.error(t("studio.poems.toast.image_upload_failed"));
       }
     } finally {
       setIsImageUploading(false);
@@ -118,15 +120,15 @@ const PoemForm = ({
     e.preventDefault();
 
     if (!title.trim()) {
-      toast.error("Title is required");
+      toast.error(t("studio.poems.validation.title_required"));
       return;
     }
     if (!content.trim()) {
-      toast.error("Content is required");
+      toast.error(t("studio.poems.validation.content_required"));
       return;
     }
     if (!authorName.trim()) {
-      toast.error("Author name is required");
+      toast.error(t("studio.poems.validation.author_required"));
       return;
     }
 
@@ -172,46 +174,54 @@ const PoemForm = ({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4">
       <div className="space-y-2">
-        <label className="text-sm font-bold">Title</label>
+        <label className="text-sm font-bold">{t("studio.common.title")}</label>
         <Pecha.Input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Enter poem title"
+          placeholder={t("studio.poems.form.title_placeholder")}
         />
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-bold">Content</label>
+        <label className="text-sm font-bold">
+          {t("studio.poems.form.content_label")}
+        </label>
         <Textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder="Enter poem content"
+          placeholder={t("studio.poems.form.content_placeholder")}
           className="min-h-[160px] resize-none"
         />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <label className="text-sm font-bold">Author</label>
+          <label className="text-sm font-bold">
+            {t("studio.poems.table.author")}
+          </label>
           <Pecha.Input
             value={authorName}
             onChange={(e) => setAuthorName(e.target.value)}
-            placeholder="Author name"
+            placeholder={t("studio.poems.form.author_placeholder")}
           />
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-bold">Chapter (optional)</label>
+          <label className="text-sm font-bold">
+            {t("studio.poems.form.chapter_label")}
+          </label>
           <Pecha.Input
             value={chapterName}
             onChange={(e) => setChapterName(e.target.value)}
-            placeholder="Chapter name"
+            placeholder={t("studio.poems.form.chapter_placeholder")}
           />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <label className="text-sm font-bold">Language</label>
+          <label className="text-sm font-bold">
+            {t("studio.common.language")}
+          </label>
           <Pecha.Select value={language} onValueChange={setLanguage}>
             <Pecha.SelectTrigger className="w-full">
               <Pecha.SelectValue />
@@ -226,7 +236,9 @@ const PoemForm = ({
           </Pecha.Select>
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-bold">Status</label>
+          <label className="text-sm font-bold">
+            {t("studio.common.status")}
+          </label>
           <Pecha.Select
             value={poemStatus}
             onValueChange={(v) => setPoemStatus(v as PoemStatus)}
@@ -235,22 +247,28 @@ const PoemForm = ({
               <Pecha.SelectValue />
             </Pecha.SelectTrigger>
             <Pecha.SelectContent>
-              <Pecha.SelectItem value="DRAFT">Draft</Pecha.SelectItem>
-              <Pecha.SelectItem value="PUBLISHED">Published</Pecha.SelectItem>
+              <Pecha.SelectItem value="DRAFT">
+                {t("studio.common.draft")}
+              </Pecha.SelectItem>
+              <Pecha.SelectItem value="PUBLISHED">
+                {t("studio.common.published")}
+              </Pecha.SelectItem>
             </Pecha.SelectContent>
           </Pecha.Select>
         </div>
       </div>
 
       <div className="space-y-2">
-        <label className="text-sm font-bold">Image (optional)</label>
+        <label className="text-sm font-bold">
+          {t("studio.poems.form.image_label")}
+        </label>
         <div className="flex gap-4 items-start">
           {!imagePreview && (
             <button
               type="button"
               onClick={() => setIsImageDialogOpen(true)}
               className="border w-32 h-24 border-dashed border-gray-300 rounded-lg flex items-center justify-center hover:border-gray-400 transition-colors"
-              aria-label="Upload poem image"
+              aria-label={t("studio.poems.form.upload_image_aria")}
             >
               <IoMdAdd className="h-8 w-8 text-gray-400" />
             </button>
@@ -259,14 +277,14 @@ const PoemForm = ({
             <div className="relative">
               <img
                 src={imagePreview}
-                alt="Poem preview"
+                alt={t("studio.poems.form.image_preview_alt")}
                 className="w-32 h-24 object-cover rounded-lg border"
               />
               <button
                 type="button"
                 onClick={handleRemoveImage}
                 className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1"
-                aria-label="Remove image"
+                aria-label={t("studio.poems.form.remove_image_aria")}
               >
                 <IoMdClose className="h-4 w-4" />
               </button>
@@ -282,7 +300,7 @@ const PoemForm = ({
           onClick={onCancel}
           disabled={isPending}
         >
-          Cancel
+          {t("studio.common.cancel")}
         </Button>
         <Button
           type="submit"
@@ -291,11 +309,11 @@ const PoemForm = ({
         >
           {isPending
             ? mode === "edit"
-              ? "Updating..."
-              : "Creating..."
+              ? t("studio.poems.form.updating")
+              : t("studio.common.creating")
             : mode === "edit"
-              ? "Update"
-              : "Create"}
+              ? t("studio.common.update")
+              : t("studio.common.create")}
         </Button>
       </div>
 
@@ -305,7 +323,9 @@ const PoemForm = ({
       >
         <Pecha.DialogContent showCloseButton>
           <Pecha.DialogHeader>
-            <Pecha.DialogTitle>Upload & Crop Image</Pecha.DialogTitle>
+            <Pecha.DialogTitle>
+              {t("studio.poems.form.upload_crop_image")}
+            </Pecha.DialogTitle>
           </Pecha.DialogHeader>
           <ImageContentData
             onUpload={handleImageUpload}

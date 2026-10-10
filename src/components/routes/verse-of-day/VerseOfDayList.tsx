@@ -1,3 +1,4 @@
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import { type SortOrder, type VerseOfDayItem } from "./api/verseOfDayApi";
@@ -22,10 +23,11 @@ const VerseOfDayList = ({
   onEdit,
   onDelete,
 }: VerseOfDayListProps) => {
+  const { t } = useTranslate();
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <p className="text-muted-foreground">Loading...</p>
+        <p className="text-muted-foreground">{t("studio.common.loading")}</p>
       </div>
     );
   }
@@ -33,7 +35,9 @@ const VerseOfDayList = ({
   if (!verses.length) {
     return (
       <div className="flex items-center justify-center py-8">
-        <p className="text-muted-foreground">No verses found</p>
+        <p className="text-muted-foreground">
+          {t("studio.verse_of_day.empty")}
+        </p>
       </div>
     );
   }
@@ -43,8 +47,12 @@ const VerseOfDayList = ({
       <Pecha.Table>
         <Pecha.TableHeader>
           <Pecha.TableRow>
-            <Pecha.TableHead className="w-[400px]">English</Pecha.TableHead>
-            <Pecha.TableHead className="w-[100px]">Image</Pecha.TableHead>
+            <Pecha.TableHead className="w-[400px]">
+              {t("studio.verse_of_day.list.english_column")}
+            </Pecha.TableHead>
+            <Pecha.TableHead className="w-[100px]">
+              {t("studio.common.image")}
+            </Pecha.TableHead>
             <Pecha.TableHead
               className="w-[120px]"
               aria-sort={sortOrder === "desc" ? "descending" : "ascending"}
@@ -52,12 +60,14 @@ const VerseOfDayList = ({
               <button
                 type="button"
                 onClick={onToggleSort}
-                aria-label={`Sort by date, currently ${
-                  sortOrder === "desc" ? "newest first" : "oldest first"
-                }`}
+                aria-label={
+                  sortOrder === "desc"
+                    ? t("studio.verse_of_day.list.sort_aria_newest")
+                    : t("studio.verse_of_day.list.sort_aria_oldest")
+                }
                 className="flex items-center gap-1 hover:text-foreground"
               >
-                Date
+                {t("studio.common.date")}
                 {sortOrder === "desc" ? (
                   <FaSortAmountDown className="h-3 w-3" />
                 ) : (
@@ -65,9 +75,11 @@ const VerseOfDayList = ({
                 )}
               </button>
             </Pecha.TableHead>
-            <Pecha.TableHead className="w-[150px]">Page</Pecha.TableHead>
+            <Pecha.TableHead className="w-[150px]">
+              {t("studio.verse_of_day.form.page_label")}
+            </Pecha.TableHead>
             <Pecha.TableHead className="w-[180px] text-right">
-              Actions
+              {t("studio.common.actions")}
             </Pecha.TableHead>
           </Pecha.TableRow>
         </Pecha.TableHeader>
@@ -90,7 +102,7 @@ const VerseOfDayList = ({
                 {verse.image_url ? (
                   <img
                     src={verse.image_url}
-                    alt="Verse"
+                    alt={t("studio.verse_of_day.list.image_alt")}
                     className="h-12 w-12 rounded object-cover"
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = "none";
@@ -121,7 +133,7 @@ const VerseOfDayList = ({
                     size="sm"
                     onClick={() => onEdit(verse)}
                   >
-                    Edit
+                    {t("studio.common.edit")}
                   </Button>
                   <Button
                     type="button"
@@ -130,7 +142,7 @@ const VerseOfDayList = ({
                     onClick={() => onDelete(verse)}
                     className="text-red-600 hover:text-red-700"
                   >
-                    Delete
+                    {t("studio.common.delete")}
                   </Button>
                 </div>
               </Pecha.TableCell>

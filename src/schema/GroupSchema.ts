@@ -6,12 +6,12 @@ export type GroupLanguageCode = LanguageCode;
 /** One language's text. Only the title is required, in every language; the
  *  sub-title and both descriptions may be left empty. */
 export const groupLanguageBlockSchema = z.object({
-  title: z.string().trim().min(1, "Title is required"),
+  title: z.string().trim().min(1, "studio.validation.title_required"),
   sub_title: z.string().trim().optional(),
   description: z
     .string()
     .trim()
-    .max(200, "Description must be 200 characters or less")
+    .max(200, "studio.validation.description_max_200")
     .optional(),
   description_long: z.string().trim().optional(),
 });
@@ -45,7 +45,7 @@ const refineGroupCore =
     if (present.length < 1) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Add at least one language",
+        message: "studio.validation.add_at_least_one_language",
         path: ["languages"],
       });
     }
@@ -53,15 +53,14 @@ const refineGroupCore =
       if (slugRequired(data)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "Slug is required",
+          message: "studio.validation.slug_required",
           path: ["slug"],
         });
       }
     } else if (!SLUG_PATTERN.test(data.slug)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message:
-          "Use lowercase letters, numbers, hyphens, and underscores only",
+        message: "studio.validation.slug_pattern",
         path: ["slug"],
       });
     }
@@ -84,7 +83,7 @@ export type GroupCoreFormData = z.infer<typeof groupCoreSchema>;
 
 export const groupSocialLinkSchema = z.object({
   platform: z.string().min(1),
-  url: z.string().url("Enter a valid URL"),
+  url: z.string().url("studio.validation.url_invalid"),
 });
 
 export type GroupSocialLinkFormData = z.infer<typeof groupSocialLinkSchema>;

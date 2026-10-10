@@ -1,3 +1,5 @@
+import { useTranslate } from "@tolgee/react";
+
 interface EditorTabSwitcherProps {
   activeTab: "task" | "notification";
   onTabChange: (tab: "task" | "notification") => void;
@@ -7,6 +9,7 @@ export const EditorTabSwitcher = ({
   activeTab,
   onTabChange,
 }: EditorTabSwitcherProps) => {
+  const { t } = useTranslate();
   return (
     <div className="flex border-b border-gray-300 dark:border-input">
       <button
@@ -18,7 +21,7 @@ export const EditorTabSwitcher = ({
             : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
         }`}
       >
-        Add Task
+        {t("studio.task.tabs.add_task")}
       </button>
       <button
         type="button"
@@ -29,7 +32,7 @@ export const EditorTabSwitcher = ({
             : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
         }`}
       >
-        Notification
+        {t("studio.task.tabs.notification")}
       </button>
     </div>
   );

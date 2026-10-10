@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { SortableList, SortableItem } from "@/components/ui/atoms/sortable";
 import { FaYoutube } from "react-icons/fa";
@@ -33,6 +34,7 @@ const sortByOrder = (videos: PlanVideoSummary[]) =>
   [...videos].sort((a, b) => a.display_order - b.display_order);
 
 const PlanVideosSection = ({ planId, videos }: PlanVideosSectionProps) => {
+  const { t } = useTranslate();
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const queryClient = useQueryClient();
@@ -62,11 +64,11 @@ const PlanVideosSection = ({ planId, videos }: PlanVideosSectionProps) => {
     onSuccess: () => {
       setUrl("");
       setTitle("");
-      toast.success("Video added");
+      toast.success(t("studio.plan.videos.added"));
       invalidateVideos();
     },
     onError: (error: unknown) => {
-      toast.error("Failed to add video", {
+      toast.error(t("studio.plan.videos.add_failed"), {
         description: getApiErrorMessage(error),
       });
     },
@@ -75,11 +77,11 @@ const PlanVideosSection = ({ planId, videos }: PlanVideosSectionProps) => {
   const deleteMutation = useMutation({
     mutationFn: (videoId: string) => deletePlanVideo(planId, videoId),
     onSuccess: () => {
-      toast.success("Video removed");
+      toast.success(t("studio.plan.videos.removed"));
       invalidateVideos();
     },
     onError: (error: unknown) => {
-      toast.error("Failed to remove video", {
+      toast.error(t("studio.plan.videos.remove_failed"), {
         description: getApiErrorMessage(error),
       });
     },
@@ -93,7 +95,7 @@ const PlanVideosSection = ({ planId, videos }: PlanVideosSectionProps) => {
     },
     onError: (error: unknown) => {
       setOrderedVideos(sortByOrder(serverVideos)); // revert optimistic order
-      toast.error("Failed to reorder videos", {
+      toast.error(t("studio.plan.videos.reorder_failed"), {
         description: getApiErrorMessage(error),
       });
     },
@@ -129,7 +131,7 @@ const PlanVideosSection = ({ planId, videos }: PlanVideosSectionProps) => {
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         <FaYoutube className="w-4 h-4 text-[#A51C21]" />
-        <h3 className="text-sm font-bold">YouTube videos</h3>
+        <h3 className="text-sm font-bold">{t("studio.plan.videos.title")}</h3>
         {orderedVideos.length > 0 && (
           <span className="text-xs text-muted-foreground">
             {orderedVideos.length}
@@ -141,7 +143,7 @@ const PlanVideosSection = ({ planId, videos }: PlanVideosSectionProps) => {
         <div className="flex flex-col gap-2 sm:flex-row">
           <Pecha.Input
             type="url"
-            placeholder="Enter YouTube URL"
+            placeholder={t("studio.plan.videos.url_placeholder")}
             value={url}
             disabled={isBusy}
             className="bg-white"
@@ -155,7 +157,7 @@ const PlanVideosSection = ({ planId, videos }: PlanVideosSectionProps) => {
           />
           <Pecha.Input
             type="text"
-            placeholder="Title (optional)"
+            placeholder={t("studio.plan.videos.title_placeholder")}
             value={title}
             disabled={isBusy}
             className="bg-white sm:max-w-[40%]"
@@ -178,12 +180,12 @@ const PlanVideosSection = ({ planId, videos }: PlanVideosSectionProps) => {
             ) : (
               <FiPlus className="w-4 h-4" />
             )}
-            Add
+            {t("studio.common.add")}
           </Pecha.Button>
         </div>
         {trimmedUrl && !urlIsValid && (
           <p className="text-xs text-[#A51C21]">
-            Please enter a valid YouTube URL.
+            {t("studio.plan.videos.invalid_url")}
           </p>
         )}
       </div>
@@ -191,7 +193,7 @@ const PlanVideosSection = ({ planId, videos }: PlanVideosSectionProps) => {
       <div className="max-h-[40vh] overflow-y-auto">
         {orderedVideos.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4 text-center">
-            No videos added yet.
+            {t("studio.plan.videos.empty")}
           </p>
         ) : (
           <SortableList
@@ -221,7 +223,9 @@ const PlanVideosSection = ({ planId, videos }: PlanVideosSectionProps) => {
                         {videoId && (
                           <img
                             src={`https://img.youtube.com/vi/${videoId}/default.jpg`}
-                            alt={video.title ?? "YouTube video"}
+                            alt={
+                              video.title ?? t("studio.plan.videos.video_alt")
+                            }
                             className="w-20 h-14 object-cover rounded shrink-0"
                           />
                         )}
@@ -245,7 +249,7 @@ const PlanVideosSection = ({ planId, videos }: PlanVideosSectionProps) => {
                           size="icon"
                           className="shrink-0 h-9 w-9"
                           disabled={isBusy}
-                          title="Remove video"
+                          title={t("studio.plan.videos.remove_video")}
                           onClick={() => deleteMutation.mutate(video.id)}
                         >
                           {deleteMutation.isPending &&

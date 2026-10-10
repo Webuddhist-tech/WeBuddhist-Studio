@@ -44,13 +44,42 @@ export const EVENT_TAB_FIELDS = {
   settings: ["chat_enabled", "notifications_enabled", "intention_ids"],
 } as const satisfies Record<EventTabId, readonly (keyof EventFormData)[]>;
 
-export const EVENT_TABS: readonly { id: EventTabId; label: string }[] = [
-  { id: "about", label: "About" },
-  { id: "schedule", label: "Schedule" },
-  { id: "venue", label: "Venue & location" },
-  { id: "youtube", label: "YouTube" },
-  { id: "links", label: "Links & content" },
-  { id: "settings", label: "Settings" },
+/** `label` is the English text; render `t(labelKey)` in the UI. */
+export const EVENT_TABS: readonly {
+  id: EventTabId;
+  label: string;
+  labelKey: string;
+}[] = [
+  {
+    id: "about",
+    label: "About",
+    labelKey: "studio.groups.shared.event_tabs.about",
+  },
+  {
+    id: "schedule",
+    label: "Schedule",
+    labelKey: "studio.groups.shared.event_tabs.schedule",
+  },
+  {
+    id: "venue",
+    label: "Venue & location",
+    labelKey: "studio.groups.shared.event_tabs.venue",
+  },
+  {
+    id: "youtube",
+    label: "YouTube",
+    labelKey: "studio.groups.shared.event_tabs.youtube",
+  },
+  {
+    id: "links",
+    label: "Links & content",
+    labelKey: "studio.groups.shared.event_tabs.links",
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    labelKey: "studio.groups.shared.event_tabs.settings",
+  },
 ];
 
 /** Compile-time check that the map covers `EventFormData` with no field left

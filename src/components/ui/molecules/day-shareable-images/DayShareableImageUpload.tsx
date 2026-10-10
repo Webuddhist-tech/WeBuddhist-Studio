@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Dropzone from "react-dropzone";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { FiLoader } from "react-icons/fi";
 import { FaTrash } from "react-icons/fa6";
@@ -29,6 +30,7 @@ const DayShareableImageUpload = ({
   imageUrl,
   isEditable = true,
 }: DayShareableImageUploadProps) => {
+  const { t } = useTranslate();
   const queryClient = useQueryClient();
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -56,13 +58,18 @@ const DayShareableImageUpload = ({
     mutationFn: (file: File) => uploadDayShareableImage(dayId, imageType, file),
     onSuccess: () => {
       setPendingFile(null);
-      toast.success(`${label} uploaded`);
+      toast.success(t("studio.molecules.shareable_image.uploaded", { label }));
       invalidatePlan();
     },
     onError: (error: Error) => {
-      toast.error(`Failed to upload ${label.toLowerCase()}`, {
-        description: error.message,
-      });
+      toast.error(
+        t("studio.molecules.shareable_image.upload_failed", {
+          label: label.toLowerCase(),
+        }),
+        {
+          description: error.message,
+        },
+      );
     },
   });
 
@@ -70,13 +77,18 @@ const DayShareableImageUpload = ({
     mutationFn: () => deleteDayShareableImage(dayId, imageType),
     onSuccess: () => {
       setPendingFile(null);
-      toast.success(`${label} removed`);
+      toast.success(t("studio.molecules.shareable_image.removed", { label }));
       invalidatePlan();
     },
     onError: (error: Error) => {
-      toast.error(`Failed to remove ${label.toLowerCase()}`, {
-        description: error.message,
-      });
+      toast.error(
+        t("studio.molecules.shareable_image.remove_failed", {
+          label: label.toLowerCase(),
+        }),
+        {
+          description: error.message,
+        },
+      );
     },
   });
 
@@ -94,7 +106,9 @@ const DayShareableImageUpload = ({
             size="icon"
             className="h-8 w-8 shrink-0"
             disabled={isBusy}
-            title={`Remove ${label.toLowerCase()}`}
+            title={t("studio.molecules.shareable_image.remove", {
+              label: label.toLowerCase(),
+            })}
             onClick={() => deleteMutation.mutate()}
           >
             {deleteMutation.isPending ? (
@@ -139,10 +153,16 @@ const DayShareableImageUpload = ({
               >
                 <input {...getInputProps()} />
                 {pendingFile
-                  ? `Selected: ${pendingFile.name}`
+                  ? t("studio.subtask.audio.selected_file", {
+                      name: pendingFile.name,
+                    })
                   : imageUrl
-                    ? `Drop or click to replace ${label.toLowerCase()}`
-                    : `Drop or click to upload ${label.toLowerCase()}`}
+                    ? t("studio.molecules.shareable_image.drop_replace", {
+                        label: label.toLowerCase(),
+                      })
+                    : t("studio.molecules.shareable_image.drop_upload", {
+                        label: label.toLowerCase(),
+                      })}
               </div>
             )}
           </Dropzone>
@@ -159,7 +179,9 @@ const DayShareableImageUpload = ({
                 {uploadMutation.isPending && (
                   <FiLoader className="w-4 h-4 animate-spin mr-1" />
                 )}
-                {uploadMutation.isPending ? "Uploading..." : "Upload"}
+                {uploadMutation.isPending
+                  ? t("studio.common.uploading")
+                  : t("studio.common.upload")}
               </Pecha.Button>
               <Pecha.Button
                 type="button"
@@ -167,7 +189,7 @@ const DayShareableImageUpload = ({
                 disabled={isBusy}
                 onClick={() => setPendingFile(null)}
               >
-                Cancel
+                {t("studio.common.cancel")}
               </Pecha.Button>
             </div>
           )}

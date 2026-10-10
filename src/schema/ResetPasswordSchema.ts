@@ -4,11 +4,13 @@ export const resetPasswordSchema = z
   .object({
     password: z
       .string()
-      .min(1, "Password is required")
-      .min(6, "Password must be at least 6 characters"),
-    confirmPassword: z.string().min(1, "Please confirm your password"),
+      .min(1, "studio.validation.password_required")
+      .min(6, "studio.validation.password_min_6"),
+    confirmPassword: z
+      .string()
+      .min(1, "studio.validation.confirm_password_required"),
   })
   .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match",
+    message: "studio.validation.passwords_do_not_match",
     path: ["confirmPassword"],
   });

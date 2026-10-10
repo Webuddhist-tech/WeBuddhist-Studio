@@ -1,7 +1,19 @@
 export const TTS_AUDIO_TYPES = [
-  { value: "RECITATION", label: "Recitation" },
-  { value: "INSTRUCTION", label: "Instruction" },
-  { value: "TEXT_READING", label: "Text Reading" },
+  {
+    value: "RECITATION",
+    label: "Recitation",
+    labelKey: "studio.ui.options.tts_audio_type.recitation",
+  },
+  {
+    value: "INSTRUCTION",
+    label: "Instruction",
+    labelKey: "studio.ui.options.tts_audio_type.instruction",
+  },
+  {
+    value: "TEXT_READING",
+    label: "Text Reading",
+    labelKey: "studio.ui.options.tts_audio_type.text_reading",
+  },
 ] as const;
 
 export type TtsAudioType = (typeof TTS_AUDIO_TYPES)[number]["value"];
@@ -9,6 +21,7 @@ export type TtsAudioType = (typeof TTS_AUDIO_TYPES)[number]["value"];
 export const MONLAM_VOICE_REGIONS = [
   {
     label: "Lhasa",
+    labelKey: "studio.ui.options.voice_region.lhasa",
     voices: [
       { value: "dolkar_lhasa_female", label: "Dolkar" },
       { value: "yangchen_lhasa_female", label: "Yangchen" },
@@ -19,6 +32,7 @@ export const MONLAM_VOICE_REGIONS = [
   },
   {
     label: "Amdo",
+    labelKey: "studio.ui.options.voice_region.amdo",
     voices: [
       { value: "dolma_amdo_female", label: "Dolma" },
       { value: "kid_amdo_female", label: "Kid" },
@@ -29,6 +43,7 @@ export const MONLAM_VOICE_REGIONS = [
   },
   {
     label: "Kham",
+    labelKey: "studio.ui.options.voice_region.kham",
     voices: [
       { value: "kotheke_kham_male", label: "Kotheke" },
       { value: "tibet_tongue_kham_male", label: "Tibet Tongue" },

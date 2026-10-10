@@ -7,6 +7,8 @@ import {
   useState,
 } from "react";
 import { useParams } from "react-router-dom";
+import { useTranslate } from "@tolgee/react";
+import { tolgee } from "@/i18n/tolgee";
 import { RECITATION_EMIT_TOKEN } from "@/lib/constant";
 import { ROUTES } from "@/routes/paths";
 import { useQueries, useQuery } from "@tanstack/react-query";
@@ -14,6 +16,18 @@ import { useDebounce } from "use-debounce";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import { AppUpdateButton } from "@/components/ui/molecules/install-app/AppUpdateButton";
 import { useHostsUpdateButton } from "@/components/ui/molecules/install-app/appUpdateContext";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/atoms/popover";
+import { IoBookOutline, IoMenu, IoSettingsSharp } from "react-icons/io5";
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/atoms/dialog";
 import {
   fetchAutoplayState,
   fetchEditionTitle,
@@ -49,8 +63,6 @@ import {
   plannedRoundsStorageKey,
 } from "./plannedRounds";
 import {
-  CUE_OFFSET_MAX_MS,
-  cueAt,
   normalizeCue,
   readStoredCue,
   storeCue,
@@ -58,6 +70,13 @@ import {
 } from "./cueConfig";
 import { passageAt, returnButtonForLine, returnPassages } from "./returnJumps";
 import { seekTarget } from "./seekTarget";
+import {
+  applySectionOrder,
+  readSectionOrder,
+  storeSectionOrder,
+} from "./sectionOrder";
+import { SortableSectionList, SortableSectionRow } from "./SortableSections";
+import { TouchMenu, type TouchMenuItem } from "./TouchMenu";
 import { usePositionPublisher, type SendMove } from "./usePositionPublisher";
 import { useRecitationSocket } from "./useRecitationSocket";
 import { useWakeLock } from "./useWakeLock";
@@ -234,6 +253,29 @@ const storeOpenText = (eventId: string | undefined, textId: string) => {
   }
 };
 
+/** Whether this screen is on air for one event: sending its moves to the room,
+ * or stopped, driving this screen alone. Kept per browser, so a reload does not
+ * put a stopped controller back on air. On air unless stopped. */
+const onAirStorageKey = (eventId: string | undefined) =>
+  `live-control-on-air:${eventId ?? ""}`;
+
+const readOnAir = (eventId: string | undefined) => {
+  try {
+    return localStorage.getItem(onAirStorageKey(eventId)) !== "false";
+  } catch {
+    return true;
+  }
+};
+
+const storeOnAir = (eventId: string | undefined, onAir: boolean) => {
+  try {
+    if (!eventId) return;
+    localStorage.setItem(onAirStorageKey(eventId), String(onAir));
+  } catch {
+    // Blocked site data: the choice holds for this session only.
+  }
+};
+
 const readStoredCounts = (storageKey: string): Record<string, number> => {
   try {
     const parsed: unknown = JSON.parse(
@@ -346,6 +388,8 @@ const allowsShortcut = (target: EventTarget | null) => {
   if (target.isContentEditable) return false;
   if (target.closest("[data-line]")) return true;
   if (target.closest("[role='separator']")) return false;
+  // The titles popup and the settings menu take their own keys.
+  if (target.closest("[role='dialog']")) return false;
   if (target.closest("button, a, [role='button']")) return false;
   return true;
 };
@@ -358,143 +402,25 @@ const formatPlayTime = (ms: number) => {
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 };
 
-/**
- * The live line's time, running down as a bar beneath it, as the autoplay
- * test shows it. Under autoplay it reads the same start and time the autoplay
- * clock does, so the bar fills the moment the room is moved on. While the
- * clock waits (fresh play times, the yigchung) the bar waits too. By hand it
- * runs on the line's learned play time from when the line went out.
- *
- * The bar is white, its last stretches coloured by the cue offsets: red for
- * when to press Next by hand, yellow for when autoplay is about to move the
- * room on. What is still to come is dimmed, so the bright part is the time
- * spent. Once this mode's stretch is reached, a badge says so.
- */
-const AutoplayProgress = ({
-  startedAt,
-  duration,
-  running,
-  autoplay,
-  cue,
-  heldAt = null,
-}: {
-  startedAt: number;
-  duration: number;
-  running: boolean;
-  autoplay: boolean;
-  cue: CueSettings;
-  /** When autoplay's hold on the line began: the bar stands still there. */
-  heldAt?: number | null;
-}) => {
-  const [elapsed, setElapsed] = useState(0);
-  useEffect(() => {
-    if (!running) {
-      setElapsed(0);
-      return;
-    }
-    if (heldAt !== null) {
-      setElapsed(Math.min(duration, heldAt - startedAt));
-      return;
-    }
-    let frame = 0;
-    const tick = () => {
-      setElapsed(Math.min(duration, performance.now() - startedAt));
-      frame = requestAnimationFrame(tick);
-    };
-    tick();
-    return () => cancelAnimationFrame(frame);
-  }, [startedAt, duration, running, heldAt]);
-  const progress = duration > 0 ? Math.max(0, elapsed) / duration : 0;
-  const held = heldAt !== null;
-  const cued =
-    running &&
-    !held &&
-    duration > 0 &&
-    elapsed >= cueAt(duration, cue, autoplay);
-  const share = (ms: number) =>
-    duration > 0 ? Math.min(1, Math.max(0, ms / duration)) : 0;
-  // The wider stretch first, so the narrower one shows on top of it.
-  const zones = [
-    {
-      kind: "next",
-      color: "bg-[#ff453a]",
-      width: share(cue.nextClickOffsetMs),
-    },
-    {
-      kind: "autoplay",
-      color: "bg-[#ffd60a]",
-      width: share(cue.autoplayOffsetMs),
-    },
-  ].sort((a, b) => b.width - a.width);
-  return (
-    <span
-      data-autoplay-progress=""
-      data-cued={cued ? "" : undefined}
-      className="mt-1.5 flex items-center gap-2 font-sans"
-    >
-      {held ? (
-        <span
-          data-held=""
-          className="shrink-0 rounded-full bg-[#64d2ff] px-2 py-0.5 text-[11px] leading-none font-bold tracking-wide text-black uppercase"
-        >
-          Held
-        </span>
-      ) : null}
-      {cued ? (
-        <span
-          data-cue=""
-          className={`shrink-0 animate-pulse rounded-full px-2 py-0.5 text-[11px] leading-none font-bold tracking-wide uppercase ${
-            autoplay ? "bg-[#ffd60a] text-black" : "bg-[#ff453a] text-white"
-          }`}
-        >
-          {autoplay ? "Moving on" : "Next"}
-        </span>
-      ) : null}
-      <span
-        role="progressbar"
-        aria-label={
-          autoplay
-            ? "Autoplay: time spent on this line"
-            : "Line time: time spent on this line"
-        }
-        aria-valuemin={0}
-        aria-valuemax={Math.round(duration)}
-        aria-valuenow={Math.round(Math.max(0, elapsed))}
-        className="relative block h-2 flex-1 overflow-hidden rounded-full bg-white"
-      >
-        {zones.map((zone) =>
-          zone.width > 0 ? (
-            <span
-              key={zone.kind}
-              data-cue-zone={zone.kind}
-              className={`absolute inset-y-0 right-0 block ${zone.color}`}
-              style={{ width: `${zone.width * 100}%` }}
-            />
-          ) : null,
-        )}
-        {/* The time still to come, dimmed. */}
-        <span
-          className="absolute inset-y-0 right-0 block bg-black/45"
-          style={{ width: `${(1 - Math.min(1, progress)) * 100}%` }}
-        />
-      </span>
-      <span className="shrink-0 text-[11px] text-[#aeaeb2] tabular-nums">
-        {formatPlayTime(Math.max(0, elapsed))} / {formatPlayTime(duration)}
-      </span>
-    </span>
-  );
-};
-
 /** The phones' lead is set in seconds, to the nearest 50 ms, up to 2 s. */
 const LEAD_STEP_MS = 50;
 const LEAD_MAX_MS = 2000;
 
 /** The room's pace in words: how much faster or slower than recorded. */
-const paceLabel = (tempo: number | null): string => {
+const paceLabel = (
+  tempo: number | null,
+  t: ReturnType<typeof useTranslate>["t"],
+): string => {
   if (tempo === null) return "—";
-  if (tempo < 0.995) return `${Math.round((1 / tempo - 1) * 100)}% faster`;
-  if (tempo > 1.005) return `${Math.round((1 - 1 / tempo) * 100)}% slower`;
-  return "as recorded";
+  if (tempo < 0.995)
+    return t("studio.live_control.settings.pace_faster", {
+      percent: Math.round((1 / tempo - 1) * 100),
+    });
+  if (tempo > 1.005)
+    return t("studio.live_control.settings.pace_slower", {
+      percent: Math.round((1 - 1 / tempo) * 100),
+    });
+  return t("studio.live_control.settings.pace_as_recorded");
 };
 
 /**
@@ -513,6 +439,7 @@ const AutoplaySettingsFields = ({
   disabled: boolean;
   onChange: (change: { leadMs?: number; tempo?: number }) => void;
 }) => {
+  const { t } = useTranslate();
   const [draft, setDraft] = useState<string | null>(null);
   const shown = draft ?? (leadMs === null ? "" : String(leadMs / 1000));
   const commit = () => {
@@ -526,11 +453,11 @@ const AutoplaySettingsFields = ({
       ) * LEAD_STEP_MS;
     if (ms !== leadMs) onChange({ leadMs: ms });
   };
-  const pace = paceLabel(tempo);
+  const pace = paceLabel(tempo, t);
   return (
     <>
       <label className="flex items-center gap-2">
-        Phone lead
+        {t("studio.live_control.settings.phone_lead")}
         <input
           type="number"
           min={0}
@@ -545,17 +472,19 @@ const AutoplaySettingsFields = ({
           }}
           className="w-20 rounded-md border border-[#2c2c2e] bg-black px-2 py-1 text-[#f2f2f7] tabular-nums disabled:opacity-40 max-lg:text-base"
         />
-        s
+        {t("studio.live_control.settings.seconds_unit")}
       </label>
       <span className="flex items-center gap-2">
-        Room pace
+        {t("studio.live_control.settings.room_pace")}
         <span
           data-room-pace=""
           className="text-[#f2f2f7] tabular-nums"
           title={
             tempo === null
               ? undefined
-              : `×${tempo.toFixed(2)} the recorded times`
+              : t("studio.live_control.settings.pace_title", {
+                  tempo: tempo.toFixed(2),
+                })
           }
         >
           {pace}
@@ -567,7 +496,7 @@ const AutoplaySettingsFields = ({
             onClick={() => onChange({ tempo: 1 })}
             className="cursor-pointer rounded-md bg-[#2c2c2e] px-2 py-1 text-[12px] font-semibold text-[#f2f2f7] hover:bg-[#3a3a3c] disabled:opacity-40"
           >
-            Reset
+            {t("studio.common.reset")}
           </button>
         ) : null}
       </span>
@@ -592,19 +521,20 @@ const ReturnPlan = ({
   left: number;
   onChange: (rounds: number) => void;
 }) => {
+  const { t } = useTranslate();
   const stepClass =
     "size-9 shrink-0 touch-manipulation cursor-pointer rounded-md bg-[#2c2c2e] text-lg leading-none font-semibold text-[#f2f2f7] select-none hover:bg-[#3a3a3c] disabled:cursor-default disabled:opacity-40";
   return (
     <div
       role="group"
-      aria-label={`Autoplay rounds: ${label}`}
+      aria-label={t("studio.live_control.return_plan.aria", { label })}
       data-return-plan=""
       className="mt-1 flex basis-full items-center gap-2 font-sans text-sm text-[#8e8e93]"
     >
-      <span>Autoplay rounds</span>
+      <span>{t("studio.live_control.return_plan.title")}</span>
       <button
         type="button"
-        aria-label="One round fewer"
+        aria-label={t("studio.live_control.return_plan.fewer")}
         disabled={planned <= FIRST_ROUND}
         onClick={() => onChange(planned - 1)}
         className={stepClass}
@@ -619,7 +549,7 @@ const ReturnPlan = ({
       </span>
       <button
         type="button"
-        aria-label="One round more"
+        aria-label={t("studio.live_control.return_plan.more")}
         disabled={planned >= MAX_PLANNED_ROUNDS}
         onClick={() => onChange(planned + 1)}
         className={stepClass}
@@ -633,7 +563,14 @@ const ReturnPlan = ({
             left > 0 ? "bg-[#1c3a24] text-[#30d158]" : "bg-[#1c1c1e]"
           }`}
         >
-          {left > 0 ? `${left} return${left === 1 ? "" : "s"} left` : "done"}
+          {left > 0
+            ? t(
+                left === 1
+                  ? "studio.live_control.return_plan.returns_left_one"
+                  : "studio.live_control.return_plan.returns_left_other",
+                { count: left },
+              )
+            : t("studio.live_control.return_plan.done")}
         </span>
       ) : null}
     </div>
@@ -685,12 +622,32 @@ const LineContent = ({
 };
 
 const LiveControlPage = () => {
+  const { t } = useTranslate();
   const { eventId } = useParams<{ eventId: string }>();
   useHostsUpdateButton();
 
   const [token, setToken] = useState<string | null>(() => readStoredToken());
   const [tokenDraft, setTokenDraft] = useState("");
   const [showTokenBox, setShowTokenBox] = useState(() => !readStoredToken());
+  /**
+   * Stop / Go live. While stopped, nothing this screen does reaches the
+   * backend: lines, sections, Returns and Next move this screen alone, and
+   * autoplay cannot be started. The room is still heard, so its line shows.
+   */
+  const [onAirState, setOnAirState] = useState(() => ({
+    eventId,
+    onAir: readOnAir(eventId),
+  }));
+  const onAir =
+    onAirState.eventId === eventId ? onAirState.onAir : readOnAir(eventId);
+  /** For callbacks made between renders; written at once by `setOnAir`. */
+  const onAirRef = useRef(onAir);
+  onAirRef.current = onAir;
+  const setOnAir = (next: boolean) => {
+    onAirRef.current = next;
+    storeOnAir(eventId, next);
+    setOnAirState({ eventId, onAir: next });
+  };
   /** The work the operator is on: this event's liturgy, or one found by title
    * or pasted by id. A reload of the same event lands back on it. A text
    * opened for another event is not carried over. */
@@ -725,7 +682,7 @@ const LiveControlPage = () => {
   /**
    * When the line on screen went out to the room, on this page's clock. Under
    * autoplay it is the backend's own start for the step, carried over to this
-   * clock, so the time bar runs with the backend's hold.
+   * clock, so a hand-over reports how long the line was held.
    */
   const [lineStartedAt, setLineStartedAt] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -760,6 +717,9 @@ const LiveControlPage = () => {
    * browser like the sizes. Defaults come from cueConfig. */
   const [cue, setCue] = useState(() => readStoredCue());
   const [cueOpen, setCueOpen] = useState(false);
+  const [controlsOpen, setControlsOpen] = useState(false);
+  /** The titles as a popup, opened from the menu button after the title. */
+  const [tocOpen, setTocOpen] = useState(false);
   const changeCue = (change: Partial<CueSettings>) => {
     const next = normalizeCue({ ...cue, ...change });
     setCue(next);
@@ -914,6 +874,8 @@ const LiveControlPage = () => {
    * later reset. */
   const publish = useCallback(
     (cues: PositionToPublish[]) => {
+      // Stopped: the room is not told.
+      if (!onAirRef.current) return;
       if (cues.length > 0) {
         moveSequenceRef.current += 1;
         const move = moveSequenceRef.current;
@@ -1001,7 +963,12 @@ const LiveControlPage = () => {
       requestedRef.current.delete(textId);
       setFollowed((current) => current.filter((id) => id !== textId));
       setLoadError(
-        getApiErrorMessage(error, `Could not load ${edition.title || textId}.`),
+        getApiErrorMessage(
+          error,
+          tolgee.t("studio.live_control.errors.load_edition_failed", {
+            title: edition.title || textId,
+          }),
+        ),
       );
     } finally {
       setPreparing((current) => current.filter((id) => id !== textId));
@@ -1188,6 +1155,41 @@ const LiveControlPage = () => {
       })),
     [tocSections, indexBySegmentId],
   );
+
+  /**
+   * The order the operator dragged this edition's sections into, as stored in
+   * this browser. Only the list is drawn in it; `sections` keeps the outline's
+   * order, which the active section and each section's end are found by.
+   */
+  const [sectionOrder, setSectionOrder] = useState(() => ({
+    editionId: driverTextId,
+    order: readSectionOrder(driverTextId),
+  }));
+  // Another edition on screen: its own stored order, read once.
+  if (sectionOrder.editionId !== driverTextId) {
+    setSectionOrder({
+      editionId: driverTextId,
+      order: readSectionOrder(driverTextId),
+    });
+  }
+  const orderedSections = useMemo(
+    () => applySectionOrder(sections, sectionOrder.order),
+    [sections, sectionOrder.order],
+  );
+  const changeSectionOrder = (order: string[]) => {
+    storeSectionOrder(driverTextId, order);
+    setSectionOrder({ editionId: driverTextId, order });
+  };
+  const moveSection = (activeId: string, overId: string) => {
+    const ids = orderedSections.map((section) => section.id);
+    const from = ids.indexOf(activeId);
+    const to = ids.indexOf(overId);
+    if (from < 0 || to < 0) return;
+    ids.splice(to, 0, ...ids.splice(from, 1));
+    // Dragged back into the outline's own order: nothing left to keep.
+    const asOutlined = ids.every((id, index) => sections[index]?.id === id);
+    changeSectionOrder(asOutlined ? [] : ids);
+  };
 
   /** The section being recited: the last one that starts at or before this line. */
   const activeSectionId = useMemo(() => {
@@ -1509,6 +1511,15 @@ const LiveControlPage = () => {
   const jump = useCallback(
     (index: number, round?: number) => {
       if (index < 0 || index >= driverLines.length) return;
+      // Stopped: this screen moves alone. Its hold is nobody's, so the first
+      // move after going live carries no time for the line it leaves.
+      if (!onAirRef.current) {
+        heldLineRef.current = null;
+        setCurrentIndex(index);
+        setLineStartedAt(performance.now());
+        scrollLineIntoBand(index);
+        return;
+      }
       // Autoplay started elsewhere is taken over the same way: one line sent
       // from here would be overtaken by its plan's next step.
       if (autoplayRef.current || remoteAutoplayRef.current) {
@@ -1644,7 +1655,10 @@ const LiveControlPage = () => {
     resetAllReturns();
     // A running plan still holds the old puja's rounds: seeking into it would
     // carry them on. The new puja is a plan of its own, built after the reset.
-    if (autoplayRef.current || remoteAutoplayRef.current) {
+    if (
+      onAirRef.current &&
+      (autoplayRef.current || remoteAutoplayRef.current)
+    ) {
       setHeldMoves((current) => (current.length > 0 ? [] : current));
       setFreshPujaFrom(index);
       return;
@@ -1654,8 +1668,9 @@ const LiveControlPage = () => {
 
   const beginNextRound = (key: string, index: number) => {
     const round = roundOf(key) + 1;
-    // With no token nothing goes to the room, so no round is begun there.
-    if (token) {
+    // With no token, or stopped, nothing goes to the room, so no round is
+    // begun there.
+    if (token && onAirRef.current) {
       setRequestedRounds((current) => ({ ...current, [key]: round }));
     }
     goTo(index, round);
@@ -1663,7 +1678,8 @@ const LiveControlPage = () => {
 
   const step = useCallback(
     (delta: number) => {
-      if (autoplayRef.current && stepPlanRef.current(delta)) return;
+      if (onAirRef.current && autoplayRef.current && stepPlanRef.current(delta))
+        return;
       if (awaitingYigchungs) {
         setHeldMoves((current) => [...current, delta]);
         return;
@@ -1689,8 +1705,6 @@ const LiveControlPage = () => {
   const [autoplay, setAutoplay] = useState(false);
   autoplayRef.current = autoplay;
   const [autoplayNote, setAutoplayNote] = useState<string | null>(null);
-  /** Set while a plan is being made and handed over. */
-  const [autoplayBusy, setAutoplayBusy] = useState(false);
   /** The plan the backend is running for this page, as the page laid it out. */
   const planRef = useRef<RunningPlan | null>(null);
   /** The backend's autoplay as last heard, from the socket or by asking. */
@@ -1699,9 +1713,6 @@ const LiveControlPage = () => {
   );
   const serverAutoplayRef = useRef(serverAutoplay);
   serverAutoplayRef.current = serverAutoplay;
-  /** When the backend's hold on the line began, on this page's clock; null
-   * while the plan is moving. */
-  const [heldAt, setHeldAt] = useState<number | null>(null);
   /** Set while a hold or resume is on its way, so it is not pressed twice. */
   const [holdBusy, setHoldBusy] = useState(false);
   /** Counts plan hand-overs, so only the newest one's answer is acted on. */
@@ -1776,12 +1787,6 @@ const LiveControlPage = () => {
   const followAutoplay = (next: AutoplayState) => {
     setServerAutoplay(next);
     serverAutoplayRef.current = next;
-    // When the hold began, on this page's clock, so the bar stands still.
-    setHeldAt(
-      next.status === "running" && next.held && next.heldAtMs !== null
-        ? performance.now() - Math.max(0, next.serverTimeMs - next.heldAtMs)
-        : null,
-    );
     const plan = planRef.current;
     if (!plan || next.planId !== plan.planId) return;
     // A seek is on its way: until it is answered, word of any other step is
@@ -1799,12 +1804,12 @@ const LiveControlPage = () => {
       autoplayRef.current = false;
       if (next.reason === "finished" && plan.noTimeAt !== null) {
         setAutoplayNote(
-          `Autoplay stopped at line ${plan.noTimeAt + 1}: it has not been recited here before, so there is no time to hold it for. Move on by hand and it will be learned.`,
+          t("studio.live_control.autoplay.stopped_no_time", {
+            line: plan.noTimeAt + 1,
+          }),
         );
       } else if (next.reason === "failed") {
-        setAutoplayNote(
-          "Autoplay stopped: the server could not send a line to the room. Start it again, or move on by hand.",
-        );
+        setAutoplayNote(t("studio.live_control.autoplay.stopped_failed"));
       }
       return;
     }
@@ -1890,12 +1895,11 @@ const LiveControlPage = () => {
     keepFirstFor?: number,
     byHand = false,
   ) => {
-    if (!eventId || !token) return;
+    if (!eventId || !token || !onAirRef.current) return;
     autoplayStartRef.current += 1;
     const handOverId = autoplayStartRef.current;
     setAutoplay(true);
     autoplayRef.current = true;
-    setAutoplayBusy(true);
     setAutoplayNote(null);
     // The times are read before every plan, a hand move's too. Other
     // controllers, here and at other pujas of this text, teach the backend
@@ -1909,9 +1913,10 @@ const LiveControlPage = () => {
     if (plan.noTimeAt === from && keepFirstFor === undefined && !byHand) {
       setAutoplay(false);
       autoplayRef.current = false;
-      setAutoplayBusy(false);
       setAutoplayNote(
-        `Autoplay cannot start at line ${from + 1}: it has not been recited here before, so there is no time to hold it for. Move on by hand and it will be learned.`,
+        t("studio.live_control.autoplay.cannot_start_no_time", {
+          line: from + 1,
+        }),
       );
       return;
     }
@@ -1969,7 +1974,7 @@ const LiveControlPage = () => {
       } catch {
         finish({
           ok: false,
-          message: "The server could not run autoplay just now. Try again.",
+          message: t("studio.live_control.errors.autoplay_unavailable"),
         });
       }
     })();
@@ -1985,12 +1990,15 @@ const LiveControlPage = () => {
       }
       return;
     }
-    setAutoplayBusy(false);
     if (!started.ok) {
       planRef.current = null;
       setAutoplay(false);
       autoplayRef.current = false;
-      setAutoplayNote(`Autoplay could not start: ${started.message}`);
+      setAutoplayNote(
+        t("studio.live_control.autoplay.could_not_start", {
+          message: started.message,
+        }),
+      );
       return;
     }
     planRef.current = { ...plan, planId: started.state.planId };
@@ -2006,7 +2014,13 @@ const LiveControlPage = () => {
     command: AutoplayCommand,
   ): Promise<AutoplayResult> => {
     if (!eventId || !token) {
-      return { ok: false, message: "Add the emit token to use autoplay." };
+      return {
+        ok: false,
+        message: t("studio.live_control.autoplay.token_needed"),
+      };
+    }
+    if (!onAirRef.current) {
+      return { ok: false, message: t("studio.live_control.on_air.stopped") };
     }
     const viaSocket = socketRef.current.sendCommand(command);
     return (await viaSocket) ?? sendAutoplayCommand(eventId, token, command);
@@ -2065,7 +2079,6 @@ const LiveControlPage = () => {
     };
     setCurrentIndex(step.lineIndex);
     setLineStartedAt(now);
-    setHeldAt(null);
     scrollLineIntoBand(step.lineIndex);
     // The passage's round is settled once the backend says the room is on it.
 
@@ -2164,7 +2177,7 @@ const LiveControlPage = () => {
   /** Holds the room on its line past its time, or lets it go on. */
   const toggleHold = async () => {
     const server = serverAutoplayRef.current;
-    if (holdBusy || server?.status !== "running") return;
+    if (holdBusy || server?.status !== "running" || !onAirRef.current) return;
     setHoldBusy(true);
     const result = await commandAutoplay({
       type: server.held ? "resume" : "hold",
@@ -2175,7 +2188,12 @@ const LiveControlPage = () => {
       followAutoplayRef.current(result.state);
     } else {
       setAutoplayNote(
-        `Autoplay could not be ${server.held ? "resumed" : "held"}: ${result.message}`,
+        t(
+          server.held
+            ? "studio.live_control.autoplay.could_not_resume"
+            : "studio.live_control.autoplay.could_not_hold",
+          { message: result.message },
+        ),
       );
     }
   };
@@ -2192,7 +2210,11 @@ const LiveControlPage = () => {
     if (result.ok) {
       setServerAutoplay(result.state);
     } else {
-      setAutoplayNote(`Autoplay settings not saved: ${result.message}`);
+      setAutoplayNote(
+        t("studio.live_control.autoplay.settings_not_saved", {
+          message: result.message,
+        }),
+      );
     }
   };
   replanRef.current = () => {
@@ -2246,7 +2268,6 @@ const LiveControlPage = () => {
     autoplayStartRef.current += 1;
     const pauseId = autoplayStartRef.current;
     planRef.current = null;
-    setAutoplayBusy(false);
     if (!eventId || !token) {
       setAutoplay(false);
       autoplayRef.current = false;
@@ -2260,7 +2281,9 @@ const LiveControlPage = () => {
     if (pauseId !== autoplayStartRef.current) return;
     if (!stopped.ok) {
       setAutoplayNote(
-        `Autoplay could not be paused: ${stopped.message} It is still moving the room - press Pause again.`,
+        t("studio.live_control.autoplay.could_not_pause", {
+          message: stopped.message,
+        }),
       );
       setServerAutoplay((current) =>
         current ? { ...current, status: "running" } : current,
@@ -2283,7 +2306,6 @@ const LiveControlPage = () => {
     planRef.current = null;
     setAutoplay(false);
     autoplayRef.current = false;
-    setAutoplayBusy(false);
     const { eventId: event, token: key } = stopForRef.current;
     if (wasPlaying && event && key) {
       // After any start still on its way, so the stop is not overtaken by it.
@@ -2301,11 +2323,25 @@ const LiveControlPage = () => {
     planRef.current = null;
     setAutoplay(false);
     autoplayRef.current = false;
-    setAutoplayBusy(false);
   }, [token]);
 
   // Whoever is moving the room, the screen stays on while autoplay runs.
   useWakeLock(autoplay || serverAutoplay?.status === "running");
+
+  /**
+   * Stop lets the room go where it is; Go live sends moves again, from the
+   * next one made. Autoplay is the backend moving the room by itself, so
+   * stopping pauses it first - the last word this screen sends.
+   */
+  const toggleOnAir = () => {
+    if (!onAir) {
+      setOnAir(true);
+      return;
+    }
+    if (autoplay || remoteAutoplay) void pauseAutoplay();
+    setHeldMoves((current) => (current.length > 0 ? [] : current));
+    setOnAir(false);
+  };
 
   const toggleAutoplay = () => {
     if (autoplay || remoteAutoplay) {
@@ -2330,7 +2366,7 @@ const LiveControlPage = () => {
     }
     const next = landingFrom(currentIndex, 1);
     if (next === currentIndex) {
-      setAutoplayNote("Autoplay has nothing to play: this is the last line.");
+      setAutoplayNote(t("studio.live_control.autoplay.nothing_to_play"));
       return;
     }
     void handOver(next, undefined);
@@ -2489,8 +2525,14 @@ const LiveControlPage = () => {
 
   /** The one problem the page is showing, if any. */
   const libraryError = editionsError
-    ? getApiErrorMessage(editionsError, "Could not load this text.")
-    : getApiErrorMessage(eventError, "Could not load this event.");
+    ? getApiErrorMessage(
+        editionsError,
+        t("studio.live_control.errors.load_text_failed"),
+      )
+    : getApiErrorMessage(
+        eventError,
+        t("studio.live_control.errors.load_event_failed"),
+      );
   const errorMessage =
     editionsError || eventError || loadError || notice || autoplayNote
       ? (loadError ?? notice ?? autoplayNote ?? libraryError)
@@ -2523,7 +2565,7 @@ const LiveControlPage = () => {
   })();
 
   /**
-   * Live: back to the line the room is on - the green one - when this screen
+   * Live: back to the line the room is on - the white one - when this screen
    * has been left on another, and into view either way. Nothing is sent, as
    * the room is already there. This screen never saw it arrive, so the line's
    * time is not measured from here.
@@ -2540,16 +2582,35 @@ const LiveControlPage = () => {
   };
   const offLive = roomLineIndex >= 0 && roomLineIndex !== currentIndex;
 
-  /** The backend's current step, when it is this page's plan it is running:
-   * as long as the backend holds it, the room's pace applied. */
-  const autoplayStepDuration =
-    autoplay &&
-    serverAutoplay?.status === "running" &&
-    serverAutoplay.planId === planRef.current?.planId
-      ? (serverAutoplay.stepDurationMs ??
-        planRef.current?.steps[serverAutoplay.step]?.durationMs ??
-        null)
-      : null;
+  /** Which way the room's line lies when it is scrolled out of the list, so it
+   * can still be found however far this screen has gone from it. */
+  const [liveOutOfView, setLiveOutOfView] = useState<"above" | "below" | null>(
+    null,
+  );
+  const roomLineIndexRef = useRef(roomLineIndex);
+  roomLineIndexRef.current = roomLineIndex;
+  const measureLiveInView = useCallback(() => {
+    const box = listRef.current;
+    const index = roomLineIndexRef.current;
+    const node =
+      box && index >= 0 ? box.querySelector(`[data-line="${index}"]`) : null;
+    let next: "above" | "below" | null = null;
+    const boxRect = box?.getBoundingClientRect();
+    // A list not laid out yet has nothing scrolled out of it.
+    if (node && boxRect && boxRect.height > 0) {
+      const rect = node.getBoundingClientRect();
+      if (rect.bottom <= boxRect.top) next = "above";
+      else if (rect.top >= boxRect.bottom) next = "below";
+    }
+    setLiveOutOfView(next);
+  }, []);
+  useEffect(() => {
+    measureLiveInView();
+  }, [measureLiveInView, roomLineIndex, driverLines]);
+  useEffect(() => {
+    window.addEventListener("resize", measureLiveInView);
+    return () => window.removeEventListener("resize", measureLiveInView);
+  }, [measureLiveInView]);
 
   /** A change to the plan while autoplay runs - rounds, a reset - is handed
    * over as the same plan, rebuilt. */
@@ -2558,19 +2619,22 @@ const LiveControlPage = () => {
   };
 
   const statusLabel = !token
-    ? "no emit token"
-    : state === "live"
-      ? "publishing"
-      : state === "publishing"
-        ? "sending…"
-        : state === "error"
-          ? "not publishing"
-          : "ready";
-  const online = state === "live" || state === "publishing";
+    ? t("studio.live_control.status.no_token")
+    : !onAir
+      ? t("studio.live_control.status.stopped")
+      : state === "live"
+        ? t("studio.live_control.status.publishing")
+        : state === "publishing"
+          ? t("studio.live_control.status.sending")
+          : state === "error"
+            ? t("studio.live_control.status.not_publishing")
+            : t("studio.live_control.status.ready");
+  const online = onAir && (state === "live" || state === "publishing");
 
   /** What an edition has ready, and whether it lines up with what is on screen. */
   const editionNote = (edition: TextEdition) => {
-    if (preparing.includes(edition.textId)) return "loading…";
+    if (preparing.includes(edition.textId))
+      return t("studio.live_control.editions.loading");
     const loaded = lines[edition.textId];
     if (!loaded) return null;
     const misaligned =
@@ -2578,8 +2642,10 @@ const LiveControlPage = () => {
       driverLines.length > 0 &&
       loaded.length !== driverLines.length;
     return misaligned
-      ? `${loaded.length} lines — does not line up`
-      : `${loaded.length} lines`;
+      ? t("studio.live_control.editions.lines_misaligned", {
+          count: loaded.length,
+        })
+      : t("studio.live_control.editions.lines_count", { count: loaded.length });
   };
   /**
    * Dragging the divider: the titles end where the finger is. The drag is
@@ -2631,7 +2697,7 @@ const LiveControlPage = () => {
   };
   /** The lines are read at arm's length, from a cushion. The titles start at
    * the same size, and each pane is then sized on its own. */
-  const lineClass = "mb-3 px-1.5 py-1.5 leading-[1.6] lg:leading-[1.7]";
+  const lineClass = "mb-3 px-1.5 pb-1.5 leading-[1.6] lg:leading-[1.7]";
   const lineSize =
     "text-[calc(26px*var(--text-scale))] lg:text-[calc(23px*var(--text-scale))]";
   /** Yigchung lines are set smaller than the verse, as a printed liturgy does. */
@@ -2639,6 +2705,164 @@ const LiveControlPage = () => {
     "text-[calc(19px*var(--text-scale))] lg:text-[calc(17px*var(--text-scale))]";
   const titleSize =
     "text-[calc(26px*var(--titles-scale))] leading-[1.6] lg:text-[calc(23px*var(--titles-scale))] lg:leading-[1.7]";
+  /** The liturgies and the section outline: beside the text, and in the
+   * popup the title's menu button opens, which closes once one is picked. */
+  const titleLists = (inPopup: boolean) => {
+    const picked = () => {
+      if (inPopup) setTocOpen(false);
+    };
+    return (
+      <>
+        {liturgies && liturgies.length > 0 ? (
+          <>
+            <h2 className="mx-2 mt-5 mb-2 text-[13px] tracking-[0.1em] text-[#8e8e93] uppercase max-lg:mx-1 max-lg:mt-2 max-lg:mb-1">
+              {t("studio.live_control.liturgies")}
+            </h2>
+            <div>
+              {liturgies.map((liturgy) => {
+                const isOpen = liturgy.textId === sourceTextId;
+                return (
+                  <button
+                    key={liturgy.textId}
+                    type="button"
+                    aria-pressed={isOpen}
+                    onClick={() => {
+                      openTextById(liturgy.textId, liturgy.title);
+                      picked();
+                    }}
+                    className={`mb-0.5 block w-full cursor-pointer rounded-[7px] px-3 py-1.5 text-left ${titleSize} [overflow-wrap:anywhere] max-lg:py-1 ${
+                      isOpen
+                        ? "bg-[#e5231c] text-white"
+                        : "text-[#8e8e93] hover:bg-[#1a1a1c]"
+                    }`}
+                  >
+                    {liturgy.title}
+                  </button>
+                );
+              })}
+            </div>
+          </>
+        ) : null}
+
+        {sections.length > 0 ? (
+          <>
+            <div className="mx-2 mt-5 mb-2 flex items-baseline gap-2 max-lg:mx-1 max-lg:mt-2 max-lg:mb-1">
+              <h2 className="mr-auto text-[13px] tracking-[0.1em] text-[#8e8e93] uppercase">
+                {t("studio.live_control.sections")}
+              </h2>
+              {/* Back to the outline's own order, once it was dragged. */}
+              {sectionOrder.order.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => changeSectionOrder([])}
+                  className="cursor-pointer text-[12px] text-[#0a84ff] hover:underline"
+                >
+                  {t("studio.live_control.section.reset_order")}
+                </button>
+              ) : null}
+            </div>
+            <div ref={inPopup ? undefined : sectionListRef}>
+              <SortableSectionList
+                ids={orderedSections.map((section) => section.id)}
+                onMove={moveSection}
+              >
+                {orderedSections.map((section) => {
+                  const isActive = section.id === activeSectionId;
+                  const landing = sectionLandingLine(section);
+                  const reachable = landing >= 0;
+                  const resumeAt = resumeLineFor(section);
+                  return (
+                    <SortableSectionRow
+                      key={section.id}
+                      id={section.id}
+                      handleLabel={t(
+                        "studio.live_control.section.reorder_aria",
+                        {
+                          title: section.title,
+                        },
+                      )}
+                    >
+                      <button
+                        type="button"
+                        data-section-active={isActive}
+                        disabled={!reachable}
+                        // A shortened title keeps the library's full one on hover.
+                        title={
+                          reachable
+                            ? section.fullTitle !== section.title
+                              ? section.fullTitle
+                              : undefined
+                            : section.lineIndex >= 0
+                              ? t("studio.live_control.section.nothing_recited")
+                              : t("studio.live_control.section.no_segment")
+                        }
+                        onClick={() => {
+                          if (!reachable) return;
+                          goTo(landing);
+                          picked();
+                        }}
+                        // Outlines nest deeply - six levels is ordinary - so the
+                        // indent stops after three and the titles keep their width.
+                        style={{
+                          paddingLeft: 12 + Math.min(section.depth, 3) * 12,
+                        }}
+                        className={`block min-w-0 flex-1 rounded-[7px] py-1.5 pr-3 text-left ${titleSize} [overflow-wrap:anywhere] max-lg:py-1 ${
+                          isActive
+                            ? "bg-[#e5231c] text-white"
+                            : reachable
+                              ? "cursor-pointer text-[#8e8e93] hover:bg-[#1a1a1c]"
+                              : "cursor-default text-[#5a5a5f]"
+                        }`}
+                      >
+                        {/* The icon stands apart, so a title that wraps lines
+                         * up under itself, not under the icon. */}
+                        <span className="flex items-baseline gap-1.5">
+                          {section.icon ? (
+                            <span
+                              aria-hidden="true"
+                              data-section-icon=""
+                              className="shrink-0"
+                            >
+                              {section.icon}
+                            </span>
+                          ) : null}
+                          <span className="min-w-0">{section.title}</span>
+                        </span>
+                      </button>
+                      {/* A section left partway is picked up where it was left,
+                       * not from its start. */}
+                      {resumeAt !== null ? (
+                        <button
+                          type="button"
+                          aria-label={t(
+                            "studio.live_control.section.resume_aria",
+                            {
+                              title: section.title,
+                            },
+                          )}
+                          title={t("studio.live_control.section.resume_title", {
+                            line: resumeAt + 1,
+                          })}
+                          onClick={() => {
+                            goTo(resumeAt);
+                            picked();
+                          }}
+                          className="shrink-0 cursor-pointer rounded-[7px] border border-[#e5231c] px-2.5 py-1 text-[13px] font-semibold text-[#f2f2f7] hover:bg-[#2c2c2e] max-lg:px-2 max-lg:text-[12px]"
+                        >
+                          {t("studio.live_control.section.resume")}
+                        </button>
+                      ) : null}
+                    </SortableSectionRow>
+                  );
+                })}
+              </SortableSectionList>
+            </div>
+          </>
+        ) : null}
+      </>
+    );
+  };
+
   const sizePicker = (
     label: string,
     value: number,
@@ -2657,6 +2881,22 @@ const LiveControlPage = () => {
       ))}
     </select>
   );
+
+  /** Every title of the open text behind the floating dot, by its icon, so
+   * one is a tap away wherever the screen is held. */
+  const touchMenuItems: TouchMenuItem[] = orderedSections.map((section) => {
+    const landing = sectionLandingLine(section);
+    return {
+      id: section.id,
+      label: section.title,
+      icon: section.icon ?? <IoBookOutline />,
+      onSelect: () => {
+        if (landing >= 0) goTo(landing);
+      },
+      disabled: landing < 0,
+      active: section.id === activeSectionId,
+    };
+  });
 
   return (
     // A phone must not zoom on a quick second tap of Next, nor reload the page
@@ -2687,7 +2927,7 @@ const LiveControlPage = () => {
             <div className="flex min-w-0 flex-col leading-tight">
               <span className="text-lg font-bold">WeBuddhist</span>
               <span className="mt-0.5 text-[11px] font-medium tracking-[0.11em] text-[#8e8e93] uppercase">
-                Live control
+                {t("studio.live_control.title")}
               </span>
             </div>
           </div>
@@ -2695,105 +2935,18 @@ const LiveControlPage = () => {
           {/* The titles are sized on their own, where they are read. */}
           {sections.length > 0 ? (
             <label className="mx-2 mb-2 flex shrink-0 items-center gap-2 text-[12px] tracking-[0.08em] text-[#8e8e93] uppercase max-lg:mx-1 max-lg:mb-1">
-              <span className="mr-auto">Title size</span>
-              {sizePicker("Title size", titlesScale, changeTitlesScale)}
+              <span className="mr-auto">
+                {t("studio.live_control.title_size")}
+              </span>
+              {sizePicker(
+                t("studio.live_control.title_size"),
+                titlesScale,
+                changeTitlesScale,
+              )}
             </label>
           ) : null}
 
-          {liturgies && liturgies.length > 0 ? (
-            <>
-              <h2 className="mx-2 mt-5 mb-2 text-[13px] tracking-[0.1em] text-[#8e8e93] uppercase max-lg:mx-1 max-lg:mt-2 max-lg:mb-1">
-                Liturgies
-              </h2>
-              <div>
-                {liturgies.map((liturgy) => {
-                  const isOpen = liturgy.textId === sourceTextId;
-                  return (
-                    <button
-                      key={liturgy.textId}
-                      type="button"
-                      aria-pressed={isOpen}
-                      onClick={() =>
-                        openTextById(liturgy.textId, liturgy.title)
-                      }
-                      className={`mb-0.5 block w-full cursor-pointer rounded-[7px] px-3 py-1.5 text-left ${titleSize} [overflow-wrap:anywhere] max-lg:py-1 ${
-                        isOpen
-                          ? "bg-[#e5231c] text-white"
-                          : "text-[#8e8e93] hover:bg-[#1a1a1c]"
-                      }`}
-                    >
-                      {liturgy.title}
-                    </button>
-                  );
-                })}
-              </div>
-            </>
-          ) : null}
-
-          {sections.length > 0 ? (
-            <>
-              <h2 className="mx-2 mt-5 mb-2 text-[13px] tracking-[0.1em] text-[#8e8e93] uppercase max-lg:mx-1 max-lg:mt-2 max-lg:mb-1">
-                Sections
-              </h2>
-              <div ref={sectionListRef}>
-                {sections.map((section) => {
-                  const isActive = section.id === activeSectionId;
-                  const landing = sectionLandingLine(section);
-                  const reachable = landing >= 0;
-                  const resumeAt = resumeLineFor(section);
-                  return (
-                    <div
-                      key={section.id}
-                      className="mb-0.5 flex items-center gap-1"
-                    >
-                      <button
-                        type="button"
-                        data-section-active={isActive}
-                        disabled={!reachable}
-                        title={
-                          reachable
-                            ? undefined
-                            : section.lineIndex >= 0
-                              ? "Nothing in this section is recited"
-                              : "No segment to go to"
-                        }
-                        onClick={() => {
-                          if (reachable) goTo(landing);
-                        }}
-                        // Outlines nest deeply - six levels is ordinary - so the
-                        // indent stops after three and the titles keep their width.
-                        style={{
-                          paddingLeft: 12 + Math.min(section.depth, 3) * 12,
-                        }}
-                        className={`block min-w-0 flex-1 rounded-[7px] py-1.5 pr-3 text-left ${titleSize} [overflow-wrap:anywhere] max-lg:py-1 ${
-                          isActive
-                            ? "bg-[#e5231c] text-white"
-                            : reachable
-                              ? "cursor-pointer text-[#8e8e93] hover:bg-[#1a1a1c]"
-                              : "cursor-default text-[#5a5a5f]"
-                        }`}
-                      >
-                        {section.title}
-                      </button>
-                      {/* A section left partway is picked up where it was left,
-                       * not from its start. */}
-                      {resumeAt !== null ? (
-                        <button
-                          type="button"
-                          aria-label={`Resume ${section.title}`}
-                          title={`Resume at line ${resumeAt + 1}`}
-                          onClick={() => goTo(resumeAt)}
-                          className="shrink-0 cursor-pointer rounded-[7px] border border-[#e5231c] px-2.5 py-1 text-[13px] font-semibold text-[#f2f2f7] hover:bg-[#2c2c2e] max-lg:px-2 max-lg:text-[12px]"
-                        >
-                          Resume
-                        </button>
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          ) : null}
+          {titleLists(false)}
 
           <button
             type="button"
@@ -2802,7 +2955,9 @@ const LiveControlPage = () => {
               needsText ? "hidden" : ""
             }`}
           >
-            {setupUnfolded ? "Hide setup" : "Setup"}
+            {setupUnfolded
+              ? t("studio.live_control.setup.hide")
+              : t("studio.live_control.setup.show")}
           </button>
 
           {/* Setup stays in the page at every width: on a phone it is folded
@@ -2824,23 +2979,23 @@ const LiveControlPage = () => {
                 rel="noopener noreferrer"
                 className="mx-2 mt-4 block text-[13px] text-[#0a84ff] hover:underline max-lg:mx-1 max-lg:mt-2"
               >
-                Test autoplay without the room ↗
+                {t("studio.live_control.setup.test_autoplay")} ↗
               </a>
             ) : null}
             <h2 className="mx-2 mt-5 mb-2 text-[13px] tracking-[0.1em] text-[#8e8e93] uppercase max-lg:mx-1 max-lg:mt-2">
-              Add a text
+              {t("studio.live_control.setup.add_text")}
             </h2>
             <div className="px-2 max-lg:px-1">
               <input
                 type="search"
-                aria-label="Search texts"
+                aria-label={t("studio.live_control.setup.search_aria")}
                 value={textQuery}
                 onChange={(e) => setTextQuery(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") openFirstMatch();
                   if (e.key === "Escape") setTextQuery("");
                 }}
-                placeholder="Search by name or paste an id"
+                placeholder={t("studio.live_control.setup.search_placeholder")}
                 autoComplete="off"
                 className="w-full rounded-md border border-[#2c2c2e] bg-[#1c1c1e] px-3 py-2 text-sm text-[#f2f2f7] placeholder:text-[#8e8e93] max-lg:text-base"
               />
@@ -2848,7 +3003,7 @@ const LiveControlPage = () => {
             {textQuery.trim() ? (
               <div
                 role="listbox"
-                aria-label="Matching texts"
+                aria-label={t("studio.live_control.setup.matching_texts")}
                 className="mx-2 mt-1 max-h-72 overflow-y-auto overscroll-contain rounded-md border border-[#2c2c2e] bg-[#111113] max-lg:mx-1 max-lg:max-h-56"
               >
                 {looksLikeId ? (
@@ -2859,7 +3014,7 @@ const LiveControlPage = () => {
                     onClick={() => openTextById(textQuery.trim())}
                     className="block w-full cursor-pointer border-b border-[#2c2c2e] px-3 py-2.5 text-left text-[14px] text-[#f2f2f7] hover:bg-[#1c1c1e]"
                   >
-                    Open id{" "}
+                    {t("studio.live_control.setup.open_id")}{" "}
                     <span className="font-mono">{textQuery.trim()}</span>
                   </button>
                 ) : null}
@@ -2878,15 +3033,15 @@ const LiveControlPage = () => {
                 ))}
                 {textQuery.trim().length < 2 ? (
                   <p className="px-3 py-2.5 text-[13px] text-[#8e8e93]">
-                    Keep typing…
+                    {t("studio.live_control.setup.keep_typing")}
                   </p>
                 ) : !matchesAreCurrent ? (
                   <p className="px-3 py-2.5 text-[13px] text-[#8e8e93]">
-                    Searching…
+                    {t("studio.live_control.setup.searching")}
                   </p>
                 ) : currentMatches.length === 0 && !looksLikeId ? (
                   <p className="px-3 py-2.5 text-[13px] text-[#8e8e93]">
-                    No text by that name.
+                    {t("studio.live_control.setup.no_match")}
                   </p>
                 ) : null}
               </div>
@@ -2900,7 +3055,9 @@ const LiveControlPage = () => {
                       key={item.textId}
                       type="button"
                       title={item.textId}
-                      aria-label={`Open ${item.title ?? item.textId}`}
+                      aria-label={t("studio.live_control.setup.open_aria", {
+                        title: item.title ?? item.textId,
+                      })}
                       aria-pressed={isOpen}
                       onClick={() => openTextById(item.textId)}
                       className={`max-w-full cursor-pointer truncate rounded-full border px-3 py-1.5 text-[13px] ${
@@ -2919,11 +3076,10 @@ const LiveControlPage = () => {
             {editions.length > 0 ? (
               <>
                 <h2 className="mx-2 mt-5 mb-1 text-[13px] tracking-[0.1em] text-[#8e8e93] uppercase max-lg:mx-1 max-lg:mt-3">
-                  Editions
+                  {t("studio.live_control.editions.title")}
                 </h2>
                 <p className="mx-2 mb-2 text-[12px] text-[#8e8e93] max-lg:mx-1">
-                  Tick every edition the room should follow. One move sends them
-                  all.
+                  {t("studio.live_control.editions.hint")}
                 </p>
                 {editions.map((edition) => {
                   const isDriver = edition.textId === driverTextId;
@@ -2937,7 +3093,12 @@ const LiveControlPage = () => {
                     >
                       <input
                         type="checkbox"
-                        aria-label={`Follow ${edition.title}`}
+                        aria-label={t(
+                          "studio.live_control.editions.follow_aria",
+                          {
+                            title: edition.title,
+                          },
+                        )}
                         checked={isDriver || followed.includes(edition.textId)}
                         disabled={isDriver}
                         onChange={() => toggleFollow(edition)}
@@ -2957,7 +3118,9 @@ const LiveControlPage = () => {
                         </span>
                         <span className="block text-[11px] text-[#8e8e93]">
                           {edition.language || "?"}
-                          {isDriver ? " · reading" : ""}
+                          {isDriver
+                            ? ` · ${t("studio.live_control.editions.reading")}`
+                            : ""}
                           {note ? ` · ${note}` : ""}
                         </span>
                       </button>
@@ -2975,7 +3138,7 @@ const LiveControlPage = () => {
           <div
             role="separator"
             aria-orientation="horizontal"
-            aria-label="Resize titles"
+            aria-label={t("studio.live_control.resize_titles")}
             aria-valuemin={Math.round(TITLES_SHARE_MIN * 100)}
             aria-valuemax={Math.round(TITLES_SHARE_MAX * 100)}
             aria-valuenow={Math.round(titlesShare * 100)}
@@ -2995,163 +3158,371 @@ const LiveControlPage = () => {
         ) : null}
 
         <main className="flex min-h-0 min-w-0 flex-1 flex-col px-8 pt-5 max-lg:px-3 max-lg:pt-2">
-          <div className="flex flex-wrap items-center gap-2 text-[13px] tracking-[0.04em] text-[#8e8e93] max-lg:gap-1.5">
+          {/* Only the title and the settings stay at the top, so the lines get
+           * the height. The rest sits behind the settings button, top right. */}
+          <div className="flex shrink-0 items-start gap-2">
+            <div className="flex min-w-0 flex-1 items-center gap-1.5">
+              <h1 className="min-w-0 text-2xl leading-relaxed [overflow-wrap:anywhere] max-lg:text-base max-lg:leading-snug">
+                {driverEdition?.title ??
+                  (sourceTextId || t("studio.live_control.no_text_loaded"))}
+              </h1>
+              {/* The titles as a popup, wherever the side panel is. */}
+              {(liturgies && liturgies.length > 0) || sections.length > 0 ? (
+                <Dialog open={tocOpen} onOpenChange={setTocOpen}>
+                  <DialogTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label={t("studio.live_control.toc.open")}
+                      title={t("studio.live_control.toc.open")}
+                      className="shrink-0 cursor-pointer rounded-md p-1.5 text-[#8e8e93] hover:bg-[#2c2c2e] hover:text-[#f2f2f7]"
+                    >
+                      <IoMenu aria-hidden="true" className="size-5" />
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent
+                    aria-describedby={undefined}
+                    className="flex max-h-[85dvh] flex-col gap-0 border-[#2c2c2e] bg-[#111113] p-0 font-tibetan-ui text-[#f2f2f7] sm:max-w-xl [&>[data-slot=dialog-close]]:text-[#f2f2f7]"
+                  >
+                    <DialogTitle className="border-b border-[#2c2c2e] px-4 py-3 pr-12 text-base font-semibold">
+                      {t("studio.live_control.toc.title")}
+                    </DialogTitle>
+                    <div
+                      data-toc=""
+                      className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 pb-4"
+                    >
+                      {titleLists(true)}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              ) : null}
+            </div>
+            {/* Stop / Go live stays out of the menu: whether the app follows
+             * this screen must be seen, and changed, at a glance. */}
             <button
               type="button"
-              onClick={() => setNavOpen((open) => !open)}
-              aria-pressed={titlesUnfolded}
-              className={`shrink-0 cursor-pointer rounded-md bg-[#2c2c2e] px-3 py-1.5 text-[13px] font-semibold hover:bg-[#3a3a3c] max-lg:px-2.5 ${
-                needsText ? "hidden" : ""
+              onClick={toggleOnAir}
+              aria-pressed={onAir}
+              data-on-air={onAir ? "on" : "off"}
+              title={
+                onAir
+                  ? t("studio.live_control.on_air.stop_title")
+                  : t("studio.live_control.on_air.go_live_title")
+              }
+              className={`mt-1 flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold whitespace-nowrap select-none max-lg:mt-0 max-lg:px-2.5 max-lg:py-1 ${
+                onAir
+                  ? "bg-[#2c2c2e] text-[#f2f2f7] hover:bg-[#3a3a3c]"
+                  : "bg-[#e5231c] text-white hover:bg-[#ff3a33]"
               }`}
             >
-              {titlesUnfolded ? "Hide titles" : "Show titles"}
-            </button>
-            <span className="max-lg:hidden">
-              The WeBuddhist app follows this controller.
-            </span>
-            <span
-              data-testid="publish-state"
-              className={`shrink-0 rounded-full px-2.5 py-1 text-[13px] font-semibold whitespace-nowrap max-lg:px-2 max-lg:text-[12px] ${
-                online
-                  ? "bg-[#1f3a24] text-[#7fd598]"
-                  : "bg-[#3a1f1f] text-[#e08585]"
-              }`}
-            >
-              {statusLabel}
-            </span>
-            {/* Size and token travel together: on a phone too narrow for one
-             * row they wrap as a pair to the right, never one button alone. */}
-            <div className="ml-auto flex shrink-0 items-center gap-1.5">
-              {/* The update toast is held back here, as it would cover Next;
-               * this is where a waiting update shows instead. */}
-              <AppUpdateButton
-                showLabel
-                // Below 360px the row of size, Cue and Token has no room for the word.
-                labelClassName="max-[360px]:sr-only"
-                description="Reloading takes a second. Tap Live afterwards to get back to the room's line."
-                className="h-auto shrink-0 border-0 bg-[#0b2a4a] px-3 py-1.5 text-sm font-semibold text-[#64b5ff] hover:bg-[#123a63] hover:text-[#64b5ff] max-lg:px-2.5 max-lg:text-[13px]"
+              <span
+                aria-hidden="true"
+                className={`inline-block size-2 shrink-0 ${
+                  onAir ? "rounded-[1px] bg-[#e5231c]" : "rounded-full bg-white"
+                }`}
               />
-              {/* The text size suits the screen, so it is kept per browser. */}
-              <label className="flex shrink-0 items-center gap-1.5">
-                <span className="max-lg:hidden">Text size</span>
-                {sizePicker("Text size", textScale, changeTextScale)}
-              </label>
-              <button
-                type="button"
-                aria-expanded={cueOpen}
-                aria-controls="cue-settings"
-                onClick={() => setCueOpen((open) => !open)}
-                className="shrink-0 rounded-md bg-[#2c2c2e] px-3 py-1.5 text-sm font-semibold whitespace-nowrap hover:bg-[#3a3a3c] max-lg:px-2.5 max-lg:text-[13px]"
+              {onAir
+                ? t("studio.live_control.on_air.stop")
+                : t("studio.live_control.on_air.go_live")}
+            </button>
+            {/* Live, Auto and Hold, and everything set up once - status, the
+             * titles, size, cue, token - folded away so the lines have the
+             * screen. The dot says what Live or Auto would: red when this
+             * screen is off the room's line, green while autoplay runs. */}
+            <Popover open={controlsOpen} onOpenChange={setControlsOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  aria-label={t("studio.live_control.controls.settings")}
+                  title={t("studio.live_control.controls.settings")}
+                  className="relative mt-1 shrink-0 cursor-pointer rounded-md bg-[#2c2c2e] p-2 text-[#f2f2f7] hover:bg-[#3a3a3c] max-lg:mt-0 max-lg:p-1.5"
+                >
+                  <IoSettingsSharp aria-hidden="true" className="size-4" />
+                  {offLive || autoplay || remoteAutoplay ? (
+                    <span
+                      aria-hidden="true"
+                      data-controls-dot={offLive ? "off-live" : "autoplay"}
+                      className={`absolute -top-0.5 -right-0.5 size-2.5 rounded-full ring-2 ring-black ${
+                        offLive ? "bg-[#e5231c]" : "bg-[#30d158]"
+                      }`}
+                    />
+                  ) : null}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                collisionPadding={8}
+                className="flex max-h-[var(--radix-popover-content-available-height)] w-80 max-w-[calc(100vw-16px)] flex-col gap-2 overflow-y-auto overscroll-contain border-[#2c2c2e] bg-[#1c1c1e] p-2 font-tibetan-ui text-[#f2f2f7]"
               >
-                Cue
-              </button>
-              {/* A phone has little room for this, so the button says less. */}
-              <button
-                type="button"
-                aria-label={token ? "Change token" : "Add token"}
-                onClick={() => (token ? forgetToken() : setShowTokenBox(true))}
-                className="shrink-0 rounded-md bg-[#2c2c2e] px-3 py-1.5 text-sm font-semibold whitespace-nowrap hover:bg-[#3a3a3c] max-lg:px-2.5 max-lg:text-[13px]"
-              >
-                <span className="max-lg:hidden">
-                  {token ? "Change token" : "Add token"}
-                </span>
-                <span className="lg:hidden" aria-hidden="true">
-                  Token
-                </span>
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={goLive}
+                  disabled={roomLineIndex < 0}
+                  title={
+                    roomLineIndex < 0
+                      ? t("studio.live_control.controls.live_unknown")
+                      : t("studio.live_control.controls.live_title")
+                  }
+                  className={`w-full touch-manipulation cursor-pointer rounded-[9px] py-3 text-base font-semibold select-none disabled:cursor-not-allowed disabled:opacity-40 ${
+                    offLive
+                      ? // White as the room's line is, so it is found the moment
+                        // this screen is somewhere else.
+                        "bg-white text-black hover:bg-[#e5e5ea]"
+                      : "bg-[#2c2c2e] hover:bg-[#3a3a3c] active:bg-[#48484a]"
+                  }`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`mr-1.5 inline-block h-2 w-2 rounded-full align-[0.1em] ${
+                      offLive ? "bg-[#e5231c]" : "bg-white"
+                    }`}
+                  />
+                  {t("studio.live_control.controls.live")}
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleAutoplay}
+                  aria-pressed={autoplay || remoteAutoplay}
+                  // Pausing is always allowed; starting waits for the lines and
+                  // the yigchung, which the plan is laid out from.
+                  disabled={
+                    !token ||
+                    !onAir ||
+                    (!autoplay &&
+                      !remoteAutoplay &&
+                      (driverLines.length === 0 || awaitingYigchungs))
+                  }
+                  title={
+                    !token
+                      ? t("studio.live_control.autoplay.token_needed")
+                      : !onAir
+                        ? t("studio.live_control.on_air.stopped")
+                        : t("studio.live_control.controls.auto_title")
+                  }
+                  className={`w-full touch-manipulation cursor-pointer rounded-[9px] py-3 text-base font-semibold select-none disabled:cursor-not-allowed disabled:opacity-40 ${
+                    autoplay || remoteAutoplay
+                      ? "bg-[#1f3a24] text-[#7fd598] hover:bg-[#274a2e]"
+                      : "bg-[#2c2c2e] hover:bg-[#3a3a3c] active:bg-[#48484a]"
+                  }`}
+                >
+                  {autoplay || remoteAutoplay
+                    ? `❚❚ ${t("studio.live_control.controls.pause")}`
+                    : `▶ ${t("studio.live_control.controls.auto")}`}
+                </button>
+                {serverAutoplay?.status === "running" ? (
+                  <button
+                    type="button"
+                    onClick={() => void toggleHold()}
+                    aria-pressed={serverAutoplay.held}
+                    disabled={holdBusy || !onAir}
+                    title={
+                      serverAutoplay.held
+                        ? t("studio.live_control.controls.go_on_title")
+                        : t("studio.live_control.controls.hold_title")
+                    }
+                    className={`w-full touch-manipulation cursor-pointer rounded-[9px] py-3 text-base font-semibold select-none disabled:cursor-wait disabled:opacity-60 ${
+                      serverAutoplay.held
+                        ? "bg-[#0a3a4a] text-[#64d2ff] hover:bg-[#0f4a5e]"
+                        : "bg-[#2c2c2e] hover:bg-[#3a3a3c] active:bg-[#48484a]"
+                    }`}
+                  >
+                    {serverAutoplay.held
+                      ? `▶ ${t("studio.live_control.controls.go_on")}`
+                      : `✋ ${t("studio.live_control.controls.hold")}`}
+                  </button>
+                ) : null}
+                <div className="mt-1 flex flex-col gap-2 border-t border-[#2c2c2e] px-1 pt-3">
+                  <div className="flex flex-wrap items-center gap-2 text-[13px] text-[#8e8e93]">
+                    <span
+                      data-testid="publish-state"
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-[13px] font-semibold whitespace-nowrap ${
+                        online
+                          ? "bg-[#1f3a24] text-[#7fd598]"
+                          : "bg-[#3a1f1f] text-[#e08585]"
+                      }`}
+                    >
+                      {statusLabel}
+                    </span>
+                    <span>{t("studio.live_control.app_follows")}</span>
+                  </div>
+                  {token ? (
+                    <div
+                      data-room=""
+                      aria-live="polite"
+                      className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] text-[#8e8e93]"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`inline-block size-2 shrink-0 rounded-full ${
+                          socket.status === "open"
+                            ? "bg-[#30d158]"
+                            : "bg-[#636366]"
+                        }`}
+                      />
+                      <span className="shrink-0">
+                        {socket.status === "open"
+                          ? t("studio.live_control.room.room")
+                          : socket.status === "connecting"
+                            ? t("studio.live_control.room.connecting")
+                            : socket.status === "refused"
+                              ? t("studio.live_control.room.refused", {
+                                  reason:
+                                    socket.refusal ??
+                                    t(
+                                      "studio.live_control.room.refused_reason",
+                                    ),
+                                })
+                              : t("studio.live_control.room.offline")}
+                      </span>
+                      {socket.status === "open" ? (
+                        <span
+                          data-room-line
+                          className="min-w-0 [overflow-wrap:anywhere]"
+                        >
+                          {roomLineIndex >= 0
+                            ? `${t("studio.live_control.room.line", { line: roomLineIndex + 1 })}${
+                                socket.room?.roundNumber &&
+                                socket.room.roundNumber > 1
+                                  ? ` · ${t("studio.live_control.room.round", {
+                                      round: socket.room.roundNumber,
+                                    })}`
+                                  : ""
+                              } · ${driverLines[roomLineIndex]?.content ?? ""}`
+                            : socket.room
+                              ? t("studio.live_control.room.other_text")
+                              : t("studio.live_control.room.no_line")}
+                        </span>
+                      ) : null}
+                      {socket.status === "open" && socket.people !== null ? (
+                        <span className="shrink-0">
+                          ·{" "}
+                          {t("studio.live_control.room.people_following", {
+                            count: socket.people,
+                          })}
+                        </span>
+                      ) : null}
+                      {remoteAutoplay ? (
+                        <span className="shrink-0 text-[#7fd598]">
+                          · {t("studio.live_control.room.autoplay_running")}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+                <div className="flex flex-col gap-1.5 border-t border-[#2c2c2e] pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setNavOpen((open) => !open)}
+                    aria-pressed={titlesUnfolded}
+                    className={`w-full cursor-pointer rounded-md bg-[#2c2c2e] px-3 py-2 text-left text-sm font-semibold hover:bg-[#3a3a3c] ${
+                      needsText ? "hidden" : ""
+                    }`}
+                  >
+                    {titlesUnfolded
+                      ? t("studio.live_control.hide_titles")
+                      : t("studio.live_control.show_titles")}
+                  </button>
+                  {/* The text size suits the screen, so it is kept per browser. */}
+                  <label className="flex items-center gap-2 px-1 text-sm text-[#8e8e93]">
+                    <span className="mr-auto">
+                      {t("studio.live_control.text_size")}
+                    </span>
+                    {sizePicker(
+                      t("studio.live_control.text_size"),
+                      textScale,
+                      changeTextScale,
+                    )}
+                  </label>
+                  <button
+                    type="button"
+                    aria-expanded={cueOpen}
+                    aria-controls="cue-settings"
+                    onClick={() => setCueOpen((open) => !open)}
+                    className="w-full cursor-pointer rounded-md bg-[#2c2c2e] px-3 py-2 text-left text-sm font-semibold hover:bg-[#3a3a3c]"
+                  >
+                    {t("studio.live_control.cue.button")}
+                  </button>
+                  {cueOpen ? (
+                    <div
+                      id="cue-settings"
+                      role="group"
+                      aria-label={t("studio.live_control.cue.settings_aria")}
+                      className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border border-[#2c2c2e] bg-black p-3 text-sm text-[#8e8e93]"
+                    >
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={cue.recordPlayTimes}
+                          onChange={(e) =>
+                            changeCue({ recordPlayTimes: e.target.checked })
+                          }
+                          className="size-4 accent-[#e5231c]"
+                        />
+                        {t("studio.live_control.cue.record_play_times")}
+                      </label>
+                      <AutoplaySettingsFields
+                        leadMs={serverAutoplay?.leadMs ?? null}
+                        tempo={serverAutoplay?.tempo ?? null}
+                        disabled={!token || !onAir}
+                        onChange={(change) =>
+                          void changeAutoplaySettings(change)
+                        }
+                      />
+                      <p className="w-full text-[12px]">
+                        {t("studio.live_control.cue.help_record")}
+                      </p>
+                      <p className="w-full text-[12px]">
+                        {t("studio.live_control.cue.help_lead")}
+                      </p>
+                    </div>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (token) forgetToken();
+                      else setShowTokenBox(true);
+                      setControlsOpen(false);
+                    }}
+                    className="w-full cursor-pointer rounded-md bg-[#2c2c2e] px-3 py-2 text-left text-sm font-semibold hover:bg-[#3a3a3c]"
+                  >
+                    {token
+                      ? t("studio.live_control.token.change")
+                      : t("studio.live_control.token.add")}
+                  </button>
+                  {/* The update toast is held back here, as it would cover Next;
+                   * this is where a waiting update shows instead. */}
+                  <AppUpdateButton
+                    showLabel
+                    description={t("studio.live_control.update_description")}
+                    className="h-auto w-full justify-start border-0 bg-[#0b2a4a] px-3 py-2 text-sm font-semibold text-[#64b5ff] hover:bg-[#123a63] hover:text-[#64b5ff]"
+                  />
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
 
-          {cueOpen ? (
-            <div
-              id="cue-settings"
-              role="group"
-              aria-label="Cue settings"
-              className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border border-[#2c2c2e] bg-[#1c1c1e] p-3 text-sm text-[#8e8e93] max-lg:mt-2"
-            >
-              <label className="flex items-center gap-2">
-                <span
-                  aria-hidden="true"
-                  className="size-2.5 rounded-full bg-[#ff453a]"
-                />
-                Next click
-                <input
-                  type="number"
-                  min={0}
-                  max={CUE_OFFSET_MAX_MS / 1000}
-                  step={0.1}
-                  value={cue.nextClickOffsetMs / 1000}
-                  onChange={(e) =>
-                    changeCue({
-                      nextClickOffsetMs: Math.round(
-                        Number(e.target.value) * 1000,
-                      ),
-                    })
-                  }
-                  className="w-20 rounded-md border border-[#2c2c2e] bg-black px-2 py-1 text-[#f2f2f7] tabular-nums max-lg:text-base"
-                />
-                s early
-              </label>
-              <label className="flex items-center gap-2">
-                <span
-                  aria-hidden="true"
-                  className="size-2.5 rounded-full bg-[#ffd60a]"
-                />
-                Autoplay
-                <input
-                  type="number"
-                  min={0}
-                  max={CUE_OFFSET_MAX_MS / 1000}
-                  step={0.1}
-                  value={cue.autoplayOffsetMs / 1000}
-                  onChange={(e) =>
-                    changeCue({
-                      autoplayOffsetMs: Math.round(
-                        Number(e.target.value) * 1000,
-                      ),
-                    })
-                  }
-                  className="w-20 rounded-md border border-[#2c2c2e] bg-black px-2 py-1 text-[#f2f2f7] tabular-nums max-lg:text-base"
-                />
-                s early
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={cue.recordPlayTimes}
-                  onChange={(e) =>
-                    changeCue({ recordPlayTimes: e.target.checked })
-                  }
-                  className="size-4 accent-[#e5231c]"
-                />
-                Record play times
-              </label>
-              <AutoplaySettingsFields
-                leadMs={serverAutoplay?.leadMs ?? null}
-                tempo={serverAutoplay?.tempo ?? null}
-                disabled={!token}
-                onChange={(change) => void changeAutoplaySettings(change)}
-              />
-              <p className="w-full text-[12px]">
-                With Record play times off, moves by hand send no time and the
-                stored play times are left as they are. The end of the line's
-                bar is red for the Next-click offset and yellow for the autoplay
-                offset. Kept in this browser.
-              </p>
-              <p className="w-full text-[12px]">
-                Phone lead sends each autoplay line to the app that much before
-                its time, so it lands on phones with the stage; raise it if
-                phones trail the room, lower it if they run ahead. Room pace is
-                learned from Next and Hold while autoplay runs. Both are kept by
-                the server for this event.
-              </p>
-            </div>
-          ) : null}
+          {/* Where this screen is, for a screen reader: it is not shown, as the
+           * lines themselves say it. */}
+          <p data-position="" aria-live="polite" className="sr-only">
+            {driverLines.length > 0
+              ? t("studio.live_control.position.line_of", {
+                  line: currentIndex + 1,
+                  total: driverLines.length,
+                })
+              : t("studio.live_control.position.nothing_loaded")}
+            {followedCount > 0
+              ? ` · ${t(
+                  followedCount === 1
+                    ? "studio.live_control.position.following_one"
+                    : "studio.live_control.position.following_other",
+                  { count: followedCount },
+                )}`
+              : null}
+          </p>
 
           {showTokenBox ? (
-            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-[#2c2c2e] bg-[#1c1c1e] p-3 max-lg:mt-2">
+            <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg border border-[#2c2c2e] bg-[#1c1c1e] p-3">
               <label className="text-sm text-[#8e8e93]" htmlFor="emit-token">
-                Emit token
+                {t("studio.live_control.token.label")}
               </label>
               <input
                 id="emit-token"
@@ -3161,7 +3532,7 @@ const LiveControlPage = () => {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") saveToken();
                 }}
-                placeholder="paste the recitation emit token"
+                placeholder={t("studio.live_control.token.placeholder")}
                 className="min-w-[240px] flex-1 rounded-md border border-[#2c2c2e] bg-black px-3 py-2 text-sm text-[#f2f2f7] placeholder:text-[#8e8e93] max-lg:min-w-0 max-lg:text-base"
               />
               <button
@@ -3169,74 +3540,22 @@ const LiveControlPage = () => {
                 onClick={saveToken}
                 className="rounded-md bg-[#e5231c] px-4 py-2 text-sm font-semibold text-white hover:bg-[#ff3a33]"
               >
-                Save
+                {t("studio.common.save")}
               </button>
               <p className="w-full text-[12px] text-[#8e8e93]">
-                Kept in this browser only, never in the link. This one token can
-                drive any live recitation, so treat it like a password.
+                {t("studio.live_control.token.help")}
               </p>
             </div>
           ) : null}
+          <div className="mb-2 max-lg:mb-1" />
 
-          <h1 className="mt-3.5 mb-0.5 text-2xl leading-relaxed [overflow-wrap:anywhere] max-lg:mt-2 max-lg:text-base max-lg:leading-snug">
-            {driverEdition?.title ?? (sourceTextId || "No text loaded")}
-          </h1>
-          {/* Where the room is, at every width and in both modes: the line that
-           * answers "where are we" without reading the text. */}
-          <div className="mb-3 text-[13px] text-[#8e8e93] max-lg:mb-1 max-lg:text-[12px]">
-            {driverLines.length > 0
-              ? `line ${currentIndex + 1}/${driverLines.length}`
-              : "nothing loaded yet"}
-            {followedCount > 0
-              ? ` · ${followedCount} more edition${followedCount === 1 ? "" : "s"} following`
-              : null}
-          </div>
-          {/* What the room is shown, as the backend says: the controller's own
-           * view of the room, whoever is moving it. */}
-          {token ? (
+          {!onAir ? (
             <div
-              data-room=""
-              aria-live="polite"
-              className="mb-3 flex min-w-0 items-center gap-2 text-[13px] text-[#8e8e93] max-lg:mb-1 max-lg:text-[12px]"
+              data-off-air=""
+              role="status"
+              className="mb-3 rounded-lg border border-[#5a4a1f] bg-[#2a2310] px-3 py-2 text-sm text-[#e0c46a] max-lg:mb-2"
             >
-              <span
-                aria-hidden="true"
-                className={`inline-block size-2 shrink-0 rounded-full ${
-                  socket.status === "open" ? "bg-[#30d158]" : "bg-[#636366]"
-                }`}
-              />
-              <span className="shrink-0">
-                {socket.status === "open"
-                  ? "Room"
-                  : socket.status === "connecting"
-                    ? "Connecting to the room…"
-                    : socket.status === "refused"
-                      ? `The room turned the controller away (${
-                          socket.refusal ?? "refused"
-                        }) · moves go by HTTP. The server may not take the emit token on its socket yet.`
-                      : "Room offline · moves go by HTTP"}
-              </span>
-              {socket.status === "open" ? (
-                <span data-room-line className="min-w-0 truncate">
-                  {roomLineIndex >= 0
-                    ? `line ${roomLineIndex + 1}${
-                        socket.room?.roundNumber && socket.room.roundNumber > 1
-                          ? ` · round ${socket.room.roundNumber}`
-                          : ""
-                      } · ${driverLines[roomLineIndex]?.content ?? ""}`
-                    : socket.room
-                      ? "on another text"
-                      : "no line yet"}
-                </span>
-              ) : null}
-              {socket.status === "open" && socket.people !== null ? (
-                <span className="shrink-0">· {socket.people} following</span>
-              ) : null}
-              {remoteAutoplay ? (
-                <span className="shrink-0 text-[#7fd598]">
-                  · autoplay running
-                </span>
-              ) : null}
+              {t("studio.live_control.on_air.stopped")}
             </div>
           ) : null}
 
@@ -3250,7 +3569,7 @@ const LiveControlPage = () => {
               </p>
               <button
                 type="button"
-                aria-label="Dismiss message"
+                aria-label={t("studio.live_control.dismiss_message")}
                 onClick={() => setDismissedError(errorMessage)}
                 className="-my-0.5 shrink-0 cursor-pointer rounded-md px-2 py-0.5 text-lg leading-none hover:bg-[#3a1f1f]"
               >
@@ -3262,274 +3581,262 @@ const LiveControlPage = () => {
           {/* A phone held sideways has height to spare for neither, so the
            * controls stand in a column to the right of the lines. */}
           <div className="flex min-h-0 flex-1 flex-col max-lg:landscape:flex-row max-lg:landscape:gap-2">
-            <div
-              ref={listRef}
-              className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-2 max-lg:pr-0"
-            >
-              {driverLines.length === 0 ? (
-                <p className="py-12 text-center text-sm text-[#8e8e93]">
-                  {isPreparingDriver ||
-                  (sourceTextId && !driverTextId && !loadError)
-                    ? "Loading…"
-                    : "Pick a liturgy or add a text id, then tap a line (or press Space) to move the room."}
-                </p>
-              ) : (
-                driverLines.map((segment, index) => {
-                  const returnTo = returnButtonForLine(segment.id, driverLines);
-                  const yigchung = yigchungs?.[segment.id];
-                  const isYigchung = Boolean(yigchung?.full);
-                  const playTime = playTimes?.[segment.id];
-                  return (
-                    <Fragment key={segment.id}>
-                      <button
-                        type="button"
-                        data-line={index}
-                        data-yigchung={isYigchung ? "" : undefined}
-                        data-room-here={
-                          index === roomLineIndex && index !== currentIndex
-                            ? ""
-                            : undefined
-                        }
-                        title={
-                          isYigchung ? "Yigchung · skipped by Next" : undefined
-                        }
-                        onClick={() => goTo(index)}
-                        className={`block w-full cursor-pointer rounded-[5px] text-left break-words ${lineClass} ${
-                          isYigchung
-                            ? // Instruction, not recitation: smaller, in its own
-                              // colour, and ruled off so the verse around it reads on.
-                              `border-l-2 border-dashed border-[#c9a063]/60 pl-3 ${yigchungLineSize}`
-                            : lineSize
-                        } ${
-                          index === currentIndex
-                            ? // Packed lines need more than a tint to be found at a
-                              // glance, so the live one is outlined as well.
-                              "bg-[rgba(229,35,28,0.30)] text-white outline-1 outline-[#e5231c]"
-                            : index === roomLineIndex
-                              ? // The room is somewhere else than this screen -
-                                // a move still on its way, or another controller.
-                                "text-[#f2f2f7] outline-1 outline-dashed outline-[#30d158]/70"
-                              : isYigchung
-                                ? "text-[#c9a063]/80 hover:bg-[#1a1a1c] hover:text-[#e0bd84]"
-                                : "text-[#8e8e93] hover:bg-[#1a1a1c] hover:text-[#f2f2f7]"
-                        }`}
-                      >
-                        {/* What autoplay holds the line for; a dash is a line
-                         * it stops at, never having been recited through. */}
-                        {playTimes && !isYigchung ? (
-                          <span
-                            data-play-time={playTime ?? ""}
-                            title={
-                              playTime === undefined
-                                ? "No play time yet · autoplay stops here"
-                                : "Play time learned from earlier pujas"
-                            }
-                            className={`float-right mt-1 ml-2 rounded-full px-2 py-0.5 font-sans text-[11px] leading-none tabular-nums ${
-                              playTime === undefined
-                                ? "text-[#636366]"
-                                : "bg-[#1c1c1e] text-[#c7c7cc]"
-                            }`}
-                          >
-                            {playTime === undefined
-                              ? "—"
-                              : formatPlayTime(playTime)}
-                          </span>
-                        ) : null}
-                        {/* The line's ref, as autoplay's notes name it. */}
-                        <span
-                          data-line-ref={index + 1}
-                          aria-hidden="true"
-                          className="mr-2 align-[0.15em] font-sans text-[11px] text-[#636366] tabular-nums select-none"
+            <div className="relative flex min-h-0 flex-1 flex-col">
+              <div
+                ref={listRef}
+                onScroll={measureLiveInView}
+                className="min-h-0 flex-1 overflow-y-auto overscroll-contain pt-2 pr-2 max-lg:pr-0"
+              >
+                {driverLines.length === 0 ? (
+                  <p className="py-12 text-center text-sm text-[#8e8e93]">
+                    {isPreparingDriver ||
+                    (sourceTextId && !driverTextId && !loadError)
+                      ? t("studio.common.loading")
+                      : t("studio.live_control.empty_hint")}
+                  </p>
+                ) : (
+                  driverLines.map((segment, index) => {
+                    const returnTo = returnButtonForLine(
+                      segment.id,
+                      driverLines,
+                    );
+                    const yigchung = yigchungs?.[segment.id];
+                    const isYigchung = Boolean(yigchung?.full);
+                    const playTime = playTimes?.[segment.id];
+                    return (
+                      <Fragment key={segment.id}>
+                        <button
+                          type="button"
+                          data-line={index}
+                          data-yigchung={isYigchung ? "" : undefined}
+                          data-room-here={
+                            index === roomLineIndex && index !== currentIndex
+                              ? ""
+                              : undefined
+                          }
+                          title={
+                            isYigchung
+                              ? t("studio.live_control.line.yigchung_title")
+                              : undefined
+                          }
+                          onClick={() => goTo(index)}
+                          className={`relative block w-full cursor-pointer rounded-[5px] text-left break-words ${lineClass} ${
+                            index === roomLineIndex ? "pt-3" : "pt-1.5"
+                          } ${
+                            isYigchung
+                              ? // Instruction, not recitation: smaller, in its own
+                                // colour, and ruled off so the verse around it reads on.
+                                `border-l-2 border-dashed border-[#c9a063]/60 pl-3 ${yigchungLineSize}`
+                              : lineSize
+                          } ${
+                            index === currentIndex
+                              ? // Packed lines need more than a tint to be found at a
+                                // glance, so this screen's line is outlined as well.
+                                // Its text turns white only once the room is on it.
+                                `bg-[rgba(229,35,28,0.30)] outline-1 outline-[#e5231c] ${
+                                  offLive ? "text-[#aeaeb2]" : "text-white"
+                                }`
+                              : index === roomLineIndex
+                                ? // The room is somewhere else than this screen -
+                                  // a move still on its way, or another controller.
+                                  // White, as the room's line always is, and barred.
+                                  "text-white shadow-[inset_3px_0_0_#ffffff]"
+                                : isYigchung
+                                  ? "text-[#c9a063]/80 hover:bg-[#1a1a1c] hover:text-[#e0bd84]"
+                                  : "text-[#8e8e93] hover:bg-[#1a1a1c] hover:text-[#f2f2f7]"
+                          }`}
                         >
-                          {index + 1}
-                        </span>
-                        <LineContent
-                          content={segment.content}
-                          yigchung={yigchung}
-                        />
-                        {autoplay &&
-                        index === currentIndex &&
-                        (autoplayStepDuration ?? playTime) !== undefined ? (
-                          <AutoplayProgress
-                            startedAt={lineStartedAt}
-                            duration={autoplayStepDuration ?? playTime ?? 0}
-                            running={!autoplayBusy}
-                            autoplay
-                            cue={cue}
-                            heldAt={heldAt}
-                          />
-                        ) : !autoplay &&
-                          index === currentIndex &&
-                          !isYigchung &&
-                          playTime !== undefined ? (
-                          <AutoplayProgress
-                            startedAt={lineStartedAt}
-                            duration={playTime}
-                            running
-                            autoplay={false}
-                            cue={cue}
-                          />
-                        ) : null}
-                      </button>
-                      {returnTo ? (
-                        <div className="mt-1 mb-4 ml-1.5 flex flex-wrap items-center gap-2">
-                          <button
-                            type="button"
-                            aria-label={`${returnTo.label}, round ${acceptedRound(returnTo.key)}`}
-                            title={
-                              returnTo.key === lastReturnKey
-                                ? "Last return: clears every return count and starts over from round 1"
-                                : undefined
-                            }
-                            onClick={() =>
-                              returnTo.key === lastReturnKey
-                                ? finishWithLastReturn(returnTo.index)
-                                : beginNextRound(returnTo.key, returnTo.index)
-                            }
-                            className="flex cursor-pointer items-center gap-3 rounded-[9px] border border-[#e5231c] bg-[#2c2c2e] py-2.5 pr-2.5 pl-5 text-left text-base font-semibold text-[#f2f2f7] hover:bg-[#3a3a3c]"
-                          >
-                            <span>{returnTo.label}</span>
-                            {/* Which round this is, where the finger lands. */}
+                          {/* What autoplay holds the line for; a dash is a line
+                           * it stops at, never having been recited through. */}
+                          {playTimes && !isYigchung ? (
                             <span
-                              aria-hidden="true"
-                              className="min-w-[2.25rem] shrink-0 rounded-full bg-[#e5231c] px-2.5 py-0.5 text-center text-sm font-bold text-white tabular-nums"
+                              data-play-time={playTime ?? ""}
+                              title={
+                                playTime === undefined
+                                  ? t("studio.live_control.line.no_play_time")
+                                  : t(
+                                      "studio.live_control.line.play_time_learned",
+                                    )
+                              }
+                              className={`float-right mt-1 ml-2 rounded-full px-2 py-0.5 font-sans text-[11px] leading-none tabular-nums ${
+                                playTime === undefined
+                                  ? "text-[#636366]"
+                                  : "bg-[#1c1c1e] text-[#c7c7cc]"
+                              }`}
                             >
-                              {acceptedRound(returnTo.key)}
+                              {playTime === undefined
+                                ? "—"
+                                : formatPlayTime(playTime)}
                             </span>
-                            {/* Begun but not yet taken by the room: shown apart,
-                             * so the badge never runs ahead of the recitation. */}
-                            {roundOf(returnTo.key) >
-                            acceptedRound(returnTo.key) ? (
-                              <span
-                                data-round-pending=""
-                                title="Waiting for the room to take this round"
-                                className="shrink-0 text-sm font-semibold text-[#8e8e93] tabular-nums"
-                              >
-                                → {roundOf(returnTo.key)}
-                              </span>
-                            ) : null}
-                          </button>
-                          {roundOf(returnTo.key) > FIRST_ROUND ? (
+                          ) : null}
+                          {/* Pinned on the line's top border, half outside it,
+                           * so it marks the line without sitting on its text. */}
+                          {index === roomLineIndex ? (
+                            <span
+                              data-live-badge=""
+                              aria-hidden="true"
+                              className="pointer-events-none absolute top-0 left-2 -translate-y-1/2 rounded-full bg-white px-1.5 py-0.5 font-sans text-[10px] leading-none font-bold tracking-wide text-black uppercase shadow-[0_0_0_2px_#000] select-none"
+                            >
+                              {t("studio.live_control.controls.live")}
+                            </span>
+                          ) : null}
+                          {/* The line's ref, as autoplay's notes name it. */}
+                          <span
+                            data-line-ref={index + 1}
+                            aria-hidden="true"
+                            className="mr-2 align-[0.15em] font-sans text-[11px] text-[#636366] tabular-nums select-none"
+                          >
+                            {index + 1}
+                          </span>
+                          <LineContent
+                            content={segment.content}
+                            yigchung={yigchung}
+                          />
+                        </button>
+                        {returnTo ? (
+                          <div className="mt-1 mb-4 ml-1.5 flex flex-wrap items-center gap-2">
                             <button
                               type="button"
-                              aria-label={`Reset count: ${returnTo.label}`}
-                              title="Reset the count to 1"
-                              onClick={() => {
-                                resetReturn(returnTo.key);
-                                planChanged();
-                              }}
-                              className="cursor-pointer rounded-[9px] bg-[#1c1c1e] px-3 py-2.5 text-sm font-semibold text-[#8e8e93] hover:bg-[#2c2c2e] hover:text-[#f2f2f7]"
+                              aria-label={t("studio.live_control.return.aria", {
+                                label: returnTo.label,
+                                round: acceptedRound(returnTo.key),
+                              })}
+                              title={
+                                returnTo.key === lastReturnKey
+                                  ? t("studio.live_control.return.last_title")
+                                  : undefined
+                              }
+                              onClick={() =>
+                                returnTo.key === lastReturnKey
+                                  ? finishWithLastReturn(returnTo.index)
+                                  : beginNextRound(returnTo.key, returnTo.index)
+                              }
+                              className="flex cursor-pointer items-center gap-3 rounded-[9px] border border-[#e5231c] bg-[#2c2c2e] py-2.5 pr-2.5 pl-5 text-left text-base font-semibold text-[#f2f2f7] hover:bg-[#3a3a3c]"
                             >
-                              Reset to 1
+                              <span>{returnTo.label}</span>
+                              {/* Which round this is, where the finger lands. */}
+                              <span
+                                aria-hidden="true"
+                                className="min-w-[2.25rem] shrink-0 rounded-full bg-[#e5231c] px-2.5 py-0.5 text-center text-sm font-bold text-white tabular-nums"
+                              >
+                                {acceptedRound(returnTo.key)}
+                              </span>
+                              {/* Begun but not yet taken by the room: shown apart,
+                               * so the badge never runs ahead of the recitation. */}
+                              {roundOf(returnTo.key) >
+                              acceptedRound(returnTo.key) ? (
+                                <span
+                                  data-round-pending=""
+                                  title={t(
+                                    "studio.live_control.return.pending_title",
+                                  )}
+                                  className="shrink-0 text-sm font-semibold text-[#8e8e93] tabular-nums"
+                                >
+                                  → {roundOf(returnTo.key)}
+                                </span>
+                              ) : null}
                             </button>
-                          ) : null}
-                          <ReturnPlan
-                            label={returnTo.label}
-                            planned={plannedRoundsOf(returnTo.key)}
-                            left={returnsLeft(returnTo.key)}
-                            onChange={(rounds) => {
-                              planRounds(returnTo.key, rounds);
-                              planChanged();
-                            }}
-                          />
-                        </div>
-                      ) : null}
-                    </Fragment>
-                  );
-                })
-              )}
+                            {roundOf(returnTo.key) > FIRST_ROUND ? (
+                              <button
+                                type="button"
+                                aria-label={t(
+                                  "studio.live_control.return.reset_aria",
+                                  {
+                                    label: returnTo.label,
+                                  },
+                                )}
+                                title={t(
+                                  "studio.live_control.return.reset_title",
+                                )}
+                                onClick={() => {
+                                  resetReturn(returnTo.key);
+                                  planChanged();
+                                }}
+                                className="cursor-pointer rounded-[9px] bg-[#1c1c1e] px-3 py-2.5 text-sm font-semibold text-[#8e8e93] hover:bg-[#2c2c2e] hover:text-[#f2f2f7]"
+                              >
+                                {t("studio.live_control.return.reset")}
+                              </button>
+                            ) : null}
+                            {/* Only while this screen's autoplay runs: a change
+                             * then rebuilds its plan. By hand it has no use. */}
+                            {autoplay ? (
+                              <ReturnPlan
+                                label={returnTo.label}
+                                planned={plannedRoundsOf(returnTo.key)}
+                                left={returnsLeft(returnTo.key)}
+                                onChange={(rounds) => {
+                                  planRounds(returnTo.key, rounds);
+                                  planChanged();
+                                }}
+                              />
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </Fragment>
+                    );
+                  })
+                )}
+              </div>
+              {/* The room's line, scrolled out of the list: which way it lies, and
+               * a tap to look at it without moving this screen's own line. */}
+              {liveOutOfView && roomLineIndex >= 0 ? (
+                <button
+                  type="button"
+                  data-live-offscreen={liveOutOfView}
+                  title={t("studio.live_control.room.show_live_title")}
+                  onClick={() => scrollLineIntoBand(roomLineIndex)}
+                  className={`absolute left-1/2 z-10 flex -translate-x-1/2 cursor-pointer items-center gap-2 rounded-full bg-white px-3.5 py-1.5 text-[13px] font-semibold whitespace-nowrap text-black shadow-[0_2px_12px_rgba(0,0,0,0.6)] hover:bg-[#e5e5ea] ${
+                    liveOutOfView === "above" ? "top-2" : "bottom-2"
+                  }`}
+                >
+                  <span aria-hidden="true">
+                    {liveOutOfView === "above" ? "↑" : "↓"}
+                  </span>
+                  {t("studio.live_control.controls.live")} ·{" "}
+                  {t("studio.live_control.room.line", {
+                    line: roomLineIndex + 1,
+                  })}
+                  {/* How far from this screen's line, in lines. */}
+                  {roomLineIndex !== currentIndex ? (
+                    <span className="font-normal text-[#636366] tabular-nums">
+                      {roomLineIndex > currentIndex ? "+" : "−"}
+                      {Math.abs(roomLineIndex - currentIndex)}
+                    </span>
+                  ) : null}
+                </button>
+              ) : null}
             </div>
 
             <div className="border-t border-[#2c2c2e] pt-3 pb-4 max-lg:pt-2 max-lg:pb-2 max-lg:landscape:flex max-lg:landscape:w-[120px] max-lg:landscape:shrink-0 max-lg:landscape:flex-col max-lg:landscape:border-t-0 max-lg:landscape:border-l max-lg:landscape:pt-0 max-lg:landscape:pl-2">
               <p className="text-[13px] text-[#8e8e93] max-lg:hidden">
-                {lastSent ? `sent ${lastSent}` : "Tap any line · ← / → / Space"}
+                {lastSent
+                  ? t("studio.live_control.controls.sent", { detail: lastSent })
+                  : t("studio.live_control.controls.hint")}
               </p>
 
-              {/* Next takes the room left over and stands tall enough to take a
-               * fresh finger each time; Live stays smaller beside it - or below
-               * it, on a phone held sideways - so it is not the one hit by
-               * mistake. Going back a line is left to ← and ↑. */}
-              <div className="mt-2 flex items-stretch gap-3 max-lg:gap-2 max-lg:landscape:mt-0 max-lg:landscape:min-h-0 max-lg:landscape:flex-1 max-lg:landscape:flex-col-reverse">
-                <button
-                  type="button"
-                  onClick={goLive}
-                  disabled={roomLineIndex < 0}
-                  title={
-                    roomLineIndex < 0
-                      ? "The room's line is not known yet"
-                      : "Go to the line the room is on"
-                  }
-                  className={`w-[28%] max-w-[200px] touch-manipulation cursor-pointer rounded-[9px] py-4 text-base font-semibold select-none disabled:cursor-not-allowed disabled:opacity-40 max-lg:py-3 max-lg:text-[15px] max-lg:landscape:w-full max-lg:landscape:max-w-none ${
-                    offLive
-                      ? // Green as the room's line is, so it is found the moment
-                        // this screen is somewhere else.
-                        "bg-[#0f2a17] text-[#30d158] outline-1 outline-dashed outline-[#30d158]/70 hover:bg-[#143820]"
-                      : "bg-[#2c2c2e] hover:bg-[#3a3a3c] active:bg-[#48484a]"
-                  }`}
-                >
-                  <span
-                    aria-hidden="true"
-                    className="mr-1.5 inline-block h-2 w-2 rounded-full bg-[#30d158] align-[0.1em]"
-                  />
-                  Live
-                </button>
-                <button
-                  type="button"
-                  onClick={toggleAutoplay}
-                  aria-pressed={autoplay || remoteAutoplay}
-                  // Pausing is always allowed; starting waits for the lines and
-                  // the yigchung, which the plan is laid out from.
-                  disabled={
-                    !token ||
-                    (!autoplay &&
-                      !remoteAutoplay &&
-                      (driverLines.length === 0 || awaitingYigchungs))
-                  }
-                  title={
-                    token
-                      ? "Move the room on by itself, at the pace this text was recited before. The server keeps it going even if this screen sleeps."
-                      : "Add the emit token to use autoplay"
-                  }
-                  className={`w-[22%] max-w-[160px] touch-manipulation cursor-pointer rounded-[9px] py-4 text-base font-semibold select-none disabled:cursor-not-allowed disabled:opacity-40 max-lg:py-3 max-lg:text-[15px] max-lg:landscape:w-full max-lg:landscape:max-w-none ${
-                    autoplay || remoteAutoplay
-                      ? "bg-[#1f3a24] text-[#7fd598] hover:bg-[#274a2e]"
-                      : "bg-[#2c2c2e] hover:bg-[#3a3a3c] active:bg-[#48484a]"
-                  }`}
-                >
-                  {autoplay || remoteAutoplay ? "❚❚ Pause" : "▶ Auto"}
-                </button>
-                {serverAutoplay?.status === "running" ? (
-                  <button
-                    type="button"
-                    onClick={() => void toggleHold()}
-                    aria-pressed={serverAutoplay.held}
-                    disabled={holdBusy}
-                    title={
-                      serverAutoplay.held
-                        ? "Let autoplay go on: the line keeps what was left of its time (H)"
-                        : "Keep the room on this line until you let it go on - the line is running long (H)"
-                    }
-                    className={`w-[18%] max-w-[140px] touch-manipulation cursor-pointer rounded-[9px] py-4 text-base font-semibold select-none disabled:cursor-wait disabled:opacity-60 max-lg:py-3 max-lg:text-[15px] max-lg:landscape:w-full max-lg:landscape:max-w-none ${
-                      serverAutoplay.held
-                        ? "bg-[#0a3a4a] text-[#64d2ff] hover:bg-[#0f4a5e]"
-                        : "bg-[#2c2c2e] hover:bg-[#3a3a3c] active:bg-[#48484a]"
-                    }`}
-                  >
-                    {serverAutoplay.held ? "▶ Go on" : "✋ Hold"}
-                  </button>
-                ) : null}
+              {/* Next is the one control at the bottom, the full width, and tall
+               * enough to take a fresh finger each time; Live, Auto and Hold sit
+               * in the controls menu at the top. Going back a line is left to ← and ↑. */}
+              <div className="mt-2 flex items-stretch max-lg:landscape:mt-0 max-lg:landscape:min-h-0 max-lg:landscape:flex-1">
                 <button
                   type="button"
                   onClick={() => step(1)}
-                  className="flex-1 touch-manipulation cursor-pointer rounded-[9px] bg-[#e5231c] py-4 text-xl font-semibold text-white select-none hover:bg-[#ff3a33] active:bg-[#ff6b66] max-lg:portrait:min-h-[84px] max-lg:landscape:min-h-0"
+                  className="w-full touch-manipulation cursor-pointer rounded-[9px] bg-[#e5231c] py-4 text-xl font-semibold text-white select-none hover:bg-[#ff3a33] active:bg-[#ff6b66] max-lg:portrait:min-h-[84px] max-lg:landscape:min-h-0"
                 >
-                  Next →
+                  {t("studio.live_control.controls.next")} →
                 </button>
               </div>
             </div>
           </div>
         </main>
       </div>
+      {touchMenuItems.length > 0 ? (
+        <TouchMenu
+          label={t("studio.live_control.toc.open")}
+          title={t("studio.live_control.toc.title")}
+          items={touchMenuItems}
+        />
+      ) : null}
     </div>
   );
 };

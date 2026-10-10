@@ -1,4 +1,5 @@
 import { Pecha } from "@/components/ui/shadimport";
+import { useTranslate } from "@tolgee/react";
 import type { Control } from "react-hook-form";
 
 interface TaskTitleFieldProps {
@@ -22,6 +23,7 @@ export const TaskTitleField = ({
   onCancel,
   disabled = false,
 }: TaskTitleFieldProps) => {
+  const { t } = useTranslate();
   if (isEditMode && !isTitleEditing) {
     return (
       <>
@@ -34,7 +36,7 @@ export const TaskTitleField = ({
           onClick={onEdit}
           disabled={disabled === true}
         >
-          Edit
+          {t("studio.common.edit")}
         </Pecha.Button>
       </>
     );
@@ -51,7 +53,7 @@ export const TaskTitleField = ({
               <Pecha.FormControl>
                 <Pecha.Input
                   type="text"
-                  placeholder="Task Title"
+                  placeholder={t("studio.molecules.task_title.placeholder")}
                   className="h-12 text-base bg-white dark:bg-[#161616]"
                   disabled={disabled}
                   {...field}
@@ -63,10 +65,10 @@ export const TaskTitleField = ({
         />
         <div className="flex gap-2">
           <Pecha.Button variant="outline" type="button" onClick={onSave}>
-            Save
+            {t("studio.common.save")}
           </Pecha.Button>
           <Pecha.Button variant="outline" type="button" onClick={onCancel}>
-            Cancel
+            {t("studio.common.cancel")}
           </Pecha.Button>
         </div>
       </>
@@ -82,7 +84,7 @@ export const TaskTitleField = ({
           <Pecha.FormControl>
             <Pecha.Input
               type="text"
-              placeholder="Task Title"
+              placeholder={t("studio.molecules.task_title.placeholder")}
               className="h-12 text-base bg-white dark:bg-[#161616]"
               disabled={disabled}
               {...field}

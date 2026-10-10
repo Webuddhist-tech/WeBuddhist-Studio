@@ -148,15 +148,14 @@ describe("PlanDetailsPanel Component", () => {
 
   it("renders plan details panel with current plan title and days", async () => {
     renderWithProviders(<PlanDetailsPage />);
-    expect(screen.getByText("Current Plan")).toBeInTheDocument();
-    expect(screen.getByText("Days")).toBeInTheDocument();
+    expect(
+      screen.getByText("studio.task.sidebar.current_plan"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("studio.task.sidebar.days")).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByText(mockPlanData.title)).toBeInTheDocument();
     });
-    expect(screen.getByText("Day 1")).toBeInTheDocument();
-    expect(screen.getByText("Day 2")).toBeInTheDocument();
-    expect(screen.getByText("Day 3")).toBeInTheDocument();
-    expect(screen.getByText("Day 4")).toBeInTheDocument();
+    expect(screen.getAllByText("studio.task.day_number")).toHaveLength(4);
   });
 
   it("shows tasks when a day is selected and expanded", async () => {
@@ -166,7 +165,7 @@ describe("PlanDetailsPanel Component", () => {
     });
     expect(screen.getByText("Morning Intention Setting")).toBeInTheDocument();
     expect(screen.getByText("Compassion Reflection")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Day 2"));
+    fireEvent.click(screen.getAllByText("studio.task.day_number")[1]);
     await waitFor(() => {
       expect(
         screen.getByText("Meaningful Living Practice"),
@@ -180,11 +179,13 @@ describe("PlanDetailsPanel Component", () => {
     const mockAxios = axiosInstance as any;
     renderWithProviders(<PlanDetailsPage />, true);
     await waitFor(() => {
-      expect(screen.getByText("Day 4")).toBeInTheDocument();
+      expect(screen.getAllByText("studio.task.day_number")).toHaveLength(4);
     });
     // "Add New Day" now opens a dialog; submitting it triggers the request.
-    fireEvent.click(screen.getByText("Add New Day"));
-    const submitButton = await screen.findByText("Add 1 Day");
+    fireEvent.click(screen.getByText("studio.modals.day_add.add_new_day"));
+    const submitButton = await screen.findByText(
+      "studio.modals.day_create.submit_one",
+    );
     fireEvent.click(submitButton);
     await waitFor(() => {
       expect(mockAxios.post).toHaveBeenCalledWith(
@@ -209,15 +210,20 @@ describe("PlanDetailsPanel Component", () => {
     });
     renderWithProviders(<PlanDetailsPage />, true);
     await waitFor(() => {
-      expect(screen.getByText("Day 4")).toBeInTheDocument();
+      expect(screen.getAllByText("studio.task.day_number")).toHaveLength(4);
     });
-    fireEvent.click(screen.getByText("Add New Day"));
-    const submitButton = await screen.findByText("Add 1 Day");
+    fireEvent.click(screen.getByText("studio.modals.day_add.add_new_day"));
+    const submitButton = await screen.findByText(
+      "studio.modals.day_create.submit_one",
+    );
     fireEvent.click(submitButton);
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith("Failed to create days", {
-        description: "Cannot create day",
-      });
+      expect(toast.error).toHaveBeenCalledWith(
+        "studio.task.mutations.days_create_failed",
+        {
+          description: "Cannot create day",
+        },
+      );
     });
   });
 
@@ -226,8 +232,12 @@ describe("PlanDetailsPanel Component", () => {
     await waitFor(() => {
       expect(screen.getByText(mockPlanData.title)).toBeInTheDocument();
     });
-    expect(screen.getAllByText("Add Task").length).toBeGreaterThan(0);
-    expect(screen.getByPlaceholderText("Task Title")).toBeInTheDocument();
+    expect(
+      screen.getAllByText("studio.task.tabs.add_task").length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getByPlaceholderText("studio.molecules.task_title.placeholder"),
+    ).toBeInTheDocument();
   });
 
   it("switches to task view after clicking a task", async () => {
@@ -251,13 +261,17 @@ describe("PlanDetailsPanel Component", () => {
     await waitFor(() => {
       expect(screen.getByText(mockPlanData.title)).toBeInTheDocument();
     });
-    expect(screen.getAllByText("Add Task").length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText("studio.task.tabs.add_task").length,
+    ).toBeGreaterThan(0);
     fireEvent.click(screen.getByText("Morning Intention Setting"));
     await waitFor(() => {
-      expect(screen.queryAllByText("Add Task")).toHaveLength(0);
+      expect(screen.queryAllByText("studio.task.tabs.add_task")).toHaveLength(
+        0,
+      );
     });
     await waitFor(() => {
-      expect(screen.getByText("Task")).toBeInTheDocument();
+      expect(screen.getByText("studio.task.view.task")).toBeInTheDocument();
     });
   });
 
@@ -318,7 +332,7 @@ describe("PlanDetailsPanel Component", () => {
 
     fireEvent.click(screen.getByText("Morning Intention Setting"));
     await waitFor(() => {
-      expect(screen.getByText("Task")).toBeInTheDocument();
+      expect(screen.getByText("studio.task.view.task")).toBeInTheDocument();
     });
 
     const taskElements = screen.getAllByText("Morning Intention Setting");
@@ -331,14 +345,16 @@ describe("PlanDetailsPanel Component", () => {
     ) as HTMLElement;
     await user.click(dropdownTrigger);
 
-    const deleteText = await screen.findByText("Delete");
+    const deleteText = await screen.findByText("studio.common.delete");
     await user.click(deleteText);
 
-    const deleteTaskBtn = await screen.findByText("Delete Task");
+    const deleteTaskBtn = await screen.findByText("studio.modals.delete_task");
     await user.click(deleteTaskBtn);
 
     await waitFor(() => {
-      expect(screen.getAllByText("Add Task").length).toBeGreaterThan(0);
+      expect(
+        screen.getAllByText("studio.task.tabs.add_task").length,
+      ).toBeGreaterThan(0);
     });
   });
 
@@ -369,13 +385,15 @@ describe("PlanDetailsPanel Component", () => {
 
     fireEvent.click(screen.getByText("Morning Intention Setting"));
     await waitFor(() => {
-      expect(screen.getByText("Task")).toBeInTheDocument();
+      expect(screen.getByText("studio.task.view.task")).toBeInTheDocument();
     });
 
     const editBtn = await screen.findByRole("button", { name: /edit/i });
     fireEvent.click(editBtn);
     await waitFor(() => {
-      expect(screen.getByText("Edit Task")).toBeInTheDocument();
+      expect(
+        screen.getByText("studio.task.form.edit_task"),
+      ).toBeInTheDocument();
     });
 
     const taskElements = screen.getAllByText("Morning Intention Setting");
@@ -388,14 +406,16 @@ describe("PlanDetailsPanel Component", () => {
     ) as HTMLElement;
     await user.click(dropdownTrigger);
 
-    const deleteText = await screen.findByText("Delete");
+    const deleteText = await screen.findByText("studio.common.delete");
     await user.click(deleteText);
 
-    const deleteTaskBtn = await screen.findByText("Delete Task");
+    const deleteTaskBtn = await screen.findByText("studio.modals.delete_task");
     await user.click(deleteTaskBtn);
 
     await waitFor(() => {
-      expect(screen.getAllByText("Add Task").length).toBeGreaterThan(0);
+      expect(
+        screen.getAllByText("studio.task.tabs.add_task").length,
+      ).toBeGreaterThan(0);
     });
   });
 
@@ -425,8 +445,10 @@ describe("PlanDetailsPanel Component", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("This plan has no days yet")).toBeInTheDocument();
+      expect(screen.getByText("studio.task.no_days.title")).toBeInTheDocument();
     });
-    expect(screen.queryByText("Add Subtask")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("studio.task.form.add_subtask"),
+    ).not.toBeInTheDocument();
   });
 });

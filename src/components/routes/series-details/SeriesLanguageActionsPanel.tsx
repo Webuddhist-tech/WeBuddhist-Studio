@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { IoMdAdd } from "react-icons/io";
 import { Pecha } from "@/components/ui/shadimport";
+import { useTranslate } from "@tolgee/react";
 import { ROUTES } from "@/routes/paths";
 import type { LanguageCode } from "@/schema/SeriesSchema";
 import type { SeriesStartDateSettings } from "./seriesDetailsMappers";
@@ -25,6 +26,7 @@ export function SeriesLanguageActionsPanel({
   cloneSourceLanguages,
   seriesStartDate,
 }: Readonly<SeriesLanguageActionsPanelProps>) {
+  const { t } = useTranslate();
   const planNewState = {
     seriesId,
     language: activeLanguage,
@@ -53,7 +55,7 @@ export function SeriesLanguageActionsPanel({
             className="gap-2 bg-[#A51C21] hover:bg-[#8a171c] text-white"
           >
             <IoMdAdd className="h-4 w-4" />
-            Add New Plan
+            {t("studio.series.add_new_plan")}
           </Pecha.Button>
         </Link>
       </div>

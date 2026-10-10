@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { IoMdClose } from "react-icons/io";
 import { IoInformationCircleOutline } from "react-icons/io5";
 import { FiPlus } from "react-icons/fi";
@@ -36,6 +37,7 @@ const PartnerRow = ({
   isRemoving,
   onRemove,
 }: PartnerRowProps) => {
+  const { t } = useTranslate();
   const showRemove = canManage && !partner.is_owner;
   return (
     <div
@@ -61,7 +63,7 @@ const PartnerRow = ({
 
       {partner.is_owner ? (
         <Pecha.Badge variant="secondary" className="shrink-0">
-          Owner
+          {t("studio.series.partners.owner")}
         </Pecha.Badge>
       ) : null}
 
@@ -74,7 +76,9 @@ const PartnerRow = ({
           className="shrink-0 text-muted-foreground hover:text-destructive"
           onClick={() => onRemove(partner)}
         >
-          {isRemoving ? "Removing…" : "Remove"}
+          {isRemoving
+            ? t("studio.series.partners.removing")
+            : t("studio.common.remove")}
         </Pecha.Button>
       ) : null}
     </div>
@@ -88,6 +92,7 @@ const SeriesPartnersSection = ({
   canManage,
 }: SeriesPartnersSectionProps) => {
   const queryClient = useQueryClient();
+  const { t } = useTranslate();
   const partnersKey = ["series-partners", seriesId, language ?? null];
   const [pendingRemove, setPendingRemove] =
     useState<SeriesPartnerItemDTO | null>(null);
@@ -125,7 +130,9 @@ const SeriesPartnersSection = ({
       });
     },
     onError: (err) =>
-      toast.error(getApiErrorMessage(err, "Could not add partner group")),
+      toast.error(
+        getApiErrorMessage(err, t("studio.series.partners.add_failed")),
+      ),
   });
 
   const removeMutation = useMutation({
@@ -137,7 +144,9 @@ const SeriesPartnersSection = ({
       });
     },
     onError: (err) =>
-      toast.error(getApiErrorMessage(err, "Could not remove partner group")),
+      toast.error(
+        getApiErrorMessage(err, t("studio.series.partners.remove_failed")),
+      ),
   });
 
   const removingGroupId = removeMutation.isPending
@@ -151,15 +160,15 @@ const SeriesPartnersSection = ({
 
   const onlyOwner = partners.length <= 1;
   const emptyHint = canManage
-    ? "No partner groups yet — add one to let another group's page enrol users."
-    : "No partner groups yet.";
+    ? t("studio.series.partners.empty_hint_manage")
+    : t("studio.series.partners.empty_hint");
 
   return (
     <section className="mt-6 rounded-xl border border-dashed border-gray-300 bg-white/60 p-4 dark:border-input dark:bg-[#1f1f1f]">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-1.5">
           <h2 className="text-sm font-semibold">
-            Partner groups{" "}
+            {t("studio.series.partners.title")}{" "}
             <span className="text-muted-foreground">({partners.length})</span>
           </h2>
           <Pecha.TooltipProvider>
@@ -167,15 +176,14 @@ const SeriesPartnersSection = ({
               <Pecha.TooltipTrigger asChild>
                 <button
                   type="button"
-                  aria-label="About partner groups"
+                  aria-label={t("studio.series.partners.about_aria")}
                   className="text-muted-foreground hover:text-foreground"
                 >
                   <IoInformationCircleOutline className="h-4 w-4" />
                 </button>
               </Pecha.TooltipTrigger>
               <Pecha.TooltipContent side="right" className="max-w-xs text-xs">
-                Groups whose page a user can enroll through. The series&rsquo;
-                own group is always a partner by default.
+                {t("studio.series.partners.about_tooltip")}
               </Pecha.TooltipContent>
             </Pecha.Tooltip>
           </Pecha.TooltipProvider>
@@ -190,7 +198,7 @@ const SeriesPartnersSection = ({
             onClick={() => setIsAdding(true)}
           >
             <FiPlus className="h-4 w-4" />
-            Add partner
+            {t("studio.series.partners.add_partner")}
           </Pecha.Button>
         ) : null}
       </div>
@@ -199,12 +207,12 @@ const SeriesPartnersSection = ({
         <div className="mt-3 flex items-start gap-2">
           <div className="max-w-md flex-1">
             <EventLinkPicker
-              label="Group"
+              label={t("studio.series.partners.group_label")}
               value={null}
               onChange={handleAdd}
               searchFn={searchFn}
               queryKeyPrefix={`series-partner-picker-${seriesId}`}
-              searchPlaceholder="Search groups to add…"
+              searchPlaceholder={t("studio.series.partners.search_placeholder")}
               disabled={addMutation.isPending}
             />
           </div>
@@ -212,7 +220,7 @@ const SeriesPartnersSection = ({
             type="button"
             variant="ghost"
             size="icon"
-            aria-label="Cancel adding partner"
+            aria-label={t("studio.series.partners.cancel_adding_aria")}
             className="mt-6 shrink-0"
             onClick={() => setIsAdding(false)}
           >
@@ -223,11 +231,13 @@ const SeriesPartnersSection = ({
 
       <div className="mt-4 space-y-2">
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading…</p>
+          <p className="text-sm text-muted-foreground">
+            {t("studio.common.loading")}
+          </p>
         ) : null}
         {isError ? (
           <p className="text-sm text-destructive">
-            Could not load partner groups.
+            {t("studio.series.partners.load_failed")}
           </p>
         ) : null}
         {!isLoading && !isError
@@ -255,16 +265,17 @@ const SeriesPartnersSection = ({
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
             <Pecha.AlertDialogTitle>
-              Remove partner group?
+              {t("studio.series.partners.remove_confirm_title")}
             </Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
-              &ldquo;{pendingRemove?.group_name ?? ""}&rdquo; will no longer be
-              a partner of this series. You can add it back later.
+              {t("studio.series.partners.remove_confirm_description", {
+                name: pendingRemove?.group_name ?? "",
+              })}
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <Pecha.AlertDialogFooter>
             <Pecha.AlertDialogCancel disabled={removeMutation.isPending}>
-              Cancel
+              {t("studio.common.cancel")}
             </Pecha.AlertDialogCancel>
             <Pecha.AlertDialogAction
               className="bg-[#AD1B21] text-white hover:bg-[#AD1B21]/90 dark:bg-[#AD1B21]/70"
@@ -275,7 +286,9 @@ const SeriesPartnersSection = ({
                   removeMutation.mutate(pendingRemove.group_id);
               }}
             >
-              {removeMutation.isPending ? "Removing…" : "Remove"}
+              {removeMutation.isPending
+                ? t("studio.series.partners.removing")
+                : t("studio.common.remove")}
             </Pecha.AlertDialogAction>
           </Pecha.AlertDialogFooter>
         </Pecha.AlertDialogContent>

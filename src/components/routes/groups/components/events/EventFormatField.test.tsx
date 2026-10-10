@@ -38,7 +38,9 @@ describe("EventFormatField", () => {
     render(<Harness hydrateWith="online" />);
 
     await waitFor(() =>
-      expect(screen.getByRole("combobox")).toHaveTextContent("Live"),
+      expect(screen.getByRole("combobox")).toHaveTextContent(
+        "studio.groups.events.format.option_online",
+      ),
     );
     expect(screen.getByTestId("value")).toHaveTextContent("online");
   });
@@ -46,13 +48,17 @@ describe("EventFormatField", () => {
   it("follows a later change of the same field", async () => {
     const { rerender } = render(<Harness hydrateWith="online" />);
     await waitFor(() =>
-      expect(screen.getByRole("combobox")).toHaveTextContent("Live"),
+      expect(screen.getByRole("combobox")).toHaveTextContent(
+        "studio.groups.events.format.option_online",
+      ),
     );
 
     rerender(<Harness hydrateWith="hybrid" />);
 
     await waitFor(() =>
-      expect(screen.getByRole("combobox")).toHaveTextContent("Hybrid"),
+      expect(screen.getByRole("combobox")).toHaveTextContent(
+        "studio.groups.events.format.option_hybrid",
+      ),
     );
     expect(screen.getByTestId("value")).toHaveTextContent("hybrid");
   });

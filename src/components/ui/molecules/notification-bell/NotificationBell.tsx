@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslate } from "@tolgee/react";
 import { IoNotificationsOutline } from "react-icons/io5";
 import { Pecha } from "@/components/ui/shadimport";
 import {
@@ -12,6 +13,7 @@ import {
 } from "./NotificationsPanel";
 
 const NotificationBell = () => {
+  const { t } = useTranslate();
   const [open, setOpen] = useState(false);
   const [tooltipOpen, setTooltipOpen] = useState(false);
   const { data } = useUnreadNotifications();
@@ -30,7 +32,7 @@ const NotificationBell = () => {
             <button
               type="button"
               className="relative border p-2 rounded-md text-zinc-400 dark:text-zinc-600 hover:text-black dark:hover:text-white transition-colors"
-              aria-label="Notifications"
+              aria-label={t("studio.notifications.title")}
             >
               <IoNotificationsOutline className="w-4 h-4" />
               {unreadCount > 0 && (
@@ -41,7 +43,9 @@ const NotificationBell = () => {
             </button>
           </Pecha.DropdownMenuTrigger>
         </TooltipTrigger>
-        <TooltipContent side="right">Notifications</TooltipContent>
+        <TooltipContent side="right">
+          {t("studio.notifications.title")}
+        </TooltipContent>
       </Tooltip>
 
       <Pecha.DropdownMenuContent

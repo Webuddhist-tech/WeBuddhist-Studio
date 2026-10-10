@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
+import { tolgee } from "@/i18n/tolgee";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import { Pagination } from "@/components/ui/molecules/pagination/Pagination";
@@ -53,13 +55,16 @@ const nameInitial = (name: string): string =>
   name.trim().charAt(0).toUpperCase() || "?";
 
 const displayName = (person: { fullname: string; username?: string | null }) =>
-  person.fullname.trim() || person.username?.trim() || "Unknown user";
+  person.fullname.trim() ||
+  person.username?.trim() ||
+  tolgee.t("studio.groups.components.community.unknown_user");
 
 type GroupCommunitySectionProps = {
   groupId: string;
 };
 
 const GroupCommunitySection = ({ groupId }: GroupCommunitySectionProps) => {
+  const { t } = useTranslate();
   const queryClient = useQueryClient();
   const { data: userInfo } = useUserInfo();
   const showActions = shouldShowCmsActionsColumn(userInfo?.platform_role);
@@ -136,7 +141,10 @@ const GroupCommunitySection = ({ groupId }: GroupCommunitySectionProps) => {
     onSuccess: (ban, { userName }) => {
       setRemoveTarget(null);
       toast.success(
-        `${userName} removed — blocked ${banEndsIn(ban.expires_at)}`,
+        t("studio.groups.components.community.removed_toast", {
+          name: userName,
+          until: banEndsIn(ban.expires_at),
+        }),
       );
       invalidate();
     },
@@ -149,12 +157,18 @@ const GroupCommunitySection = ({ groupId }: GroupCommunitySectionProps) => {
     onMutate: ({ banId }) =>
       setLiftingIds((current) => ({ ...current, [banId]: true })),
     onSuccess: (_data, { userName }) => {
-      toast.success(`${userName} can rejoin this group`);
+      toast.success(
+        t("studio.groups.components.community.lifted_toast", {
+          name: userName,
+        }),
+      );
       invalidate();
     },
     onError: (err) => {
       if (isBanAlreadyResolvedError(err)) {
-        toast.error("This ban was already lifted or has expired.");
+        toast.error(
+          t("studio.groups.components.community.ban_already_resolved"),
+        );
         invalidate();
         return;
       }
@@ -199,7 +213,9 @@ const GroupCommunitySection = ({ groupId }: GroupCommunitySectionProps) => {
               title={exactTime(user.joined_at)}
               className="text-xs text-muted-foreground"
             >
-              Joined {relativeTime(user.joined_at)}
+              {t("studio.groups.components.community.joined_ago", {
+                time: relativeTime(user.joined_at),
+              })}
             </time>
           ) : null}
         </div>
@@ -213,7 +229,7 @@ const GroupCommunitySection = ({ groupId }: GroupCommunitySectionProps) => {
             disabled={removeMutation.isPending}
             onClick={() => setRemoveTarget(user)}
           >
-            Remove
+            {t("studio.common.remove")}
           </Button>
         ) : null}
       </li>
@@ -241,7 +257,10 @@ const GroupCommunitySection = ({ groupId }: GroupCommunitySectionProps) => {
         <div className="min-w-0 flex-1 space-y-1">
           <p className="text-sm leading-snug">
             <span className="font-semibold">{name}</span>
-            <span className="text-muted-foreground"> · removed </span>
+            <span className="text-muted-foreground">
+              {" · "}
+              {t("studio.groups.components.community.removed_label")}{" "}
+            </span>
             <time
               dateTime={ban.created_at}
               title={exactTime(ban.created_at)}
@@ -251,7 +270,7 @@ const GroupCommunitySection = ({ groupId }: GroupCommunitySectionProps) => {
             </time>
           </p>
           <p className="text-xs text-muted-foreground">
-            Can rejoin{" "}
+            {t("studio.groups.components.community.can_rejoin")}{" "}
             <time dateTime={ban.expires_at} title={exactTime(ban.expires_at)}>
               {banEndsIn(ban.expires_at)}
             </time>
@@ -272,7 +291,9 @@ const GroupCommunitySection = ({ groupId }: GroupCommunitySectionProps) => {
               liftMutation.mutate({ banId: ban.id, userName: name })
             }
           >
-            {isLifting ? "Lifting…" : "Lift ban"}
+            {isLifting
+              ? t("studio.groups.components.community.lifting")
+              : t("studio.groups.components.community.lift_ban")}
           </Button>
         ) : null}
       </li>
@@ -306,8 +327,8 @@ const GroupCommunitySection = ({ groupId }: GroupCommunitySectionProps) => {
             {getApiErrorMessage(
               activeQuery.error,
               tab === "joined"
-                ? "Could not load members."
-                : "Could not load removed users.",
+                ? t("studio.groups.components.community.load_members_error")
+                : t("studio.groups.components.community.load_removed_error"),
             )}
           </p>
         </div>
@@ -319,9 +340,11 @@ const GroupCommunitySection = ({ groupId }: GroupCommunitySectionProps) => {
       if (users.length === 0) {
         return (
           <div className="rounded-xl border border-dashed px-4 py-10 text-center sm:px-6 sm:py-14">
-            <p className="font-medium">No one has joined yet</p>
+            <p className="font-medium">
+              {t("studio.groups.components.community.joined_empty_title")}
+            </p>
             <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-              People who join this group from the app will be listed here.
+              {t("studio.groups.components.community.joined_empty_description")}
             </p>
           </div>
         );
@@ -333,10 +356,11 @@ const GroupCommunitySection = ({ groupId }: GroupCommunitySectionProps) => {
     if (bans.length === 0) {
       return (
         <div className="rounded-xl border border-dashed px-4 py-10 text-center sm:px-6 sm:py-14">
-          <p className="font-medium">No one is blocked</p>
+          <p className="font-medium">
+            {t("studio.groups.components.community.banned_empty_title")}
+          </p>
           <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-            Users you remove appear here until their ban ends. You can let
-            someone back in early from this list.
+            {t("studio.groups.components.community.banned_empty_description")}
           </p>
         </div>
       );
@@ -350,8 +374,8 @@ const GroupCommunitySection = ({ groupId }: GroupCommunitySectionProps) => {
       <GroupSectionHeader
         title={
           tab === "joined"
-            ? `Joined members${total ? ` (${total})` : ""}`
-            : `Removed${total ? ` (${total})` : ""}`
+            ? `${t("studio.groups.components.community.joined_members")}${total ? ` (${total})` : ""}`
+            : `${t("studio.groups.components.community.removed")}${total ? ` (${total})` : ""}`
         }
         action={
           <Pecha.Select
@@ -360,13 +384,17 @@ const GroupCommunitySection = ({ groupId }: GroupCommunitySectionProps) => {
           >
             <Pecha.SelectTrigger
               className="h-8 w-28 shrink-0 sm:w-36"
-              aria-label="Filter community users"
+              aria-label={t("studio.groups.components.community.filter_label")}
             >
               <Pecha.SelectValue />
             </Pecha.SelectTrigger>
             <Pecha.SelectContent>
-              <Pecha.SelectItem value="joined">Joined</Pecha.SelectItem>
-              <Pecha.SelectItem value="banned">Removed</Pecha.SelectItem>
+              <Pecha.SelectItem value="joined">
+                {t("studio.groups.components.community.joined")}
+              </Pecha.SelectItem>
+              <Pecha.SelectItem value="banned">
+                {t("studio.groups.components.community.removed")}
+              </Pecha.SelectItem>
             </Pecha.SelectContent>
           </Pecha.Select>
         }

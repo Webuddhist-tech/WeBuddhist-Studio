@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslate } from "@tolgee/react";
 import { IoMenu } from "react-icons/io5";
 import pechaIcon from "../../../../assets/icon/pecha_icon.png";
 import {
@@ -21,11 +22,20 @@ import { useNavModel, type NavItem } from "./useNavModel";
 /** A phone's tab bar fits this many destinations beside the menu button. */
 const MAX_TABS = 4;
 
+/** Labels are translation keys. */
 const settingsRows = [
-  { id: "install", component: <InstallAppButton />, label: "Install app" },
-  { id: "theme", component: <ModeToggle />, label: "Change theme" },
-  { id: "language", component: <LanguageToggle />, label: "Change language" },
-  { id: "logout", component: <AuthLogout />, label: "Logout" },
+  {
+    id: "install",
+    component: <InstallAppButton />,
+    label: "studio.nav.install_app",
+  },
+  { id: "theme", component: <ModeToggle />, label: "studio.nav.change_theme" },
+  {
+    id: "language",
+    component: <LanguageToggle />,
+    label: "studio.nav.change_language",
+  },
+  { id: "logout", component: <AuthLogout />, label: "studio.nav.logout" },
 ];
 
 /**
@@ -36,6 +46,7 @@ const settingsRows = [
 export const MobileTopBar = () => {
   useHostsUpdateButton();
   const { homePath, isActive, visiblePinnedItems, sections } = useNavModel();
+  const { t } = useTranslate();
   const current = [
     ...visiblePinnedItems,
     ...sections.flatMap((section) => section.items),
@@ -46,15 +57,15 @@ export const MobileTopBar = () => {
       <Link
         to={homePath}
         className="flex min-w-0 items-center gap-2"
-        aria-label="Webuddhist Studio home"
+        aria-label={t("studio.nav.home_aria")}
       >
         <img
           src={pechaIcon}
-          alt="Webuddhist Studio Logo"
+          alt={t("studio.nav.logo_alt")}
           className="h-8 w-8 shrink-0"
         />
         <span className="truncate text-base font-semibold">
-          {current?.label ?? "Webuddhist Studio"}
+          {current ? t(current.label) : "Webuddhist Studio"}
         </span>
       </Link>
       {/* Kept in the bar, not the menu: a waiting update should be seen. */}
@@ -75,6 +86,7 @@ export const MobileTabBar = () => {
     sections,
     activeSectionId,
   } = useNavModel();
+  const { t } = useTranslate();
   const [menuOpen, setMenuOpen] = useState(false);
   const installMode = useInstallMode();
   const menuSettingsRows = installMode
@@ -105,21 +117,21 @@ export const MobileTabBar = () => {
       }`}
     >
       {item.icon}
-      <span className="truncate">{item.label}</span>
+      <span className="truncate">{t(item.label)}</span>
     </Link>
   );
 
   return (
     <>
       <nav
-        aria-label="Main"
+        aria-label={t("studio.nav.main_aria")}
         className="font-dynamic flex shrink-0 items-stretch border-t border-gray-200 bg-background pb-[env(safe-area-inset-bottom)] dark:border-[#313132]"
       >
         {tabs.map((item) => (
           <Link
             key={item.path}
             to={item.path}
-            aria-label={item.tooltip}
+            aria-label={t(item.tooltip)}
             aria-current={isActive(item.path) ? "page" : undefined}
             className={`flex min-h-14 flex-1 flex-col items-center justify-center gap-1 px-1 text-[11px] leading-tight transition-colors [&_svg]:size-5 ${
               isActive(item.path)
@@ -128,7 +140,7 @@ export const MobileTabBar = () => {
             }`}
           >
             {item.icon}
-            <span className="max-w-full truncate">{item.label}</span>
+            <span className="max-w-full truncate">{t(item.label)}</span>
           </Link>
         ))}
         <button
@@ -143,7 +155,7 @@ export const MobileTabBar = () => {
           }`}
         >
           <IoMenu className="size-5" />
-          <span>Menu</span>
+          <span>{t("studio.nav.menu")}</span>
         </button>
       </nav>
 
@@ -160,13 +172,13 @@ export const MobileTabBar = () => {
             >
               <img
                 src={pechaIcon}
-                alt="Webuddhist Studio Logo"
+                alt={t("studio.nav.logo_alt")}
                 className="h-9 w-9 shrink-0"
               />
               <SheetTitle className="text-base">Webuddhist Studio</SheetTitle>
             </Link>
             <SheetDescription className="sr-only">
-              Every Studio page, and your settings
+              {t("studio.nav.menu_description")}
             </SheetDescription>
           </div>
 
@@ -175,7 +187,7 @@ export const MobileTabBar = () => {
             {sections.map((section) => (
               <div key={section.id} className="mt-3 flex flex-col gap-1">
                 <p className="px-3 pb-1 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                  {section.label}
+                  {t(section.label)}
                 </p>
                 {section.items.map(renderMenuLink)}
               </div>
@@ -187,7 +199,7 @@ export const MobileTabBar = () => {
               <div key={row.id} className="flex items-center gap-3">
                 {row.component}
                 <span className="text-sm text-zinc-500 dark:text-zinc-400">
-                  {row.label}
+                  {t(row.label)}
                 </span>
               </div>
             ))}

@@ -1,3 +1,4 @@
+import { useTranslate } from "@tolgee/react";
 import { useQuery } from "@tanstack/react-query";
 import type { UseFormReturn } from "react-hook-form";
 import { Pecha } from "@/components/ui/shadimport";
@@ -13,6 +14,7 @@ const EventIntentionsField = ({
   form,
   readOnly,
 }: EventIntentionsFieldProps) => {
+  const { t } = useTranslate();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["cms-prayer-intentions"],
     queryFn: fetchPrayerIntentions,
@@ -38,25 +40,24 @@ const EventIntentionsField = ({
       render={() => (
         <Pecha.FormItem className="rounded-md border border-input bg-white p-4 dark:bg-[#262626]">
           <Pecha.FormLabel className="text-sm font-medium">
-            Prayer intentions for this event
+            {t("studio.groups.events.intentions.label")}
           </Pecha.FormLabel>
           <p className="text-xs text-muted-foreground mb-3">
-            Leave all unchecked to allow every catalog intention. Select one or
-            more to restrict the prayer picker and accepted slugs for this
-            event&apos;s chat.
+            {t("studio.groups.events.intentions.help")}
           </p>
           {isLoading ? (
-            <p className="text-xs text-muted-foreground">Loading intentions…</p>
+            <p className="text-xs text-muted-foreground">
+              {t("studio.groups.events.intentions.loading")}
+            </p>
           ) : null}
           {isError ? (
             <p className="text-xs text-destructive">
-              Could not load intentions. Save other event fields and try again.
+              {t("studio.groups.events.intentions.load_error")}
             </p>
           ) : null}
           {!isLoading && !isError && options.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              No intentions in the catalog yet. Add them under Prayer intentions
-              in the sidebar.
+              {t("studio.groups.events.intentions.empty")}
             </p>
           ) : null}
           <div className="flex flex-col gap-2">

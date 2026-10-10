@@ -1,4 +1,5 @@
 import { IoMdVideocam } from "react-icons/io";
+import { useTranslate } from "@tolgee/react";
 import { IoMusicalNotesSharp, IoTextOutline } from "react-icons/io5";
 import { MdOutlineImage } from "react-icons/md";
 import { LuCalendarDays, LuLayers, LuNewspaper } from "react-icons/lu";
@@ -11,7 +12,7 @@ import {
 import pechaIcon from "@/assets/icon/pecha_icon.png";
 import { Badge } from "@/components/ui/atoms/badge";
 import {
-  LINKED_CONTENT_LABELS,
+  LINKED_CONTENT_I18N,
   type LinkedContentType,
   type SubTaskReference,
 } from "@/components/ui/molecules/linked-content/linkedContent";
@@ -25,6 +26,7 @@ type ContentType =
   | LinkedContentType;
 
 export const ContentIcon = ({ type }: { type: ContentType }) => {
+  const { t } = useTranslate();
   switch (type) {
     case "VIDEO":
       return <IoMdVideocam className="w-4 h-4 text-gray-600" />;
@@ -35,7 +37,13 @@ export const ContentIcon = ({ type }: { type: ContentType }) => {
     case "IMAGE":
       return <MdOutlineImage className="w-4 h-4 text-gray-600" />;
     case "SOURCE_REFERENCE":
-      return <img src={pechaIcon} alt="Webuddhist Icon" className="w-4 h-4" />;
+      return (
+        <img
+          src={pechaIcon}
+          alt={t("studio.content.webuddhist_icon_alt")}
+          className="w-4 h-4"
+        />
+      );
     case "GROUP_ACCUMULATION":
       return <GiPrayerBeads className="w-4 h-4 text-gray-600" />;
     case "GROUP_COLLECTION":
@@ -50,6 +58,7 @@ export const ContentIcon = ({ type }: { type: ContentType }) => {
 };
 
 export const VideoContent = ({ content }: { content: string }) => {
+  const { t } = useTranslate();
   const regularVideoId = getYouTubeVideoId(content);
   const shortsVideoId = getYouTubeShortsId(content);
   const videoId = regularVideoId || shortsVideoId;
@@ -61,13 +70,14 @@ export const VideoContent = ({ content }: { content: string }) => {
       <iframe
         className={`w-full max-w-[315px] mx-auto rounded-md border bg-[#FAFAFA] dark:bg-sidebar-secondary ${shortsVideoId ? "aspect-[9/16]" : "aspect-[16/9]"}`}
         src={`https://www.youtube.com/embed/${videoId}`}
-        title="YouTube preview"
+        title={t("studio.content.youtube_preview")}
       />
     </div>
   );
 };
 
 export const AudioContent = ({ content }: { content: string }) => {
+  const { t } = useTranslate();
   const getEmbedSrc = () => {
     if (content.includes("spotify.com")) {
       const data = extractSpotifyId(content);
@@ -85,8 +95,8 @@ export const AudioContent = ({ content }: { content: string }) => {
   if (!src) return null;
 
   const audioTitle = content.includes("spotify.com")
-    ? "Spotify audio player"
-    : "SoundCloud audio player";
+    ? t("studio.content.spotify_player")
+    : t("studio.content.soundcloud_player");
 
   return (
     <div className="mt-4 w-full rounded-md overflow-hidden bg-[#FAFAFA] dark:bg-sidebar-secondary ">
@@ -102,17 +112,20 @@ export const AudioContent = ({ content }: { content: string }) => {
   );
 };
 
-export const ImageContent = ({ content }: { content: string }) => (
-  <div className="mt-4 flex mx-auto justify-center bg-[#FAFAFA] dark:bg-sidebar-secondary ">
-    <div>
-      <img
-        src={content}
-        alt="Task content"
-        className="w-full h-48 object-cover rounded-lg border"
-      />
+export const ImageContent = ({ content }: { content: string }) => {
+  const { t } = useTranslate();
+  return (
+    <div className="mt-4 flex mx-auto justify-center bg-[#FAFAFA] dark:bg-sidebar-secondary ">
+      <div>
+        <img
+          src={content}
+          alt={t("studio.content.task_content_alt")}
+          className="w-full h-48 object-cover rounded-lg border"
+        />
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 export const TextContent = ({ content }: { content: string }) => (
   <div className="w-full min-h-64 max-h-56 overflow-y-auto bg-[#FAFAFA] dark:bg-sidebar-secondary  whitespace-pre-wrap text-base p-3 border rounded-md">
@@ -169,18 +182,18 @@ export const LinkedContent = ({
   reference?: SubTaskReference | null;
   referenceId?: string | null;
 }) => {
+  const { t } = useTranslate();
+  const keys = LINKED_CONTENT_I18N[type];
   if (!reference) {
     return (
       <div className="mt-2 rounded-md border border-dashed border-amber-400 bg-amber-50 dark:bg-amber-900/20 p-3">
         <p className="text-sm font-medium">
-          {referenceId
-            ? `This ${LINKED_CONTENT_LABELS[type].toLowerCase()} is no longer available`
-            : `No ${LINKED_CONTENT_LABELS[type].toLowerCase()} linked yet`}
+          {referenceId ? t(keys.unavailable) : t(keys.notLinked)}
         </p>
         <p className="text-xs text-muted-foreground mt-1">
           {referenceId
-            ? "It may have been deleted. Remove this subtask or link another one."
-            : "Pick one from this plan's group."}
+            ? t("studio.content.linked.deleted_hint")
+            : t("studio.content.linked.pick_hint")}
         </p>
       </div>
     );
@@ -199,10 +212,10 @@ export const LinkedContent = ({
       )}
       <div className="min-w-0 flex-1">
         <Badge variant="outline" className="text-[10px] font-normal mb-1">
-          {LINKED_CONTENT_LABELS[type]}
+          {t(keys.label)}
         </Badge>
         <p className="font-medium truncate">
-          {reference.title || LINKED_CONTENT_LABELS[type]}
+          {reference.title || t(keys.label)}
         </p>
         {reference.subtitle && (
           <p className="text-sm text-muted-foreground truncate">

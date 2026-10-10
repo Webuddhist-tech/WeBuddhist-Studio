@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
 import { useInfiniteQuery, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { FiLoader } from "react-icons/fi";
 import { IoMdClose } from "react-icons/io";
 import { Pecha } from "@/components/ui/shadimport";
@@ -34,6 +35,7 @@ const PlanAudioSearchInput = ({
   disabled = false,
   onAttached,
 }: PlanAudioSearchInputProps) => {
+  const { t } = useTranslate();
   const containerRef = useRef<HTMLDivElement>(null);
   const audioRefs = useRef<Map<string, HTMLAudioElement>>(new Map());
   const [inputValue, setInputValue] = useState("");
@@ -41,9 +43,9 @@ const PlanAudioSearchInput = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
 
   const [filterPlanId, setFilterPlanId] = useState<string | undefined>(planId);
-  const [filterPlanTitle, setFilterPlanTitle] = useState(
-    planTitle ?? "This plan",
-  );
+  // Empty means "no title to show": the label then falls back to a
+  // translated "This plan" / "All plans" depending on the filter.
+  const [filterPlanTitle, setFilterPlanTitle] = useState(planTitle ?? "");
   const [planSearchInput, setPlanSearchInput] = useState("");
   const [debouncedPlanSearch] = useDebounce(
     planSearchInput,
@@ -56,7 +58,7 @@ const PlanAudioSearchInput = ({
 
   useEffect(() => {
     setFilterPlanId(planId);
-    setFilterPlanTitle(planTitle ?? "This plan");
+    setFilterPlanTitle(planTitle ?? "");
     setPlanSearchInput("");
     setShowPlanPicker(false);
   }, [planId, planTitle]);
@@ -104,12 +106,15 @@ const PlanAudioSearchInput = ({
     onSuccess: () => {
       setInputValue("");
       setShowSuggestions(false);
-      toast.success("Day audio attached");
+      toast.success(t("studio.day_audio.attached"));
       onAttached();
     },
     onError: (error: unknown) => {
-      toast.error("Failed to attach audio", {
-        description: getApiErrorMessage(error, "Could not attach this audio"),
+      toast.error(t("studio.day_audio.attach_failed"), {
+        description: getApiErrorMessage(
+          error,
+          t("studio.day_audio.attach_failed_description"),
+        ),
       });
     },
   });
@@ -139,7 +144,7 @@ const PlanAudioSearchInput = ({
 
   const clearPlanFilter = () => {
     setFilterPlanId(undefined);
-    setFilterPlanTitle("All plans");
+    setFilterPlanTitle("");
     setPlanSearchInput("");
     setShowPlanPicker(false);
     setShowSuggestions(true);
@@ -164,6 +169,12 @@ const PlanAudioSearchInput = ({
     ? attachMutation.variables?.audio_key
     : null;
 
+  const filterPlanLabel =
+    filterPlanTitle ||
+    (filterPlanId != null
+      ? t("studio.day_audio.this_plan")
+      : t("studio.day_audio.all_plans"));
+
   const showPlanDropdown =
     showPlanPicker &&
     !disabled &&
@@ -174,15 +185,15 @@ const PlanAudioSearchInput = ({
   return (
     <div ref={containerRef} className="space-y-2">
       <p className="text-sm font-medium text-muted-foreground">
-        Search existing audio
+        {t("studio.day_audio.search_existing")}
       </p>
       <div className="flex items-center gap-2">
         <div className="space-y-1">
           <div className="relative">
             <Input
-              placeholder="Search plans…"
+              placeholder={t("studio.day_audio.search_plans")}
               className="border shadow-none bg-white dark:bg-sidebar-secondary pr-9"
-              value={showPlanPicker ? planSearchInput : filterPlanTitle}
+              value={showPlanPicker ? planSearchInput : filterPlanLabel}
               disabled={disabled || attachMutation.isPending}
               autoComplete="off"
               onChange={(e) => {
@@ -199,7 +210,7 @@ const PlanAudioSearchInput = ({
             {filterPlanId != null && !showPlanPicker && (
               <button
                 type="button"
-                aria-label="Clear plan filter"
+                aria-label={t("studio.day_audio.clear_plan_filter")}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 disabled={disabled || attachMutation.isPending}
                 onClick={clearPlanFilter}
@@ -217,14 +228,14 @@ const PlanAudioSearchInput = ({
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={clearPlanFilter}
                     >
-                      All plans
+                      {t("studio.day_audio.all_plans")}
                     </button>
                   </li>
                 )}
                 {isPlanSearchFetching && planOptions.length === 0 && (
                   <li className="px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
                     <FiLoader className="w-4 h-4 animate-spin" />
-                    Searching plans…
+                    {t("studio.day_audio.searching_plans")}
                   </li>
                 )}
                 {planOptions.map((plan) => (
@@ -236,7 +247,9 @@ const PlanAudioSearchInput = ({
                       onClick={() => selectPlanFilter(plan.id, plan.title)}
                     >
                       {plan.title}
-                      {plan.id === planId ? " (current)" : ""}
+                      {plan.id === planId
+                        ? ` ${t("studio.day_audio.current_suffix")}`
+                        : ""}
                     </button>
                   </li>
                 ))}
@@ -244,7 +257,7 @@ const PlanAudioSearchInput = ({
                   planOptions.length === 0 &&
                   planSearchTerm.length > 0 && (
                     <li className="px-3 py-2 text-sm text-muted-foreground">
-                      No plans found
+                      {t("studio.day_audio.no_plans")}
                     </li>
                   )}
               </ul>
@@ -254,7 +267,7 @@ const PlanAudioSearchInput = ({
 
         <div className="relative w-full">
           <Input
-            placeholder="Search by file name or path…"
+            placeholder={t("studio.day_audio.search_files")}
             className="border shadow-none bg-white dark:bg-sidebar-secondary"
             value={inputValue}
             disabled={disabled || attachMutation.isPending}
@@ -273,7 +286,7 @@ const PlanAudioSearchInput = ({
               {isFetching && results.length === 0 && (
                 <li className="px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
                   <FiLoader className="w-4 h-4 animate-spin" />
-                  Searching…
+                  {t("studio.day_audio.searching")}
                 </li>
               )}
 
@@ -292,8 +305,12 @@ const PlanAudioSearchInput = ({
                           {item.file_name}
                         </p>
                         <p className="text-xs text-muted-foreground truncate">
-                          Day {item.day_number}
-                          {item.plan_id === planId ? " (this plan)" : ""}
+                          {t("studio.day_audio.day_label", {
+                            number: item.day_number,
+                          })}
+                          {item.plan_id === planId
+                            ? ` ${t("studio.day_audio.this_plan_suffix")}`
+                            : ""}
                           {durationLabel ? ` · ${durationLabel}` : ""}
                         </p>
                       </div>
@@ -308,7 +325,7 @@ const PlanAudioSearchInput = ({
                         {isAttaching ? (
                           <FiLoader className="w-3.5 h-3.5 animate-spin" />
                         ) : (
-                          "Use"
+                          t("studio.day_audio.use")
                         )}
                       </Pecha.Button>
                     </div>
@@ -331,8 +348,8 @@ const PlanAudioSearchInput = ({
               {!isFetching && results.length === 0 && (
                 <li className="px-3 py-2 text-sm text-muted-foreground">
                   {searchTerm
-                    ? "No audio found — upload a new file below"
-                    : "No audio in library yet — upload below"}
+                    ? t("studio.day_audio.no_audio_found")
+                    : t("studio.day_audio.library_empty")}
                 </li>
               )}
 
@@ -346,8 +363,11 @@ const PlanAudioSearchInput = ({
                     onClick={() => fetchNextPage()}
                   >
                     {isFetchingNextPage
-                      ? "Loading more…"
-                      : `Load more (${results.length} of ${total})`}
+                      ? t("studio.editor.link.loading_more")
+                      : t("studio.day_audio.load_more", {
+                          count: results.length,
+                          total,
+                        })}
                   </button>
                 </li>
               )}

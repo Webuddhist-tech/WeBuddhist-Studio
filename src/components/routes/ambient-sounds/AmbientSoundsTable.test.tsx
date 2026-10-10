@@ -3,6 +3,14 @@ import { describe, expect, it, vi } from "vitest";
 import AmbientSoundsTable from "./AmbientSoundsTable";
 import type { AmbientSound } from "./api/ambientSoundsApi";
 
+// Echo the interpolated name so per-row aria-labels stay distinguishable.
+vi.mock("@tolgee/react", () => ({
+  useTranslate: () => ({
+    t: (key: string, params?: { name?: string }) =>
+      params?.name ? `${key}:${params.name}` : key,
+  }),
+}));
+
 const sound = (overrides: Partial<AmbientSound> = {}): AmbientSound => ({
   id: "sound-1",
   name: "Rain",
@@ -27,7 +35,7 @@ const renderTable = (sounds: AmbientSound[]) =>
 
 /** The row's cover slot: either the <img> or the placeholder. */
 const placeholderFor = (name: string) =>
-  screen.queryByLabelText(`${name} has no cover image`);
+  screen.queryByLabelText(`studio.ambient_sounds.table.no_cover_aria:${name}`);
 
 describe("AmbientSoundsTable — cover image", () => {
   it("renders the thumbnail when the sound has a cover", () => {

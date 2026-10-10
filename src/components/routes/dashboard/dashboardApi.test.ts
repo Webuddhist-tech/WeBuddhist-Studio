@@ -130,7 +130,9 @@ describe("displayDashboardItemTitle", () => {
       enrolled_count: 0,
       created_at: "2026-01-01T00:00:00Z",
     };
-    expect(displayDashboardItemTitle(item)).toBe("Untitled series");
+    expect(displayDashboardItemTitle(item)).toBe(
+      "Studio.dashboard.untitled_series",
+    );
   });
 });
 

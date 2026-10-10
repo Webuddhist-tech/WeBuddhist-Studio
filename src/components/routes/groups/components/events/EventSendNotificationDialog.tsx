@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslate } from "@tolgee/react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Pecha } from "@/components/ui/shadimport";
@@ -22,18 +23,19 @@ const BODY_MAX = 500;
 
 const AUDIENCE_OPTIONS: {
   value: EventNotificationAudience;
-  label: string;
-  hint: string;
+  labelKey: string;
+  hintKey: string;
 }[] = [
   {
     value: "participants",
-    label: "People attending",
-    hint: "Everyone who has joined this event.",
+    labelKey: "studio.groups.events.send_notification.audience_participants",
+    hintKey:
+      "studio.groups.events.send_notification.audience_participants_hint",
   },
   {
     value: "group",
-    label: "The whole group",
-    hint: "Every member of the group, whether or not they have joined.",
+    labelKey: "studio.groups.events.send_notification.audience_group",
+    hintKey: "studio.groups.events.send_notification.audience_group_hint",
   },
 ];
 
@@ -52,6 +54,7 @@ const EventSendNotificationDialog = ({
   disabled = false,
   disabledReason,
 }: EventSendNotificationDialogProps) => {
+  const { t } = useTranslate();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -72,12 +75,17 @@ const EventSendNotificationDialog = ({
         audience,
       }),
     onSuccess: () => {
-      toast.success("Notification queued for delivery");
+      toast.success(t("studio.groups.events.send_notification.success"));
       setOpen(false);
       reset();
     },
     onError: (error) => {
-      toast.error(getApiErrorMessage(error, "Could not send the notification"));
+      toast.error(
+        getApiErrorMessage(
+          error,
+          t("studio.groups.events.send_notification.error"),
+        ),
+      );
     },
   });
 
@@ -92,7 +100,7 @@ const EventSendNotificationDialog = ({
     ? disabledReason
     : notificationsEnabled
       ? undefined
-      : "Notifications are turned off for this event";
+      : t("studio.groups.events.send_notification.notifications_off");
 
   return (
     <>
@@ -103,7 +111,7 @@ const EventSendNotificationDialog = ({
         onClick={() => setOpen(true)}
         title={blockedReason}
       >
-        Send a notification
+        {t("studio.groups.events.send_notification.button")}
       </Pecha.Button>
 
       <Pecha.Dialog
@@ -115,14 +123,16 @@ const EventSendNotificationDialog = ({
       >
         <Pecha.DialogContent className="sm:max-w-lg">
           <Pecha.DialogHeader>
-            <Pecha.DialogTitle>Send a notification</Pecha.DialogTitle>
+            <Pecha.DialogTitle>
+              {t("studio.groups.events.send_notification.title")}
+            </Pecha.DialogTitle>
           </Pecha.DialogHeader>
 
           <div className="space-y-4">
             <p className="text-xs text-muted-foreground">
-              Goes out straight away as a push notification about{" "}
-              <span className="font-medium">{eventName}</span>. It cannot be
-              edited or taken back once sent.
+              {t("studio.groups.events.send_notification.intro_before")}{" "}
+              <span className="font-medium">{eventName}</span>
+              {t("studio.groups.events.send_notification.intro_after")}
             </p>
 
             <div className="space-y-1">
@@ -130,13 +140,15 @@ const EventSendNotificationDialog = ({
                 htmlFor="event-notification-title"
                 className="text-sm font-medium"
               >
-                Title
+                {t("studio.common.title")}
               </label>
               <Pecha.Input
                 id="event-notification-title"
                 value={title}
                 maxLength={TITLE_MAX}
-                placeholder="Change of venue"
+                placeholder={t(
+                  "studio.groups.events.send_notification.title_placeholder",
+                )}
                 onChange={(event: React.ChangeEvent<HTMLInputElement>) =>
                   setTitle(event.target.value)
                 }
@@ -151,14 +163,16 @@ const EventSendNotificationDialog = ({
                 htmlFor="event-notification-body"
                 className="text-sm font-medium"
               >
-                Message
+                {t("studio.groups.events.send_notification.message_label")}
               </label>
               <Pecha.Textarea
                 id="event-notification-body"
                 value={body}
                 maxLength={BODY_MAX}
                 rows={4}
-                placeholder="We are meeting in the main hall today, not the annexe."
+                placeholder={t(
+                  "studio.groups.events.send_notification.message_placeholder",
+                )}
                 onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) =>
                   setBody(event.target.value)
                 }
@@ -169,7 +183,9 @@ const EventSendNotificationDialog = ({
             </div>
 
             <div className="space-y-2">
-              <p className="text-sm font-medium">Send to</p>
+              <p className="text-sm font-medium">
+                {t("studio.groups.events.send_notification.send_to")}
+              </p>
               <Pecha.RadioGroup
                 value={audience}
                 onValueChange={(value: string) =>
@@ -188,10 +204,10 @@ const EventSendNotificationDialog = ({
                     />
                     <span className="space-y-0.5">
                       <span className="block text-sm font-medium">
-                        {option.label}
+                        {t(option.labelKey)}
                       </span>
                       <span className="block text-xs text-muted-foreground">
-                        {option.hint}
+                        {t(option.hintKey)}
                       </span>
                     </span>
                   </label>
@@ -200,8 +216,7 @@ const EventSendNotificationDialog = ({
             </div>
 
             <p className="text-xs text-muted-foreground">
-              People who muted this event, or turned event notifications off
-              altogether, will not receive it.
+              {t("studio.groups.events.send_notification.muted_note")}
             </p>
 
             <div className="flex justify-end gap-2 pt-2">
@@ -211,14 +226,16 @@ const EventSendNotificationDialog = ({
                 onClick={() => setOpen(false)}
                 disabled={sendMutation.isPending}
               >
-                Cancel
+                {t("studio.common.cancel")}
               </Pecha.Button>
               <Pecha.Button
                 type="button"
                 disabled={!canSend}
                 onClick={() => sendMutation.mutate()}
               >
-                {sendMutation.isPending ? "Sending..." : "Send now"}
+                {sendMutation.isPending
+                  ? t("studio.groups.events.send_notification.sending")
+                  : t("studio.groups.events.send_notification.send_now")}
               </Pecha.Button>
             </div>
           </div>

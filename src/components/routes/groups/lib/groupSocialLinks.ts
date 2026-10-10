@@ -1,4 +1,5 @@
 import { PLATFORM_PATTERNS } from "@/lib/constant";
+import { tolgee } from "@/i18n/tolgee";
 import type { GroupSocialLinkDTO } from "../api/groupsApi";
 
 export const getSocialLinkUrlError = (
@@ -8,7 +9,9 @@ export const getSocialLinkUrlError = (
   if (!platform || !url || platform === "email") return null;
   const pattern = PLATFORM_PATTERNS[platform];
   if (pattern && !pattern.test(url)) {
-    return `URL must be a valid ${platform} link`;
+    return tolgee.t("studio.groups.shared.social_link_invalid_url", {
+      platform,
+    });
   }
   return null;
 };
