@@ -10,6 +10,7 @@ import {
   LuLibrary,
   LuRadio,
   LuScrollText,
+  LuSettings2,
 } from "react-icons/lu";
 import { Pecha } from "@/components/ui/shadimport";
 import { MarkdownPreview } from "@/components/ui/molecules/markdown-editor/MarkdownPreview";
@@ -41,6 +42,7 @@ import { formatCoordinates, hasCoordinates } from "./api/locationsApi";
 import LocationMap from "./components/locations/LocationMap";
 import PrayerPdfActions from "./components/prayer-pdf/PrayerPdfActions";
 import InPersonCountsActions from "./components/events/InPersonCountsActions";
+import { LiveControlSummaryCard } from "./components/live-control/LiveControlSummaryCard";
 
 const languageLabel = (code: string) => getLanguageLabel(code);
 
@@ -278,6 +280,17 @@ const GroupEventDetailPage = () => {
               <LuRadio className="h-4 w-4" />
               {t("studio.groups.pages.event_detail.live_control")}
             </Pecha.Button>
+            <Pecha.Button
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={() =>
+                navigate(ROUTES.groupEventLive(groupId ?? "", data.id))
+              }
+            >
+              <LuSettings2 className="h-4 w-4" />
+              {t("studio.live_settings.open_settings")}
+            </Pecha.Button>
             <PrayerPdfActions scope={{ kind: "event", eventId: data.id }} />
             {data.group_accumulator_id ? (
               <InPersonCountsActions eventId={data.id} />
@@ -396,6 +409,10 @@ const GroupEventDetailPage = () => {
           ) : null}
         </div>
       </div>
+
+      {canWrite && groupId ? (
+        <LiveControlSummaryCard groupId={groupId} eventId={data.id} />
+      ) : null}
 
       {rows.length > 1 ? (
         <div className="flex flex-wrap gap-2">

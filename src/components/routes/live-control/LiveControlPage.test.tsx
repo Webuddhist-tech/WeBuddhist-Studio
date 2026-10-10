@@ -170,6 +170,11 @@ vi.mock("./api/liveControlApi", async () => {
     searchTextsByTitle,
     fetchEditionTitle,
     fetchSegmentPlayTimes,
+    // No repeats or returns set in Studio: the built-in returns are used.
+    fetchEditionRecitationSettings: async () => ({
+      repeats: {},
+      returnJumps: [],
+    }),
     publishMove,
     startAutoplay,
     stopAutoplay,
@@ -190,6 +195,7 @@ vi.mock("./useRecitationSocket", async () => {
 vi.mock("./api/libraryTocApi", () => ({
   fetchEditionSections,
   fetchEditionYigchungs,
+  resolveEditionId: async (id: string) => id,
 }));
 
 vi.mock("react-router-dom", async () => {

@@ -39,6 +39,12 @@ export const ROUTES = {
     `/groups/${groupId}/events/${eventId}`,
   groupEventEdit: (groupId: string, eventId: string) =>
     `/groups/${groupId}/events/${eventId}/edit`,
+  /** The event's controllers, room settings and plan texts for live control. */
+  groupEventLive: (groupId: string, eventId: string) =>
+    `/groups/${groupId}/events/${eventId}/live`,
+  /** Short titles, repeated segments and return jumps of a text's editions. */
+  groupEventLiveText: (groupId: string, eventId: string, textId: string) =>
+    `/groups/${groupId}/events/${eventId}/live/texts/${encodeURIComponent(textId)}`,
   /** Standalone operator control. Signed out by design, so it takes no group. */
   liveControl: (eventId: string) => `/live-control/${eventId}`,
   /** Dry run of autoplay: plays by recorded times, never touches the room. */

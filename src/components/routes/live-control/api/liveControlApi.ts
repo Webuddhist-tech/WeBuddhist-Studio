@@ -1,6 +1,7 @@
 import axios from "axios";
 import axiosInstance from "@/config/axios-config";
 import { tolgee } from "@/i18n/tolgee";
+import type { StudioReturnJump } from "../returnJumps";
 import { fetchTextLanguages, searchTitles } from "@/components/api/searchApi";
 
 /**
@@ -700,6 +701,50 @@ export const endRecitationSession = async (
       : undefined;
     return { ok: false, message: emitFailure(status) };
   }
+};
+
+interface EditionRecitationSettingsResponse {
+  repeated_segments?: { segment_id: string; times: number }[];
+  return_jumps?: {
+    key: string;
+    after_segment_id: string;
+    to_segment_id: string;
+    times: number;
+    label?: Record<string, string>;
+  }[];
+}
+
+/** What Studio set for one edition: repeated lines and return buttons. */
+export interface EditionRecitationSettings {
+  /** Times each repeated line is read, by segment id. Lines read once are absent. */
+  repeats: Record<string, number>;
+  returnJumps: StudioReturnJump[];
+}
+
+/**
+ * The repeats and returns set in Studio for one library edition. Public, like
+ * the play times: settings of a public text, read with no token.
+ */
+export const fetchEditionRecitationSettings = async (
+  editionId: string,
+): Promise<EditionRecitationSettings> => {
+  const { data } = await emitClient.get<EditionRecitationSettingsResponse>(
+    `/api/v1/events/recitation/editions/${encodeURIComponent(editionId)}/settings`,
+  );
+  return {
+    repeats: Object.fromEntries(
+      (data.repeated_segments ?? [])
+        .filter((segment) => segment.times > 1)
+        .map((segment) => [segment.segment_id, segment.times]),
+    ),
+    returnJumps: (data.return_jumps ?? []).map((jump) => ({
+      key: jump.key,
+      afterSegmentId: jump.after_segment_id,
+      toSegmentId: jump.to_segment_id,
+      times: jump.times,
+      label: jump.label ?? {},
+    })),
+  };
 };
 
 interface SegmentPlayTimesResponse {
