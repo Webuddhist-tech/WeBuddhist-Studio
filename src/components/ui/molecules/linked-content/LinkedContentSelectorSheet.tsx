@@ -1,12 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "use-debounce";
-import { IoMdSearch } from "react-icons/io";
+import { IoMdAdd, IoMdSearch } from "react-icons/io";
+import { LuExternalLink, LuRefreshCw } from "react-icons/lu";
+import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Pagination } from "@/components/ui/molecules/pagination/Pagination";
+import { createChantCollection } from "@/components/routes/groups/api/chantsApi";
+import { getApiErrorMessage } from "@/lib/apiErrors";
 import {
-  LINKED_CONTENT_LABELS,
+  LINKED_CONTENT_CREATE_PATHS,
+  LINKED_CONTENT_I18N,
   fetchLinkedContent,
+  supportsQuickCreate,
   supportsServerSearch,
   type LinkedContentOption,
   type LinkedContentType,
@@ -26,6 +33,11 @@ interface LinkedContentSelectorSheetProps {
  * Picks a group accumulation, chant collection, event or post to link from a
  * plan subtask. Only content from the plan's own group is listed, which is
  * also what the backend enforces on save.
+ *
+ * Content that does not exist yet can be made from here: a chant collection
+ * inline, the rest in their own form in a new tab, so the plan being edited
+ * keeps its unsaved state. The list reloads when the window regains focus,
+ * so whatever was created there is waiting on return.
  */
 export const LinkedContentSelectorSheet = ({
   type,
@@ -34,19 +46,25 @@ export const LinkedContentSelectorSheet = ({
   onOpenChange,
   onSelect,
 }: LinkedContentSelectorSheetProps) => {
+  const { t } = useTranslate();
   const [search, setSearch] = useState("");
   const [debouncedSearch] = useDebounce(search, 400);
   const [page, setPage] = useState(1);
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  const [quickCreateName, setQuickCreateName] = useState("");
+  const queryClient = useQueryClient();
 
   // Start clean each time the sheet opens or switches type.
   useEffect(() => {
     setSearch("");
     setPage(1);
+    setQuickCreateOpen(false);
+    setQuickCreateName("");
   }, [type, isOpen]);
 
   const serverSearch = type ? supportsServerSearch(type) : false;
 
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error, refetch, isFetching } = useQuery({
     queryKey: [
       "linkedContent",
       type,
@@ -62,7 +80,8 @@ export const LinkedContentSelectorSheet = ({
         ...(serverSearch && debouncedSearch ? { search: debouncedSearch } : {}),
       }),
     enabled: isOpen && !!type && !!groupId,
-    refetchOnWindowFocus: false,
+    // Coming back from a create form opened in another tab.
+    refetchOnWindowFocus: true,
   });
 
   const items = useMemo(() => {
@@ -75,7 +94,8 @@ export const LinkedContentSelectorSheet = ({
   }, [data?.items, search, serverSearch]);
 
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE));
-  const label = type ? LINKED_CONTENT_LABELS[type] : "";
+  const keys = type ? LINKED_CONTENT_I18N[type] : null;
+  const tk = (key?: string) => (key ? t(key) : "");
 
   const handleSelect = (option: LinkedContentOption) => {
     if (!type) return;
@@ -83,11 +103,122 @@ export const LinkedContentSelectorSheet = ({
     onOpenChange(false);
   };
 
+  const quickCreateMutation = useMutation({
+    mutationFn: (name: string) => createChantCollection(groupId!, { name }),
+    onSuccess: (collection) => {
+      queryClient.invalidateQueries({ queryKey: ["linkedContent"] });
+      queryClient.invalidateQueries({
+        queryKey: ["cms-chant-collections", groupId],
+      });
+      toast.success(t("studio.content.linked.chant_collection.created"));
+      handleSelect({
+        id: collection.id,
+        title: collection.name,
+        subtitle: null,
+        imageUrl: collection.img_url ?? null,
+      });
+    },
+    onError: (err) => toast.error(getApiErrorMessage(err)),
+  });
+
+  const openCreateForm = () => {
+    if (!type || !groupId) return;
+    window.open(
+      LINKED_CONTENT_CREATE_PATHS[type](groupId),
+      "_blank",
+      "noopener,noreferrer",
+    );
+  };
+
+  const renderCreate = () => {
+    if (!type || !groupId) return null;
+    if (quickCreateOpen) {
+      const name = quickCreateName.trim();
+      return (
+        <form
+          className="flex gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (name) quickCreateMutation.mutate(name);
+          }}
+        >
+          <Pecha.Input
+            autoFocus
+            value={quickCreateName}
+            onChange={(event) => setQuickCreateName(event.target.value)}
+            placeholder={t(
+              "studio.content.linked.chant_collection.quick_create_placeholder",
+            )}
+            maxLength={255}
+            disabled={quickCreateMutation.isPending}
+          />
+          <Pecha.Button
+            type="submit"
+            disabled={!name || quickCreateMutation.isPending}
+            className="bg-[#A51C21] text-white hover:bg-[#A51C21]/90"
+          >
+            {quickCreateMutation.isPending
+              ? t("studio.common.creating")
+              : t("studio.content.linked.create_and_link")}
+          </Pecha.Button>
+          <Pecha.Button
+            type="button"
+            variant="ghost"
+            onClick={() => setQuickCreateOpen(false)}
+            disabled={quickCreateMutation.isPending}
+          >
+            {t("studio.common.cancel")}
+          </Pecha.Button>
+        </form>
+      );
+    }
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        {supportsQuickCreate(type) ? (
+          <Pecha.Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setQuickCreateOpen(true)}
+          >
+            <IoMdAdd className="h-4 w-4" />
+            {t("studio.content.linked.create_new")}
+          </Pecha.Button>
+        ) : null}
+        <Pecha.Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={openCreateForm}
+          title={t("studio.content.linked.open_form_hint")}
+        >
+          <LuExternalLink className="h-4 w-4" />
+          {supportsQuickCreate(type)
+            ? t("studio.content.linked.open_full_form")
+            : t("studio.content.linked.create_new")}
+        </Pecha.Button>
+        <Pecha.Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => refetch()}
+          disabled={isFetching}
+          aria-label={t("studio.content.linked.refresh")}
+          title={t("studio.content.linked.refresh")}
+        >
+          <LuRefreshCw
+            className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`}
+          />
+        </Pecha.Button>
+      </div>
+    );
+  };
+
   const renderBody = () => {
     if (!groupId) {
       return (
         <p className="text-sm text-muted-foreground py-8 text-center">
-          This plan has no group, so there is nothing to link.
+          {t("studio.content.linked.no_group")}
         </p>
       );
     }
@@ -103,19 +234,18 @@ export const LinkedContentSelectorSheet = ({
     if (isError) {
       return (
         <p className="text-sm text-red-500 py-8 text-center">
-          {(error as Error)?.message ||
-            `Failed to load ${label.toLowerCase()}s`}
+          {(error as Error)?.message || tk(keys?.loadFailed)}
         </p>
       );
     }
     if (items.length === 0) {
       return (
         <div className="text-center py-12 space-y-1">
-          <p className="text-sm">No {label.toLowerCase()} found</p>
+          <p className="text-sm">{tk(keys?.noneFound)}</p>
           <span className="text-sm text-muted-foreground">
             {search
-              ? "Try a different search term"
-              : `This group has no ${label.toLowerCase()} yet`}
+              ? t("studio.content.linked.try_different_search")
+              : tk(keys?.groupEmpty)}
           </span>
         </div>
       );
@@ -159,9 +289,9 @@ export const LinkedContentSelectorSheet = ({
         className="w-full sm:max-w-xl flex flex-col gap-0"
       >
         <Pecha.SheetHeader>
-          <Pecha.SheetTitle>Link {label.toLowerCase()}</Pecha.SheetTitle>
+          <Pecha.SheetTitle>{tk(keys?.sheetTitle)}</Pecha.SheetTitle>
           <Pecha.SheetDescription>
-            Choose from this plan&apos;s group.
+            {t("studio.content.linked.sheet_description")}
           </Pecha.SheetDescription>
         </Pecha.SheetHeader>
 
@@ -174,15 +304,16 @@ export const LinkedContentSelectorSheet = ({
                 setSearch(event.target.value);
                 if (serverSearch) setPage(1);
               }}
-              placeholder={`Search ${label.toLowerCase()}`}
+              placeholder={tk(keys?.searchPlaceholder)}
               className="pl-9"
             />
           </div>
           {!serverSearch && search.trim() && (
             <p className="text-xs text-muted-foreground mt-1">
-              Filtering this page only — use the pages below to see more.
+              {t("studio.content.linked.filtering_page_only")}
             </p>
           )}
+          <div className="mt-3">{renderCreate()}</div>
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 pb-4">{renderBody()}</div>

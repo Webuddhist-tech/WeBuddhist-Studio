@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import Dropzone, { ErrorCode, type FileRejection } from "react-dropzone";
 import { FiUpload } from "react-icons/fi";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
+import { tolgee } from "@/i18n/tolgee";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import type { AmbientSound } from "./api/ambientSoundsApi";
@@ -23,18 +25,21 @@ const describeRejection = (
   );
   if (isTooLarge) {
     return kind === "audio"
-      ? "File is too large — maximum 50 MB."
-      : "Image is too large — maximum 5 MB.";
+      ? tolgee.t("studio.ambient_sounds.form.error_audio_too_large")
+      : tolgee.t("studio.ambient_sounds.form.error_image_too_large");
   }
   const isInvalidType = rejection.errors.some(
     (error) => error.code === ErrorCode.FileInvalidType,
   );
   if (isInvalidType) {
     return kind === "audio"
-      ? "Unsupported file type — use MP3, M4A, WAV, AAC, or OGG."
-      : "Unsupported image type — use PNG, JPG, or WEBP.";
+      ? tolgee.t("studio.ambient_sounds.form.error_audio_type")
+      : tolgee.t("studio.ambient_sounds.form.error_image_type");
   }
-  return rejection.errors[0]?.message ?? "File was rejected.";
+  return (
+    rejection.errors[0]?.message ??
+    tolgee.t("studio.ambient_sounds.form.error_rejected")
+  );
 };
 
 export interface AmbientSoundFormPayload {
@@ -60,6 +65,7 @@ const AmbientSoundFormDialog = ({
   isSubmitting,
   onSubmit,
 }: AmbientSoundFormDialogProps) => {
+  const { t } = useTranslate();
   const isEdit = !!sound;
   const [name, setName] = useState("");
   const [displayOrder, setDisplayOrder] = useState("0");
@@ -82,18 +88,18 @@ const AmbientSoundFormDialog = ({
 
     const trimmedName = name.trim();
     if (!trimmedName) {
-      toast.error("Name is required");
+      toast.error(t("studio.ambient_sounds.form.error_name_required"));
       return;
     }
 
     const parsedOrder = Number(displayOrder.trim());
     if (!Number.isFinite(parsedOrder) || parsedOrder < 0) {
-      toast.error("Order must be a non-negative number");
+      toast.error(t("studio.ambient_sounds.form.error_order_invalid"));
       return;
     }
 
     if (!isEdit && !pendingFile) {
-      toast.error("An audio file is required");
+      toast.error(t("studio.ambient_sounds.form.error_audio_required"));
       return;
     }
 
@@ -106,8 +112,12 @@ const AmbientSoundFormDialog = ({
     });
   };
 
-  const idleLabel = isEdit ? "Save changes" : "Add sound";
-  const pendingLabel = isEdit ? "Saving…" : "Adding…";
+  const idleLabel = isEdit
+    ? t("studio.ambient_sounds.form.save_changes")
+    : t("studio.ambient_sounds.form.add_sound");
+  const pendingLabel = isEdit
+    ? t("studio.common.saving")
+    : t("studio.ambient_sounds.form.adding");
   const submitLabel = isSubmitting ? pendingLabel : idleLabel;
 
   return (
@@ -115,15 +125,17 @@ const AmbientSoundFormDialog = ({
       <Pecha.DialogContent className="max-w-lg">
         <Pecha.DialogHeader>
           <Pecha.DialogTitle>
-            {isEdit ? `Edit sound — ${sound.name}` : "Add ambient sound"}
+            {isEdit
+              ? t("studio.ambient_sounds.form.edit_title", { name: sound.name })
+              : t("studio.ambient_sounds.form.add_title")}
           </Pecha.DialogTitle>
         </Pecha.DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-5 pt-2">
           <div className="space-y-2">
-            <p className="text-sm font-bold">Name</p>
+            <p className="text-sm font-bold">{t("studio.common.name")}</p>
             <Pecha.Input
-              placeholder="e.g. Sea waves"
+              placeholder={t("studio.ambient_sounds.form.name_placeholder")}
               className="h-12 bg-white dark:bg-[#262626]"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -131,7 +143,9 @@ const AmbientSoundFormDialog = ({
           </div>
 
           <div className="space-y-2">
-            <p className="text-sm font-bold">Order</p>
+            <p className="text-sm font-bold">
+              {t("studio.ambient_sounds.form.order")}
+            </p>
             <Pecha.Input
               type="number"
               min={0}
@@ -146,11 +160,13 @@ const AmbientSoundFormDialog = ({
               checked={isDefault}
               onCheckedChange={(checked) => setIsDefault(checked === true)}
             />
-            Default sound
+            {t("studio.ambient_sounds.form.default_sound")}
           </label>
 
           <div className="space-y-2">
-            <p className="text-sm font-bold">Audio file</p>
+            <p className="text-sm font-bold">
+              {t("studio.ambient_sounds.form.audio_file")}
+            </p>
             <Dropzone
               accept={{ "audio/*": [".mp3", ".m4a", ".wav", ".aac", ".ogg"] }}
               multiple={false}
@@ -174,27 +190,27 @@ const AmbientSoundFormDialog = ({
                     {pendingFile
                       ? pendingFile.name
                       : isEdit
-                        ? "Replace audio (optional)"
-                        : "Add an audio file"}
+                        ? t("studio.ambient_sounds.form.replace_audio")
+                        : t("studio.ambient_sounds.form.add_audio_file")}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    MP3, M4A, WAV, AAC, or OGG; maximum 50 MB.
+                    {t("studio.ambient_sounds.form.audio_hint")}
                   </p>
                 </div>
               )}
             </Dropzone>
             {isEdit && !pendingFile ? (
               <p className="text-xs text-muted-foreground">
-                Leave empty to keep the current audio.
+                {t("studio.ambient_sounds.form.keep_current_audio")}
               </p>
             ) : null}
           </div>
 
           <div className="space-y-2">
             <p className="text-sm font-bold">
-              Cover image{" "}
+              {t("studio.ambient_sounds.form.cover_image")}{" "}
               <span className="font-normal text-muted-foreground">
-                (optional)
+                {t("studio.ambient_sounds.form.optional_suffix")}
               </span>
             </p>
             <Dropzone
@@ -220,18 +236,18 @@ const AmbientSoundFormDialog = ({
                     {pendingImage
                       ? pendingImage.name
                       : sound?.image_url
-                        ? "Replace image (optional)"
-                        : "Add a cover image"}
+                        ? t("studio.ambient_sounds.form.replace_image")
+                        : t("studio.ambient_sounds.form.add_cover_image")}
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    PNG, JPG, or WEBP; maximum 5 MB.
+                    {t("studio.ambient_sounds.form.image_hint")}
                   </p>
                 </div>
               )}
             </Dropzone>
             {isEdit && !pendingImage && sound?.image_url ? (
               <p className="text-xs text-muted-foreground">
-                Leave empty to keep the current image.
+                {t("studio.ambient_sounds.form.keep_current_image")}
               </p>
             ) : null}
           </div>
@@ -243,7 +259,7 @@ const AmbientSoundFormDialog = ({
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >
-              Cancel
+              {t("studio.common.cancel")}
             </Button>
             <Button
               type="submit"

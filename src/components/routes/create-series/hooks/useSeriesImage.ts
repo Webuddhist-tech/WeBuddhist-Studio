@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { uploadImageToS3 } from "@/components/routes/task/api/taskApi";
 
 type UseSeriesImageParams = {
@@ -27,6 +28,7 @@ export const useSeriesImage = ({
   seriesId,
   setImageUrl,
 }: UseSeriesImageParams): UseSeriesImageReturn => {
+  const { t } = useTranslate();
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isImageDialogOpen, setImageDialogOpen] = useState(false);
@@ -45,22 +47,22 @@ export const useSeriesImage = ({
         setSelectedImage(file);
         setImageUrl(key);
         setImageDialogOpen(false);
-        toast.success("Image uploaded successfully!");
+        toast.success(t("studio.series.image.upload_success"));
       } catch (error: unknown) {
         const err = error as { response?: { status?: number } };
         if (err?.response?.status === 413) {
-          toast.error("Failed to upload image", {
-            description: "File exceeds the maximum size of 1MB",
+          toast.error(t("studio.series.image.upload_failed"), {
+            description: t("studio.series.image.too_large"),
           });
         } else {
           console.error("Image upload failed:", error);
-          toast.error("Failed to upload image");
+          toast.error(t("studio.series.image.upload_failed"));
         }
       } finally {
         setIsImageUploading(false);
       }
     },
-    [isNew, seriesId, setImageUrl],
+    [isNew, seriesId, setImageUrl, t],
   );
 
   const removeImage = useCallback(() => {

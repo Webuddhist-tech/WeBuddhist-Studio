@@ -32,9 +32,15 @@ function baseValidData(overrides: Partial<EventFormData> = {}): EventFormData {
 
 describe("eventFormatLabel", () => {
   it("maps each backend value to its display label", () => {
-    expect(eventFormatLabel("offline")).toBe("In person");
-    expect(eventFormatLabel("online")).toBe("Live");
-    expect(eventFormatLabel("hybrid")).toBe("Hybrid");
+    expect(eventFormatLabel("offline")).toBe(
+      "studio.ui.options.event_format.offline",
+    );
+    expect(eventFormatLabel("online")).toBe(
+      "studio.ui.options.event_format.online",
+    );
+    expect(eventFormatLabel("hybrid")).toBe(
+      "studio.ui.options.event_format.hybrid",
+    );
   });
 
   it("returns null for an unset or unrecognized value", () => {
@@ -46,19 +52,33 @@ describe("eventFormatLabel", () => {
 
 describe("eventRecurrenceLabel", () => {
   it("labels a one-time event", () => {
-    expect(eventRecurrenceLabel(false)).toBe("One-time");
-    expect(eventRecurrenceLabel(undefined)).toBe("One-time");
+    expect(eventRecurrenceLabel(false)).toBe(
+      "studio.ui.options.recurrence.one_time",
+    );
+    expect(eventRecurrenceLabel(undefined)).toBe(
+      "studio.ui.options.recurrence.one_time",
+    );
   });
 
   it("labels known recurrence frequencies", () => {
-    expect(eventRecurrenceLabel(true, "WEEKLY")).toBe("Weekly");
-    expect(eventRecurrenceLabel(true, "MONTHLY")).toBe("Monthly");
-    expect(eventRecurrenceLabel(true, "YEARLY")).toBe("Yearly");
+    expect(eventRecurrenceLabel(true, "WEEKLY")).toBe(
+      "studio.ui.options.recurrence.weekly",
+    );
+    expect(eventRecurrenceLabel(true, "MONTHLY")).toBe(
+      "studio.ui.options.recurrence.monthly",
+    );
+    expect(eventRecurrenceLabel(true, "YEARLY")).toBe(
+      "studio.ui.options.recurrence.yearly",
+    );
   });
 
   it("falls back to Recurring when frequency is missing", () => {
-    expect(eventRecurrenceLabel(true)).toBe("Recurring");
-    expect(eventRecurrenceLabel(true, "DAILY")).toBe("Recurring");
+    expect(eventRecurrenceLabel(true)).toBe(
+      "studio.ui.options.recurrence.recurring",
+    );
+    expect(eventRecurrenceLabel(true, "DAILY")).toBe(
+      "studio.ui.options.recurrence.recurring",
+    );
   });
 });
 

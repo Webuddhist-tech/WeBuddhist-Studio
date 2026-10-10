@@ -1,5 +1,6 @@
 import { Pecha } from "@/components/ui/shadimport";
 import React from "react";
+import { useTranslate } from "@tolgee/react";
 
 interface PaginationProps {
   currentPage: number;
@@ -14,15 +15,18 @@ export const Pagination: React.FC<PaginationProps> = ({
   onPageChange,
   className = "",
 }) => {
+  const { t } = useTranslate();
   return (
     <div
       role="navigation"
-      aria-label="pagination"
+      aria-label={t("studio.shell.pagination_aria")}
       className={"flex p-4 w-full items-center justify-between " + className}
     >
       <div className="text-sm text-muted-foreground">
-        Page <span className=" text-black dark:text-white">{currentPage}</span>{" "}
-        of {totalPages}
+        {t("studio.common.page_of", {
+          page: currentPage,
+          total: totalPages,
+        })}
       </div>
       <div className="flex items-center space-x-2">
         <Pecha.PaginationPrevious

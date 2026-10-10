@@ -1,3 +1,4 @@
+import { useTranslate } from "@tolgee/react";
 import type { UseFormReturn } from "react-hook-form";
 import { Pecha } from "@/components/ui/shadimport";
 import type { EventFormData } from "@/schema/EventSchema";
@@ -13,6 +14,7 @@ type EventChatFieldProps = {
  * its prayer requests are kept, and turning it back on restores access.
  */
 const EventChatField = ({ form, readOnly }: EventChatFieldProps) => {
+  const { t } = useTranslate();
   return (
     <Pecha.FormField
       control={form.control}
@@ -28,12 +30,10 @@ const EventChatField = ({ form, readOnly }: EventChatFieldProps) => {
           </Pecha.FormControl>
           <div className="space-y-1 leading-none">
             <Pecha.FormLabel className="text-sm font-medium">
-              Enable event chat
+              {t("studio.groups.events.chat.enable_label")}
             </Pecha.FormLabel>
             <p className="text-xs text-muted-foreground">
-              Gives this event its own chat room, where members of the group can
-              talk and post prayer requests. Existing messages are kept if you
-              turn it off.
+              {t("studio.groups.events.chat.enable_help")}
             </p>
           </div>
           <Pecha.FormMessage />

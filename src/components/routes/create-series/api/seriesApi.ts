@@ -1,4 +1,5 @@
 import axiosInstance from "@/config/axios-config";
+import { tolgee } from "@/i18n/tolgee";
 import {
   LANGUAGE_CODE_ORDER,
   normalizeLanguageCode,
@@ -455,7 +456,8 @@ export type SeriesOption = {
 };
 
 function resolveSeriesListTitle(metadata?: SeriesMetadataDTO[]): string {
-  if (!Array.isArray(metadata) || metadata.length === 0) return "Untitled";
+  if (!Array.isArray(metadata) || metadata.length === 0)
+    return tolgee.t("studio.series.untitled");
   const order = [...LANGUAGE_CODE_ORDER];
   for (const lang of order) {
     const row = metadata.find(
@@ -468,7 +470,7 @@ function resolveSeriesListTitle(metadata?: SeriesMetadataDTO[]): string {
     const t = row.title?.trim();
     if (t) return t;
   }
-  return "Untitled";
+  return tolgee.t("studio.series.untitled");
 }
 
 export const fetchSeriesList = async (): Promise<SeriesOption[]> => {

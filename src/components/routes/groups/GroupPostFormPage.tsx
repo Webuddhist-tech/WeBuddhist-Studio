@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import { ROUTES } from "@/routes/paths";
@@ -20,6 +21,7 @@ import {
 } from "./api/groupPostsApi";
 
 const GroupPostFormPage = () => {
+  const { t } = useTranslate();
   const { groupId, postId } = useParams<{
     groupId: string;
     postId?: string;
@@ -87,7 +89,11 @@ const GroupPostFormPage = () => {
       });
     },
     onSuccess: () => {
-      toast.success(isNew ? "Post created" : "Post updated");
+      toast.success(
+        isNew
+          ? t("studio.groups.pages.post_form.post_created")
+          : t("studio.groups.pages.post_form.post_updated"),
+      );
       queryClient.invalidateQueries({
         queryKey: ["cms-group-posts", groupId],
       });
@@ -109,7 +115,7 @@ const GroupPostFormPage = () => {
   if (!isNew && postQuery.isLoading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">
-        Loading post…
+        {t("studio.groups.pages.post_form.loading")}
       </div>
     );
   }
@@ -118,10 +124,13 @@ const GroupPostFormPage = () => {
     return (
       <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4">
         <p className="text-center text-destructive">
-          {getApiErrorMessage(postQuery.error, "Could not load this post.")}
+          {getApiErrorMessage(
+            postQuery.error,
+            t("studio.groups.pages.post_form.load_failed"),
+          )}
         </p>
         <Pecha.Button variant="outline" onClick={() => navigate(postsListPath)}>
-          Back to posts
+          {t("studio.groups.pages.post_form.back_to_posts")}
         </Pecha.Button>
       </div>
     );
@@ -131,8 +140,11 @@ const GroupPostFormPage = () => {
   const mediaDirty = form.watch("media_dirty");
 
   const getSaveLabel = () => {
-    if (mutation.isPending) return isNew ? "Creating…" : "Saving…";
-    return isNew ? "Create post" : "Save changes";
+    if (mutation.isPending)
+      return isNew ? t("studio.common.creating") : t("studio.common.saving");
+    return isNew
+      ? t("studio.groups.pages.post_form.create_post")
+      : t("studio.groups.pages.post_form.save_changes");
   };
 
   const saveDisabled =
@@ -142,14 +154,17 @@ const GroupPostFormPage = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">
-          {isNew ? "New post" : "Edit post"}
+          {isNew
+            ? t("studio.groups.pages.posts.new_post")
+            : t("studio.groups.pages.post_form.edit_post")}
         </h1>
       </div>
 
       {readOnly ? (
         <p className="text-sm text-muted-foreground">
-          You do not have permission to {isNew ? "create" : "edit"} posts in
-          this group.
+          {isNew
+            ? t("studio.groups.pages.post_form.no_permission_create")
+            : t("studio.groups.pages.post_form.no_permission_edit")}
         </p>
       ) : null}
 
@@ -160,12 +175,16 @@ const GroupPostFormPage = () => {
             name="caption"
             render={({ field }) => (
               <Pecha.FormItem>
-                <Pecha.FormLabel>Caption</Pecha.FormLabel>
+                <Pecha.FormLabel>
+                  {t("studio.groups.pages.post_form.caption_label")}
+                </Pecha.FormLabel>
                 <Pecha.FormControl>
                   <Pecha.Textarea
                     {...field}
                     rows={5}
-                    placeholder="Write a caption…"
+                    placeholder={t(
+                      "studio.groups.pages.post_form.caption_placeholder",
+                    )}
                     disabled={readOnly}
                     className="bg-white dark:bg-[#181818]"
                   />
@@ -180,7 +199,7 @@ const GroupPostFormPage = () => {
             name="status"
             render={({ field }) => (
               <Pecha.FormItem className="max-w-xs">
-                <Pecha.FormLabel>Status</Pecha.FormLabel>
+                <Pecha.FormLabel>{t("studio.common.status")}</Pecha.FormLabel>
                 <Pecha.Select
                   value={field.value}
                   onValueChange={field.onChange}
@@ -194,7 +213,9 @@ const GroupPostFormPage = () => {
                   <Pecha.SelectContent>
                     {POST_STATUSES.map((status) => (
                       <Pecha.SelectItem key={status} value={status}>
-                        {status === "PUBLISHED" ? "Published" : "Hidden"}
+                        {status === "PUBLISHED"
+                          ? t("studio.common.published")
+                          : t("studio.groups.pages.post_form.status_hidden")}
                       </Pecha.SelectItem>
                     ))}
                   </Pecha.SelectContent>
@@ -232,7 +253,7 @@ const GroupPostFormPage = () => {
               variant="outline"
               onClick={() => navigate(postsListPath)}
             >
-              Cancel
+              {t("studio.common.cancel")}
             </Pecha.Button>
             {!readOnly ? (
               <Pecha.Button

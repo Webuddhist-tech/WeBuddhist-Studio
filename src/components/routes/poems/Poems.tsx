@@ -3,6 +3,7 @@ import { IoMdAdd, IoMdSearch } from "react-icons/io";
 import { useDebounce } from "use-debounce";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import AuthButton from "@/components/ui/molecules/auth-button/AuthButton";
@@ -18,6 +19,7 @@ import PoemFormDialog from "./PoemFormDialog";
 const PAGE_SIZE = 10;
 
 const Poems = () => {
+  const { t } = useTranslate();
   const { data: userInfo } = useUserInfo();
   const showActionsColumn =
     !!userInfo && shouldShowCmsActionsColumn(userInfo.platform_role);
@@ -52,7 +54,7 @@ const Poems = () => {
   const deleteMutation = useMutation({
     mutationFn: deletePoem,
     onSuccess: () => {
-      toast.success("Poem deleted successfully!");
+      toast.success(t("studio.poems.toast.deleted"));
       setDeleteTarget(null);
       if (data?.poems.length === 1 && currentPage > 1) {
         setCurrentPage(currentPage - 1);
@@ -101,7 +103,7 @@ const Poems = () => {
           <div className="border w-fit px-2 bg-white dark:bg-input/30 rounded-md border-gray-200 dark:border-[#313132] flex items-center">
             <IoMdSearch className="w-4 h-4" />
             <Pecha.Input
-              placeholder="Search by author..."
+              placeholder={t("studio.poems.search_placeholder")}
               className="rounded-md border-none dark:bg-transparent px-4 shadow-none py-2"
               value={search}
               onChange={(e) => {
@@ -118,10 +120,14 @@ const Poems = () => {
             }}
           >
             <Pecha.SelectTrigger className="w-[160px]">
-              <Pecha.SelectValue placeholder="All languages" />
+              <Pecha.SelectValue
+                placeholder={t("studio.poems.all_languages")}
+              />
             </Pecha.SelectTrigger>
             <Pecha.SelectContent>
-              <Pecha.SelectItem value="ALL">All languages</Pecha.SelectItem>
+              <Pecha.SelectItem value="ALL">
+                {t("studio.poems.all_languages")}
+              </Pecha.SelectItem>
               {languageOptions.map((lang) => (
                 <Pecha.SelectItem key={lang.value} value={lang.value}>
                   {lang.label}
@@ -135,7 +141,7 @@ const Poems = () => {
               className="bg-gray-100 hover:bg-gray-200"
               onClick={handleOpenCreate}
             >
-              <IoMdAdd /> Add Poem
+              <IoMdAdd /> {t("studio.poems.add_poem")}
             </Button>
           ) : null}
         </div>
@@ -145,18 +151,20 @@ const Poems = () => {
       <div className="flex-1 overflow-hidden px-6 py-4">
         {error ? (
           <p className="text-sm text-red-500 py-8">
-            Failed to load poems. {getApiErrorMessage(error)}
+            {t("studio.poems.load_failed")} {getApiErrorMessage(error)}
           </p>
         ) : poems.length === 0 && !isLoading ? (
           <div className="flex flex-col h-full items-center justify-center">
-            <p className="text-base text-muted-foreground">No poems found</p>
+            <p className="text-base text-muted-foreground">
+              {t("studio.poems.empty")}
+            </p>
             {showActionsColumn ? (
               <Button
                 variant="outline"
                 className="mt-2"
                 onClick={handleOpenCreate}
               >
-                <IoMdAdd /> Add Poem
+                <IoMdAdd /> {t("studio.poems.add_poem")}
               </Button>
             ) : null}
           </div>
@@ -201,15 +209,18 @@ const Poems = () => {
       >
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
-            <Pecha.AlertDialogTitle>Delete Poem</Pecha.AlertDialogTitle>
+            <Pecha.AlertDialogTitle>
+              {t("studio.poems.delete_dialog.title")}
+            </Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
-              Are you sure you want to delete "{deleteTarget?.title}"? This
-              action cannot be undone.
+              {t("studio.poems.delete_dialog.description", {
+                title: deleteTarget?.title ?? "",
+              })}
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <Pecha.AlertDialogFooter>
             <Pecha.AlertDialogCancel disabled={deleteMutation.isPending}>
-              Cancel
+              {t("studio.common.cancel")}
             </Pecha.AlertDialogCancel>
             <Pecha.AlertDialogAction
               className="bg-[#AD1B21] dark:text-white hover:bg-[#AD1B21]/90"
@@ -218,7 +229,9 @@ const Poems = () => {
                 deleteTarget && deleteMutation.mutate(deleteTarget.id)
               }
             >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              {deleteMutation.isPending
+                ? t("studio.common.deleting")
+                : t("studio.common.delete")}
             </Pecha.AlertDialogAction>
           </Pecha.AlertDialogFooter>
         </Pecha.AlertDialogContent>

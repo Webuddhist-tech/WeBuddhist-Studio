@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Pecha } from "@/components/ui/shadimport";
+import { useTranslate } from "@tolgee/react";
 import { FiLoader } from "react-icons/fi";
 import { AiOutlineSound } from "react-icons/ai";
 import {
@@ -34,6 +35,7 @@ const TtsGenerateControls = ({
   size = "default",
   onGenerate,
 }: TtsGenerateControlsProps) => {
+  const { t } = useTranslate();
   const [audioType, setAudioType] = useState<TtsAudioType>(defaultAudioType);
   const [voiceName, setVoiceName] =
     useState<MonlamVoiceName>(DEFAULT_MONLAM_VOICE);
@@ -63,9 +65,9 @@ const TtsGenerateControls = ({
             <Pecha.SelectValue />
           </Pecha.SelectTrigger>
           <Pecha.SelectContent>
-            {TTS_AUDIO_TYPES.map(({ value, label }) => (
+            {TTS_AUDIO_TYPES.map(({ value, labelKey }) => (
               <Pecha.SelectItem key={value} value={value}>
-                {label}
+                {t(labelKey)}
               </Pecha.SelectItem>
             ))}
           </Pecha.SelectContent>
@@ -83,7 +85,7 @@ const TtsGenerateControls = ({
           <Pecha.SelectContent>
             {MONLAM_VOICE_REGIONS.map((region) => (
               <Pecha.SelectGroup key={region.label}>
-                <Pecha.SelectLabel>{region.label}</Pecha.SelectLabel>
+                <Pecha.SelectLabel>{t(region.labelKey)}</Pecha.SelectLabel>
                 {region.voices.map((voice) => (
                   <Pecha.SelectItem key={voice.value} value={voice.value}>
                     {voice.label}
@@ -107,7 +109,9 @@ const TtsGenerateControls = ({
         ) : (
           <AiOutlineSound className="w-4 h-4" />
         )}
-        {isPending ? "Generating..." : "Generate Audio"}
+        {isPending
+          ? t("studio.molecules.tts.generating")
+          : t("studio.molecules.tts.generate_audio")}
       </Pecha.Button>
     </div>
   );

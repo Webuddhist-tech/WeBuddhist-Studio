@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import { Textarea } from "@/components/ui/atoms/textarea";
@@ -33,8 +34,8 @@ type TextKey = {
 }[keyof PrayerPdfSettingsPayload];
 
 const PAGE_SIZES: { value: PrayerPdfPageSize; label: string }[] = [
-  { value: "A3", label: "A3 (297 × 420 mm)" },
-  { value: "A4", label: "A4 (210 × 297 mm)" },
+  { value: "A3", label: "studio.groups.prayer_pdf.settings.page_size_a3" },
+  { value: "A4", label: "studio.groups.prayer_pdf.settings.page_size_a4" },
 ];
 
 const COLUMN_OPTIONS = [2, 3, 4, 5, 6];
@@ -93,13 +94,14 @@ const blankToNull = (value: string | null): string | null => {
   return trimmed ? trimmed : null;
 };
 
+/** The translation key of the first color field's label that is not a valid hex color. */
 const colorProblem = (form: PrayerPdfSettingsPayload): string | null => {
-  for (const [key, label] of [
-    ["primary_color", "Main color"],
-    ["secondary_color", "Accent color"],
+  for (const [key, labelKey] of [
+    ["primary_color", "studio.groups.prayer_pdf.settings.main_color"],
+    ["secondary_color", "studio.groups.prayer_pdf.settings.accent_color"],
   ] as const) {
     if (!HEX_COLOR.test(form[key])) {
-      return `${label} must be a hex color like #7a1f1f`;
+      return labelKey;
     }
   }
   return null;
@@ -118,19 +120,19 @@ const toRequest = (
   return payload;
 };
 
+/** Translation key of the note on where the shown settings come from. */
 const sourceNote = (scope: PrayerPdfScope, settings: PrayerPdfSettings) => {
   if (scope.kind === "event") {
     if (settings.source === "EVENT")
-      return "This event has its own PDF settings.";
+      return "studio.groups.prayer_pdf.settings.source_event_own";
     if (settings.source === "GROUP")
-      return "Using the group's PDF settings. Saving here gives this event its own.";
+      return "studio.groups.prayer_pdf.settings.source_event_group";
   } else if (settings.source === "GROUP") {
-    return "Events without their own settings use these too.";
+    return "studio.groups.prayer_pdf.settings.source_group_own";
   }
-  return (
-    "Using the default text. Saving creates settings for this " +
-    (scope.kind === "event" ? "event." : "group, which its events also use.")
-  );
+  return scope.kind === "event"
+    ? "studio.groups.prayer_pdf.settings.source_default_event"
+    : "studio.groups.prayer_pdf.settings.source_default_group";
 };
 
 const SectionTitle = ({ children }: { children: React.ReactNode }) => (
@@ -144,6 +146,7 @@ const PrayerPdfSettingsDialog = ({
   open,
   onOpenChange,
 }: PrayerPdfSettingsDialogProps) => {
+  const { t } = useTranslate();
   const queryClient = useQueryClient();
   const queryKey = prayerPdfQueryKey(scope);
   const timeZones = useMemo(supportedTimeZones, []);
@@ -173,7 +176,7 @@ const PrayerPdfSettingsDialog = ({
     mutationFn: (payload: PrayerPdfSettingsPayload) =>
       updatePrayerPdfSettings(scope, payload),
     onSuccess: (saved) => {
-      onSaved(saved, "Prayer PDF settings saved");
+      onSaved(saved, t("studio.groups.prayer_pdf.settings.saved_toast"));
       onOpenChange(false);
     },
     onError: (err) => toast.error(getApiErrorMessage(err)),
@@ -185,8 +188,8 @@ const PrayerPdfSettingsDialog = ({
       onSaved(
         saved,
         scope.kind === "event"
-          ? "Event now uses the group's settings"
-          : "Prayer PDF settings reset to defaults",
+          ? t("studio.groups.prayer_pdf.settings.reset_event_toast")
+          : t("studio.groups.prayer_pdf.settings.reset_group_toast"),
       );
       setForm(toPayload(saved));
     },
@@ -261,7 +264,9 @@ const PrayerPdfSettingsDialog = ({
           />
           <input
             type="color"
-            aria-label={`Pick ${label.toLowerCase()}`}
+            aria-label={t("studio.groups.prayer_pdf.settings.pick_color", {
+              label: label.toLowerCase(),
+            })}
             value={HEX_COLOR.test(value) ? value : "#000000"}
             onChange={(e) => set(key, e.target.value)}
             className="h-9 w-10 shrink-0 cursor-pointer rounded border border-input bg-transparent p-0.5"
@@ -273,7 +278,9 @@ const PrayerPdfSettingsDialog = ({
 
   const applyTemplate = () => {
     setForm((prev) => (prev ? { ...prev, ...ZABTIK_DROLCHOK_TEMPLATE } : prev));
-    toast.success("Filled in the Zabtik Drolchok text. Review and save.");
+    toast.success(
+      t("studio.groups.prayer_pdf.settings.template_applied_toast"),
+    );
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -281,11 +288,15 @@ const PrayerPdfSettingsDialog = ({
     if (!form) return;
     const problem = colorProblem(form);
     if (problem) {
-      toast.error(problem);
+      toast.error(
+        t("studio.groups.prayer_pdf.settings.color_invalid", {
+          label: t(problem),
+        }),
+      );
       return;
     }
     if (!form.timezone.trim()) {
-      toast.error("Timezone is required");
+      toast.error(t("studio.groups.prayer_pdf.settings.timezone_required"));
       return;
     }
     saveMutation.mutate(toRequest(form));
@@ -299,16 +310,21 @@ const PrayerPdfSettingsDialog = ({
     <Pecha.Dialog open={open} onOpenChange={onOpenChange}>
       <Pecha.DialogContent className="flex h-[92vh] max-w-[calc(100%-1rem)] flex-col p-4 sm:max-w-[min(96vw,1400px)] sm:p-6">
         <Pecha.DialogHeader>
-          <Pecha.DialogTitle>Prayer request PDF</Pecha.DialogTitle>
+          <Pecha.DialogTitle>
+            {t("studio.groups.prayer_pdf.settings.title")}
+          </Pecha.DialogTitle>
         </Pecha.DialogHeader>
 
         {isLoading || (!form && !isError) ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
-            Loading settings…
+            {t("studio.groups.prayer_pdf.settings.loading")}
           </p>
         ) : isError || !form || !data ? (
           <p className="py-8 text-center text-sm text-destructive">
-            {getApiErrorMessage(error, "Could not load the PDF settings.")}
+            {getApiErrorMessage(
+              error,
+              t("studio.groups.prayer_pdf.settings.load_error"),
+            )}
           </p>
         ) : (
           <div className="grid min-h-0 flex-1 gap-5 overflow-y-auto lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:overflow-hidden">
@@ -318,7 +334,7 @@ const PrayerPdfSettingsDialog = ({
             >
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted px-3 py-2">
                 <p className="text-xs text-muted-foreground">
-                  {sourceNote(scope, data)}
+                  {t(sourceNote(scope, data))}
                 </p>
                 <Button
                   type="button"
@@ -327,29 +343,47 @@ const PrayerPdfSettingsDialog = ({
                   onClick={applyTemplate}
                   disabled={busy}
                 >
-                  Fill Zabtik Drolchok text
+                  {t("studio.groups.prayer_pdf.settings.fill_template")}
                 </Button>
               </div>
 
               <section className="space-y-3">
-                <SectionTitle>Header</SectionTitle>
+                <SectionTitle>
+                  {t("studio.groups.prayer_pdf.settings.section_header")}
+                </SectionTitle>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  {textField("title_bo", "Tibetan title")}
-                  {textField("title", "Title")}
-                  {textField("title_zh", "Chinese title")}
+                  {textField(
+                    "title_bo",
+                    t("studio.groups.prayer_pdf.settings.tibetan_title"),
+                  )}
+                  {textField("title", t("studio.common.title"))}
+                  {textField(
+                    "title_zh",
+                    t("studio.groups.prayer_pdf.settings.chinese_title"),
+                  )}
                 </div>
-                {textField("subtitle_bo", "Tibetan subtitle")}
-                {textField("subtitle", "Subtitle", {
-                  multiline: true,
-                  rows: 2,
-                })}
-                {textField("subtitle_zh", "Chinese subtitle")}
+                {textField(
+                  "subtitle_bo",
+                  t("studio.groups.prayer_pdf.settings.tibetan_subtitle"),
+                )}
+                {textField(
+                  "subtitle",
+                  t("studio.groups.prayer_pdf.settings.subtitle"),
+                  {
+                    multiline: true,
+                    rows: 2,
+                  },
+                )}
+                {textField(
+                  "subtitle_zh",
+                  t("studio.groups.prayer_pdf.settings.chinese_subtitle"),
+                )}
                 <div className="space-y-1.5">
                   <label
                     htmlFor="prayer-pdf-day_one"
                     className="text-sm font-bold"
                   >
-                    Day 1 date
+                    {t("studio.groups.prayer_pdf.settings.day_one")}
                   </label>
                   <div className="flex items-center gap-2">
                     <Pecha.Input
@@ -366,40 +400,65 @@ const PrayerPdfSettingsDialog = ({
                         size="sm"
                         onClick={() => set("day_one", null)}
                       >
-                        Clear
+                        {t("studio.common.clear")}
                       </Button>
                     ) : null}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Shows the &ldquo;Day: n&rdquo; badge, counting from this
-                    date. Leave empty for no badge.
+                    {t("studio.groups.prayer_pdf.settings.day_one_hint")}
                   </p>
                 </div>
               </section>
 
               <section className="space-y-3">
-                <SectionTitle>Closing prayer</SectionTitle>
-                {textField("closing_bo", "Tibetan verses", {
-                  multiline: true,
-                  hint: "One printed line per line.",
-                })}
-                {textField("closing_mantra", "Mantra")}
+                <SectionTitle>
+                  {t("studio.groups.prayer_pdf.settings.section_closing")}
+                </SectionTitle>
+                {textField(
+                  "closing_bo",
+                  t("studio.groups.prayer_pdf.settings.tibetan_verses"),
+                  {
+                    multiline: true,
+                    hint: t(
+                      "studio.groups.prayer_pdf.settings.tibetan_verses_hint",
+                    ),
+                  },
+                )}
+                {textField(
+                  "closing_mantra",
+                  t("studio.groups.prayer_pdf.settings.mantra"),
+                )}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  {textField("closing_zh", "Chinese translation", {
-                    multiline: true,
-                  })}
-                  {textField("closing_en", "English translation", {
-                    multiline: true,
-                  })}
+                  {textField(
+                    "closing_zh",
+                    t("studio.groups.prayer_pdf.settings.chinese_translation"),
+                    {
+                      multiline: true,
+                    },
+                  )}
+                  {textField(
+                    "closing_en",
+                    t("studio.groups.prayer_pdf.settings.english_translation"),
+                    {
+                      multiline: true,
+                    },
+                  )}
                 </div>
-                {textField("closing_emoji", "Closing emoji")}
+                {textField(
+                  "closing_emoji",
+                  t("studio.groups.prayer_pdf.settings.closing_emoji"),
+                )}
               </section>
 
               <section className="space-y-3">
-                <SectionTitle>Layout</SectionTitle>
+                <SectionTitle>
+                  {t("studio.groups.prayer_pdf.settings.section_layout")}
+                </SectionTitle>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <span className="text-sm font-bold">Page size</span>
+                    <span className="text-sm font-bold">
+                      {t("studio.groups.prayer_pdf.settings.page_size")}
+                    </span>
                     <Pecha.Select
                       value={form.page_size}
                       onValueChange={(value) =>
@@ -407,7 +466,9 @@ const PrayerPdfSettingsDialog = ({
                       }
                     >
                       <Pecha.SelectTrigger
-                        aria-label="Page size"
+                        aria-label={t(
+                          "studio.groups.prayer_pdf.settings.page_size",
+                        )}
                         className="w-full"
                       >
                         <Pecha.SelectValue />
@@ -415,20 +476,24 @@ const PrayerPdfSettingsDialog = ({
                       <Pecha.SelectContent>
                         {PAGE_SIZES.map((size) => (
                           <Pecha.SelectItem key={size.value} value={size.value}>
-                            {size.label}
+                            {t(size.label)}
                           </Pecha.SelectItem>
                         ))}
                       </Pecha.SelectContent>
                     </Pecha.Select>
                   </div>
                   <div className="space-y-1.5">
-                    <span className="text-sm font-bold">Columns</span>
+                    <span className="text-sm font-bold">
+                      {t("studio.groups.prayer_pdf.settings.columns")}
+                    </span>
                     <Pecha.Select
                       value={String(form.columns)}
                       onValueChange={(value) => set("columns", Number(value))}
                     >
                       <Pecha.SelectTrigger
-                        aria-label="Columns"
+                        aria-label={t(
+                          "studio.groups.prayer_pdf.settings.columns",
+                        )}
                         className="w-full"
                       >
                         <Pecha.SelectValue />
@@ -442,14 +507,20 @@ const PrayerPdfSettingsDialog = ({
                       </Pecha.SelectContent>
                     </Pecha.Select>
                   </div>
-                  {colorField("primary_color", "Main color")}
-                  {colorField("secondary_color", "Accent color")}
+                  {colorField(
+                    "primary_color",
+                    t("studio.groups.prayer_pdf.settings.main_color"),
+                  )}
+                  {colorField(
+                    "secondary_color",
+                    t("studio.groups.prayer_pdf.settings.accent_color"),
+                  )}
                   <div className="space-y-1.5 sm:col-span-2">
                     <label
                       htmlFor="prayer-pdf-timezone"
                       className="text-sm font-bold"
                     >
-                      Timezone
+                      {t("studio.groups.prayer_pdf.settings.timezone")}
                     </label>
                     <Pecha.Input
                       id="prayer-pdf-timezone"
@@ -464,19 +535,27 @@ const PrayerPdfSettingsDialog = ({
                       ))}
                     </datalist>
                     <p className="text-xs text-muted-foreground">
-                      Decides which day a prayer request falls on.
+                      {t("studio.groups.prayer_pdf.settings.timezone_hint")}
                     </p>
                   </div>
                 </div>
               </section>
 
               <section className="space-y-3">
-                <SectionTitle>Filtering</SectionTitle>
-                {textField("skip_messages", "Messages to leave out", {
-                  multiline: true,
-                  hint: "One per line. Requests that say exactly this (any case) are app feedback, not prayers.",
-                  placeholder: "no sound la",
-                })}
+                <SectionTitle>
+                  {t("studio.groups.prayer_pdf.settings.section_filtering")}
+                </SectionTitle>
+                {textField(
+                  "skip_messages",
+                  t("studio.groups.prayer_pdf.settings.skip_messages"),
+                  {
+                    multiline: true,
+                    hint: t(
+                      "studio.groups.prayer_pdf.settings.skip_messages_hint",
+                    ),
+                    placeholder: "no sound la",
+                  },
+                )}
               </section>
 
               <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
@@ -489,8 +568,12 @@ const PrayerPdfSettingsDialog = ({
                     disabled={busy}
                   >
                     {scope.kind === "event"
-                      ? "Use group settings"
-                      : "Reset to defaults"}
+                      ? t(
+                          "studio.groups.prayer_pdf.settings.use_group_settings",
+                        )
+                      : t(
+                          "studio.groups.prayer_pdf.settings.reset_to_defaults",
+                        )}
                   </Button>
                 ) : (
                   <span />
@@ -502,10 +585,12 @@ const PrayerPdfSettingsDialog = ({
                     onClick={() => onOpenChange(false)}
                     disabled={busy}
                   >
-                    Cancel
+                    {t("studio.common.cancel")}
                   </Button>
                   <Button type="submit" disabled={busy}>
-                    {saveMutation.isPending ? "Saving…" : "Save"}
+                    {saveMutation.isPending
+                      ? t("studio.common.saving")
+                      : t("studio.common.save")}
                   </Button>
                 </div>
               </div>

@@ -13,8 +13,10 @@ import {
 } from "@/config/auth0-config";
 import { getPhoneAuthErrorMessage, linkPhoneToken } from "@/lib/phoneAuthApi";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 
 const Profile = () => {
+  const { t } = useTranslate();
   const [isEditing, setIsEditing] = useState(false);
   const [linkError, setLinkError] = useState("");
   const [linkSuccess, setLinkSuccess] = useState("");
@@ -63,14 +65,14 @@ const Profile = () => {
         const result = await linkPhoneToken(auth0Token);
         const message =
           result.message ||
-          `Phone number ${result.phone_number} linked successfully`;
+          t("studio.profile.phone_linked", { phone: result.phone_number });
         setLinkSuccess(message);
         toast.success(message);
       } catch (error) {
         linkHandled.current = false;
         const message = getPhoneAuthErrorMessage(
           error,
-          "Unable to link phone number",
+          t("studio.profile.phone_link_failed"),
         );
         setLinkError(message);
         toast.error(message);
@@ -93,7 +95,7 @@ const Profile = () => {
     setLinkSuccess("");
 
     if (!isAuth0Configured) {
-      setLinkError("Phone linking is not configured.");
+      setLinkError(t("studio.profile.phone_link_not_configured"));
       return;
     }
 
@@ -111,7 +113,7 @@ const Profile = () => {
         },
       });
     } catch {
-      setLinkError("Unable to start phone linking. Please try again.");
+      setLinkError(t("studio.profile.phone_link_start_failed"));
     }
   };
 
@@ -131,14 +133,14 @@ const Profile = () => {
     <div className="container flex items-center justify-center mx-auto p-6">
       <div className="border w-full border-dashed rounded-lg space-y-6">
         <div className="flex h-full border-b border-dashed border-gray-300 dark:border-input justify-between items-center p-4">
-          <h1 className="text-xl font-semibold">Profile</h1>
+          <h1 className="text-xl font-semibold">{t("studio.profile.title")}</h1>
           {!isEditing ? (
             <Pecha.Button variant="outline" onClick={handleEdit}>
-              Edit
+              {t("studio.common.edit")}
             </Pecha.Button>
           ) : (
             <Pecha.Button variant="outline" onClick={handleCancel}>
-              Cancel
+              {t("studio.common.cancel")}
             </Pecha.Button>
           )}
         </div>
@@ -151,7 +153,9 @@ const Profile = () => {
                 onClick={handleLinkPhone}
                 disabled={isLinking || isAuth0Loading}
               >
-                {isLinking ? "Linking phone..." : "Link phone number"}
+                {isLinking
+                  ? t("studio.profile.linking_phone")
+                  : t("studio.profile.link_phone")}
               </Pecha.Button>
               {linkError && (
                 <p className="text-sm text-red-800 dark:text-red-400">

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IoMdClose, IoMdSearch } from "react-icons/io";
 import { useDebounce } from "use-debounce";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import { getApiErrorMessage } from "@/lib/apiErrors";
@@ -33,6 +34,7 @@ const ROLE_OPTIONS: PlatformRole[] = [
 ];
 
 const AdminAuthorsPage = () => {
+  const { t } = useTranslate();
   const { data: userInfo } = useUserInfo();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
@@ -54,13 +56,7 @@ const AdminAuthorsPage = () => {
   const tableColumnCount = showActionsColumn ? 6 : 5;
 
   const { data, isLoading, error } = useQuery({
-    queryKey: [
-      "admin-authors",
-      page,
-      inQueueView,
-      debouncedSearch,
-      roleFilter,
-    ],
+    queryKey: ["admin-authors", page, inQueueView, debouncedSearch, roleFilter],
     queryFn: () =>
       fetchAdminAuthors({
         skip: page * PAGE_SIZE,
@@ -80,7 +76,7 @@ const AdminAuthorsPage = () => {
   const activateMutation = useMutation({
     mutationFn: activateAuthor,
     onSuccess: () => {
-      toast.success("Author activated");
+      toast.success(t("studio.admin_authors.toast.activated"));
       invalidate();
     },
     onError: (err) => toast.error(getApiErrorMessage(err)),
@@ -89,7 +85,7 @@ const AdminAuthorsPage = () => {
   const suspendMutation = useMutation({
     mutationFn: suspendAuthor,
     onSuccess: () => {
-      toast.success("Author suspended");
+      toast.success(t("studio.admin_authors.toast.suspended"));
       invalidate();
     },
     onError: (err) => toast.error(getApiErrorMessage(err)),
@@ -99,7 +95,7 @@ const AdminAuthorsPage = () => {
     mutationFn: ({ id, role }: { id: string; role: PlatformRole }) =>
       patchAuthorPlatformRole(id, role),
     onSuccess: () => {
-      toast.success("Platform role updated");
+      toast.success(t("studio.admin_authors.toast.role_updated"));
       invalidate();
     },
     onError: (err) => toast.error(getApiErrorMessage(err)),
@@ -114,11 +110,19 @@ const AdminAuthorsPage = () => {
   const displayName = (a: AdminAuthorDTO) =>
     [a.firstname, a.lastname].filter(Boolean).join(" ").trim() || contact(a);
 
+  const roleLabel = (role: PlatformRole) =>
+    t(`studio.admin_authors.role.${role.toLowerCase()}`);
+
   const emptyMessage = debouncedSearch
-    ? `No authors match "${debouncedSearch}"${roleFilter ? ` with the ${roleFilter} role` : ""}.`
+    ? roleFilter
+      ? t("studio.admin_authors.empty.search_and_role", {
+          search: debouncedSearch,
+          role: roleLabel(roleFilter),
+        })
+      : t("studio.admin_authors.empty.search", { search: debouncedSearch })
     : roleFilter
-      ? `No authors have the ${roleFilter} role.`
-      : "No authors found.";
+      ? t("studio.admin_authors.empty.role", { role: roleLabel(roleFilter) })
+      : t("studio.admin_authors.empty.none");
 
   if (userInfo && !canAccess) {
     return <Navigate to={ROUTES.dashboard} replace />;
@@ -127,14 +131,16 @@ const AdminAuthorsPage = () => {
   return (
     <div className="font-dynamic border h-[calc(100vh-40px)] overflow-auto bg-[#F5F5F5] dark:bg-[#181818] my-4 rounded-l-2xl max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
       <div className="px-4 pt-10 pb-4 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Authors</h1>
+        <h1 className="text-xl font-semibold">
+          {t("studio.admin_authors.title")}
+        </h1>
         <div className="flex flex-wrap items-center gap-2">
           <div className="border w-fit px-2 bg-white dark:bg-input/30 rounded-md border-gray-200 dark:border-[#313132] flex items-center">
             <IoMdSearch className="w-4 h-4 shrink-0" />
             <Pecha.Input
               type="search"
-              aria-label="Search authors"
-              placeholder="Search name, email or phone..."
+              aria-label={t("studio.admin_authors.search_aria")}
+              placeholder={t("studio.admin_authors.search_placeholder")}
               className="w-64 rounded-md border-none dark:bg-transparent px-3 shadow-none py-2 max-md:w-48"
               value={search}
               onChange={(e) => {
@@ -145,7 +151,7 @@ const AdminAuthorsPage = () => {
             {search ? (
               <button
                 type="button"
-                aria-label="Clear search"
+                aria-label={t("studio.admin_authors.clear_search")}
                 className="text-muted-foreground hover:text-foreground"
                 onClick={() => {
                   setSearch("");
@@ -157,7 +163,7 @@ const AdminAuthorsPage = () => {
             ) : null}
           </div>
           <select
-            aria-label="Filter by role"
+            aria-label={t("studio.admin_authors.filter_by_role")}
             className="h-9 rounded-md border bg-white px-2 text-sm dark:bg-input/30"
             value={roleFilter}
             onChange={(e) => {
@@ -165,10 +171,10 @@ const AdminAuthorsPage = () => {
               setPage(0);
             }}
           >
-            <option value="">All roles</option>
+            <option value="">{t("studio.admin_authors.all_roles")}</option>
             {ROLE_OPTIONS.map((role) => (
               <option key={role} value={role}>
-                {role}
+                {roleLabel(role)}
               </option>
             ))}
           </select>
@@ -182,7 +188,7 @@ const AdminAuthorsPage = () => {
               setPage(0);
             }}
           >
-            Activation queue
+            {t("studio.admin_authors.activation_queue")}
           </Button>
           <Button
             variant={!inQueueView ? "default" : "outline"}
@@ -192,7 +198,7 @@ const AdminAuthorsPage = () => {
               setPage(0);
             }}
           >
-            All authors
+            {t("studio.admin_authors.all_authors")}
           </Button>
         </div>
       </div>
@@ -207,13 +213,21 @@ const AdminAuthorsPage = () => {
         <Pecha.Table>
           <Pecha.TableHeader>
             <Pecha.TableRow>
-              <Pecha.TableHead>Name</Pecha.TableHead>
-              <Pecha.TableHead>Contact</Pecha.TableHead>
-              <Pecha.TableHead>Role</Pecha.TableHead>
-              <Pecha.TableHead>Verified</Pecha.TableHead>
-              <Pecha.TableHead>Active</Pecha.TableHead>
+              <Pecha.TableHead>{t("studio.common.name")}</Pecha.TableHead>
+              <Pecha.TableHead>
+                {t("studio.admin_authors.table.contact")}
+              </Pecha.TableHead>
+              <Pecha.TableHead>
+                {t("studio.admin_authors.table.role")}
+              </Pecha.TableHead>
+              <Pecha.TableHead>
+                {t("studio.admin_authors.table.verified")}
+              </Pecha.TableHead>
+              <Pecha.TableHead>
+                {t("studio.admin_authors.table.active")}
+              </Pecha.TableHead>
               {showActionsColumn ? (
-                <Pecha.TableHead>Actions</Pecha.TableHead>
+                <Pecha.TableHead>{t("studio.common.actions")}</Pecha.TableHead>
               ) : null}
             </Pecha.TableRow>
           </Pecha.TableHeader>
@@ -221,7 +235,7 @@ const AdminAuthorsPage = () => {
             {isLoading ? (
               <Pecha.TableRow>
                 <Pecha.TableCell colSpan={tableColumnCount}>
-                  Loading…
+                  {t("studio.common.loading")}
                 </Pecha.TableCell>
               </Pecha.TableRow>
             ) : authors.length === 0 ? (
@@ -238,7 +252,12 @@ const AdminAuthorsPage = () => {
                   <Pecha.TableCell>
                     {writeEnabled ? (
                       <select
-                        aria-label={`Platform role of ${displayName(author)}`}
+                        aria-label={t(
+                          "studio.admin_authors.table.role_select_aria",
+                          {
+                            name: displayName(author),
+                          },
+                        )}
                         className="rounded border bg-background px-2 py-1 text-sm"
                         value={author.platform_role}
                         onChange={(e) =>
@@ -249,20 +268,30 @@ const AdminAuthorsPage = () => {
                         }
                         disabled={roleMutation.isPending}
                       >
-                        <option value="CREATOR">CREATOR</option>
-                        <option value="CONTENT_ADMIN">CONTENT_ADMIN</option>
-                        <option value="REVIEWER">REVIEWER</option>
-                        <option value="SUPER_ADMIN">SUPER_ADMIN</option>
+                        <option value="CREATOR">{roleLabel("CREATOR")}</option>
+                        <option value="CONTENT_ADMIN">
+                          {roleLabel("CONTENT_ADMIN")}
+                        </option>
+                        <option value="REVIEWER">
+                          {roleLabel("REVIEWER")}
+                        </option>
+                        <option value="SUPER_ADMIN">
+                          {roleLabel("SUPER_ADMIN")}
+                        </option>
                       </select>
                     ) : (
-                      author.platform_role
+                      roleLabel(author.platform_role)
                     )}
                   </Pecha.TableCell>
                   <Pecha.TableCell>
-                    {author.is_verified ? "Yes" : "No"}
+                    {author.is_verified
+                      ? t("studio.common.yes")
+                      : t("studio.common.no")}
                   </Pecha.TableCell>
                   <Pecha.TableCell>
-                    {author.is_active ? "Yes" : "No"}
+                    {author.is_active
+                      ? t("studio.common.yes")
+                      : t("studio.common.no")}
                   </Pecha.TableCell>
                   {showActionsColumn ? (
                     <Pecha.TableCell>
@@ -274,7 +303,7 @@ const AdminAuthorsPage = () => {
                             disabled={activateMutation.isPending}
                             onClick={() => activateMutation.mutate(author.id)}
                           >
-                            Activate
+                            {t("studio.admin_authors.activate")}
                           </Button>
                         ) : (
                           <Button
@@ -283,7 +312,7 @@ const AdminAuthorsPage = () => {
                             disabled={suspendMutation.isPending}
                             onClick={() => suspendMutation.mutate(author.id)}
                           >
-                            Suspend
+                            {t("studio.admin_authors.suspend")}
                           </Button>
                         )}
                       </div>
@@ -303,10 +332,13 @@ const AdminAuthorsPage = () => {
               disabled={page <= 0}
               onClick={() => setPage((p) => p - 1)}
             >
-              Previous
+              {t("studio.common.previous")}
             </Button>
             <span className="text-sm self-center">
-              Page {page + 1} of {totalPages}
+              {t("studio.common.page_of", {
+                page: page + 1,
+                total: totalPages,
+              })}
             </span>
             <Button
               size="sm"
@@ -314,7 +346,7 @@ const AdminAuthorsPage = () => {
               disabled={page + 1 >= totalPages}
               onClick={() => setPage((p) => p + 1)}
             >
-              Next
+              {t("studio.common.next")}
             </Button>
           </div>
         ) : null}

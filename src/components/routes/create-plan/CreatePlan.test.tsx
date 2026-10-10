@@ -184,7 +184,7 @@ describe("CreatePlan Component", () => {
     renderWithProviders(<CreatePlan />);
 
     expect(
-      screen.getByRole("heading", { name: "Plan Details" }),
+      screen.getByRole("heading", { name: "studio.plan.heading.details" }),
     ).toBeInTheDocument();
   });
 
@@ -295,16 +295,22 @@ describe("CreatePlan Component", () => {
     expect(
       screen.getByText("studio.plan.cover_image.constraints"),
     ).toBeInTheDocument();
-    const uploadButton = screen.getByLabelText("Upload cover image");
+    const uploadButton = screen.getByLabelText(
+      "studio.plan.image.upload_cover_aria",
+    );
     expect(uploadButton).toBeInTheDocument();
   });
 
   it("displays image preview after upload", async () => {
     renderWithProviders(<CreatePlan />);
-    const uploadButton = screen.getByLabelText("Upload cover image");
+    const uploadButton = screen.getByLabelText(
+      "studio.plan.image.upload_cover_aria",
+    );
     fireEvent.click(uploadButton);
     await waitFor(() => {
-      expect(screen.getByText("Upload & Crop Image")).toBeInTheDocument();
+      expect(
+        screen.getByText("studio.plan.image.upload_crop_title"),
+      ).toBeInTheDocument();
     });
     const mockUploadButton = screen.getByTestId("mock-upload-trigger");
 
@@ -313,16 +319,22 @@ describe("CreatePlan Component", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByAltText("Cover preview")).toBeInTheDocument();
+      expect(
+        screen.getByAltText("studio.plan.image.cover_preview_alt"),
+      ).toBeInTheDocument();
     });
     expect(screen.getByTestId("image-remove")).toBeInTheDocument();
     expect(screen.getByText("sample.jpg")).toBeInTheDocument();
-    expect(screen.queryByText("Upload & Crop Image")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("studio.plan.image.upload_crop_title"),
+    ).not.toBeInTheDocument();
   });
 
   it("removes image preview when remove button is clicked", async () => {
     renderWithProviders(<CreatePlan />);
-    const uploadButton = screen.getByLabelText("Upload cover image");
+    const uploadButton = screen.getByLabelText(
+      "studio.plan.image.upload_cover_aria",
+    );
     fireEvent.click(uploadButton);
     await waitFor(() => {
       expect(screen.getByTestId("mock-upload-trigger")).toBeInTheDocument();
@@ -333,7 +345,9 @@ describe("CreatePlan Component", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByAltText("Cover preview")).toBeInTheDocument();
+      expect(
+        screen.getByAltText("studio.plan.image.cover_preview_alt"),
+      ).toBeInTheDocument();
     });
 
     const removeButton = screen.getByTestId("image-remove");
@@ -344,7 +358,9 @@ describe("CreatePlan Component", () => {
     });
 
     await waitFor(() => {
-      expect(screen.queryByAltText("Cover preview")).not.toBeInTheDocument();
+      expect(
+        screen.queryByAltText("studio.plan.image.cover_preview_alt"),
+      ).not.toBeInTheDocument();
     });
     expect(screen.queryByTestId("image-remove")).not.toBeInTheDocument();
     expect(screen.queryByText("sample.jpg")).not.toBeInTheDocument();
@@ -358,26 +374,36 @@ describe("CreatePlan Component", () => {
       return Promise.resolve({ data: {} });
     });
     renderWithProviders(<CreatePlan />);
-    const uploadButton = screen.getByLabelText("Upload cover image");
+    const uploadButton = screen.getByLabelText(
+      "studio.plan.image.upload_cover_aria",
+    );
     fireEvent.click(uploadButton);
     await waitFor(() => {
-      expect(screen.getByText("Upload & Crop Image")).toBeInTheDocument();
+      expect(
+        screen.getByText("studio.plan.image.upload_crop_title"),
+      ).toBeInTheDocument();
     });
     const mockUploadButton = screen.getByTestId("mock-upload-trigger");
     await act(async () => {
       fireEvent.click(mockUploadButton);
     });
     await waitFor(() => {
-      expect(screen.queryByAltText("Cover preview")).not.toBeInTheDocument();
+      expect(
+        screen.queryByAltText("studio.plan.image.cover_preview_alt"),
+      ).not.toBeInTheDocument();
     });
   });
 
   it("opens image upload dialog when upload button is clicked", async () => {
     renderWithProviders(<CreatePlan />);
-    const uploadButton = screen.getByLabelText("Upload cover image");
+    const uploadButton = screen.getByLabelText(
+      "studio.plan.image.upload_cover_aria",
+    );
     fireEvent.click(uploadButton);
     await waitFor(() => {
-      expect(screen.getByText("Upload & Crop Image")).toBeInTheDocument();
+      expect(
+        screen.getByText("studio.plan.image.upload_crop_title"),
+      ).toBeInTheDocument();
       expect(screen.getByRole("dialog")).toBeInTheDocument();
     });
   });
@@ -400,7 +426,9 @@ describe("CreatePlan Component", () => {
 
   it("handles tag search selection and remove", async () => {
     renderWithProviders(<CreatePlan />);
-    const tagInput = screen.getByPlaceholderText("Search or add tags...");
+    const tagInput = screen.getByPlaceholderText(
+      "studio.plan.tags.search_placeholder",
+    );
     fireEvent.change(tagInput, { target: { value: "Med" } });
     fireEvent.focus(tagInput);
 
@@ -414,34 +442,36 @@ describe("CreatePlan Component", () => {
     expect(screen.getAllByText("Meditation").length).toBeGreaterThan(0);
 
     const removeButton = screen.getByRole("button", {
-      name: /Remove Meditation/i,
+      name: "studio.plan.tags.remove_aria",
     });
     fireEvent.click(removeButton);
     expect(
-      screen.queryByRole("button", { name: /Remove Meditation/i }),
+      screen.queryByRole("button", { name: "studio.plan.tags.remove_aria" }),
     ).toBeNull();
   });
 
   it("creates a new tag when typing a name that does not exist", async () => {
     renderWithProviders(<CreatePlan />);
-    const tagInput = screen.getByPlaceholderText("Search or add tags...");
+    const tagInput = screen.getByPlaceholderText(
+      "studio.plan.tags.search_placeholder",
+    );
     fireEvent.change(tagInput, { target: { value: "Brand New Tag" } });
     fireEvent.focus(tagInput);
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: 'Create "Brand New Tag"' }),
+        screen.getByRole("button", { name: "studio.plan.tags.create_option" }),
       ).toBeInTheDocument();
     });
 
     fireEvent.click(
-      screen.getByRole("button", { name: 'Create "Brand New Tag"' }),
+      screen.getByRole("button", { name: "studio.plan.tags.create_option" }),
     );
 
     // Clicking the create option opens a multi-language dialog with the
     // typed name pre-filled for the default (EN) language.
     const createTagButton = await screen.findByRole("button", {
-      name: "Create Tag",
+      name: "studio.plan.tags.create_tag",
     });
     fireEvent.click(createTagButton);
 
@@ -464,14 +494,16 @@ describe("CreatePlan Component", () => {
     // scroll-lock is torn down and does not leak into later tests.
     await waitFor(() => {
       expect(
-        screen.queryByRole("button", { name: "Create Tag" }),
+        screen.queryByRole("button", { name: "studio.plan.tags.create_tag" }),
       ).not.toBeInTheDocument();
     });
   });
 
   it("shows no image preview initially", () => {
     renderWithProviders(<CreatePlan />);
-    expect(screen.queryByAltText("Cover preview")).not.toBeInTheDocument();
+    expect(
+      screen.queryByAltText("studio.plan.image.cover_preview_alt"),
+    ).not.toBeInTheDocument();
   });
 
   it("handles failed plan creation", async () => {
@@ -493,7 +525,9 @@ describe("CreatePlan Component", () => {
     fireEvent.change(daysInput, { target: { value: "30" } });
     const difficultyButton = screen.getByTestId("select-trigger");
     fireEvent.click(difficultyButton);
-    const difficultyOption = screen.getByText("Beginner");
+    const difficultyOption = screen.getByText(
+      "studio.plan.difficulty.beginner",
+    );
     fireEvent.click(difficultyOption);
     const submitButton = screen.getByText("studio.plan.next_button");
     fireEvent.click(submitButton);
@@ -561,7 +595,9 @@ describe("CreatePlan Component", () => {
       ),
     ).toHaveValue(14);
 
-    expect(screen.getByAltText("Cover preview")).toBeInTheDocument();
+    expect(
+      screen.getByAltText("studio.plan.image.cover_preview_alt"),
+    ).toBeInTheDocument();
   });
 
   it("handles navigation cancellation", async () => {
@@ -629,7 +665,9 @@ describe("CreatePlan Component", () => {
       ).toHaveValue("Existing Plan");
     });
 
-    const enrollRadio = screen.getByLabelText(/When User Enrolls/i);
+    const enrollRadio = screen.getByLabelText(
+      "studio.plan.start_date.when_user_enrolls",
+    );
     await act(async () => {
       fireEvent.click(enrollRadio);
     });
@@ -689,14 +727,14 @@ describe("CreatePlan Component", () => {
       await waitFor(() => {
         expect(
           screen.getByRole("heading", {
-            name: "Add New Plan for Abhidhamma in a year (English)",
+            name: "studio.plan.heading.add_for_series_language",
           }),
         ).toBeInTheDocument();
         expect(screen.getByText("Abhidhamma in a year")).toBeInTheDocument();
       });
 
       const seriesField = screen
-        .getByText("Series")
+        .getByText("studio.plan.form_field.series")
         .closest('[data-slot="form-item"]');
       expect(seriesField).not.toBeNull();
       expect(
@@ -730,14 +768,14 @@ describe("CreatePlan Component", () => {
 
       await waitFor(() => {
         const seriesField = screen
-          .getByText("Series")
+          .getByText("studio.plan.form_field.series")
           .closest('[data-slot="form-item"]');
         expect(seriesField).not.toBeNull();
         const seriesCombobox = within(seriesField as HTMLElement).getByRole(
           "combobox",
           { hidden: true },
         );
-        expect(seriesCombobox).toHaveTextContent("None");
+        expect(seriesCombobox).toHaveTextContent("studio.common.none");
         expect(seriesCombobox).not.toBeDisabled();
       });
     });

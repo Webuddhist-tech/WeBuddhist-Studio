@@ -59,10 +59,10 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4">
         <div className="text-base text-red-500">
-          Failed to load your profile.
+          {t("studio.auth.profile_load_failed")}
         </div>
         <Button variant="outline" onClick={() => refetchUserInfo()}>
-          Retry
+          {t("studio.common.retry")}
         </Button>
       </div>
     );

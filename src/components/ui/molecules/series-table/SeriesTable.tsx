@@ -1,5 +1,6 @@
 import { Pecha } from "@/components/ui/shadimport";
 import { useState } from "react";
+import { useTranslate } from "@tolgee/react";
 import { FaChevronDown, FaChevronRight } from "react-icons/fa6";
 import { BsThreeDotsVertical } from "react-icons/bs";
 import { IoMdTrash } from "react-icons/io";
@@ -47,6 +48,7 @@ export function SeriesTable({
   error,
   onDeleteSeries,
 }: SeriesTableProps) {
+  const { t } = useTranslate();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const toggleRow = (id: string) =>
@@ -57,7 +59,7 @@ export function SeriesTable({
       return (
         <Pecha.TableRow>
           <Pecha.TableCell colSpan={7} className="text-center py-6">
-            Loading...
+            {t("studio.common.loading")}
           </Pecha.TableCell>
         </Pecha.TableRow>
       );
@@ -83,7 +85,7 @@ export function SeriesTable({
             colSpan={7}
             className="text-center py-6 text-muted-foreground"
           >
-            No series found.
+            {t("studio.molecules.series_table.empty")}
           </Pecha.TableCell>
         </Pecha.TableRow>
       );
@@ -100,7 +102,11 @@ export function SeriesTable({
               variant="ghost"
               size="icon"
               onClick={() => toggleRow(s.id)}
-              aria-label={isOpen ? "Collapse row" : "Expand row"}
+              aria-label={
+                isOpen
+                  ? t("studio.molecules.series_table.collapse_row")
+                  : t("studio.molecules.series_table.expand_row")
+              }
             >
               <Chevron size={14} />
             </Pecha.Button>
@@ -108,20 +114,26 @@ export function SeriesTable({
           <Pecha.TableCell className="font-semibold text-sm">
             {s.title}
           </Pecha.TableCell>
-          <Pecha.TableCell>{s.total_days} Days</Pecha.TableCell>
+          <Pecha.TableCell>
+            {t("studio.molecules.dashboard_table.days_count", {
+              count: s.total_days,
+            })}
+          </Pecha.TableCell>
           <Pecha.TableCell>{s.enrolled}</Pecha.TableCell>
           <Pecha.TableCell>
             <StatusDot status={s.status} />
           </Pecha.TableCell>
           <Pecha.TableCell>{s.language || "-"}</Pecha.TableCell>
-          <Pecha.TableCell>{s.featured ? "Yes" : "No"}</Pecha.TableCell>
+          <Pecha.TableCell>
+            {s.featured ? t("studio.common.yes") : t("studio.common.no")}
+          </Pecha.TableCell>
           <Pecha.TableCell className="w-[120px]">
             <Pecha.DropdownMenu>
               <Pecha.DropdownMenuTrigger asChild>
                 <Pecha.Button
                   variant="outline"
                   size="icon"
-                  aria-label="Actions"
+                  aria-label={t("studio.common.actions")}
                 >
                   <BsThreeDotsVertical />
                 </Pecha.Button>
@@ -141,7 +153,7 @@ export function SeriesTable({
                     >
                       <span className="flex items-center gap-2 w-full">
                         <IoMdTrash className="h-4 w-4" />
-                        Delete Series
+                        {t("studio.molecules.series_table.delete_series")}
                       </span>
                     </Pecha.DropdownMenuItem>
                   }
@@ -158,10 +170,12 @@ export function SeriesTable({
             <Pecha.TableCell />
             <Pecha.TableCell colSpan={7} className="py-3">
               <div className="text-sm">
-                <div className="font-semibold mb-2">Plans in this series</div>
+                <div className="font-semibold mb-2">
+                  {t("studio.molecules.series_table.plans_in_series")}
+                </div>
                 {s.plans.length === 0 ? (
                   <div className="text-muted-foreground">
-                    No plans added yet to this series.
+                    {t("studio.molecules.series_table.no_plans")}
                   </div>
                 ) : (
                   <ul className="list-disc pl-5 space-y-1">
@@ -183,13 +197,27 @@ export function SeriesTable({
       <Pecha.TableHeader className="dark:bg-[#1d1d1f]">
         <Pecha.TableRow className="font-dynamic">
           <Pecha.TableHead className="w-[44px]" />
-          <Pecha.TableHead className="font-bold">Title</Pecha.TableHead>
-          <Pecha.TableHead className="font-bold">No. of days</Pecha.TableHead>
-          <Pecha.TableHead className="font-bold">Enrolled</Pecha.TableHead>
-          <Pecha.TableHead className="font-bold">Status</Pecha.TableHead>
-          <Pecha.TableHead className="font-bold">Language</Pecha.TableHead>
-          <Pecha.TableHead className="font-bold">Featured</Pecha.TableHead>
-          <Pecha.TableHead className="font-bold">Actions</Pecha.TableHead>
+          <Pecha.TableHead className="font-bold">
+            {t("studio.common.title")}
+          </Pecha.TableHead>
+          <Pecha.TableHead className="font-bold">
+            {t("studio.molecules.series_table.days_header")}
+          </Pecha.TableHead>
+          <Pecha.TableHead className="font-bold">
+            {t("studio.molecules.series_table.enrolled_header")}
+          </Pecha.TableHead>
+          <Pecha.TableHead className="font-bold">
+            {t("studio.common.status")}
+          </Pecha.TableHead>
+          <Pecha.TableHead className="font-bold">
+            {t("studio.common.language")}
+          </Pecha.TableHead>
+          <Pecha.TableHead className="font-bold">
+            {t("studio.molecules.dashboard_table.featured")}
+          </Pecha.TableHead>
+          <Pecha.TableHead className="font-bold">
+            {t("studio.common.actions")}
+          </Pecha.TableHead>
         </Pecha.TableRow>
       </Pecha.TableHeader>
       <Pecha.TableBody>{renderBody()}</Pecha.TableBody>

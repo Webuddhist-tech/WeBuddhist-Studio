@@ -42,16 +42,14 @@ describe("groupCreateSchema", () => {
     const result = groupCreateSchema.safeParse(
       formData({ group_type: "PAGE" }),
     );
-    expect(slugErrors(result)).toEqual(["Slug is required"]);
+    expect(slugErrors(result)).toEqual(["studio.validation.slug_required"]);
   });
 
   it("rejects a badly formed slug when one is given", () => {
     const result = groupCreateSchema.safeParse(
       formData({ group_type: "PAGE", slug: "Dharma Circle" }),
     );
-    expect(slugErrors(result)).toEqual([
-      "Use lowercase letters, numbers, hyphens, and underscores only",
-    ]);
+    expect(slugErrors(result)).toEqual(["studio.validation.slug_pattern"]);
   });
 });
 
@@ -65,7 +63,7 @@ describe("groupCoreSchema (editing)", () => {
 
   it("keeps the slug required for every group", () => {
     expect(slugErrors(groupCoreSchema.safeParse(formData()))).toEqual([
-      "Slug is required",
+      "studio.validation.slug_required",
     ]);
   });
 
@@ -120,13 +118,13 @@ describe("group language text", () => {
           EN: { title: "", sub_title: "Sub", description: "Desc" },
         }),
       ),
-    ).toEqual(["EN.title: Title is required"]);
+    ).toEqual(["EN.title: studio.validation.title_required"]);
   });
 
   it("treats a title of spaces as missing", () => {
-    expect(
-      languageErrors(withLanguages({ EN: { title: "   " } })),
-    ).toEqual(["EN.title: Title is required"]);
+    expect(languageErrors(withLanguages({ EN: { title: "   " } }))).toEqual([
+      "EN.title: studio.validation.title_required",
+    ]);
   });
 
   it("needs a title in every language", () => {
@@ -137,14 +135,14 @@ describe("group language text", () => {
           BO: { title: "", description: "Something" },
         }),
       ),
-    ).toEqual(["BO.title: Title is required"]);
+    ).toEqual(["BO.title: studio.validation.title_required"]);
   });
 
   it("applies when creating and when editing", () => {
     const languages = { EN: { title: "Dharma Circle" } };
-    expect(
-      groupCreateSchema.safeParse(formData({ languages })).success,
-    ).toBe(true);
+    expect(groupCreateSchema.safeParse(formData({ languages })).success).toBe(
+      true,
+    );
     expect(
       groupCoreSchema.safeParse(
         formData({ languages, slug: "dharma-circle_4821" }),
@@ -159,7 +157,7 @@ describe("group language text", () => {
           EN: { title: "Dharma Circle", description: "x".repeat(201) },
         }),
       ),
-    ).toEqual(["EN.description: Description must be 200 characters or less"]);
+    ).toEqual(["EN.description: studio.validation.description_max_200"]);
     expect(
       withLanguages({
         EN: { title: "Dharma Circle", description: "x".repeat(200) },
@@ -167,4 +165,3 @@ describe("group language text", () => {
     ).toBe(true);
   });
 });
-

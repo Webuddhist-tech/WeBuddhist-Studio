@@ -1,4 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslate } from "@tolgee/react";
 import { getPreset } from "../../api/presetApi";
 import { fetchLanguageVersions } from "@/components/api/searchApi";
 import { Pecha } from "@/components/ui/shadimport";
@@ -15,7 +16,6 @@ import {
   LinkedContent,
 } from "../../../../ui/molecules/content-sub/ContentComponents";
 import {
-  LINKED_CONTENT_LABELS,
   isLinkedContentType,
   type LinkedContentType,
 } from "@/components/ui/molecules/linked-content/linkedContent";
@@ -161,6 +161,7 @@ const SubtaskCard = ({
 }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const queryClient = useQueryClient();
+  const { t } = useTranslate();
 
   const { data: preset } = useQuery({
     queryKey: ["preset", subtask.id],
@@ -177,9 +178,9 @@ const SubtaskCard = ({
           <div className="flex items-center gap-2">
             <div className="flex items-center border w-fit bg-[#F7F7F7] dark:bg-sidebar-secondary px-2 py-1 text-sm rounded-md border-dashed gap-2">
               <ContentIcon type={subtask.content_type} />{" "}
-              {LINKED_CONTENT_LABELS[
-                subtask.content_type as LinkedContentType
-              ] ?? subtask.content_type}
+              {t(
+                `studio.task.content_type.${String(subtask.content_type).toLowerCase()}`,
+              )}
             </div>
             {subtask.content_type === "SOURCE_REFERENCE" &&
               !preset &&
@@ -190,7 +191,7 @@ const SubtaskCard = ({
                   onClick={() => setIsModalOpen(true)}
                   className="text-xs"
                 >
-                  Add Version
+                  {t("studio.task.view.add_version")}
                 </Pecha.Button>
               )}
           </div>
@@ -231,8 +232,10 @@ const SubtaskCard = ({
             />
           ) : (
             <p className="text-xs text-muted-foreground border-t border-dashed pt-2">
-              Timeline: {formatMs(subtask.start_ms)} –{" "}
-              {formatMs(subtask.end_ms)}
+              {t("studio.task.view.timeline", {
+                start: formatMs(subtask.start_ms),
+                end: formatMs(subtask.end_ms),
+              })}
             </p>
           ))
         )}
@@ -263,6 +266,7 @@ const TaskView = ({
   isEditable,
   dayAudioUrl,
 }: TaskViewProps) => {
+  const { t } = useTranslate();
   const { data: taskDetails, isLoading } = useQuery({
     queryKey: ["taskDetails", taskId],
     queryFn: () => fetchTaskDetails(taskId),
@@ -280,7 +284,9 @@ const TaskView = ({
     <div className="w-full my-4 h-[calc(100vh-40px)] bg-[#F5F5F5] border-dashed dark:bg-[#181818]  rounded-l-2xl border overflow-y-auto max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
       <div className=" space-y-4  overflow-y-auto">
         <div className="flex p-4 items-center justify-between w-3/4 max-md:w-full">
-          <h2 className="text-xl font-semibold">Task</h2>
+          <h2 className="text-xl font-semibold">
+            {t("studio.task.view.task")}
+          </h2>
           {isEditable && (
             <Pecha.Button
               variant="outline"
@@ -288,7 +294,7 @@ const TaskView = ({
               onClick={() => onEditTask(taskDetails)}
             >
               <FaPen className="h-4 w-4" />
-              Edit
+              {t("studio.common.edit")}
             </Pecha.Button>
           )}
         </div>
@@ -304,7 +310,9 @@ const TaskView = ({
         <div className="border-b w-full border-dashed border-gray-300 dark:border-input" />
         <div className="space-y-4 w-full lg:w-2/3 p-4 ">
           {taskDetails?.subtasks.length > 0 && (
-            <h2 className="text-xl font-semibold">Subtask</h2>
+            <h2 className="text-xl font-semibold">
+              {t("studio.task.view.subtask")}
+            </h2>
           )}
           {isLoading ? (
             <>

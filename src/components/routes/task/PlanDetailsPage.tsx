@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 
 import { useQuery } from "@tanstack/react-query";
+import { useTranslate } from "@tolgee/react";
 
 import { SplitPane, Pane } from "react-split-pane";
 
@@ -43,6 +44,8 @@ const PlanDetailsPage = () => {
   const { planId } = useParams<{ planId: string }>();
 
   const navigate = useNavigate();
+
+  const { t } = useTranslate();
 
   // Get selected day from URL params, default to day 1
 
@@ -291,10 +294,10 @@ const PlanDetailsPage = () => {
                 className="flex min-h-10 items-center gap-1 rounded-md px-2 text-sm font-medium"
               >
                 <IoChevronBack className="h-5 w-5" />
-                Days
+                {t("studio.task.sidebar.days")}
               </button>
               <span className="truncate text-sm text-muted-foreground">
-                Day {selectedDay}
+                {t("studio.task.day_number", { day: selectedDay })}
                 {planDetails?.title ? ` · ${planDetails.title}` : ""}
               </span>
             </div>

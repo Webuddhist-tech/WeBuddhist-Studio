@@ -6,6 +6,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import AutoplayTestPage from "./AutoplayTestPage";
 import type { RecitationDetails } from "./api/liveControlApi";
 
+// Echo interpolated values so assertions can still check them.
+const { echoT } = vi.hoisted(() => ({
+  echoT: (key: string, params?: Record<string, unknown>) =>
+    params
+      ? `${key} ${Object.entries(params)
+          .map(([name, value]) => `${name}=${String(value)}`)
+          .join(" ")}`
+      : key,
+}));
+vi.mock("@tolgee/react", () => ({ useTranslate: () => ({ t: echoT }) }));
+vi.mock("@/i18n/tolgee", () => ({ tolgee: { t: echoT } }));
+
 const {
   fetchLiveControlEvent,
   fetchTextEditions,
@@ -113,7 +125,9 @@ describe("AutoplayTestPage", () => {
     renderPage();
 
     expect(
-      await screen.findByRole("heading", { name: "Choose a text" }),
+      await screen.findByRole("heading", {
+        name: "studio.live_control.autoplay_test.choose_text",
+      }),
     ).toBeInTheDocument();
     expect(
       await screen.findByText("Title of Zt5c0fe1OMJI1Kh8rp2FM"),
@@ -121,16 +135,22 @@ describe("AutoplayTestPage", () => {
     await user.click(await screen.findByRole("button", { name: /Praise/ }));
 
     expect(await screen.findByText("root line 1")).toBeInTheDocument();
-    expect(screen.queryByText("Choose a text")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("studio.live_control.autoplay_test.choose_text"),
+    ).not.toBeInTheDocument();
   });
 
   it("offers the texts opened in the controller, and never reads the event", async () => {
     renderPage();
 
     expect(
-      await screen.findByRole("heading", { name: "Choose a text" }),
+      await screen.findByRole("heading", {
+        name: "studio.live_control.autoplay_test.choose_text",
+      }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Opened in the controller")).toBeInTheDocument();
+    expect(
+      screen.getByText("studio.live_control.autoplay_test.group_recent"),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Praise/ })).toBeInTheDocument();
     // The event's record needs a session this page does not have.
     expect(fetchLiveControlEvent).not.toHaveBeenCalled();
@@ -144,7 +164,7 @@ describe("AutoplayTestPage", () => {
       await screen.findByText("Title of Zt5c0fe1OMJI1Kh8rp2FM"),
     ).toBeInTheDocument();
     expect(
-      screen.queryByText("Opened in the controller"),
+      screen.queryByText("studio.live_control.autoplay_test.group_recent"),
     ).not.toBeInTheDocument();
   });
 
@@ -156,26 +176,38 @@ describe("AutoplayTestPage", () => {
     });
     const user = await openRoot();
 
-    await user.click(await screen.findByRole("button", { name: "Play" }));
+    await user.click(
+      await screen.findByRole("button", {
+        name: "studio.live_control.autoplay_test.play",
+      }),
+    );
 
     await waitFor(() => expect(activeLine()).toBe("0"));
     await waitFor(() => expect(activeLine()).toBe("1"));
     await waitFor(() => expect(activeLine()).toBe("2"));
     expect(
-      await screen.findByText("Reached the end of the text."),
+      await screen.findByText("studio.live_control.autoplay_test.reached_end"),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Play" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "studio.live_control.autoplay_test.play",
+      }),
+    ).toBeInTheDocument();
   });
 
   it("stops at a line with no recorded time", async () => {
     fetchSegmentPlayTimes.mockResolvedValue({ "root-s1": 40 });
     const user = await openRoot();
 
-    await user.click(await screen.findByRole("button", { name: "Play" }));
+    await user.click(
+      await screen.findByRole("button", {
+        name: "studio.live_control.autoplay_test.play",
+      }),
+    );
 
     expect(
       await screen.findByText(
-        /Stopped at line 2: it has no recorded play time/,
+        "studio.live_control.autoplay_test.stopped_untimed line=2",
       ),
     ).toBeInTheDocument();
     expect(activeLine()).toBe("1");
@@ -196,14 +228,26 @@ describe("AutoplayTestPage", () => {
     );
     const user = await openRoot();
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Play" })).toBeEnabled(),
+      expect(
+        screen.getByRole("button", {
+          name: "studio.live_control.autoplay_test.play",
+        }),
+      ).toBeEnabled(),
     );
 
-    await user.click(screen.getByRole("button", { name: "Play" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: "studio.live_control.autoplay_test.play",
+      }),
+    );
     await new Promise((resolve) => setTimeout(resolve, 100));
     // Line 1 might be an instruction: nothing is chosen until that is known.
     expect(activeLine()).toBeUndefined();
-    expect(screen.getByRole("button", { name: "Next line" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", {
+        name: "studio.live_control.autoplay_test.next_line",
+      }),
+    ).toBeDisabled();
 
     await act(async () => releaseMarks());
     // It is one, so the dry run starts on line 2, as live autoplay would.
@@ -219,12 +263,16 @@ describe("AutoplayTestPage", () => {
     await waitFor(() => expect(fetchSegmentPlayTimes).toHaveBeenCalled());
 
     fresh = true;
-    await user.click(await screen.findByRole("button", { name: "Play" }));
+    await user.click(
+      await screen.findByRole("button", {
+        name: "studio.live_control.autoplay_test.play",
+      }),
+    );
 
     expect(
-      await screen.findByText("Reached the end of the text."),
+      await screen.findByText("studio.live_control.autoplay_test.reached_end"),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/Stopped at line/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/stopped_untimed/)).not.toBeInTheDocument();
   });
 
   it("jumps back for a return planned on this event", async () => {
@@ -257,9 +305,15 @@ describe("AutoplayTestPage", () => {
 
     expect(await screen.findByText("homage")).toBeInTheDocument();
     expect(
-      screen.getByText("Planned returns for this event are included."),
+      screen.getByText(
+        "studio.live_control.autoplay_test.planned_returns_included",
+      ),
     ).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Play" }));
+    await user.click(
+      screen.getByRole("button", {
+        name: "studio.live_control.autoplay_test.play",
+      }),
+    );
 
     const seen: string[] = [];
     await waitFor(
@@ -267,7 +321,7 @@ describe("AutoplayTestPage", () => {
         const line = activeLine();
         if (line && seen[seen.length - 1] !== line) seen.push(line);
         expect(
-          screen.getByText("Reached the end of the text."),
+          screen.getByText("studio.live_control.autoplay_test.reached_end"),
         ).toBeInTheDocument();
       },
       { timeout: 3000 },
@@ -291,7 +345,7 @@ describe("AutoplayTestPage", () => {
     await openRoot();
 
     expect(
-      await screen.findByText(/2\/2 lines timed · total 4\.0s/),
+      await screen.findByText(/timed_summary timed=2 recited=2 total=4\.0s/),
     ).toBeInTheDocument();
   });
 });

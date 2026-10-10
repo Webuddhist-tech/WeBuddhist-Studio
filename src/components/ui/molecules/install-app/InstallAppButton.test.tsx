@@ -43,7 +43,9 @@ describe("InstallAppButton", () => {
 
   it("shows nothing until the browser offers to install", () => {
     renderButton();
-    expect(screen.queryByRole("button", { name: /install app/i })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "studio.nav.install_app" }),
+    ).toBeNull();
   });
 
   it("opens the browser's install prompt", async () => {
@@ -52,27 +54,31 @@ describe("InstallAppButton", () => {
     expect(event.defaultPrevented).toBe(true);
 
     await userEvent.click(
-      await screen.findByRole("button", { name: /install app/i }),
+      await screen.findByRole("button", { name: "studio.nav.install_app" }),
     );
 
     expect(prompt).toHaveBeenCalled();
     await waitFor(() =>
-      expect(toast.success).toHaveBeenCalledWith("Studio installed"),
+      expect(toast.success).toHaveBeenCalledWith("studio.pwa.installed"),
     );
     // A prompt is good for one use.
-    expect(screen.queryByRole("button", { name: /install app/i })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "studio.nav.install_app" }),
+    ).toBeNull();
   });
 
   it("hides once the app is installed", async () => {
     renderButton();
     fireInstallPrompt();
-    await screen.findByRole("button", { name: /install app/i });
+    await screen.findByRole("button", { name: "studio.nav.install_app" });
 
     act(() => {
       window.dispatchEvent(new Event("appinstalled"));
     });
 
-    expect(screen.queryByRole("button", { name: /install app/i })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "studio.nav.install_app" }),
+    ).toBeNull();
   });
 
   it("explains Add to Home Screen on iPhone", async () => {
@@ -81,9 +87,11 @@ describe("InstallAppButton", () => {
     );
     renderButton();
 
-    await userEvent.click(screen.getByRole("button", { name: /install app/i }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.nav.install_app" }),
+    );
 
-    expect(await screen.findByText("Install Studio")).toBeTruthy();
-    expect(screen.getByText("Add to Home Screen")).toBeTruthy();
+    expect(await screen.findByText("studio.pwa.ios_title")).toBeTruthy();
+    expect(screen.getByText("studio.pwa.ios_step_add")).toBeTruthy();
   });
 });

@@ -1,5 +1,6 @@
 import axiosInstance from "@/config/axios-config";
 import { getApiErrorMessage } from "@/lib/apiErrors";
+import { tolgee } from "@/i18n/tolgee";
 import type { GroupAccumulatorImage } from "./groupAccumulatorsApi";
 
 /**
@@ -99,13 +100,13 @@ export const getInPersonCountErrorMessage = (
   const detail = (error as { response?: { data?: { detail?: unknown } } })
     ?.response?.data?.detail;
   if (detail === IN_PERSON_COUNT_EXISTS) {
-    return "That day already has an in-person count. Edit it instead.";
+    return tolgee.t("studio.groups.shared.in_person_count_exists");
   }
   if (detail === EVENT_HAS_NO_GROUP_ACCUMULATOR) {
-    return "Link a group accumulation to this event first.";
+    return tolgee.t("studio.groups.shared.in_person_no_group_accumulator");
   }
   if (detail === IN_PERSON_USER_NOT_FOUND) {
-    return "The in-person account is missing on the server.";
+    return tolgee.t("studio.groups.shared.in_person_user_missing");
   }
   return getApiErrorMessage(error, fallback);
 };

@@ -12,14 +12,8 @@ import { AppUpdateProvider } from "@/components/ui/molecules/install-app/AppUpda
 import { PwaUpdatePrompt } from "@/components/ui/molecules/install-app/PwaUpdatePrompt";
 import { DEFERS_APP_UPDATE } from "@/components/ui/molecules/install-app/defersAppUpdate";
 import "./lib/pwaInstall";
-import {
-  BackendFetch,
-  DevTools,
-  FormatSimple,
-  Tolgee,
-  TolgeeProvider,
-} from "@tolgee/react";
-import { LANGUAGE } from "./lib/constant.ts";
+import { TolgeeProvider } from "@tolgee/react";
+import { tolgee } from "./i18n/tolgee.ts";
 import Login from "./components/auth/login/Login";
 import ForgotPassword from "./components/auth/forgot-password/ForgotPassword";
 import EmailVerification from "./components/auth/email-verification/EmailVerification";
@@ -64,6 +58,7 @@ import GroupFormPage from "./components/routes/groups/GroupFormPage.tsx";
 import AdminAuthorsPage from "./components/routes/admin-authors/AdminAuthorsPage.tsx";
 import ChinaRestrictionsPage from "./components/routes/china-restrictions/ChinaRestrictionsPage.tsx";
 import ChatReportsPage from "./components/routes/chat-reports/ChatReportsPage.tsx";
+import TextRequestsPage from "./components/routes/text-requests/TextRequestsPage.tsx";
 import AccumulatorPresetsPage from "./components/routes/accumulator-presets/AccumulatorPresetsPage.tsx";
 import TextAudioPage from "./components/routes/text-audio/TextAudioPage.tsx";
 import AmbientSoundsPage from "./components/routes/ambient-sounds/AmbientSoundsPage.tsx";
@@ -73,22 +68,6 @@ import { ROUTES } from "./routes/paths.ts";
 import { StudioAuth0Provider } from "./config/studio-auth0.tsx";
 
 const queryClient = new QueryClient();
-const defaultLanguage = import.meta.env.VITE_DEFAULT_LANGUAGE || "en";
-const tolgee = Tolgee()
-  .use(DevTools())
-  .use(FormatSimple())
-  .use(
-    BackendFetch({
-      prefix:
-        "https://cdn.tolg.ee/50cc3287503c99e8f336aad9ee80f6f1/reactjs_json",
-      fallbackOnFail: true,
-    }),
-  )
-  .init({
-    language: localStorage.getItem(LANGUAGE) || defaultLanguage,
-    fallbackLanguage: "en",
-  });
-
 const router = createBrowserRouter([
   // Outside the app shell on purpose: the operator control is opened in its own
   // tab, signs nobody in, and carries no navbar - the emit token is what lets it
@@ -380,6 +359,14 @@ const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <ChatReportsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: ROUTES.adminTextRequests,
+        element: (
+          <ProtectedRoute>
+            <TextRequestsPage />
           </ProtectedRoute>
         ),
       },

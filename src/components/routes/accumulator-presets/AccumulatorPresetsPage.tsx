@@ -3,6 +3,7 @@ import { IoMdAdd, IoMdSearch } from "react-icons/io";
 import { useDebounce } from "use-debounce";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import AuthButton from "@/components/ui/molecules/auth-button/AuthButton";
@@ -26,6 +27,7 @@ import PresetFormDialog from "./PresetFormDialog";
 const PAGE_SIZE = 10;
 
 const AccumulatorPresetsPage = () => {
+  const { t } = useTranslate();
   const { data: userInfo } = useUserInfo();
   const showActionsColumn = shouldShowCmsActionsColumn(userInfo?.platform_role);
   const [search, setSearch] = useState("");
@@ -60,7 +62,7 @@ const AccumulatorPresetsPage = () => {
   const createMutation = useMutation({
     mutationFn: createAccumulatorPreset,
     onSuccess: () => {
-      toast.success("Preset created successfully");
+      toast.success(t("studio.accumulator_presets.toast.created"));
       setFormOpen(false);
       invalidatePresets();
     },
@@ -76,7 +78,7 @@ const AccumulatorPresetsPage = () => {
       payload: UpdateAccumulatorPresetPayload;
     }) => updateAccumulatorPreset(id, payload),
     onSuccess: () => {
-      toast.success("Preset updated successfully");
+      toast.success(t("studio.accumulator_presets.toast.updated"));
       setFormOpen(false);
       setEditingPreset(null);
       invalidatePresets();
@@ -87,7 +89,7 @@ const AccumulatorPresetsPage = () => {
   const deleteMutation = useMutation({
     mutationFn: deleteAccumulatorPreset,
     onSuccess: () => {
-      toast.success("Preset deleted successfully");
+      toast.success(t("studio.accumulator_presets.toast.deleted"));
       setDeleteTarget(null);
       invalidatePresets();
     },
@@ -124,7 +126,7 @@ const AccumulatorPresetsPage = () => {
           <div className="border w-fit px-2 bg-white dark:bg-input/30 rounded-md border-gray-200 dark:border-[#313132] flex items-center">
             <IoMdSearch className="w-4 h-4" />
             <Pecha.Input
-              placeholder="Search presets..."
+              placeholder={t("studio.accumulator_presets.search_placeholder")}
               className="rounded-md border-none dark:bg-transparent px-4 shadow-none py-2"
               value={search}
               onChange={(e) => {
@@ -139,7 +141,7 @@ const AccumulatorPresetsPage = () => {
               className="bg-gray-100 hover:bg-gray-200"
               onClick={handleOpenCreate}
             >
-              <IoMdAdd /> Add Preset
+              <IoMdAdd /> {t("studio.accumulator_presets.add_preset")}
             </Button>
           ) : null}
         </div>
@@ -151,18 +153,21 @@ const AccumulatorPresetsPage = () => {
       <div className="px-4 pt-4 h-full flex flex-col items-center justify-between flex-1 min-h-0">
         {error ? (
           <p className="text-sm text-red-500 py-8">
-            Failed to load presets. {getApiErrorMessage(error)}
+            {t("studio.accumulator_presets.load_failed")}{" "}
+            {getApiErrorMessage(error)}
           </p>
         ) : presetsData?.accumulators.length === 0 && !isLoading ? (
           <div className="flex flex-col h-full items-center justify-center">
-            <p className="text-base text-muted-foreground">No presets found</p>
+            <p className="text-base text-muted-foreground">
+              {t("studio.accumulator_presets.empty")}
+            </p>
             {showActionsColumn ? (
               <Button
                 variant="outline"
                 className="mt-2"
                 onClick={handleOpenCreate}
               >
-                <IoMdAdd /> Add Preset
+                <IoMdAdd /> {t("studio.accumulator_presets.add_preset")}
               </Button>
             ) : null}
           </div>
@@ -211,17 +216,21 @@ const AccumulatorPresetsPage = () => {
       >
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
-            <Pecha.AlertDialogTitle>Delete preset?</Pecha.AlertDialogTitle>
+            <Pecha.AlertDialogTitle>
+              {t("studio.accumulator_presets.delete_dialog.title")}
+            </Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
-              This will soft-delete{" "}
+              {t("studio.accumulator_presets.delete_dialog.description_before")}{" "}
               <strong>
                 {deleteTarget ? presetDisplayName(deleteTarget) : ""}
               </strong>
-              . It will no longer appear in public preset lists.
+              {t("studio.accumulator_presets.delete_dialog.description_after")}
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <Pecha.AlertDialogFooter>
-            <Pecha.AlertDialogCancel>Cancel</Pecha.AlertDialogCancel>
+            <Pecha.AlertDialogCancel>
+              {t("studio.common.cancel")}
+            </Pecha.AlertDialogCancel>
             <Pecha.AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
               onClick={() => {
@@ -229,7 +238,9 @@ const AccumulatorPresetsPage = () => {
               }}
               disabled={deleteMutation.isPending}
             >
-              {deleteMutation.isPending ? "Deleting…" : "Delete"}
+              {deleteMutation.isPending
+                ? t("studio.common.deleting")
+                : t("studio.common.delete")}
             </Pecha.AlertDialogAction>
           </Pecha.AlertDialogFooter>
         </Pecha.AlertDialogContent>

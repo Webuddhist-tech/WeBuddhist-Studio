@@ -1,3 +1,5 @@
+import { tolgee } from "@/i18n/tolgee";
+
 /**
  * Return buttons copied from the in-person controller's content.json.
  * Each one sits after a verse and jumps back to an earlier verse, so a repeated
@@ -11,7 +13,8 @@ export interface ReturnJump {
   /** Verse the button sits after, and where it jumps, as content.json names them. */
   afterVerse: string;
   toVerse: string;
-  label: string;
+  /** Translation key of the button's label. */
+  labelKey: string;
   /** Segment the button sits after, one id per edition. */
   after: { bo: string; en: string; zh: string };
   /** Segment the button jumps to, in the same editions. */
@@ -22,7 +25,7 @@ export const RETURN_JUMPS: ReturnJump[] = [
   {
     afterVerse: "1-85",
     toVerse: "1-62",
-    label: "↺ Return to start · 1st Praises to the 21 Tārās",
+    labelKey: "studio.live_control.return_jumps.praises_1",
     after: {
       bo: "kYNR7EmC5apQWrkYl5fiO",
       en: "t3ULIQb5rGeFqz9BfTEFH",
@@ -37,7 +40,7 @@ export const RETURN_JUMPS: ReturnJump[] = [
   {
     afterVerse: "1-119",
     toVerse: "1-96",
-    label: "↺ Return to start · 2nd Praises to the 21 Tārās",
+    labelKey: "studio.live_control.return_jumps.praises_2",
     after: {
       bo: "IWMKZtgFHWDxOLQrov7Iq",
       en: "09eTJ7tOaskY6N73FnNue",
@@ -52,7 +55,7 @@ export const RETURN_JUMPS: ReturnJump[] = [
   {
     afterVerse: "1-153",
     toVerse: "1-130",
-    label: "↺ Return to start · 3rd Praises to the 21 Tārās",
+    labelKey: "studio.live_control.return_jumps.praises_3",
     after: {
       bo: "jq5mnNM9I8k1uBslB25lI",
       en: "T32HdbznAFDilAgOrn5mL",
@@ -67,7 +70,7 @@ export const RETURN_JUMPS: ReturnJump[] = [
   {
     afterVerse: "1-213",
     toVerse: "1-5",
-    label: "↺ Return to Refuge & Bodhichitta · མདུན་གྱི་ནམ་མཁར་…",
+    labelKey: "studio.live_control.return_jumps.refuge",
     after: {
       bo: "iODCra3NRL3bIZB62XvDg",
       en: "KHjMWIJKWClLkqTYRCsSE",
@@ -83,13 +86,13 @@ export const RETURN_JUMPS: ReturnJump[] = [
 
 const byAfterSegment = new Map<
   string,
-  { key: string; label: string; targetSegmentId: string }
+  { key: string; labelKey: string; targetSegmentId: string }
 >();
 for (const jump of RETURN_JUMPS) {
   for (const language of ["bo", "en", "zh"] as const) {
     byAfterSegment.set(jump.after[language], {
       key: jump.afterVerse,
-      label: jump.label,
+      labelKey: jump.labelKey,
       targetSegmentId: jump.to[language],
     });
   }
@@ -146,5 +149,5 @@ export const returnButtonForLine = (
   if (!jump) return null;
   const index = lines.findIndex((line) => line.id === jump.targetSegmentId);
   if (index < 0) return null;
-  return { key: jump.key, label: jump.label, index };
+  return { key: jump.key, label: tolgee.t(jump.labelKey), index };
 };

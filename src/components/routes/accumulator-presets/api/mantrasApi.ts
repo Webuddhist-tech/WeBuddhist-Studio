@@ -1,4 +1,5 @@
 import axiosInstance from "@/config/axios-config";
+import { tolgee } from "@/i18n/tolgee";
 import type { LanguageCode } from "@/schema/SeriesSchema";
 import type { FkOption } from "@/components/routes/groups/components/FkMultiSearchSelector";
 
@@ -61,7 +62,7 @@ export function mantraDisplayLabel(mantra: MantraDTO): string {
   if (title) return title;
   const text = meta?.mantra?.trim();
   if (text) return text.length > 60 ? `${text.slice(0, 57)}…` : text;
-  return "Untitled mantra";
+  return tolgee.t("studio.accumulator_presets.untitled_mantra");
 }
 
 export const fetchMantras = async (

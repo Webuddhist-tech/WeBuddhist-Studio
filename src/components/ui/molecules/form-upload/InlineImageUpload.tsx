@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/atoms/button";
 import Dropzone from "react-dropzone";
+import { useTranslate } from "@tolgee/react";
 import ImageCropContent from "../modals/image-upload/image-crop/ImageCropModal";
 import { useImageUploadDraft } from "../../../routes/task/hooks/useImageUploadDraft";
 import { FiLoader } from "react-icons/fi";
@@ -9,6 +10,7 @@ interface InlineImageUploadProps {
 }
 
 const InlineImageUpload = ({ onUpload }: InlineImageUploadProps) => {
+  const { t } = useTranslate();
   const {
     selectedFile,
     setSelectedFile,
@@ -48,7 +50,7 @@ const InlineImageUpload = ({ onUpload }: InlineImageUploadProps) => {
                     className="border border-dashed bg-[#FAFAFA] dark:bg-sidebar-secondary h-32 hover:border-gray-400 dark:hover:border-gray-500 transition-colors rounded-lg p-6 flex items-center justify-center cursor-pointer mb-4"
                   >
                     <input {...getInputProps()} />
-                    <p>Drag & drop an image here, or click to select</p>
+                    <p>{t("studio.molecules.inline_upload.drop_hint")}</p>
                   </div>
                 </section>
               )}
@@ -59,7 +61,7 @@ const InlineImageUpload = ({ onUpload }: InlineImageUploadProps) => {
               <div className="rounded-lg border border-gray-200 overflow-hidden bg-gray-50">
                 <img
                   src={previewUrl!}
-                  alt="preview"
+                  alt={t("studio.molecules.inline_upload.preview_alt")}
                   className="w-full max-h-72 object-contain"
                 />
               </div>
@@ -78,7 +80,7 @@ const InlineImageUpload = ({ onUpload }: InlineImageUploadProps) => {
                       className="bg-[#A51C21] text-white hover:bg-[#A51C21]/90 transition-colors"
                       disabled={uploadUiBusy}
                     >
-                      Crop
+                      {t("studio.molecules.inline_upload.crop")}
                     </Button>
                   )}
                   <Button
@@ -87,7 +89,7 @@ const InlineImageUpload = ({ onUpload }: InlineImageUploadProps) => {
                     onClick={() => setSelectedFile(null)}
                     disabled={uploadUiBusy}
                   >
-                    Delete
+                    {t("studio.common.delete")}
                   </Button>
                 </div>
               </div>
@@ -102,7 +104,9 @@ const InlineImageUpload = ({ onUpload }: InlineImageUploadProps) => {
               disabled={!selectedFile || uploadUiBusy}
             >
               {uploadUiBusy && <FiLoader className="h-4 w-4 animate-spin" />}
-              {uploadUiBusy ? "Uploading..." : "Upload"}
+              {uploadUiBusy
+                ? t("studio.common.uploading")
+                : t("studio.common.upload")}
             </Button>
           </div>
         </>

@@ -3,8 +3,8 @@ import { z } from "zod";
 export const forgotPasswordSchema = z.object({
   email: z
     .string()
-    .min(1, "Email is required")
+    .min(1, "studio.validation.email_required")
     .refine((email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email), {
-      message: "Please enter a valid email address",
+      message: "studio.validation.email_invalid",
     }),
 });

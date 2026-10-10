@@ -34,9 +34,7 @@ describe("ForgotPassword Component", () => {
     renderWithProviders(<ForgotPassword />);
 
     expect(screen.getByText("Webuddhist Studio")).toBeDefined();
-    expect(
-      screen.getByText("Learn, live and share Buddhist wisdom daily"),
-    ).toBeDefined();
+    expect(screen.getByText("studio.ui.auth_card.tagline")).toBeDefined();
   });
 
   it("shows back to login link", () => {
@@ -64,6 +62,6 @@ describe("ForgotPassword Component", () => {
     fireEvent.change(emailInput, { target: { value: "test@example.com" } });
     fireEvent.click(submitButton);
 
-    expect(screen.queryByText("Please enter a valid email address")).toBeNull();
+    expect(screen.queryByText("studio.validation.email_invalid")).toBeNull();
   });
 });

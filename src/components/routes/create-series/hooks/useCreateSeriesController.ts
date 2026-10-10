@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useBlocker, useNavigate, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslate } from "@tolgee/react";
 import { ROUTES } from "@/routes/paths";
 import { sortLanguageCodes } from "@/lib/languageCodes";
 import type { LanguageCode, SeriesFormData } from "@/schema/SeriesSchema";
@@ -22,6 +23,7 @@ export const useCreateSeriesController = () => {
     groupId?: string;
   }>();
   const navigate = useNavigate();
+  const { t } = useTranslate();
   const isNew = !seriesId;
 
   useEffect(() => {
@@ -229,9 +231,11 @@ export const useCreateSeriesController = () => {
 
   const getSaveLabel = () => {
     if (saveSeriesMutation.isPending) {
-      return isNew ? "Creating…" : "Saving…";
+      return isNew ? t("studio.common.creating") : t("studio.common.saving");
     }
-    return isNew ? "Create series" : "Save changes";
+    return isNew
+      ? t("studio.series.form.create_series")
+      : t("studio.series.form.save_changes");
   };
   const saveLabel = getSaveLabel();
 

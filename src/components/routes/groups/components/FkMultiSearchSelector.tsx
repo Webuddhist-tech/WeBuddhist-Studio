@@ -3,6 +3,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { useInView } from "react-intersection-observer";
 import { IoMdClose } from "react-icons/io";
 import { FaMagnifyingGlass } from "react-icons/fa6";
+import { useTranslate } from "@tolgee/react";
 import { NO_PROFILE_IMAGE } from "@/lib/constant";
 
 export type FkOption = {
@@ -44,9 +45,10 @@ const FkMultiSearchSelector = ({
   queryKeyPrefix,
   label,
   hideLabel = false,
-  searchPlaceholder = "Search…",
-  emptyMessage = "No items selected — use search to add.",
+  searchPlaceholder,
+  emptyMessage,
 }: FkMultiSearchSelectorProps) => {
+  const { t } = useTranslate();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -108,7 +110,7 @@ const FkMultiSearchSelector = ({
 
       {value.length === 0 ? (
         <div className="rounded-md border border-dashed border-muted-foreground/40 px-4 py-6 text-center text-sm text-muted-foreground">
-          {emptyMessage}
+          {emptyMessage ?? t("studio.groups.components.fk_selector.empty")}
         </div>
       ) : (
         <div className="space-y-2 max-h-60 overflow-auto">
@@ -128,7 +130,12 @@ const FkMultiSearchSelector = ({
               <button
                 type="button"
                 onClick={() => handleRemove(item.id)}
-                aria-label={`Remove ${item.title}`}
+                aria-label={t(
+                  "studio.groups.components.fk_selector.remove_item",
+                  {
+                    title: item.title,
+                  },
+                )}
                 className="text-muted-foreground hover:text-foreground cursor-pointer p-1 shrink-0"
               >
                 <IoMdClose className="h-4 w-4" />
@@ -142,7 +149,10 @@ const FkMultiSearchSelector = ({
         <FaMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <input
           type="text"
-          placeholder={searchPlaceholder}
+          placeholder={
+            searchPlaceholder ??
+            t("studio.groups.components.fk_selector.search_placeholder")
+          }
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           onFocus={() => setIsDropdownOpen(true)}
@@ -154,7 +164,7 @@ const FkMultiSearchSelector = ({
           <div className="absolute z-10 mt-1 w-full rounded-md border border-input bg-background dark:bg-[#262626] shadow-md max-h-52 overflow-auto">
             {isLoading && searchResults.length === 0 && (
               <div className="px-3 py-2 text-sm text-muted-foreground">
-                Searching…
+                {t("studio.groups.components.fk_selector.searching")}
               </div>
             )}
             {searchResults.map((item) => {
@@ -186,12 +196,14 @@ const FkMultiSearchSelector = ({
                 ref={sentinelRef}
                 className="px-3 py-2 text-xs text-muted-foreground text-center"
               >
-                {isFetchingNextPage ? "Loading more…" : ""}
+                {isFetchingNextPage
+                  ? t("studio.groups.components.fk_selector.loading_more")
+                  : ""}
               </div>
             )}
             {!isLoading && searchResults.length === 0 && (
               <div className="px-3 py-2 text-sm text-muted-foreground">
-                No results found
+                {t("studio.common.no_results")}
               </div>
             )}
           </div>

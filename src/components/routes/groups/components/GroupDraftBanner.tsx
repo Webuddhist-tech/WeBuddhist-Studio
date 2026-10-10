@@ -3,6 +3,7 @@ import {
   isGroupVisibleInApp,
   type AuthorGroupDetailDTO,
 } from "../api/groupsApi";
+import { useTranslate } from "@tolgee/react";
 import GroupPublishControl from "./GroupPublishControl";
 
 type GroupDraftBannerProps = {
@@ -11,6 +12,7 @@ type GroupDraftBannerProps = {
 };
 
 const GroupDraftBanner = ({ group, canPublish }: GroupDraftBannerProps) => {
+  const { t } = useTranslate();
   if (isGroupVisibleInApp(group.status) || !group.status) return null;
 
   const isDraft = group.status === "DRAFT";
@@ -24,13 +26,13 @@ const GroupDraftBanner = ({ group, canPublish }: GroupDraftBannerProps) => {
       <div className="min-w-0 flex-1 space-y-1">
         <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
           {isDraft
-            ? "This group is a draft — it isn't visible in the app yet."
-            : "This group is hidden — it isn't visible in the app."}
+            ? t("studio.groups.components.draft_banner.draft_notice")
+            : t("studio.groups.components.draft_banner.hidden_notice")}
         </p>
         <p className="text-sm text-amber-800 dark:text-amber-200/90">
           {canPublish
-            ? "Publish it when you're ready for people to find and join it."
-            : "An owner or admin can publish it when it's ready."}
+            ? t("studio.groups.components.draft_banner.publish_hint")
+            : t("studio.groups.components.draft_banner.ask_admin_hint")}
         </p>
       </div>
       {canPublish ? (

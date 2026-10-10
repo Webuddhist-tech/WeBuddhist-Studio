@@ -3,6 +3,7 @@ import { IoMdAdd, IoMdSearch } from "react-icons/io";
 import { useDebounce } from "use-debounce";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import AuthButton from "@/components/ui/molecules/auth-button/AuthButton";
@@ -25,6 +26,7 @@ import TraditionsTable from "./TraditionsTable";
 const PAGE_SIZE = 10;
 
 const TraditionsPage = () => {
+  const { t } = useTranslate();
   const { data: userInfo } = useUserInfo();
   const showActionsColumn = shouldShowCmsActionsColumn(userInfo?.platform_role);
   const [search, setSearch] = useState("");
@@ -56,7 +58,7 @@ const TraditionsPage = () => {
   const createMutation = useMutation({
     mutationFn: createTradition,
     onSuccess: () => {
-      toast.success("Tradition created successfully");
+      toast.success(t("studio.traditions.toast.created"));
       setFormOpen(false);
       invalidateTraditions();
     },
@@ -67,7 +69,7 @@ const TraditionsPage = () => {
     mutationFn: ({ id, payload }: { id: string; payload: TraditionPayload }) =>
       updateTradition(id, payload),
     onSuccess: () => {
-      toast.success("Tradition updated successfully");
+      toast.success(t("studio.traditions.toast.updated"));
       setFormOpen(false);
       setEditingTradition(null);
       invalidateTraditions();
@@ -78,7 +80,7 @@ const TraditionsPage = () => {
   const deleteMutation = useMutation({
     mutationFn: deleteTradition,
     onSuccess: () => {
-      toast.success("Tradition deleted successfully");
+      toast.success(t("studio.traditions.toast.deleted"));
       setDeleteTarget(null);
       invalidateTraditions();
     },
@@ -115,7 +117,7 @@ const TraditionsPage = () => {
           <div className="border w-fit px-2 bg-white dark:bg-input/30 rounded-md border-gray-200 dark:border-[#313132] flex items-center">
             <IoMdSearch className="w-4 h-4" />
             <Pecha.Input
-              placeholder="Search traditions..."
+              placeholder={t("studio.traditions.search_placeholder")}
               className="rounded-md border-none dark:bg-transparent px-4 shadow-none py-2"
               value={search}
               onChange={(e) => {
@@ -130,7 +132,7 @@ const TraditionsPage = () => {
               className="bg-gray-100 hover:bg-gray-200"
               onClick={handleOpenCreate}
             >
-              <IoMdAdd /> Add Tradition
+              <IoMdAdd /> {t("studio.traditions.add_tradition")}
             </Button>
           ) : null}
         </div>
@@ -142,12 +144,12 @@ const TraditionsPage = () => {
       <div className="px-4 pt-4 h-full flex flex-col items-center justify-between flex-1 min-h-0">
         {error ? (
           <p className="text-sm text-red-500 py-8">
-            Failed to load traditions. {getApiErrorMessage(error)}
+            {t("studio.traditions.load_failed")} {getApiErrorMessage(error)}
           </p>
         ) : traditionsData?.traditions.length === 0 && !isLoading ? (
           <div className="flex flex-col h-full items-center justify-center">
             <p className="text-base text-muted-foreground">
-              No traditions found
+              {t("studio.traditions.empty")}
             </p>
             {showActionsColumn ? (
               <Button
@@ -155,7 +157,7 @@ const TraditionsPage = () => {
                 className="mt-2"
                 onClick={handleOpenCreate}
               >
-                <IoMdAdd /> Add Tradition
+                <IoMdAdd /> {t("studio.traditions.add_tradition")}
               </Button>
             ) : null}
           </div>
@@ -199,22 +201,24 @@ const TraditionsPage = () => {
       >
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
-            <Pecha.AlertDialogTitle>Delete tradition?</Pecha.AlertDialogTitle>
+            <Pecha.AlertDialogTitle>
+              {t("studio.traditions.delete_dialog.title")}
+            </Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
-              This will permanently delete{" "}
+              {t("studio.traditions.delete_dialog.description_before")}{" "}
               <strong>
                 {capitalizeFirstLetter(
                   deleteTarget?.name?.trim() ||
                     deleteTarget?.code ||
-                    "Untitled",
+                    t("studio.traditions.untitled"),
                 )}
               </strong>{" "}
-              and remove it from users who selected it.
+              {t("studio.traditions.delete_dialog.description_after")}
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <Pecha.AlertDialogFooter>
             <Pecha.AlertDialogCancel disabled={deleteMutation.isPending}>
-              Cancel
+              {t("studio.common.cancel")}
             </Pecha.AlertDialogCancel>
             <Pecha.AlertDialogAction
               disabled={deleteMutation.isPending}
@@ -222,7 +226,9 @@ const TraditionsPage = () => {
                 if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
               }}
             >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              {deleteMutation.isPending
+                ? t("studio.common.deleting")
+                : t("studio.common.delete")}
             </Pecha.AlertDialogAction>
           </Pecha.AlertDialogFooter>
         </Pecha.AlertDialogContent>

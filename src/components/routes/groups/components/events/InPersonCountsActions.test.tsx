@@ -15,6 +15,15 @@ vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }));
 
+// Like the global mock, but keeps interpolated values visible so tests can
+// check the numbers and days a message names.
+vi.mock("@tolgee/react", () => ({
+  useTranslate: () => ({
+    t: (key: string, params?: Record<string, unknown>) =>
+      params ? [key, ...Object.values(params)].join(" ") : key,
+  }),
+}));
+
 vi.mock("../../api/inPersonCountsApi", async (importOriginal) => {
   const actual =
     await importOriginal<typeof import("../../api/inPersonCountsApi")>();
@@ -65,7 +74,9 @@ const renderActions = () => {
 const renderSection = async () => {
   renderActions();
   await userEvent.click(
-    screen.getByRole("button", { name: /^add in-person count$/i }),
+    screen.getByRole("button", {
+      name: "studio.groups.events.in_person.open_button",
+    }),
   );
 };
 
@@ -78,7 +89,9 @@ describe("InPersonCountsActions", () => {
   it("loads nothing until the Add In-person count button is clicked", () => {
     renderActions();
     expect(
-      screen.getByRole("button", { name: /^add in-person count$/i }),
+      screen.getByRole("button", {
+        name: "studio.groups.events.in_person.open_button",
+      }),
     ).toBeTruthy();
     expect(fetchInPersonCounts).not.toHaveBeenCalled();
   });
@@ -97,12 +110,14 @@ describe("InPersonCountsActions", () => {
 
   it("names the group accumulation the counts go to", async () => {
     await renderSection();
-    expect(screen.getByText("Add count to")).toBeTruthy();
+    expect(
+      screen.getByText("studio.groups.events.in_person.sheet_title"),
+    ).toBeTruthy();
     expect(
       await screen.findByText("Om Mani Padme Hum for World Peace"),
     ).toBeTruthy();
     expect(screen.getByText((1234567).toLocaleString())).toBeTruthy();
-    expect(screen.getByText(/of 100,000,000/)).toBeTruthy();
+    expect(screen.getByText(/of_target 100,000,000/)).toBeTruthy();
     expect(screen.getByText("1.2%")).toBeTruthy();
     const bar = screen.getByRole("progressbar");
     expect(bar.getAttribute("aria-valuenow")).toBe("1234567");
@@ -137,14 +152,26 @@ describe("InPersonCountsActions", () => {
     await renderSection();
     await screen.findByText("Om Mani Padme Hum for World Peace");
 
-    await userEvent.click(screen.getByRole("button", { name: /add day/i }));
-    fireEvent.change(screen.getByLabelText("Day"), {
-      target: { value: "2026-10-02" },
-    });
-    fireEvent.change(screen.getByLabelText("Count"), {
-      target: { value: "540" },
-    });
-    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "studio.groups.events.in_person.add_day",
+      }),
+    );
+    fireEvent.change(
+      screen.getByLabelText("studio.groups.events.in_person.day"),
+      {
+        target: { value: "2026-10-02" },
+      },
+    );
+    fireEvent.change(
+      screen.getByLabelText("studio.groups.events.in_person.count"),
+      {
+        target: { value: "540" },
+      },
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.common.save" }),
+    );
 
     await waitFor(() =>
       expect(createInPersonCount).toHaveBeenCalledWith("e1", {
@@ -158,11 +185,20 @@ describe("InPersonCountsActions", () => {
     await renderSection();
     await screen.findByText("Om Mani Padme Hum for World Peace");
 
-    await userEvent.click(screen.getByRole("button", { name: /add day/i }));
-    fireEvent.change(screen.getByLabelText("Count"), {
-      target: { value: "0" },
-    });
-    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "studio.groups.events.in_person.add_day",
+      }),
+    );
+    fireEvent.change(
+      screen.getByLabelText("studio.groups.events.in_person.count"),
+      {
+        target: { value: "0" },
+      },
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.common.save" }),
+    );
 
     expect(createInPersonCount).not.toHaveBeenCalled();
   });
@@ -172,12 +208,19 @@ describe("InPersonCountsActions", () => {
     await renderSection();
 
     await userEvent.click(
-      await screen.findByRole("button", { name: "Edit 2026-10-01" }),
+      await screen.findByRole("button", {
+        name: "studio.groups.events.in_person.edit_aria 2026-10-01",
+      }),
     );
-    fireEvent.change(screen.getByLabelText("Count"), {
-      target: { value: "2000" },
-    });
-    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.change(
+      screen.getByLabelText("studio.groups.events.in_person.count"),
+      {
+        target: { value: "2000" },
+      },
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.common.save" }),
+    );
 
     await waitFor(() =>
       expect(updateInPersonCount).toHaveBeenCalledWith("e1", "h1", {
@@ -192,10 +235,12 @@ describe("InPersonCountsActions", () => {
     await renderSection();
 
     await userEvent.click(
-      await screen.findByRole("button", { name: "Delete 2026-10-01" }),
+      await screen.findByRole("button", {
+        name: "studio.groups.events.in_person.delete_aria 2026-10-01",
+      }),
     );
     await userEvent.click(
-      await screen.findByRole("button", { name: "Delete" }),
+      await screen.findByRole("button", { name: "studio.common.delete" }),
     );
 
     await waitFor(() =>
@@ -209,8 +254,12 @@ describe("InPersonCountsActions", () => {
     );
     await renderSection();
     expect(
-      await screen.findByText(/link a group accumulation to this event/i),
+      await screen.findByText("studio.groups.events.in_person.no_accumulation"),
     ).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /add day/i })).toBeNull();
+    expect(
+      screen.queryByRole("button", {
+        name: "studio.groups.events.in_person.add_day",
+      }),
+    ).toBeNull();
   });
 });

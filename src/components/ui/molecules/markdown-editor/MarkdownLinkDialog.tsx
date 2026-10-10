@@ -4,6 +4,7 @@ import { useInView } from "react-intersection-observer";
 import { useDebounce } from "use-debounce";
 import { IoMdSearch } from "react-icons/io";
 import { Pecha } from "@/components/ui/shadimport";
+import { useTranslate } from "@tolgee/react";
 import { Button } from "@/components/ui/atoms/button";
 import {
   Dialog,
@@ -61,6 +62,7 @@ const MarkdownLinkDialog = ({
   selectedText,
   onConfirm,
 }: MarkdownLinkDialogProps) => {
+  const { t } = useTranslate();
   const [linkType, setLinkType] = useState<LinkType>("group");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery] = useDebounce(searchQuery.trim(), DEBOUNCE_MS);
@@ -227,7 +229,7 @@ const MarkdownLinkDialog = ({
     if (isLoadingGroups) {
       return (
         <p className="px-3 py-4 text-sm text-muted-foreground">
-          Searching groups…
+          {t("studio.editor.link.searching_groups")}
         </p>
       );
     }
@@ -235,7 +237,7 @@ const MarkdownLinkDialog = ({
     if (groups.length === 0) {
       return (
         <p className="px-3 py-4 text-sm text-muted-foreground">
-          No groups found.
+          {t("studio.editor.link.no_groups")}
         </p>
       );
     }
@@ -267,7 +269,7 @@ const MarkdownLinkDialog = ({
     if (!debouncedQuery) {
       return (
         <p className="px-3 py-4 text-sm text-muted-foreground">
-          Search for a text title to link a segment.
+          {t("studio.editor.link.text_hint")}
         </p>
       );
     }
@@ -275,7 +277,7 @@ const MarkdownLinkDialog = ({
     if (isLoadingTitles) {
       return (
         <p className="px-3 py-4 text-sm text-muted-foreground">
-          Searching texts…
+          {t("studio.editor.link.searching_texts")}
         </p>
       );
     }
@@ -283,7 +285,7 @@ const MarkdownLinkDialog = ({
     if (textTitles.length === 0) {
       return (
         <p className="px-3 py-4 text-sm text-muted-foreground">
-          No texts found.
+          {t("studio.editor.link.no_texts")}
         </p>
       );
     }
@@ -318,7 +320,7 @@ const MarkdownLinkDialog = ({
     if (!debouncedQuery) {
       return (
         <p className="px-3 py-4 text-sm text-muted-foreground">
-          Search for segment content to link directly.
+          {t("studio.editor.link.segment_hint")}
         </p>
       );
     }
@@ -326,7 +328,7 @@ const MarkdownLinkDialog = ({
     if (isLoadingSegmentSearch) {
       return (
         <p className="px-3 py-4 text-sm text-muted-foreground">
-          Searching segments…
+          {t("studio.editor.link.searching_segments")}
         </p>
       );
     }
@@ -334,7 +336,7 @@ const MarkdownLinkDialog = ({
     if (searchedSegments.length === 0) {
       return (
         <p className="px-3 py-4 text-sm text-muted-foreground">
-          No segments found.
+          {t("studio.editor.link.no_segments")}
         </p>
       );
     }
@@ -372,7 +374,7 @@ const MarkdownLinkDialog = ({
     if (segments.length === 0) {
       return (
         <p className="px-3 py-2 text-sm text-muted-foreground">
-          Loading segments…
+          {t("studio.source.loading_segments")}
         </p>
       );
     }
@@ -380,7 +382,9 @@ const MarkdownLinkDialog = ({
     return (
       <div className="space-y-2 border-t border-input px-3 py-3">
         <p className="text-xs font-medium text-muted-foreground">
-          Select a segment from &ldquo;{selectedTextItem.title}&rdquo;
+          {t("studio.editor.link.select_segment_from", {
+            title: selectedTextItem.title,
+          })}
         </p>
         <div className="max-h-48 space-y-2 overflow-y-auto">
           {segments.map((segment, index) => {
@@ -406,7 +410,9 @@ const MarkdownLinkDialog = ({
           })}
           <div ref={bottomSentinelRef} className="h-1" />
           {isFetchingNextPage && (
-            <p className="text-xs text-muted-foreground">Loading more…</p>
+            <p className="text-xs text-muted-foreground">
+              {t("studio.editor.link.loading_more")}
+            </p>
           )}
         </div>
       </div>
@@ -417,11 +423,13 @@ const MarkdownLinkDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg gap-0 p-0 sm:max-w-lg">
         <DialogHeader className="px-6 pt-6 pb-4">
-          <DialogTitle>Insert link</DialogTitle>
+          <DialogTitle>{t("studio.editor.link.insert")}</DialogTitle>
           <DialogDescription>
             {selectedText.trim()
-              ? `Link the selected text "${selectedText.trim()}".`
-              : "Choose a group or text segment to link."}
+              ? t("studio.editor.link.link_selected_text", {
+                  text: selectedText.trim(),
+                })
+              : t("studio.editor.link.choose_target")}
           </DialogDescription>
         </DialogHeader>
 
@@ -436,7 +444,7 @@ const MarkdownLinkDialog = ({
               }`}
               onClick={() => setLinkType("group")}
             >
-              Group
+              {t("studio.editor.link.type_group")}
             </button>
             <button
               type="button"
@@ -447,7 +455,7 @@ const MarkdownLinkDialog = ({
               }`}
               onClick={() => setLinkType("text")}
             >
-              Text
+              {t("studio.editor.link.type_text")}
             </button>
             <button
               type="button"
@@ -458,7 +466,7 @@ const MarkdownLinkDialog = ({
               }`}
               onClick={() => setLinkType("segment")}
             >
-              Segment
+              {t("studio.editor.link.type_segment")}
             </button>
           </div>
 
@@ -467,10 +475,10 @@ const MarkdownLinkDialog = ({
             <Pecha.Input
               placeholder={
                 linkType === "group"
-                  ? "Search groups…"
+                  ? t("studio.editor.link.search_groups")
                   : linkType === "text"
-                    ? "Search text titles…"
-                    : "Search segment content…"
+                    ? t("studio.editor.link.search_text_titles")
+                    : t("studio.editor.link.search_segment_content")
               }
               className="border-0 shadow-none focus-visible:ring-0"
               value={searchQuery}
@@ -495,10 +503,10 @@ const MarkdownLinkDialog = ({
             variant="outline"
             onClick={() => onOpenChange(false)}
           >
-            Cancel
+            {t("studio.common.cancel")}
           </Button>
           <Button type="button" disabled={!canConfirm} onClick={handleConfirm}>
-            Insert link
+            {t("studio.editor.link.insert")}
           </Button>
         </DialogFooter>
       </DialogContent>

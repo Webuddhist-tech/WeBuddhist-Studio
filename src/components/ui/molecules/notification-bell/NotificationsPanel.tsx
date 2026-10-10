@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IoClose } from "react-icons/io5";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Button } from "@/components/ui/atoms/button";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import { ROUTES } from "@/routes/paths";
@@ -43,6 +44,7 @@ export function NotificationsPanel({
   onRequestClose,
   showHeader = true,
 }: NotificationsPanelProps) {
+  const { t } = useTranslate();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data, isLoading } = useUnreadNotifications();
@@ -76,13 +78,13 @@ export function NotificationsPanel({
     },
     onSuccess: (group, { action }) => {
       if (action === "accept") {
-        toast.success("Invitation accepted");
+        toast.success(t("studio.notifications.invitation_accepted"));
         onRequestClose?.();
         if (group) {
           navigate(ROUTES.group(group.id));
         }
       } else {
-        toast.success("Invitation declined");
+        toast.success(t("studio.notifications.invitation_declined"));
       }
       invalidateNotifications();
     },
@@ -95,7 +97,7 @@ export function NotificationsPanel({
   ) => {
     const inviteId = notification.reference_id;
     if (!inviteId) {
-      toast.error("Invalid invitation notification");
+      toast.error(t("studio.notifications.invalid_invitation"));
       return;
     }
     inviteActionMutation.mutate({ inviteId, action });
@@ -117,7 +119,9 @@ export function NotificationsPanel({
     },
     onSuccess: (_data, { action }) => {
       toast.success(
-        action === "accept" ? "Transfer accepted" : "Transfer rejected",
+        action === "accept"
+          ? t("studio.notifications.transfer_accepted")
+          : t("studio.notifications.transfer_rejected"),
       );
       invalidateNotifications();
       queryClient.invalidateQueries({ queryKey: ["transfer-requests"] });
@@ -132,7 +136,7 @@ export function NotificationsPanel({
   ) => {
     const requestId = notification.reference_id;
     if (!requestId) {
-      toast.error("Invalid transfer notification");
+      toast.error(t("studio.notifications.invalid_transfer"));
       return;
     }
     transferActionMutation.mutate({ requestId, action });
@@ -145,14 +149,16 @@ export function NotificationsPanel({
     <div className="w-80 max-h-[min(24rem,70vh)] overflow-auto">
       {showHeader ? (
         <div className="border-b px-3 py-2 font-medium text-sm">
-          Notifications
+          {t("studio.notifications.title")}
         </div>
       ) : null}
       {isLoading ? (
-        <p className="px-3 py-4 text-sm text-muted-foreground">Loading…</p>
+        <p className="px-3 py-4 text-sm text-muted-foreground">
+          {t("studio.common.loading")}
+        </p>
       ) : !data?.notifications.length ? (
         <p className="px-3 py-4 text-sm text-muted-foreground">
-          No unread notifications
+          {t("studio.notifications.no_unread")}
         </p>
       ) : (
         <ul className="divide-y">
@@ -163,7 +169,7 @@ export function NotificationsPanel({
                 variant="ghost"
                 size="sm"
                 className="absolute top-2 right-1 h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                aria-label="Dismiss notification"
+                aria-label={t("studio.notifications.dismiss")}
                 disabled={invitePending || dismissMutation.isPending}
                 onClick={() => dismissMutation.mutate(notification.id)}
               >
@@ -189,8 +195,8 @@ export function NotificationsPanel({
                     >
                       {inviteActionMutation.isPending &&
                       inviteActionMutation.variables?.action === "accept"
-                        ? "Accepting…"
-                        : "Accept"}
+                        ? t("studio.notifications.accepting")
+                        : t("studio.notifications.accept")}
                     </Button>
                     <Button
                       type="button"
@@ -202,8 +208,8 @@ export function NotificationsPanel({
                     >
                       {inviteActionMutation.isPending &&
                       inviteActionMutation.variables?.action === "reject"
-                        ? "Declining…"
-                        : "Reject"}
+                        ? t("studio.notifications.declining")
+                        : t("studio.notifications.reject")}
                     </Button>
                   </div>
                 )}
@@ -223,7 +229,7 @@ export function NotificationsPanel({
                       );
                     }}
                   >
-                    Review request
+                    {t("studio.notifications.review_request")}
                   </Button>
                 ) : null}
                 {isContentTransferNotification(notification) && (
@@ -238,7 +244,7 @@ export function NotificationsPanel({
                           handleTransferAction(notification, "accept")
                         }
                       >
-                        Accept
+                        {t("studio.notifications.accept")}
                       </Button>
                       <Button
                         type="button"
@@ -250,7 +256,7 @@ export function NotificationsPanel({
                           handleTransferAction(notification, "reject")
                         }
                       >
-                        Reject
+                        {t("studio.notifications.reject")}
                       </Button>
                     </div>
                     {getTransferNotificationTargetGroupId(notification) ? (
@@ -270,7 +276,7 @@ export function NotificationsPanel({
                           );
                         }}
                       >
-                        View on group page
+                        {t("studio.notifications.view_on_group_page")}
                       </Button>
                     ) : null}
                   </div>

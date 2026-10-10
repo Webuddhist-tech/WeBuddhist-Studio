@@ -1,4 +1,5 @@
 import axiosInstance from "@/config/axios-config";
+import { tolgee } from "@/i18n/tolgee";
 import { uploadImageToS3 } from "@/components/routes/task/api/taskApi";
 import type {
   PostFormData,
@@ -172,12 +173,16 @@ export function postCaptionPreview(post: GroupPostDTO, max = 80): string {
     return caption.length > max ? `${caption.slice(0, max)}…` : caption;
   }
   if (post.media.length > 0) {
-    return `${post.media.length} media item${post.media.length === 1 ? "" : "s"}`;
+    return post.media.length === 1
+      ? tolgee.t("studio.groups.posts.summary.media_items_one")
+      : tolgee.t("studio.groups.posts.summary.media_items_other", {
+          count: post.media.length,
+        });
   }
   if (post.links.length > 0) {
     return post.links[0].label?.trim() || post.links[0].url;
   }
-  return "Untitled post";
+  return tolgee.t("studio.groups.posts.summary.untitled");
 }
 
 export function postThumbnail(post: GroupPostDTO): string | null {

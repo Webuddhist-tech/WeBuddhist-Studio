@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import { ROUTES } from "@/routes/paths";
@@ -17,15 +18,20 @@ import {
 } from "./api/chantsApi";
 import { useChantImage } from "./hooks/useChantImage";
 import ChantImageField from "./components/chants/ChantImageField";
+import { RequestTextsDialog } from "@/components/routes/text-requests/RequestTextsDialog";
 
 const chantCollectionSchema = z.object({
-  name: z.string().trim().min(1, "Name is required"),
+  name: z
+    .string()
+    .trim()
+    .min(1, "studio.groups.pages.chant_form.name_required"),
   img_url: z.string().trim().optional(),
 });
 
 type ChantCollectionFormData = z.infer<typeof chantCollectionSchema>;
 
 const GroupChantFormPage = () => {
+  const { t } = useTranslate();
   const { groupId, collectionId } = useParams<{
     groupId: string;
     collectionId?: string;
@@ -105,7 +111,11 @@ const GroupChantFormPage = () => {
       return updateChantCollection(groupId!, collectionId!, updates);
     },
     onSuccess: () => {
-      toast.success(isNew ? "Collection created" : "Collection updated");
+      toast.success(
+        isNew
+          ? t("studio.groups.pages.chant_form.collection_created")
+          : t("studio.groups.pages.chant_form.collection_updated"),
+      );
       queryClient.invalidateQueries({
         queryKey: ["cms-chant-collections", groupId],
       });
@@ -127,7 +137,7 @@ const GroupChantFormPage = () => {
   if (!isNew && collectionQuery.isLoading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">
-        Loading collection…
+        {t("studio.groups.pages.chant_form.loading")}
       </div>
     );
   }
@@ -138,22 +148,25 @@ const GroupChantFormPage = () => {
         <p className="text-center text-destructive">
           {getApiErrorMessage(
             collectionQuery.error,
-            "Could not load this collection.",
+            t("studio.groups.pages.chant_form.load_failed"),
           )}
         </p>
         <Pecha.Button
           variant="outline"
           onClick={() => navigate(chantsListPath)}
         >
-          Back to chants
+          {t("studio.groups.pages.chant_form.back_to_chants")}
         </Pecha.Button>
       </div>
     );
   }
 
   const getSaveLabel = () => {
-    if (mutation.isPending) return isNew ? "Creating…" : "Saving…";
-    return isNew ? "Create collection" : "Save changes";
+    if (mutation.isPending)
+      return isNew ? t("studio.common.creating") : t("studio.common.saving");
+    return isNew
+      ? t("studio.groups.pages.chant_form.create_collection")
+      : t("studio.groups.pages.chant_form.save_changes");
   };
 
   const saveDisabled =
@@ -163,14 +176,20 @@ const GroupChantFormPage = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">
-          {isNew ? "New collection" : "Edit collection"}
+          {isNew
+            ? t("studio.groups.pages.chants.new_collection")
+            : t("studio.groups.pages.chant_form.edit_collection")}
         </h1>
+        {!readOnly ? (
+          <RequestTextsDialog groupId={groupId} collectionId={collectionId} />
+        ) : null}
       </div>
 
       {readOnly ? (
         <p className="text-sm text-muted-foreground">
-          You do not have permission to {isNew ? "create" : "edit"} collections
-          in this group.
+          {isNew
+            ? t("studio.groups.pages.chant_form.no_permission_create")
+            : t("studio.groups.pages.chant_form.no_permission_edit")}
         </p>
       ) : null}
 
@@ -181,11 +200,13 @@ const GroupChantFormPage = () => {
             name="name"
             render={({ field }) => (
               <Pecha.FormItem>
-                <Pecha.FormLabel>Name</Pecha.FormLabel>
+                <Pecha.FormLabel>{t("studio.common.name")}</Pecha.FormLabel>
                 <Pecha.FormControl>
                   <Pecha.Input
                     {...field}
-                    placeholder="Collection name"
+                    placeholder={t(
+                      "studio.groups.pages.chant_form.name_placeholder",
+                    )}
                     disabled={readOnly}
                   />
                 </Pecha.FormControl>
@@ -212,7 +233,7 @@ const GroupChantFormPage = () => {
               variant="outline"
               onClick={() => navigate(chantsListPath)}
             >
-              Cancel
+              {t("studio.common.cancel")}
             </Pecha.Button>
             {!readOnly ? (
               <Pecha.Button

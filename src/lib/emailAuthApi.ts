@@ -1,6 +1,7 @@
 import axiosInstance from "@/config/axios-config";
 import { AUTHOR_NOT_ACTIVE_DETAIL } from "@/lib/platformAccess";
 import { getApiErrorDetail } from "@/lib/apiErrors";
+import { tolgee } from "@/i18n/tolgee";
 import {
   PROFILE_REQUIRED_DETAIL,
   isProfileRequiredDetail,
@@ -55,7 +56,7 @@ export async function exchangeEmailToken(
 
 export function getEmailAuthErrorMessage(
   error: unknown,
-  fallback = "Email authentication failed",
+  fallback = tolgee.t("studio.auth.errors.email_auth_failed"),
 ): string {
   return getApiErrorDetail(error) ?? fallback;
 }

@@ -3,19 +3,22 @@ import { z } from "zod";
 export const profileSchema = z.object({
   firstname: z
     .string()
-    .min(1, "First name is required")
-    .min(2, "First name must be at least 2 characters"),
+    .min(1, "studio.validation.first_name_required")
+    .min(2, "studio.validation.first_name_min_2"),
   lastname: z
     .string()
-    .min(1, "Last name is required")
-    .min(2, "Last name must be at least 2 characters"),
+    .min(1, "studio.validation.last_name_required")
+    .min(2, "studio.validation.last_name_min_2"),
   bio: z.string().optional(),
   image_url: z.string().optional(),
 });
 
 export const socialProfileSchema = z.object({
-  account: z.string().min(1, "Social platform is required"),
-  url: z.string().url("Please enter a valid URL").min(1, "URL is required"),
+  account: z.string().min(1, "studio.validation.social_platform_required"),
+  url: z
+    .string()
+    .url("studio.validation.url_invalid_please")
+    .min(1, "studio.validation.url_required"),
 });
 
 export type ProfileFormData = z.infer<typeof profileSchema>;

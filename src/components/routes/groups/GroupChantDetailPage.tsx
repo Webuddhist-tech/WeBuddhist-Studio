@@ -24,6 +24,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { IoMdArrowBack, IoMdTrash, IoMdAdd, IoMdClose } from "react-icons/io";
 import { PiDotsSixVertical } from "react-icons/pi";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import { getApiErrorMessage } from "@/lib/apiErrors";
@@ -43,6 +44,7 @@ import type { FkOption } from "./components/FkMultiSearchSelector";
 import ChantItemAudioCell from "./components/chants/ChantItemAudioCell";
 import ChantItemAudioDialog from "./components/chants/ChantItemAudioDialog";
 import { useChantItemReorder } from "./hooks/useChantItemReorder";
+import { RequestTextsDialog } from "@/components/routes/text-requests/RequestTextsDialog";
 
 function SortableChantItemRow({
   item,
@@ -67,6 +69,7 @@ function SortableChantItemRow({
     transition,
     isDragging,
   } = useSortable({ id: item.id, disabled: !canReorder });
+  const { t } = useTranslate();
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -81,7 +84,9 @@ function SortableChantItemRow({
           <button
             type="button"
             className="shrink-0 rounded p-1 text-muted-foreground hover:text-foreground touch-none disabled:cursor-not-allowed disabled:opacity-30"
-            aria-label={`Reorder ${item.title}`}
+            aria-label={t("studio.groups.pages.chant_detail.reorder_aria", {
+              title: item.title,
+            })}
             disabled={!canReorder}
             {...listeners}
           >
@@ -114,7 +119,9 @@ function SortableChantItemRow({
             size="sm"
             className="text-destructive hover:text-destructive"
             onClick={() => onRemove(item)}
-            aria-label={`Remove ${item.title}`}
+            aria-label={t("studio.groups.pages.chant_detail.remove_aria", {
+              title: item.title,
+            })}
           >
             <IoMdTrash className="h-4 w-4" />
           </Pecha.Button>
@@ -125,6 +132,7 @@ function SortableChantItemRow({
 }
 
 const GroupChantDetailPage = () => {
+  const { t } = useTranslate();
   const { groupId, collectionId } = useParams<{
     groupId: string;
     collectionId: string;
@@ -186,7 +194,7 @@ const GroupChantDetailPage = () => {
     mutationFn: (itemId: string) =>
       deleteChantItem(groupId!, collectionId!, itemId),
     onSuccess: () => {
-      toast.success("Item removed");
+      toast.success(t("studio.groups.pages.chant_detail.item_removed"));
       setPendingDeleteItem(null);
       queryClient.invalidateQueries({
         queryKey: ["cms-chant-collection", groupId, collectionId],
@@ -202,7 +210,7 @@ const GroupChantDetailPage = () => {
     mutationFn: (textIds: string[]) =>
       addChantItems(groupId!, collectionId!, textIds),
     onSuccess: () => {
-      toast.success("Items added successfully");
+      toast.success(t("studio.groups.pages.chant_detail.items_added"));
       setSelectedRecitations([]);
       setIsEditMode(false);
       queryClient.invalidateQueries({
@@ -217,7 +225,7 @@ const GroupChantDetailPage = () => {
 
   const handleAddItems = () => {
     if (selectedRecitations.length === 0) {
-      toast.error("Please select at least one recitation");
+      toast.error(t("studio.groups.pages.chant_detail.select_recitation"));
       return;
     }
 
@@ -231,8 +239,12 @@ const GroupChantDetailPage = () => {
     if (duplicates.length > 0) {
       const duplicateMessage =
         duplicates.length === 1
-          ? `"${duplicates[0].title}" is already in this collection`
-          : `${duplicates.length} chants are already in this collection`;
+          ? t("studio.groups.pages.chant_detail.duplicate_one", {
+              title: duplicates[0].title,
+            })
+          : t("studio.groups.pages.chant_detail.duplicate_other", {
+              count: duplicates.length,
+            });
       toast.error(duplicateMessage);
       return;
     }
@@ -258,9 +270,12 @@ const GroupChantDetailPage = () => {
   };
 
   const addButtonLabel = (() => {
-    if (addItemsMutation.isPending) return "Adding...";
+    if (addItemsMutation.isPending)
+      return t("studio.groups.pages.chant_detail.adding");
     const count = selectedRecitations.length;
-    return `Add ${count} ${count === 1 ? "Chant" : "Chants"}`;
+    return count === 1
+      ? t("studio.groups.pages.chant_detail.add_count_one", { count })
+      : t("studio.groups.pages.chant_detail.add_count_other", { count });
   })();
 
   const chantsListPath = groupId ? ROUTES.groupChants(groupId) : ROUTES.groups;
@@ -268,7 +283,7 @@ const GroupChantDetailPage = () => {
   if (isLoading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">
-        Loading collection…
+        {t("studio.groups.pages.chant_form.loading")}
       </div>
     );
   }
@@ -277,13 +292,16 @@ const GroupChantDetailPage = () => {
     return (
       <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4">
         <p className="text-center text-destructive">
-          {getApiErrorMessage(error, "Could not load this collection.")}
+          {getApiErrorMessage(
+            error,
+            t("studio.groups.pages.chant_form.load_failed"),
+          )}
         </p>
         <Pecha.Button
           variant="outline"
           onClick={() => navigate(chantsListPath)}
         >
-          Back to chants
+          {t("studio.groups.pages.chant_form.back_to_chants")}
         </Pecha.Button>
       </div>
     );
@@ -309,12 +327,13 @@ const GroupChantDetailPage = () => {
             onClick={() => setIsEditMode(true)}
             className="bg-[#A51C21] text-white hover:bg-[#A51C21]/90"
           >
-            <IoMdAdd className="w-4 h-4" /> Add Chants
+            <IoMdAdd className="w-4 h-4" />{" "}
+            {t("studio.groups.pages.chant_detail.add_chants")}
           </Button>
         )}
         {canWrite && isEditMode && (
           <Button variant="outline" size="sm" onClick={handleCancelEdit}>
-            <IoMdClose className="w-4 h-4" /> Cancel
+            <IoMdClose className="w-4 h-4" /> {t("studio.common.cancel")}
           </Button>
         )}
       </div>
@@ -328,17 +347,23 @@ const GroupChantDetailPage = () => {
       ) : null}
 
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Items ({displayItems.length})</h2>
+        <h2 className="text-lg font-semibold">
+          {t("studio.groups.pages.chant_detail.items_heading", {
+            count: displayItems.length,
+          })}
+        </h2>
 
         {isEditMode && (
           <div className="rounded-lg border border-blue-900 bg-blue-900/5 p-4 space-y-4">
-            <h3 className="text-sm font-bold">Add Recitations</h3>
+            <h3 className="text-sm font-bold">
+              {t("studio.groups.pages.chant_detail.add_recitations")}
+            </h3>
             <div className="w-48 space-y-2">
               <label
                 htmlFor="recitation-language"
                 className="text-sm font-medium"
               >
-                Language
+                {t("studio.common.language")}
               </label>
               <Pecha.Select
                 value={recitationLanguage}
@@ -348,7 +373,9 @@ const GroupChantDetailPage = () => {
                   id="recitation-language"
                   className="w-full bg-white dark:bg-[#181818]"
                 >
-                  <Pecha.SelectValue placeholder="Language" />
+                  <Pecha.SelectValue
+                    placeholder={t("studio.common.language")}
+                  />
                 </Pecha.SelectTrigger>
                 <Pecha.SelectContent>
                   {languageOptions.map((lang) => (
@@ -364,11 +391,22 @@ const GroupChantDetailPage = () => {
               onChange={setSelectedRecitations}
               searchFn={recitationSearchFn}
               queryKeyPrefix={`recitation-search-${recitationLanguage}`}
-              searchPlaceholder="Search recitations..."
-              emptyMessage="No recitations selected — use search to add."
+              searchPlaceholder={t(
+                "studio.groups.pages.chant_detail.search_recitations",
+              )}
+              emptyMessage={t(
+                "studio.groups.pages.chant_detail.no_recitations_selected",
+              )}
               hideLabel
             />
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <span className="mr-auto text-xs text-muted-foreground">
+                {t("studio.text_requests.request.cant_find")}
+              </span>
+              <RequestTextsDialog
+                groupId={groupId}
+                collectionId={collectionId}
+              />
               <Pecha.Button
                 type="button"
                 onClick={handleAddItems}
@@ -384,7 +422,9 @@ const GroupChantDetailPage = () => {
         )}
 
         {displayItems.length === 0 ? (
-          <p className="text-muted-foreground">No items in this collection.</p>
+          <p className="text-muted-foreground">
+            {t("studio.groups.pages.chant_detail.empty")}
+          </p>
         ) : (
           <div className="rounded-lg border">
             <DndContext
@@ -398,13 +438,21 @@ const GroupChantDetailPage = () => {
                   <Pecha.TableRow>
                     {canWrite ? <Pecha.TableHead className="w-10" /> : null}
                     <Pecha.TableHead className="w-12">#</Pecha.TableHead>
-                    <Pecha.TableHead>Title</Pecha.TableHead>
-                    <Pecha.TableHead>Language</Pecha.TableHead>
-                    <Pecha.TableHead>Type</Pecha.TableHead>
-                    <Pecha.TableHead className="w-56">Audio</Pecha.TableHead>
+                    <Pecha.TableHead>
+                      {t("studio.common.title")}
+                    </Pecha.TableHead>
+                    <Pecha.TableHead>
+                      {t("studio.common.language")}
+                    </Pecha.TableHead>
+                    <Pecha.TableHead>
+                      {t("studio.groups.pages.chant_detail.type_column")}
+                    </Pecha.TableHead>
+                    <Pecha.TableHead className="w-56">
+                      {t("studio.common.audio")}
+                    </Pecha.TableHead>
                     {canWrite ? (
                       <Pecha.TableHead className="text-right">
-                        Actions
+                        {t("studio.common.actions")}
                       </Pecha.TableHead>
                     ) : null}
                   </Pecha.TableRow>
@@ -453,15 +501,18 @@ const GroupChantDetailPage = () => {
       >
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
-            <Pecha.AlertDialogTitle>Remove item?</Pecha.AlertDialogTitle>
+            <Pecha.AlertDialogTitle>
+              {t("studio.groups.pages.chant_detail.remove_title")}
+            </Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
-              This will remove &ldquo;{pendingDeleteItem?.title ?? ""}&rdquo;
-              from this collection.
+              {t("studio.groups.pages.chant_detail.remove_description", {
+                title: pendingDeleteItem?.title ?? "",
+              })}
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <Pecha.AlertDialogFooter>
             <Pecha.AlertDialogCancel disabled={deleteItemMutation.isPending}>
-              Cancel
+              {t("studio.common.cancel")}
             </Pecha.AlertDialogCancel>
             <Pecha.AlertDialogAction
               className="bg-destructive text-white hover:bg-destructive/90"
@@ -472,7 +523,9 @@ const GroupChantDetailPage = () => {
                   deleteItemMutation.mutate(pendingDeleteItem.id);
               }}
             >
-              {deleteItemMutation.isPending ? "Removing…" : "Remove"}
+              {deleteItemMutation.isPending
+                ? t("studio.groups.pages.chant_detail.removing")
+                : t("studio.common.remove")}
             </Pecha.AlertDialogAction>
           </Pecha.AlertDialogFooter>
         </Pecha.AlertDialogContent>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import type { UniqueIdentifier } from "@dnd-kit/core";
 import { reorderTasks } from "../api/taskApi";
 import { reorderArray } from "@/lib/utils";
@@ -30,6 +31,7 @@ export const useTaskReorder = (
     [dayId: string]: Task[];
   }>({});
   const queryClient = useQueryClient();
+  const { t } = useTranslate();
 
   // Initialize optimistic tasks when plan loads
   useEffect(() => {
@@ -56,8 +58,8 @@ export const useTaskReorder = (
       queryClient.invalidateQueries({ queryKey: ["planDetails", plan_id] });
     },
     onError: () => {
-      toast.error("Failed to reorder tasks", {
-        description: "Something went wrong",
+      toast.error(t("studio.task.mutations.reorder_tasks_failed"), {
+        description: t("studio.common.something_went_wrong"),
       });
       queryClient.refetchQueries({ queryKey: ["planDetails", plan_id] });
     },

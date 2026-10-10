@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Dropzone from "react-dropzone";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { FiLoader, FiX } from "react-icons/fi";
 import { FaTrash } from "react-icons/fa6";
@@ -33,6 +34,7 @@ const DayAudioSection = ({
   hasAudio,
   isEditable = true,
 }: DayAudioSectionProps) => {
+  const { t } = useTranslate();
   const queryClient = useQueryClient();
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const showExisting = Boolean(hasAudio && audioUrl);
@@ -50,11 +52,11 @@ const DayAudioSection = ({
     },
     onSuccess: () => {
       setPendingFile(null);
-      toast.success("Day audio uploaded");
+      toast.success(t("studio.day_audio.uploaded"));
       queryClient.invalidateQueries({ queryKey: ["planDetails", planId] });
     },
     onError: (error: Error) => {
-      toast.error("Failed to upload day audio", {
+      toast.error(t("studio.day_audio.upload_failed"), {
         description: error.message,
       });
     },
@@ -65,11 +67,11 @@ const DayAudioSection = ({
     onSuccess: () => {
       setPendingFile(null);
       setIsExpanded(false);
-      toast.success("Day audio removed");
+      toast.success(t("studio.day_audio.removed"));
       queryClient.invalidateQueries({ queryKey: ["planDetails", planId] });
     },
     onError: (error: Error) => {
-      toast.error("Failed to remove day audio", {
+      toast.error(t("studio.day_audio.remove_failed"), {
         description: error.message,
       });
     },
@@ -97,7 +99,7 @@ const DayAudioSection = ({
           size="sm"
           onClick={() => setIsExpanded(true)}
         >
-          <AiOutlineSound /> Add narration
+          <AiOutlineSound /> {t("studio.day_audio.add_narration")}
         </Pecha.Button>
       </div>
     );
@@ -109,7 +111,9 @@ const DayAudioSection = ({
         <div className="flex items-center gap-2 shrink-0">
           {showExisting && audioDurationMs != null && (
             <span className="text-sm text-muted-foreground">
-              {formatMs(audioDurationMs)} total
+              {t("studio.day_audio.total_duration", {
+                duration: formatMs(audioDurationMs),
+              })}
             </span>
           )}
           {!showExisting && isEditable && (
@@ -119,7 +123,7 @@ const DayAudioSection = ({
               size="icon"
               className="h-8 w-8"
               disabled={isBusy}
-              title="Close"
+              title={t("studio.common.close")}
               onClick={handleClose}
             >
               <FiX className="w-4 h-4" />
@@ -143,7 +147,7 @@ const DayAudioSection = ({
               size="icon"
               className="shrink-0 h-9 w-9"
               disabled={isBusy}
-              title="Remove audio"
+              title={t("studio.subtask.audio.remove")}
               onClick={() => deleteMutation.mutate()}
             >
               {deleteMutation.isPending ? (
@@ -176,7 +180,7 @@ const DayAudioSection = ({
             </div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-white dark:bg-[#161616] px-2 text-muted-foreground">
-                or upload new
+                {t("studio.day_audio.or_upload_new")}
               </span>
             </div>
           </div>
@@ -196,10 +200,12 @@ const DayAudioSection = ({
               >
                 <input {...getInputProps()} />
                 {pendingFile
-                  ? `Selected: ${pendingFile.name}`
+                  ? t("studio.subtask.audio.selected_file", {
+                      name: pendingFile.name,
+                    })
                   : showExisting
-                    ? "Drop or click to replace day audio (MP3, etc.)"
-                    : "Drop or click to upload day narration audio"}
+                    ? t("studio.day_audio.drop_replace")
+                    : t("studio.day_audio.drop_upload")}
               </div>
             )}
           </Dropzone>
@@ -216,7 +222,9 @@ const DayAudioSection = ({
                 {uploadMutation.isPending && (
                   <FiLoader className="w-4 h-4 animate-spin mr-1" />
                 )}
-                {uploadMutation.isPending ? "Uploading..." : "Upload audio"}
+                {uploadMutation.isPending
+                  ? t("studio.common.uploading")
+                  : t("studio.subtask.audio.upload")}
               </Pecha.Button>
               <Pecha.Button
                 type="button"
@@ -224,7 +232,7 @@ const DayAudioSection = ({
                 disabled={isBusy}
                 onClick={() => setPendingFile(null)}
               >
-                Cancel
+                {t("studio.common.cancel")}
               </Pecha.Button>
             </div>
           )}
@@ -233,8 +241,7 @@ const DayAudioSection = ({
 
       {!showExisting && isEditable && (
         <p className="text-xs text-muted-foreground">
-          Search for existing narration or upload a new file, then set subtask
-          timestamps against this track.
+          {t("studio.day_audio.help_text")}
         </p>
       )}
     </div>

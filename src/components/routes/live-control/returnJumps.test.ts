@@ -11,7 +11,7 @@ describe("returnButtonForLine", () => {
       ];
       expect(returnButtonForLine(jump.after.en, lines)).toEqual({
         key: jump.afterVerse,
-        label: jump.label,
+        label: jump.labelKey,
         index: 0,
       });
       expect(

@@ -4,6 +4,7 @@ import { Pecha } from "@/components/ui/shadimport";
 import { Textarea } from "@/components/ui/atoms/textarea";
 import { Button } from "@/components/ui/atoms/button";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { useLanguages } from "@/hooks/useLanguages";
 import { normalizeLanguageCode } from "@/lib/languageCodes";
 import type { LanguageCode } from "@/schema/SeriesSchema";
@@ -33,6 +34,7 @@ const TraditionFormDialog = ({
   isSubmitting,
   onSubmit,
 }: TraditionFormDialogProps) => {
+  const { t } = useTranslate();
   const isEdit = !!tradition;
   const { languageOptions, getLanguageLabel } = useLanguages();
   const [code, setCode] = useState("");
@@ -92,7 +94,7 @@ const TraditionFormDialog = ({
 
   const removeLanguage = (langCode: LanguageCode) => {
     if (activeLanguages.length === 1) {
-      toast.error("At least one language is required");
+      toast.error(t("studio.traditions.validation.language_required"));
       return;
     }
     setActiveLanguages(activeLanguages.filter((l) => l !== langCode));
@@ -121,9 +123,7 @@ const TraditionFormDialog = ({
       .toLowerCase()
       .replace(/[\s-]+/g, "_");
     if (!/^[a-z][a-z0-9_]{1,62}$/.test(normalizedCode)) {
-      toast.error(
-        "Code must start with a letter and use lowercase letters, numbers, or underscores",
-      );
+      toast.error(t("studio.traditions.validation.code_format"));
       return;
     }
 
@@ -131,7 +131,11 @@ const TraditionFormDialog = ({
     for (const lang of activeLanguages) {
       const data = languageData[lang] ?? { name: "", description: "" };
       if (!data.name.trim()) {
-        toast.error(`Name is required for ${getLanguageLabel(lang)}`);
+        toast.error(
+          t("studio.traditions.validation.name_required_for", {
+            language: getLanguageLabel(lang),
+          }),
+        );
         return;
       }
       metadata.push({
@@ -158,7 +162,9 @@ const TraditionFormDialog = ({
       <Pecha.DialogContent className="flex max-h-[min(90dvh,90vh)] w-[calc(100%-2rem)] max-w-lg flex-col gap-0 overflow-hidden p-0 sm:w-full">
         <Pecha.DialogHeader className="shrink-0 border-b px-6 py-4">
           <Pecha.DialogTitle>
-            {isEdit ? "Edit Tradition" : "Create Tradition"}
+            {isEdit
+              ? t("studio.traditions.form.edit_title")
+              : t("studio.traditions.form.create_title")}
           </Pecha.DialogTitle>
         </Pecha.DialogHeader>
         <form
@@ -167,34 +173,40 @@ const TraditionFormDialog = ({
         >
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-bold">Code</label>
+              <label className="text-sm font-bold">
+                {t("studio.traditions.table.code")}
+              </label>
               <Pecha.Input
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                placeholder="e.g. pali"
+                placeholder={t("studio.traditions.form.code_placeholder")}
                 required
                 disabled={isEdit}
               />
               <p className="text-xs text-muted-foreground">
-                Stable app key. Lowercase letters, numbers, underscores.
+                {t("studio.traditions.form.code_help")}
               </p>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-bold">Regions</label>
+              <label className="text-sm font-bold">
+                {t("studio.traditions.table.regions")}
+              </label>
               <Pecha.Input
                 value={regionsText}
                 onChange={(e) => setRegionsText(e.target.value)}
-                placeholder="India, Nepal, Bhutan"
+                placeholder={t("studio.traditions.form.regions_placeholder")}
               />
               <p className="text-xs text-muted-foreground">
-                Comma-separated list of regions.
+                {t("studio.traditions.form.regions_help")}
               </p>
             </div>
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-bold">Languages</label>
+                <label className="text-sm font-bold">
+                  {t("studio.traditions.form.languages")}
+                </label>
                 {availableLanguages.length > 0 ? (
                   <Pecha.DropdownMenu>
                     <Pecha.DropdownMenuTrigger asChild>
@@ -205,7 +217,7 @@ const TraditionFormDialog = ({
                         className="h-7 text-xs"
                       >
                         <IoMdAdd className="h-3 w-3 mr-1" />
-                        Add Language
+                        {t("studio.traditions.form.add_language")}
                       </Button>
                     </Pecha.DropdownMenuTrigger>
                     <Pecha.DropdownMenuContent>
@@ -236,7 +248,12 @@ const TraditionFormDialog = ({
                         type="button"
                         onClick={() => removeLanguage(lang)}
                         className="absolute top-2 right-2 text-muted-foreground hover:text-foreground p-1 rounded"
-                        aria-label={`Remove ${langLabel}`}
+                        aria-label={t(
+                          "studio.traditions.form.remove_language_aria",
+                          {
+                            language: langLabel,
+                          },
+                        )}
                       >
                         <IoMdClose className="h-4 w-4" />
                       </button>
@@ -245,19 +262,25 @@ const TraditionFormDialog = ({
                       {langLabel}
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-bold">Name</label>
+                      <label className="text-sm font-bold">
+                        {t("studio.common.name")}
+                      </label>
                       <Pecha.Input
                         value={languageData[lang]?.name ?? ""}
                         onChange={(e) =>
                           updateLanguageField(lang, "name", e.target.value)
                         }
-                        placeholder="Tradition name"
+                        placeholder={t(
+                          "studio.traditions.form.name_placeholder",
+                        )}
                         required
                         className="bg-white dark:bg-[#181818]"
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-bold">Description</label>
+                      <label className="text-sm font-bold">
+                        {t("studio.common.description")}
+                      </label>
                       <Textarea
                         value={languageData[lang]?.description ?? ""}
                         onChange={(e) =>
@@ -267,7 +290,9 @@ const TraditionFormDialog = ({
                             e.target.value,
                           )
                         }
-                        placeholder="Optional description"
+                        placeholder={t(
+                          "studio.traditions.form.description_placeholder",
+                        )}
                         className="bg-white dark:bg-[#181818]"
                       />
                     </div>
@@ -284,14 +309,14 @@ const TraditionFormDialog = ({
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >
-              Cancel
+              {t("studio.common.cancel")}
             </Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting
-                ? "Saving..."
+                ? t("studio.common.saving")
                 : isEdit
-                  ? "Save Changes"
-                  : "Create Tradition"}
+                  ? t("studio.traditions.form.save_changes")
+                  : t("studio.traditions.form.create_title")}
             </Button>
           </div>
         </form>

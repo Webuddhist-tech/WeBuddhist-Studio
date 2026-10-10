@@ -255,8 +255,12 @@ describe("TaskForm Component", () => {
 
   it("renders task form with title input", async () => {
     renderWithProviders(<TaskForm selectedDay={1} onCancel={mockOnCancel} />);
-    expect(screen.getAllByText("Add Task").length).toBeGreaterThan(0);
-    expect(screen.getByPlaceholderText("Task Title")).toBeInTheDocument();
+    expect(
+      screen.getAllByText("studio.task.tabs.add_task").length,
+    ).toBeGreaterThan(0);
+    expect(
+      screen.getByPlaceholderText("studio.molecules.task_title.placeholder"),
+    ).toBeInTheDocument();
   });
 
   it("allows adding subtasks when content type is selected", async () => {
@@ -308,7 +312,9 @@ describe("TaskForm Component", () => {
     vi.mocked(createTask).mockResolvedValue({ id: "new-task-id" });
     vi.mocked(createSubTasks).mockResolvedValue(undefined);
     renderWithProviders(<TaskForm selectedDay={1} onCancel={mockOnCancel} />);
-    const titleInput = screen.getByPlaceholderText("Task Title");
+    const titleInput = screen.getByPlaceholderText(
+      "studio.molecules.task_title.placeholder",
+    );
     fireEvent.change(titleInput, { target: { value: "New Task" } });
 
     fireEvent.click(screen.getByText("Add Text"));
@@ -318,7 +324,7 @@ describe("TaskForm Component", () => {
       ).toBeInTheDocument();
     });
 
-    const submitButton = screen.getByText("Submit");
+    const submitButton = screen.getByText("studio.common.submit");
     fireEvent.click(submitButton);
     await waitFor(() => {
       expect(createTask).toHaveBeenCalledWith({
@@ -337,9 +343,12 @@ describe("TaskForm Component", () => {
       '["planDetails","test-plan-id"]': { ...mockPlanData, days: [] },
     });
 
-    fireEvent.change(screen.getByPlaceholderText("Task Title"), {
-      target: { value: "New Task" },
-    });
+    fireEvent.change(
+      screen.getByPlaceholderText("studio.molecules.task_title.placeholder"),
+      {
+        target: { value: "New Task" },
+      },
+    );
     fireEvent.click(screen.getByText("Add Text"));
     await waitFor(() => {
       expect(
@@ -347,15 +356,15 @@ describe("TaskForm Component", () => {
       ).toBeInTheDocument();
     });
 
-    const submitButton = screen.getByText("Submit");
+    const submitButton = screen.getByText("studio.common.submit");
     expect(submitButton.closest("button")).toBeDisabled();
 
     fireEvent.submit(submitButton.closest("form")!);
     await waitFor(() => {
       expect(toast.error).toHaveBeenCalledWith(
-        "Create a day first",
+        "studio.task.form.create_day_first",
         expect.objectContaining({
-          description: "Add a day to this plan before adding a task.",
+          description: "studio.task.form.create_day_first_description",
         }),
       );
     });
@@ -405,9 +414,9 @@ describe("TaskForm Component", () => {
       },
     );
     await waitFor(() => {
-      expect(screen.getByText("Update")).toBeInTheDocument();
+      expect(screen.getByText("studio.common.update")).toBeInTheDocument();
     });
-    const updateButton = screen.getByText("Update");
+    const updateButton = screen.getByText("studio.common.update");
     fireEvent.click(updateButton);
     await waitFor(() => {
       expect(updateSubTasks).toHaveBeenCalledWith("task-123", [
@@ -435,9 +444,9 @@ describe("TaskForm Component", () => {
       },
     );
     await waitFor(() => {
-      expect(screen.getByText("Cancel")).toBeInTheDocument();
+      expect(screen.getByText("studio.common.cancel")).toBeInTheDocument();
     });
-    const cancelButton = screen.getByText("Cancel");
+    const cancelButton = screen.getByText("studio.common.cancel");
     fireEvent.click(cancelButton);
     expect(mockOnCancel).toHaveBeenCalled();
   });
@@ -447,7 +456,9 @@ describe("TaskForm Component", () => {
     const { toast } = await import("sonner");
     vi.mocked(createTask).mockRejectedValue(new Error("Failed to create task"));
     renderWithProviders(<TaskForm selectedDay={1} onCancel={mockOnCancel} />);
-    const titleInput = screen.getByPlaceholderText("Task Title");
+    const titleInput = screen.getByPlaceholderText(
+      "studio.molecules.task_title.placeholder",
+    );
     fireEvent.change(titleInput, { target: { value: "New Task" } });
 
     fireEvent.click(screen.getByText("Add Text"));
@@ -457,12 +468,15 @@ describe("TaskForm Component", () => {
       ).toBeInTheDocument();
     });
 
-    const submitButton = screen.getByText("Submit");
+    const submitButton = screen.getByText("studio.common.submit");
     fireEvent.click(submitButton);
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith("Failed to create task", {
-        description: "Failed to create task",
-      });
+      expect(toast.error).toHaveBeenCalledWith(
+        "studio.task.form.create_failed",
+        {
+          description: "Failed to create task",
+        },
+      );
     });
   });
 
@@ -493,7 +507,7 @@ describe("TaskForm Component", () => {
         "test-plan-id",
       );
       expect(toast.success).toHaveBeenCalledWith(
-        "Image uploaded successfully!",
+        "studio.task.form.image_uploaded",
       );
     });
   });
@@ -546,14 +560,17 @@ describe("TaskForm Component", () => {
       },
     );
     await waitFor(() => {
-      expect(screen.getByText("Update")).toBeInTheDocument();
+      expect(screen.getByText("studio.common.update")).toBeInTheDocument();
     });
-    const updateButton = screen.getByText("Update");
+    const updateButton = screen.getByText("studio.common.update");
     fireEvent.click(updateButton);
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith("Failed to update task", {
-        description: "Failed to update task",
-      });
+      expect(toast.error).toHaveBeenCalledWith(
+        "studio.task.form.update_failed",
+        {
+          description: "Failed to update task",
+        },
+      );
     });
   });
 
@@ -570,7 +587,9 @@ describe("TaskForm Component", () => {
       fireEvent.change(imageInput, { target: { files: [file] } });
     });
     await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith("Failed to upload image");
+      expect(toast.error).toHaveBeenCalledWith(
+        "studio.task.form.image_upload_failed",
+      );
     });
   });
 
@@ -588,7 +607,9 @@ describe("TaskForm Component", () => {
       },
     );
     await waitFor(() => {
-      expect(screen.getByText("Edit Task")).toBeInTheDocument();
+      expect(
+        screen.getByText("studio.task.form.edit_task"),
+      ).toBeInTheDocument();
       expect(
         screen.getByPlaceholderText("Enter your text content"),
       ).toBeInTheDocument();
@@ -653,7 +674,7 @@ describe("TaskForm Component", () => {
     );
 
     await screen.findByTestId("linked-subtask");
-    fireEvent.click(screen.getByText("Update"));
+    fireEvent.click(screen.getByText("studio.common.update"));
 
     await waitFor(() => {
       expect(updateSubTasks).toHaveBeenCalledWith("task-123", [
@@ -721,9 +742,7 @@ describe("TaskForm Component", () => {
     fireEvent.change(imageInput, { target: { files: [largeFile] } });
     await waitFor(() => {
       expect(
-        screen.getByText(
-          "File size exceeds 1MB limit. Please select a smaller image.",
-        ),
+        screen.getByText("studio.task.form.image_too_large"),
       ).toBeInTheDocument();
     });
   });

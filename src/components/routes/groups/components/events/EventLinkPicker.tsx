@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslate } from "@tolgee/react";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useInView } from "react-intersection-observer";
 import { IoMdClose } from "react-icons/io";
@@ -36,9 +37,10 @@ const EventLinkPicker = ({
   onChange,
   searchFn,
   queryKeyPrefix,
-  searchPlaceholder = "Search…",
+  searchPlaceholder,
   disabled = false,
 }: EventLinkPickerProps) => {
+  const { t } = useTranslate();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -105,7 +107,9 @@ const EventLinkPicker = ({
             <button
               type="button"
               onClick={() => onChange(null)}
-              aria-label={`Remove ${value.title}`}
+              aria-label={t("studio.groups.events.links.remove_item_aria", {
+                name: value.title,
+              })}
               className="shrink-0 cursor-pointer p-1 text-muted-foreground hover:text-foreground"
             >
               <IoMdClose className="h-4 w-4" />
@@ -117,7 +121,10 @@ const EventLinkPicker = ({
           <FaMagnifyingGlass className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             type="text"
-            placeholder={searchPlaceholder}
+            placeholder={
+              searchPlaceholder ??
+              t("studio.groups.events.links.search_placeholder")
+            }
             value={searchQuery}
             disabled={disabled}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -130,7 +137,7 @@ const EventLinkPicker = ({
             <div className="absolute z-10 mt-1 max-h-52 w-full overflow-auto rounded-md border border-input bg-background shadow-md dark:bg-[#262626]">
               {isLoading && searchResults.length === 0 && (
                 <div className="px-3 py-2 text-sm text-muted-foreground">
-                  Searching…
+                  {t("studio.groups.events.links.searching")}
                 </div>
               )}
               {searchResults.map((item) => (
@@ -163,12 +170,14 @@ const EventLinkPicker = ({
                   ref={sentinelRef}
                   className="px-3 py-2 text-center text-xs text-muted-foreground"
                 >
-                  {isFetchingNextPage ? "Loading more…" : ""}
+                  {isFetchingNextPage
+                    ? t("studio.groups.events.links.loading_more")
+                    : ""}
                 </div>
               )}
               {!isLoading && searchResults.length === 0 && (
                 <div className="px-3 py-2 text-sm text-muted-foreground">
-                  No results found
+                  {t("studio.common.no_results")}
                 </div>
               )}
             </div>

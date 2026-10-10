@@ -45,7 +45,7 @@ const CreateSeries = () => {
   if (!isNew && isSeriesLoading) {
     return (
       <div className="flex items-center justify-center min-h-[40vh] text-muted-foreground">
-        Loading series…
+        {t("studio.series.loading_series")}
       </div>
     );
   }
@@ -54,7 +54,7 @@ const CreateSeries = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 gap-4">
         <p className="text-destructive text-center">
-          {(seriesError as Error)?.message || "Could not load this series."}
+          {(seriesError as Error)?.message || t("studio.series.load_failed")}
         </p>
         <Pecha.Button variant="outline" onClick={() => navigate("/dashboard")}>
           {t("common.button.cancel")}
@@ -65,19 +65,21 @@ const CreateSeries = () => {
 
   const getReadOnlyMessage = () => {
     if (platformReadOnly) {
-      return "You have read-only access to series in this group.";
+      return t("studio.series.form.read_only_platform");
     }
     if (isNew) {
-      return "You cannot create a series in this group with your current role.";
+      return t("studio.series.form.cannot_create");
     }
-    return "This series cannot be edited with your current role.";
+    return t("studio.series.cannot_edit_notice");
   };
 
   return (
     <div className="flex flex-col lg:flex-row border h-[calc(100vh-40px)] overflow-auto bg-[#F3F3F3] dark:bg-[#181818] my-4 rounded-l-2xl font-dynamic max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
       <div className="flex-1 p-4 sm:p-10 border-b lg:border-b-0 border-border">
         <h1 className="text-xl font-bold my-4 border-b border-dashed border-black dark:border-white">
-          {isNew ? "Series details" : "Series Edit"}
+          {isNew
+            ? t("studio.series.form.heading_new")
+            : t("studio.series.form.heading_edit")}
         </h1>
 
         {formReadOnly ? (
@@ -134,7 +136,9 @@ const CreateSeries = () => {
       </div>
 
       <div className="flex-1 p-4 sm:p-10 flex flex-col min-h-0">
-        <h2 className="text-lg font-bold mb-2">Included plans</h2>
+        <h2 className="text-lg font-bold mb-2">
+          {t("studio.series.form.included_plans")}
+        </h2>
 
         <IncludedPlansPanel
           form={form}

@@ -23,6 +23,6 @@ const renderWithProviders = (component: React.ReactElement) => {
 describe("Analytics", () => {
   it("renders analytics page", () => {
     renderWithProviders(<Analytics />);
-    expect(screen.getByText("Analytics")).toBeDefined();
+    expect(screen.getByText("studio.analytics.title")).toBeDefined();
   });
 });

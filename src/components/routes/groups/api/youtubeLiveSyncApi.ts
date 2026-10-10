@@ -1,4 +1,5 @@
 import axiosInstance from "@/config/axios-config";
+import { tolgee } from "@/i18n/tolgee";
 
 /** A schedule on one event: at these times of day the group's YouTube channel
  *  is checked and the stream that is live is added to the event. */
@@ -116,21 +117,31 @@ export const formatRunTime = (value: string): string => {
 export const describeRunResult = (result: YoutubeLiveSyncRunResult): string => {
   const added = result.links_added;
   const replaced = result.links_replaced ?? 0;
-  if (added + replaced > 0) {
-    const parts = [
-      added > 0 ? `added ${added} link${added === 1 ? "" : "s"}` : null,
-      replaced > 0
-        ? `replaced ${replaced} link${replaced === 1 ? "" : "s"}`
-        : null,
-    ].filter(Boolean);
-    const sentence = parts.join(" and ");
-    return `Live stream ${sentence}.`;
+  if (added > 0 && replaced > 0) {
+    return tolgee.t("studio.groups.shared.live_sync.added_and_replaced", {
+      added,
+      replaced,
+    });
+  }
+  if (added > 0) {
+    return added === 1
+      ? tolgee.t("studio.groups.shared.live_sync.added_one")
+      : tolgee.t("studio.groups.shared.live_sync.added_other", {
+          count: added,
+        });
+  }
+  if (replaced > 0) {
+    return replaced === 1
+      ? tolgee.t("studio.groups.shared.live_sync.replaced_one")
+      : tolgee.t("studio.groups.shared.live_sync.replaced_other", {
+          count: replaced,
+        });
   }
   if (result.live_streams_found === 0) {
-    return "No stream is live on the channel right now.";
+    return tolgee.t("studio.groups.shared.live_sync.none_live");
   }
   if (result.skipped_unknown_language > 0) {
-    return "A stream is live, but its language could not be told from the title, so it was not added.";
+    return tolgee.t("studio.groups.shared.live_sync.unknown_language");
   }
-  return "The selected events already have the live stream.";
+  return tolgee.t("studio.groups.shared.live_sync.already_linked");
 };

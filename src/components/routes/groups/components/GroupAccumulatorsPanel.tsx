@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import { IoMdAdd } from "react-icons/io";
 import { IoCalendarClearOutline } from "react-icons/io5";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import ImageContentData from "@/components/ui/molecules/modals/image-upload/ImageContentData";
@@ -134,6 +135,7 @@ const GroupAccumulatorsPanel = ({
   groupId,
   groupRole,
 }: GroupAccumulatorsPanelProps) => {
+  const { t } = useTranslate();
   const queryClient = useQueryClient();
   const { data: userInfo } = useUserInfo();
   const platformReadOnly = isReviewer(userInfo?.platform_role);
@@ -270,7 +272,7 @@ const GroupAccumulatorsPanel = ({
   const createMutation = useMutation({
     mutationFn: () => createGroupAccumulator(groupId, buildPayload()),
     onSuccess: (created) => {
-      toast.success("Accumulator created");
+      toast.success(t("studio.groups.components.accumulators.created_toast"));
       invalidate();
       if (form.links.some(isLinkRowFilled)) {
         // Keep the dialog open so the author can see how each link resolved.
@@ -291,7 +293,7 @@ const GroupAccumulatorsPanel = ({
     mutationFn: () =>
       updateGroupAccumulator(groupId, editing!.id, buildPayload()),
     onSuccess: (updated) => {
-      toast.success("Accumulator updated");
+      toast.success(t("studio.groups.components.accumulators.updated_toast"));
       invalidate();
       if (form.links.some(isLinkRowFilled)) {
         setForm((prev) => ({
@@ -310,7 +312,7 @@ const GroupAccumulatorsPanel = ({
     mutationFn: (accumulatorId: string) =>
       deleteGroupAccumulator(groupId, accumulatorId),
     onSuccess: () => {
-      toast.success("Accumulator deleted");
+      toast.success(t("studio.groups.components.accumulators.deleted_toast"));
       setDeleteTarget(null);
       invalidate();
     },
@@ -320,7 +322,9 @@ const GroupAccumulatorsPanel = ({
   const createPresetMutation = useMutation({
     mutationFn: createAccumulatorPreset,
     onSuccess: (created) => {
-      toast.success("Preset created");
+      toast.success(
+        t("studio.groups.components.accumulators.preset_created_toast"),
+      );
       setForm((prev) => ({
         ...prev,
         preset: {
@@ -358,9 +362,13 @@ const GroupAccumulatorsPanel = ({
         image_preview: image.original,
       }));
       setImageDialogOpen(false);
-      toast.success("Image uploaded");
+      toast.success(
+        t("studio.groups.components.accumulators.image_uploaded_toast"),
+      );
     } catch {
-      toast.error("Failed to upload image");
+      toast.error(
+        t("studio.groups.components.accumulators.image_upload_failed_toast"),
+      );
     } finally {
       setImageUploading(false);
     }
@@ -388,7 +396,7 @@ const GroupAccumulatorsPanel = ({
     const errors = validateLinkRows(form.links);
     setLinkErrors(errors);
     if (Object.keys(errors).length > 0) {
-      toast.error("Fix the highlighted links before saving");
+      toast.error(t("studio.groups.components.accumulators.fix_links_toast"));
       return;
     }
 
@@ -401,17 +409,23 @@ const GroupAccumulatorsPanel = ({
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
-  const dialogTitle = editing ? "Edit accumulator" : "Create accumulator";
+  const dialogTitle = editing
+    ? t("studio.groups.components.accumulators.edit_title")
+    : t("studio.groups.components.accumulators.create_title");
 
   const presetTriggerLabel = useMemo(() => {
-    if (form.preset) return form.preset.title;
-    return "None (optional)";
-  }, [form.preset]);
+    if (form.preset) {
+      return form.preset.title === "Linked preset"
+        ? t("studio.groups.components.accumulators.linked_preset")
+        : form.preset.title;
+    }
+    return t("studio.groups.components.accumulators.preset_none_optional");
+  }, [form.preset, t]);
 
   return (
     <div className="space-y-4">
       <GroupSectionHeader
-        title="Accumulators"
+        title={t("studio.groups.components.accumulators.title")}
         action={
           canCreate ? (
             <Button
@@ -420,7 +434,8 @@ const GroupAccumulatorsPanel = ({
               size="sm"
               onClick={openCreate}
             >
-              <IoMdAdd className="h-4 w-4" /> Add accumulator
+              <IoMdAdd className="h-4 w-4" />{" "}
+              {t("studio.groups.components.accumulators.add")}
             </Button>
           ) : undefined
         }
@@ -429,11 +444,15 @@ const GroupAccumulatorsPanel = ({
       {isError ? (
         <p className="text-sm text-destructive">{getApiErrorMessage(error)}</p>
       ) : isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading accumulators…</p>
+        <p className="text-sm text-muted-foreground">
+          {t("studio.groups.components.accumulators.loading")}
+        </p>
       ) : accumulators.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No group accumulators yet.
-          {canCreate ? " Use the button above to create one." : null}
+          {t("studio.groups.components.accumulators.empty")}
+          {canCreate
+            ? ` ${t("studio.groups.components.accumulators.empty_hint")}`
+            : null}
         </p>
       ) : (
         <div className="space-y-3">
@@ -456,27 +475,36 @@ const GroupAccumulatorsPanel = ({
                 <div className="flex-1 min-w-0 space-y-1">
                   <p className="font-medium truncate">
                     {capitalizeFirstLetter(
-                      accumulator.title?.trim() || "Untitled accumulator",
+                      accumulator.title?.trim() ||
+                        t("studio.groups.components.accumulators.untitled"),
                     )}
                   </p>
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                     <span>
-                      Target:{" "}
-                      {accumulator.target_count != null
-                        ? accumulator.target_count.toLocaleString()
-                        : "—"}
+                      {t("studio.groups.components.accumulators.target", {
+                        value:
+                          accumulator.target_count != null
+                            ? accumulator.target_count.toLocaleString()
+                            : "—",
+                      })}
                     </span>
                     <span>
-                      Start: {formatAccumulatorDate(accumulator.start_date)}
+                      {t("studio.groups.components.accumulators.start", {
+                        value: formatAccumulatorDate(accumulator.start_date),
+                      })}
                     </span>
                     <span>
-                      End: {formatAccumulatorDate(accumulator.end_date)}
+                      {t("studio.groups.components.accumulators.end", {
+                        value: formatAccumulatorDate(accumulator.end_date),
+                      })}
                     </span>
                     <span>
-                      Joined:{" "}
-                      {accumulator.member_count != null
-                        ? accumulator.member_count.toLocaleString()
-                        : "—"}
+                      {t("studio.groups.components.accumulators.joined", {
+                        value:
+                          accumulator.member_count != null
+                            ? accumulator.member_count.toLocaleString()
+                            : "—",
+                      })}
                     </span>
                   </div>
                 </div>
@@ -488,7 +516,7 @@ const GroupAccumulatorsPanel = ({
                       size="sm"
                       onClick={() => openEdit(accumulator)}
                     >
-                      Edit
+                      {t("studio.common.edit")}
                     </Button>
                     <Button
                       type="button"
@@ -497,7 +525,7 @@ const GroupAccumulatorsPanel = ({
                       className="text-destructive hover:text-destructive"
                       onClick={() => setDeleteTarget(accumulator)}
                     >
-                      Delete
+                      {t("studio.common.delete")}
                     </Button>
                   </div>
                 ) : null}
@@ -544,7 +572,7 @@ const GroupAccumulatorsPanel = ({
                     className="text-sm font-bold"
                     htmlFor="accumulator-target"
                   >
-                    Target count
+                    {t("studio.groups.components.accumulators.target_count")}
                   </label>
                   <Pecha.Input
                     id="accumulator-target"
@@ -557,7 +585,9 @@ const GroupAccumulatorsPanel = ({
                         target_count: e.target.value,
                       }))
                     }
-                    placeholder="e.g. 100000000"
+                    placeholder={t(
+                      "studio.groups.components.accumulators.target_count_placeholder",
+                    )}
                     className="h-11 bg-white dark:bg-[#262626]"
                   />
                 </div>
@@ -565,7 +595,9 @@ const GroupAccumulatorsPanel = ({
 
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <p className="text-sm font-bold">Start date</p>
+                  <p className="text-sm font-bold">
+                    {t("studio.groups.components.accumulators.start_date")}
+                  </p>
                   <Pecha.Popover
                     open={startDateOpen}
                     onOpenChange={setStartDateOpen}
@@ -586,7 +618,9 @@ const GroupAccumulatorsPanel = ({
                         >
                           {form.start_date
                             ? formatAccumulatorDate(form.start_date)
-                            : "Choose date"}
+                            : t(
+                                "studio.groups.components.accumulators.choose_date",
+                              )}
                         </span>
                       </Button>
                     </Pecha.PopoverTrigger>
@@ -611,7 +645,9 @@ const GroupAccumulatorsPanel = ({
                 </div>
 
                 <div className="space-y-2">
-                  <p className="text-sm font-bold">End date</p>
+                  <p className="text-sm font-bold">
+                    {t("studio.groups.components.accumulators.end_date")}
+                  </p>
                   <Pecha.Popover
                     open={endDateOpen}
                     onOpenChange={setEndDateOpen}
@@ -632,7 +668,9 @@ const GroupAccumulatorsPanel = ({
                         >
                           {form.end_date
                             ? formatAccumulatorDate(form.end_date)
-                            : "Choose date"}
+                            : t(
+                                "studio.groups.components.accumulators.choose_date",
+                              )}
                         </span>
                       </Button>
                     </Pecha.PopoverTrigger>
@@ -658,7 +696,9 @@ const GroupAccumulatorsPanel = ({
               </div>
 
               <div className="space-y-2">
-                <p className="text-sm font-bold">Linked preset</p>
+                <p className="text-sm font-bold">
+                  {t("studio.groups.components.accumulators.linked_preset")}
+                </p>
                 <Pecha.Popover
                   open={presetSearchOpen}
                   onOpenChange={(open) => {
@@ -689,7 +729,9 @@ const GroupAccumulatorsPanel = ({
                   >
                     <Pecha.Command shouldFilter={false}>
                       <Pecha.CommandInput
-                        placeholder="Search presets…"
+                        placeholder={t(
+                          "studio.groups.components.accumulators.search_presets",
+                        )}
                         value={presetQuery}
                         onValueChange={setPresetQuery}
                       />
@@ -702,7 +744,7 @@ const GroupAccumulatorsPanel = ({
                               setPresetSearchOpen(false);
                             }}
                           >
-                            None
+                            {t("studio.common.none")}
                           </Pecha.CommandItem>
                           {canCreatePresets ? (
                             <Pecha.CommandItem
@@ -713,12 +755,16 @@ const GroupAccumulatorsPanel = ({
                               }}
                             >
                               <IoMdAdd className="mr-2 h-4 w-4" />
-                              Create new preset…
+                              {t(
+                                "studio.groups.components.accumulators.create_preset",
+                              )}
                             </Pecha.CommandItem>
                           ) : null}
                           {presetLoading ? (
                             <Pecha.CommandItem disabled value="__loading__">
-                              Searching…
+                              {t(
+                                "studio.groups.components.fk_selector.searching",
+                              )}
                             </Pecha.CommandItem>
                           ) : (
                             presetResults.map((preset) => (
@@ -740,13 +786,12 @@ const GroupAccumulatorsPanel = ({
                   </Pecha.PopoverContent>
                 </Pecha.Popover>
                 <p className="text-xs text-muted-foreground">
-                  Optional link to a public preset (mantra and/or text) users
-                  count with.
+                  {t("studio.groups.components.accumulators.preset_help")}
                 </p>
               </div>
 
               <GroupImageField
-                label="Cover image"
+                label={t("studio.groups.components.accumulators.cover_image")}
                 displayUrl={form.image_preview}
                 hasStoredImage={Boolean(form.image_key)}
                 onUploadClick={() => setImageDialogOpen(true)}
@@ -767,14 +812,18 @@ const GroupAccumulatorsPanel = ({
 
             <div className="flex shrink-0 justify-end gap-2 border-t bg-background px-6 py-4">
               <Button type="button" variant="outline" onClick={closeDialog}>
-                Cancel
+                {t("studio.common.cancel")}
               </Button>
               <Button
                 type="submit"
                 className="bg-[#A51C21] text-white hover:bg-[#A51C21]/90"
                 disabled={isSaving}
               >
-                {isSaving ? "Saving…" : editing ? "Save changes" : "Create"}
+                {isSaving
+                  ? t("studio.common.saving")
+                  : editing
+                    ? t("studio.groups.components.accumulators.save_changes")
+                    : t("studio.common.create")}
               </Button>
             </div>
           </form>
@@ -784,7 +833,9 @@ const GroupAccumulatorsPanel = ({
       <Pecha.Dialog open={imageDialogOpen} onOpenChange={setImageDialogOpen}>
         <Pecha.DialogContent>
           <Pecha.DialogHeader>
-            <Pecha.DialogTitle>Upload cover image</Pecha.DialogTitle>
+            <Pecha.DialogTitle>
+              {t("studio.groups.components.accumulators.upload_cover_image")}
+            </Pecha.DialogTitle>
           </Pecha.DialogHeader>
           <ImageContentData
             onUpload={handleImageUpload}
@@ -811,24 +862,31 @@ const GroupAccumulatorsPanel = ({
       >
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
-            <Pecha.AlertDialogTitle>Delete accumulator?</Pecha.AlertDialogTitle>
+            <Pecha.AlertDialogTitle>
+              {t("studio.groups.components.accumulators.delete_title")}
+            </Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
-              This will remove &ldquo;
-              {capitalizeFirstLetter(
-                deleteTarget?.title?.trim() || "Untitled accumulator",
-              )}
-              &rdquo; from the group. This action cannot be undone.
+              {t("studio.groups.components.accumulators.delete_description", {
+                title: capitalizeFirstLetter(
+                  deleteTarget?.title?.trim() ||
+                    t("studio.groups.components.accumulators.untitled"),
+                ),
+              })}
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <Pecha.AlertDialogFooter>
-            <Pecha.AlertDialogCancel>Cancel</Pecha.AlertDialogCancel>
+            <Pecha.AlertDialogCancel>
+              {t("studio.common.cancel")}
+            </Pecha.AlertDialogCancel>
             <Pecha.AlertDialogAction
               className="bg-destructive text-white hover:bg-destructive/90"
               onClick={() => {
                 if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
               }}
             >
-              {deleteMutation.isPending ? "Deleting…" : "Delete"}
+              {deleteMutation.isPending
+                ? t("studio.common.deleting")
+                : t("studio.common.delete")}
             </Pecha.AlertDialogAction>
           </Pecha.AlertDialogFooter>
         </Pecha.AlertDialogContent>

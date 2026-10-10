@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { SortableList, SortableItem } from "@/components/ui/atoms/sortable";
 import { FaYoutube } from "react-icons/fa";
@@ -41,6 +42,7 @@ const DayVideosDialog = ({
   videos = [],
   isEditable,
 }: DayVideosDialogProps) => {
+  const { t } = useTranslate();
   const [open, setOpen] = useState(false);
   const [url, setUrl] = useState("");
   // Local copy so drag-reorder updates instantly before the server confirms.
@@ -60,11 +62,11 @@ const DayVideosDialog = ({
     mutationFn: (videoUrl: string) => addDayVideo(dayId, { url: videoUrl }),
     onSuccess: () => {
       setUrl("");
-      toast.success("Video added");
+      toast.success(t("studio.modals.day_videos.added"));
       invalidatePlan();
     },
     onError: (error: unknown) => {
-      toast.error("Failed to add video", {
+      toast.error(t("studio.modals.day_videos.add_failed"), {
         description: getApiErrorMessage(error),
       });
     },
@@ -73,11 +75,11 @@ const DayVideosDialog = ({
   const deleteMutation = useMutation({
     mutationFn: (videoId: string) => deleteDayVideo(dayId, videoId),
     onSuccess: () => {
-      toast.success("Video removed");
+      toast.success(t("studio.modals.day_videos.removed"));
       invalidatePlan();
     },
     onError: (error: unknown) => {
-      toast.error("Failed to remove video", {
+      toast.error(t("studio.modals.day_videos.remove_failed"), {
         description: getApiErrorMessage(error),
       });
     },
@@ -91,7 +93,7 @@ const DayVideosDialog = ({
     },
     onError: (error: unknown) => {
       setOrderedVideos(sortByOrder(videos)); // revert optimistic order
-      toast.error("Failed to reorder videos", {
+      toast.error(t("studio.modals.day_videos.reorder_failed"), {
         description: getApiErrorMessage(error),
       });
     },
@@ -128,7 +130,8 @@ const DayVideosDialog = ({
         }}
         className="flex items-center gap-2 cursor-pointer w-full"
       >
-        <FaYoutube className="w-4 h-4" /> YouTube videos
+        <FaYoutube className="w-4 h-4" />{" "}
+        {t("studio.modals.day_videos.menu_label")}
         {orderedVideos.length > 0 && (
           <span className="ml-auto text-xs text-muted-foreground">
             {orderedVideos.length}
@@ -139,7 +142,9 @@ const DayVideosDialog = ({
       <Pecha.Dialog open={open} onOpenChange={setOpen}>
         <Pecha.DialogContent className="sm:max-w-lg">
           <Pecha.DialogHeader>
-            <Pecha.DialogTitle>Day {dayNumber} videos</Pecha.DialogTitle>
+            <Pecha.DialogTitle>
+              {t("studio.modals.day_videos.title", { day: dayNumber })}
+            </Pecha.DialogTitle>
           </Pecha.DialogHeader>
 
           {isEditable && (
@@ -147,7 +152,7 @@ const DayVideosDialog = ({
               <div className="flex gap-2">
                 <Pecha.Input
                   type="url"
-                  placeholder="Enter YouTube URL"
+                  placeholder={t("studio.modals.day_videos.url_placeholder")}
                   value={url}
                   disabled={isBusy}
                   onChange={(e) => setUrl(e.target.value)}
@@ -169,12 +174,12 @@ const DayVideosDialog = ({
                   ) : (
                     <FiPlus className="w-4 h-4" />
                   )}
-                  Add
+                  {t("studio.common.add")}
                 </Pecha.Button>
               </div>
               {trimmedUrl && !urlIsValid && (
                 <p className="text-xs text-[#A51C21]">
-                  Enter a valid YouTube URL.
+                  {t("studio.modals.day_videos.invalid_url")}
                 </p>
               )}
             </div>
@@ -183,7 +188,7 @@ const DayVideosDialog = ({
           <div className="max-h-[50vh] overflow-y-auto">
             {orderedVideos.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
-                No videos added yet.
+                {t("studio.modals.day_videos.empty")}
               </p>
             ) : (
               <SortableList
@@ -215,7 +220,10 @@ const DayVideosDialog = ({
                             {videoId && (
                               <img
                                 src={`https://img.youtube.com/vi/${videoId}/default.jpg`}
-                                alt={video.title ?? "YouTube video"}
+                                alt={
+                                  video.title ??
+                                  t("studio.modals.day_videos.video_alt")
+                                }
                                 className="w-20 h-14 object-cover rounded shrink-0"
                               />
                             )}
@@ -240,7 +248,7 @@ const DayVideosDialog = ({
                                 size="icon"
                                 className="shrink-0 h-9 w-9"
                                 disabled={isBusy}
-                                title="Remove video"
+                                title={t("studio.modals.day_videos.remove")}
                                 onClick={() => deleteMutation.mutate(video.id)}
                               >
                                 {deleteMutation.isPending &&

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import { ROUTES } from "@/routes/paths";
@@ -59,6 +60,7 @@ function resolveEventImageUrl(event: EventDTO): string | null {
 }
 
 const GroupEventFormPage = () => {
+  const { t } = useTranslate();
   const { groupId, eventId } = useParams<{
     groupId: string;
     eventId?: string;
@@ -216,7 +218,11 @@ const GroupEventFormPage = () => {
       );
     },
     onSuccess: () => {
-      toast.success(isNew ? "Event created" : "Event updated");
+      toast.success(
+        isNew
+          ? t("studio.groups.pages.event_form.event_created")
+          : t("studio.groups.pages.event_form.event_updated"),
+      );
       queryClient.invalidateQueries({ queryKey: ["cms-events", groupId] });
       if (eventId) {
         queryClient.invalidateQueries({ queryKey: ["cms-event", eventId] });
@@ -250,7 +256,7 @@ const GroupEventFormPage = () => {
   if (!isNew && eventQuery.isLoading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">
-        Loading event…
+        {t("studio.groups.pages.event_detail.loading")}
       </div>
     );
   }
@@ -259,13 +265,16 @@ const GroupEventFormPage = () => {
     return (
       <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4">
         <p className="text-center text-destructive">
-          {getApiErrorMessage(eventQuery.error, "Could not load this event.")}
+          {getApiErrorMessage(
+            eventQuery.error,
+            t("studio.groups.pages.event_detail.load_failed"),
+          )}
         </p>
         <Pecha.Button
           variant="outline"
           onClick={() => navigate(eventsListPath)}
         >
-          Back to events
+          {t("studio.groups.pages.event_detail.back_to_events")}
         </Pecha.Button>
       </div>
     );
@@ -274,8 +283,11 @@ const GroupEventFormPage = () => {
   const isOneDay = form.watch("is_one_day");
 
   const getSaveLabel = () => {
-    if (mutation.isPending) return isNew ? "Creating…" : "Saving…";
-    return isNew ? "Create event" : "Save changes";
+    if (mutation.isPending)
+      return isNew ? t("studio.common.creating") : t("studio.common.saving");
+    return isNew
+      ? t("studio.groups.pages.event_form.create_event")
+      : t("studio.groups.pages.event_form.save_changes");
   };
 
   const hasUnsavedChanges = form.formState.isDirty;
@@ -287,7 +299,9 @@ const GroupEventFormPage = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold">
-          {isNew ? "New event" : "Edit event"}
+          {isNew
+            ? t("studio.groups.pages.events.new_event")
+            : t("studio.groups.pages.event_form.edit_event")}
         </h1>
         {/* Only once the event exists: there is nobody to notify about an
             event that has not been created yet.
@@ -305,15 +319,18 @@ const GroupEventFormPage = () => {
             eventName={eventName(eventData)}
             notificationsEnabled={eventData.notifications_enabled ?? true}
             disabled={hasUnsavedChanges}
-            disabledReason="Save your changes before sending a notification"
+            disabledReason={t(
+              "studio.groups.pages.event_form.save_before_notify",
+            )}
           />
         ) : null}
       </div>
 
       {readOnly ? (
         <p className="text-sm text-muted-foreground">
-          You do not have permission to {isNew ? "create" : "edit"} events in
-          this group.
+          {isNew
+            ? t("studio.groups.pages.event_form.no_permission_create")
+            : t("studio.groups.pages.event_form.no_permission_edit")}
         </p>
       ) : null}
 
@@ -328,12 +345,14 @@ const GroupEventFormPage = () => {
             onValueChange={(value) => setActiveTab(value as EventTabId)}
           >
             <Pecha.TabsList>
-              {EVENT_TABS.map(({ id, label }) => (
+              {EVENT_TABS.map(({ id, labelKey }) => (
                 <Pecha.TabsTrigger key={id} value={id}>
-                  {label}
+                  {t(labelKey)}
                   {errorTabs.has(id) ? (
                     <span
-                      aria-label="has errors"
+                      aria-label={t(
+                        "studio.groups.pages.event_form.tab_has_errors",
+                      )}
                       className="size-1.5 rounded-full bg-destructive"
                     />
                   ) : null}
@@ -479,7 +498,7 @@ const GroupEventFormPage = () => {
           <div className="sticky bottom-0 z-10 mt-8 flex items-center justify-end gap-3 border-t border-border bg-[#F3F3F3] py-4 dark:bg-[#181818]">
             {errorTabs.size > 0 ? (
               <p className="mr-auto text-xs text-destructive">
-                Some fields need attention — see the marked tabs.
+                {t("studio.groups.pages.event_form.fields_need_attention")}
               </p>
             ) : null}
             <Pecha.Button
@@ -487,7 +506,7 @@ const GroupEventFormPage = () => {
               variant="outline"
               onClick={() => navigate(eventsListPath)}
             >
-              Cancel
+              {t("studio.common.cancel")}
             </Pecha.Button>
             {!readOnly ? (
               <Pecha.Button

@@ -1,5 +1,6 @@
 import axiosInstance from "@/config/axios-config";
 import { getApiErrorMessage } from "@/lib/apiErrors";
+import { tolgee } from "@/i18n/tolgee";
 
 /** A prayer PDF is built from a group's own chat room or one event's room. */
 export type PrayerPdfScope =
@@ -299,11 +300,11 @@ export const getPrayerPdfErrorMessage = async (
     detail = (data as { detail?: unknown } | undefined)?.detail;
   }
   if (detail === NO_PRAYER_REQUESTS) {
-    return "There are no prayer requests on this day.";
+    return tolgee.t("studio.groups.shared.prayer_pdf_no_requests");
   }
   return getApiErrorMessage(
     detail !== undefined ? { response: { data: { detail } } } : error,
-    "Could not generate the prayer PDF.",
+    tolgee.t("studio.groups.shared.prayer_pdf_error"),
   );
 };
 

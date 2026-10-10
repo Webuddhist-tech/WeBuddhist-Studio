@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslate } from "@tolgee/react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { IoMdAdd, IoMdClose } from "react-icons/io";
 import { toast } from "sonner";
@@ -50,6 +51,7 @@ const LiveSyncForm = ({
   events,
   liveSync,
 }: FormProps) => {
+  const { t } = useTranslate();
   const queryClient = useQueryClient();
   const eventIds = events.map((event) => event.id);
   const scheduleByEvent = new Map(
@@ -62,10 +64,14 @@ const LiveSyncForm = ({
   const [times, setTimes] = useState<string[]>(
     existing?.run_times.length ? existing.run_times : [""],
   );
-  const [timezone, setTimezone] = useState(existing?.timezone ?? DEFAULT_TIMEZONE);
+  const [timezone, setTimezone] = useState(
+    existing?.timezone ?? DEFAULT_TIMEZONE,
+  );
 
   const refresh = () =>
-    queryClient.invalidateQueries({ queryKey: youtubeLiveSyncQueryKey(groupId) });
+    queryClient.invalidateQueries({
+      queryKey: youtubeLiveSyncQueryKey(groupId),
+    });
 
   const runTimes = cleanRunTimes(times);
   const hasBadTime = times.some(
@@ -84,13 +90,26 @@ const LiveSyncForm = ({
         timezone,
       }),
     onSuccess: () => {
+      const one = events.length === 1;
       toast.success(
-        `Live sync ${enabled ? "scheduled" : "saved (paused)"} for ${events.length} event${events.length === 1 ? "" : "s"}`,
+        t(
+          enabled
+            ? one
+              ? "studio.groups.events.live_sync.toast_scheduled_one"
+              : "studio.groups.events.live_sync.toast_scheduled_other"
+            : one
+              ? "studio.groups.events.live_sync.toast_paused_one"
+              : "studio.groups.events.live_sync.toast_paused_other",
+          { count: events.length },
+        ),
       );
       refresh();
       onOpenChange(false);
     },
-    onError: (err) => toast.error(getApiErrorMessage(err, "Could not save")),
+    onError: (err) =>
+      toast.error(
+        getApiErrorMessage(err, t("studio.groups.events.live_sync.save_error")),
+      ),
   });
 
   const runMutation = useMutation({
@@ -100,7 +119,10 @@ const LiveSyncForm = ({
       queryClient.invalidateQueries({ queryKey: ["cms-events", groupId] });
       queryClient.invalidateQueries({ queryKey: ["cms-event"] });
     },
-    onError: (err) => toast.error(getApiErrorMessage(err, "Could not run")),
+    onError: (err) =>
+      toast.error(
+        getApiErrorMessage(err, t("studio.groups.events.live_sync.run_error")),
+      ),
   });
 
   const removeMutation = useMutation({
@@ -110,22 +132,31 @@ const LiveSyncForm = ({
       const results = await Promise.allSettled(
         scheduled.map((event) => deleteYoutubeLiveSync(groupId, event.id)),
       );
-      return scheduled.filter((_, index) => results[index].status === "rejected");
+      return scheduled.filter(
+        (_, index) => results[index].status === "rejected",
+      );
     },
     onSuccess: (failed) => {
       refresh();
       if (failed.length === 0) {
-        toast.success("Schedule removed");
+        toast.success(t("studio.groups.events.live_sync.removed"));
         onOpenChange(false);
         return;
       }
       toast.error(
-        `Could not remove the schedule from: ${failed.map((event) => eventName(event)).join(", ")}`,
+        t("studio.groups.events.live_sync.remove_partial_error", {
+          events: failed.map((event) => eventName(event)).join(", "),
+        }),
       );
     },
     onError: (err) => {
       refresh();
-      toast.error(getApiErrorMessage(err, "Could not remove"));
+      toast.error(
+        getApiErrorMessage(
+          err,
+          t("studio.groups.events.live_sync.remove_error"),
+        ),
+      );
     },
   });
 
@@ -133,32 +164,37 @@ const LiveSyncForm = ({
     saveMutation.isPending || runMutation.isPending || removeMutation.isPending;
 
   const setTimeAt = (index: number, value: string) =>
-    setTimes((current) => current.map((t, i) => (i === index ? value : t)));
+    setTimes((current) =>
+      current.map((item, i) => (i === index ? value : item)),
+    );
 
   return (
     <>
       <Pecha.DialogHeader>
-        <Pecha.DialogTitle>YouTube live sync</Pecha.DialogTitle>
+        <Pecha.DialogTitle>
+          {t("studio.groups.events.live_sync.title")}
+        </Pecha.DialogTitle>
         <DialogDescription>
-          At the times you set, the group&rsquo;s YouTube channel is checked and
-          the stream that is live is put on the events below. Its language is
-          picked from the stream title. If an event already has a YouTube link
-          in that language, that link is replaced with the live stream;
-          otherwise one is added. Other events are not changed.
+          {t("studio.groups.events.live_sync.description")}
         </DialogDescription>
       </Pecha.DialogHeader>
 
       <div className="space-y-4">
         <div className="space-y-1">
           <span className="text-sm font-medium">
-            Events ({events.length})
+            {t("studio.groups.events.live_sync.events_count", {
+              count: events.length,
+            })}
           </span>
           <ul className="max-h-28 space-y-0.5 overflow-y-auto rounded-md border p-2 text-sm">
             {events.map((event) => (
               <li key={event.id} className="truncate">
                 {eventName(event)}
                 {scheduleByEvent.has(event.id) ? (
-                  <span className="text-muted-foreground"> · scheduled</span>
+                  <span className="text-muted-foreground">
+                    {" "}
+                    · {t("studio.groups.events.live_sync.scheduled_badge")}
+                  </span>
                 ) : null}
               </li>
             ))}
@@ -167,28 +203,31 @@ const LiveSyncForm = ({
 
         {!hasChannel ? (
           <p className="rounded-md border border-destructive/40 bg-destructive/5 p-2 text-sm text-destructive">
-            This group has no YouTube channel link, so nothing can be added. Add
-            one in the group&rsquo;s social links (a /@handle or /channel/ link).
+            {t("studio.groups.events.live_sync.no_channel")}
           </p>
         ) : (
           <p className="truncate text-xs text-muted-foreground">
-            Channel: {liveSync.channel_url}
+            {t("studio.groups.events.live_sync.channel", {
+              url: liveSync.channel_url ?? "",
+            })}
           </p>
         )}
 
         {recurringCount > 0 ? (
           <p className="text-xs text-muted-foreground">
             {recurringCount === 1
-              ? "One selected event is recurring: "
-              : `${recurringCount} selected events are recurring: `}
-            a link added to it stays on every date of the series.
+              ? t("studio.groups.events.live_sync.recurring_one")
+              : t("studio.groups.events.live_sync.recurring_other", {
+                  count: recurringCount,
+                })}
           </p>
         ) : null}
 
         {scheduled.length > 1 ? (
           <p className="text-xs text-muted-foreground">
-            Saving replaces the schedule on all {events.length} events with the
-            one below.
+            {t("studio.groups.events.live_sync.replaces_all", {
+              count: events.length,
+            })}
           </p>
         ) : null}
 
@@ -198,11 +237,13 @@ const LiveSyncForm = ({
             onCheckedChange={(value) => setEnabled(value === true)}
             disabled={busy}
           />
-          Enabled
+          {t("studio.groups.events.live_sync.enabled")}
         </label>
 
         <div className="space-y-2">
-          <span className="text-sm font-medium">Check the channel at</span>
+          <span className="text-sm font-medium">
+            {t("studio.groups.events.live_sync.check_at")}
+          </span>
           {times.map((time, index) => (
             <div key={index} className="flex items-center gap-2">
               <Pecha.Input
@@ -210,13 +251,18 @@ const LiveSyncForm = ({
                 value={time}
                 onChange={(e) => setTimeAt(index, e.target.value)}
                 disabled={busy}
-                aria-label={`Time ${index + 1}`}
+                aria-label={t("studio.groups.events.live_sync.time_aria", {
+                  number: index + 1,
+                })}
                 className="w-40 bg-white dark:bg-[#181818]"
               />
               {times.length > 1 ? (
                 <button
                   type="button"
-                  aria-label={`Remove time ${index + 1}`}
+                  aria-label={t(
+                    "studio.groups.events.live_sync.remove_time_aria",
+                    { number: index + 1 },
+                  )}
                   onClick={() =>
                     setTimes((current) => current.filter((_, i) => i !== index))
                   }
@@ -236,25 +282,36 @@ const LiveSyncForm = ({
             disabled={busy || times.length >= 12}
             onClick={() => setTimes((current) => [...current, ""])}
           >
-            <IoMdAdd className="h-4 w-4" /> Add time
+            <IoMdAdd className="h-4 w-4" />{" "}
+            {t("studio.groups.events.live_sync.add_time")}
           </Pecha.Button>
           {hasBadTime ? (
             <p className="text-sm text-destructive">
-              Enter each time as hours and minutes.
+              {t("studio.groups.events.live_sync.bad_time")}
             </p>
           ) : null}
           {needsTime && !hasBadTime ? (
             <p className="text-sm text-destructive">
-              Add at least one time, or turn this off.
+              {t("studio.groups.events.live_sync.needs_time")}
             </p>
           ) : null}
         </div>
 
         <div className="space-y-1">
-          <span className="text-sm font-medium">Timezone</span>
-          <Pecha.Select value={timezone} onValueChange={setTimezone} disabled={busy}>
+          <span className="text-sm font-medium">
+            {t("studio.groups.events.date.timezone")}
+          </span>
+          <Pecha.Select
+            value={timezone}
+            onValueChange={setTimezone}
+            disabled={busy}
+          >
             <Pecha.SelectTrigger className="w-full bg-white dark:bg-[#181818]">
-              <Pecha.SelectValue placeholder="Select timezone" />
+              <Pecha.SelectValue
+                placeholder={t(
+                  "studio.groups.events.date.timezone_placeholder",
+                )}
+              />
             </Pecha.SelectTrigger>
             <Pecha.SelectContent>
               {timezoneOptions(timezone).map((tz) => (
@@ -275,7 +332,9 @@ const LiveSyncForm = ({
             disabled={busy || !hasChannel}
             onClick={() => runMutation.mutate()}
           >
-            {runMutation.isPending ? "Checking…" : "Run now"}
+            {runMutation.isPending
+              ? t("studio.groups.events.live_sync.checking")
+              : t("studio.groups.events.live_sync.run_now")}
           </Pecha.Button>
           {scheduled.length > 0 ? (
             <Pecha.Button
@@ -285,7 +344,9 @@ const LiveSyncForm = ({
               disabled={busy}
               onClick={() => removeMutation.mutate()}
             >
-              {removeMutation.isPending ? "Removing…" : "Remove schedule"}
+              {removeMutation.isPending
+                ? t("studio.groups.events.live_sync.removing")
+                : t("studio.groups.events.live_sync.remove_schedule")}
             </Pecha.Button>
           ) : null}
         </div>
@@ -296,7 +357,7 @@ const LiveSyncForm = ({
             disabled={busy}
             onClick={() => onOpenChange(false)}
           >
-            Cancel
+            {t("studio.common.cancel")}
           </Pecha.Button>
           <Pecha.Button
             type="button"
@@ -304,7 +365,9 @@ const LiveSyncForm = ({
             disabled={busy || hasBadTime || needsTime}
             onClick={() => saveMutation.mutate()}
           >
-            {saveMutation.isPending ? "Saving…" : "Save"}
+            {saveMutation.isPending
+              ? t("studio.common.saving")
+              : t("studio.common.save")}
           </Pecha.Button>
         </div>
       </DialogFooter>
@@ -324,37 +387,42 @@ const EventLiveSyncDialog = ({
   isLoading = false,
   isError = false,
   onRetry,
-}: EventLiveSyncDialogProps) => (
-  <Pecha.Dialog open={open} onOpenChange={onOpenChange}>
-    <Pecha.DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-lg">
-      {!open ? null : liveSync ? (
-        <LiveSyncForm
-          onOpenChange={onOpenChange}
-          groupId={groupId}
-          events={events}
-          liveSync={liveSync}
-        />
-      ) : (
-        <>
-          <Pecha.DialogHeader>
-            <Pecha.DialogTitle>YouTube live sync</Pecha.DialogTitle>
-            <DialogDescription>
-              {isError
-                ? "The saved schedules could not be loaded, so nothing can be changed safely."
-                : "Loading the saved schedules\u2026"}
-            </DialogDescription>
-          </Pecha.DialogHeader>
-          {isError && !isLoading ? (
-            <DialogFooter>
-              <Pecha.Button type="button" variant="outline" onClick={onRetry}>
-                Retry
-              </Pecha.Button>
-            </DialogFooter>
-          ) : null}
-        </>
-      )}
-    </Pecha.DialogContent>
-  </Pecha.Dialog>
-);
+}: EventLiveSyncDialogProps) => {
+  const { t } = useTranslate();
+  return (
+    <Pecha.Dialog open={open} onOpenChange={onOpenChange}>
+      <Pecha.DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-lg">
+        {!open ? null : liveSync ? (
+          <LiveSyncForm
+            onOpenChange={onOpenChange}
+            groupId={groupId}
+            events={events}
+            liveSync={liveSync}
+          />
+        ) : (
+          <>
+            <Pecha.DialogHeader>
+              <Pecha.DialogTitle>
+                {t("studio.groups.events.live_sync.title")}
+              </Pecha.DialogTitle>
+              <DialogDescription>
+                {isError
+                  ? t("studio.groups.events.live_sync.load_error")
+                  : t("studio.groups.events.live_sync.loading")}
+              </DialogDescription>
+            </Pecha.DialogHeader>
+            {isError && !isLoading ? (
+              <DialogFooter>
+                <Pecha.Button type="button" variant="outline" onClick={onRetry}>
+                  {t("studio.common.retry")}
+                </Pecha.Button>
+              </DialogFooter>
+            ) : null}
+          </>
+        )}
+      </Pecha.DialogContent>
+    </Pecha.Dialog>
+  );
+};
 
 export default EventLiveSyncDialog;

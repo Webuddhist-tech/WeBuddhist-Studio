@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { toast } from "sonner";
+import { tolgee } from "@/i18n/tolgee";
 import { useAppUpdate } from "./appUpdateContext";
 import { defersAppUpdate, type StudioRouter } from "./defersAppUpdate";
 
@@ -32,9 +33,9 @@ export function PwaUpdatePrompt({
       closePrompt();
       return;
     }
-    toast("A new version of the Studio is ready", {
+    toast(tolgee.t("studio.pwa.ready_toast_title"), {
       id: TOAST_ID,
-      description: "Reload when you have saved your work.",
+      description: tolgee.t("studio.pwa.ready_toast_description"),
       duration: Infinity,
       // At the bottom it sits over the page's own controls on a phone.
       position: "top-center",
@@ -42,7 +43,7 @@ export function PwaUpdatePrompt({
       closeButton: hasUpdateButton,
       dismissible: hasUpdateButton,
       onDismiss: closePrompt,
-      action: { label: "Reload", onClick: reload },
+      action: { label: tolgee.t("studio.pwa.reload"), onClick: reload },
     });
   }, [ready, promptClosed, deferred, hasUpdateButton, closePrompt, reload]);
 

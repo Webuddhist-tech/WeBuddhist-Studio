@@ -2,6 +2,7 @@ import { useState } from "react";
 import { IoMdAdd } from "react-icons/io";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import AuthButton from "@/components/ui/molecules/auth-button/AuthButton";
@@ -22,6 +23,7 @@ import AmbientSoundFormDialog, {
 import { useAmbientSoundReorder } from "./hooks/useAmbientSoundReorder";
 
 const AmbientSoundsPage = () => {
+  const { t } = useTranslate();
   const { data: userInfo } = useUserInfo();
   const canManage = canManageAmbientSounds(userInfo?.platform_role);
   const [formOpen, setFormOpen] = useState(false);
@@ -53,7 +55,7 @@ const AmbientSoundsPage = () => {
   const createMutation = useMutation({
     mutationFn: createAmbientSound,
     onSuccess: () => {
-      toast.success("Sound added successfully");
+      toast.success(t("studio.ambient_sounds.toast_added"));
       setFormOpen(false);
       invalidateSounds();
     },
@@ -69,7 +71,7 @@ const AmbientSoundsPage = () => {
       payload: Parameters<typeof updateAmbientSound>[1];
     }) => updateAmbientSound(id, payload),
     onSuccess: () => {
-      toast.success("Sound updated successfully");
+      toast.success(t("studio.ambient_sounds.toast_updated"));
       setFormOpen(false);
       setEditingSound(null);
       invalidateSounds();
@@ -80,7 +82,7 @@ const AmbientSoundsPage = () => {
   const deleteMutation = useMutation({
     mutationFn: deleteAmbientSound,
     onSuccess: () => {
-      toast.success("Sound deleted successfully");
+      toast.success(t("studio.ambient_sounds.toast_deleted"));
       setDeleteTarget(null);
       invalidateSounds();
     },
@@ -126,14 +128,16 @@ const AmbientSoundsPage = () => {
     <div className="flex flex-col border h-[calc(100vh-40px)] overflow-auto bg-[#F5F5F5] dark:bg-[#181818] my-4 rounded-l-2xl font-dynamic max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
       <div className="mb-4 px-4 pt-10 flex items-center justify-between max-md:flex-wrap max-md:gap-3 max-md:px-4 max-md:pt-4">
         <div className="flex items-center space-x-2 max-md:flex-wrap max-md:gap-y-2">
-          <h1 className="text-xl font-semibold">Ambient sounds</h1>
+          <h1 className="text-xl font-semibold">
+            {t("studio.ambient_sounds.title")}
+          </h1>
           {canManage ? (
             <Button
               variant="outline"
               className="bg-gray-100 hover:bg-gray-200"
               onClick={handleOpenCreate}
             >
-              <IoMdAdd /> Add sound
+              <IoMdAdd /> {t("studio.ambient_sounds.form.add_sound")}
             </Button>
           ) : null}
         </div>
@@ -145,12 +149,12 @@ const AmbientSoundsPage = () => {
       <div className="px-4 pt-4 h-full flex flex-col items-center justify-between flex-1 min-h-0">
         {error ? (
           <p className="text-sm text-red-500 py-8">
-            Failed to load ambient sounds. {getApiErrorMessage(error)}
+            {t("studio.ambient_sounds.load_failed")} {getApiErrorMessage(error)}
           </p>
         ) : displaySounds.length === 0 && !isLoading ? (
           <div className="flex flex-col h-full items-center justify-center">
             <p className="text-base text-muted-foreground">
-              No ambient sounds found
+              {t("studio.ambient_sounds.empty")}
             </p>
             {canManage ? (
               <Button
@@ -158,7 +162,7 @@ const AmbientSoundsPage = () => {
                 className="mt-2"
                 onClick={handleOpenCreate}
               >
-                <IoMdAdd /> Add sound
+                <IoMdAdd /> {t("studio.ambient_sounds.form.add_sound")}
               </Button>
             ) : null}
           </div>
@@ -198,15 +202,19 @@ const AmbientSoundsPage = () => {
       >
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
-            <Pecha.AlertDialogTitle>Delete sound?</Pecha.AlertDialogTitle>
+            <Pecha.AlertDialogTitle>
+              {t("studio.ambient_sounds.delete_title")}
+            </Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
-              This will permanently delete{" "}
-              <strong>{deleteTarget?.name ?? ""}</strong> and remove it from
-              every timer using it.
+              {t("studio.ambient_sounds.delete_description", {
+                name: deleteTarget?.name ?? "",
+              })}
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <Pecha.AlertDialogFooter>
-            <Pecha.AlertDialogCancel>Cancel</Pecha.AlertDialogCancel>
+            <Pecha.AlertDialogCancel>
+              {t("studio.common.cancel")}
+            </Pecha.AlertDialogCancel>
             <Pecha.AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
               onClick={() => {
@@ -214,7 +222,9 @@ const AmbientSoundsPage = () => {
               }}
               disabled={deleteMutation.isPending}
             >
-              {deleteMutation.isPending ? "Deleting…" : "Delete"}
+              {deleteMutation.isPending
+                ? t("studio.common.deleting")
+                : t("studio.common.delete")}
             </Pecha.AlertDialogAction>
           </Pecha.AlertDialogFooter>
         </Pecha.AlertDialogContent>

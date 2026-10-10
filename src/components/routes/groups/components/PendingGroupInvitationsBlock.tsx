@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import {
   fetchMyPendingGroupInvites,
@@ -9,6 +10,7 @@ import GroupInviteRespondButtons from "./GroupInviteRespondButtons";
 import InviteExpiryLabel from "./InviteExpiryLabel";
 
 const PendingGroupInvitationsBlock = () => {
+  const { t } = useTranslate();
   const [dismissed, setDismissed] = useState(false);
 
   const { data: invitesData, isLoading } = useQuery({
@@ -33,12 +35,16 @@ const PendingGroupInvitationsBlock = () => {
         <div className="flex items-start justify-between gap-3 border-b px-4 py-3">
           <div className="min-w-0">
             <Pecha.DialogHeader className="space-y-1 p-0 text-left">
-              <Pecha.DialogTitle>Group invitations</Pecha.DialogTitle>
+              <Pecha.DialogTitle>
+                {t("studio.groups.components.pending_invites.title")}
+              </Pecha.DialogTitle>
             </Pecha.DialogHeader>
             <p className="text-sm text-muted-foreground mt-1">
               {invites.length === 1
-                ? "You have a pending invitation."
-                : `You have ${invites.length} pending invitations.`}
+                ? t("studio.groups.components.pending_invites.count_one")
+                : t("studio.groups.components.pending_invites.count_other", {
+                    count: invites.length,
+                  })}
             </p>
           </div>
         </div>
@@ -50,10 +56,13 @@ const PendingGroupInvitationsBlock = () => {
               <li key={invite.id} className="px-4 py-4 space-y-3">
                 <div>
                   <p className="font-medium leading-snug">
-                    {invite.group_name?.trim() || "Untitled group"}
+                    {invite.group_name?.trim() ||
+                      t("studio.groups.components.untitled_group")}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Invited by {inviter.name}
+                    {t("studio.groups.components.pending_invites.invited_by", {
+                      name: inviter.name,
+                    })}
                     {inviter.name.toLowerCase() !==
                       inviter.email.toLowerCase() && (
                       <>
@@ -63,7 +72,11 @@ const PendingGroupInvitationsBlock = () => {
                     )}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Role: {invite.role}
+                    {t("studio.groups.components.pending_invites.role", {
+                      role: t(
+                        `studio.groups.components.role.${invite.role.toLowerCase()}`,
+                      ),
+                    })}
                     <span className="mx-1.5">·</span>
                     <InviteExpiryLabel invite={invite} />
                   </p>

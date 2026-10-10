@@ -13,8 +13,10 @@ describe("EditorTabSwitcher Component", () => {
     render(
       <EditorTabSwitcher activeTab="task" onTabChange={mockOnTabChange} />,
     );
-    expect(screen.getByText("Add Task")).toBeInTheDocument();
-    expect(screen.getByText("Notification")).toBeInTheDocument();
+    expect(screen.getByText("studio.task.tabs.add_task")).toBeInTheDocument();
+    expect(
+      screen.getByText("studio.task.tabs.notification"),
+    ).toBeInTheDocument();
   });
 
   it("calls onTabChange with 'task' when Add Task tab is clicked", () => {
@@ -24,7 +26,7 @@ describe("EditorTabSwitcher Component", () => {
         onTabChange={mockOnTabChange}
       />,
     );
-    const taskTab = screen.getByText("Add Task");
+    const taskTab = screen.getByText("studio.task.tabs.add_task");
     fireEvent.click(taskTab);
     expect(mockOnTabChange).toHaveBeenCalledWith("task");
   });
@@ -33,7 +35,7 @@ describe("EditorTabSwitcher Component", () => {
     render(
       <EditorTabSwitcher activeTab="task" onTabChange={mockOnTabChange} />,
     );
-    const notificationTab = screen.getByText("Notification");
+    const notificationTab = screen.getByText("studio.task.tabs.notification");
     fireEvent.click(notificationTab);
     expect(mockOnTabChange).toHaveBeenCalledWith("notification");
   });
@@ -42,7 +44,7 @@ describe("EditorTabSwitcher Component", () => {
     render(
       <EditorTabSwitcher activeTab="task" onTabChange={mockOnTabChange} />,
     );
-    const taskTab = screen.getByText("Add Task");
+    const taskTab = screen.getByText("studio.task.tabs.add_task");
     expect(taskTab).toHaveClass("border-b-2", "border-red-500");
   });
 
@@ -53,7 +55,7 @@ describe("EditorTabSwitcher Component", () => {
         onTabChange={mockOnTabChange}
       />,
     );
-    const notificationTab = screen.getByText("Notification");
+    const notificationTab = screen.getByText("studio.task.tabs.notification");
     expect(notificationTab).toHaveClass("border-b-2", "border-red-500");
   });
 
@@ -64,7 +66,7 @@ describe("EditorTabSwitcher Component", () => {
         onTabChange={mockOnTabChange}
       />,
     );
-    const taskTab = screen.getByText("Add Task");
+    const taskTab = screen.getByText("studio.task.tabs.add_task");
     expect(taskTab).toHaveClass("text-gray-500");
     expect(taskTab).not.toHaveClass("border-b-2");
   });
@@ -73,7 +75,7 @@ describe("EditorTabSwitcher Component", () => {
     render(
       <EditorTabSwitcher activeTab="task" onTabChange={mockOnTabChange} />,
     );
-    const notificationTab = screen.getByText("Notification");
+    const notificationTab = screen.getByText("studio.task.tabs.notification");
     expect(notificationTab).toHaveClass("text-gray-500");
     expect(notificationTab).not.toHaveClass("border-b-2");
   });

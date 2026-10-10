@@ -1,4 +1,5 @@
 import { Pecha } from "@/components/ui/shadimport";
+import { useTranslate } from "@tolgee/react";
 import { IoMdAdd, IoMdVideocam } from "react-icons/io";
 import { IoMusicalNotesSharp, IoTextOutline } from "react-icons/io5";
 import { MdOutlineImage } from "react-icons/md";
@@ -9,6 +10,7 @@ import { useState } from "react";
 import { SourceSelectorSheet } from "../webuddhist-source/SourceSelectorSheet";
 import { LinkedContentSelectorSheet } from "../linked-content/LinkedContentSelectorSheet";
 import {
+  LINKED_CONTENT_I18N,
   isLinkedContentType,
   type LinkedContentOption,
   type LinkedContentType,
@@ -43,47 +45,47 @@ const iconClassName = "w-4 h-4 text-gray-400";
 const contentTypes = [
   {
     key: "IMAGE",
-    label: "Image",
+    labelKey: "studio.common.image",
     icon: <MdOutlineImage className={iconClassName} />,
   },
   {
     key: "AUDIO",
-    label: "Audio",
+    labelKey: "studio.common.audio",
     icon: <IoMusicalNotesSharp className={iconClassName} />,
   },
   {
     key: "VIDEO",
-    label: "Video",
+    labelKey: "studio.common.video",
     icon: <IoMdVideocam className={iconClassName} />,
   },
   {
     key: "TEXT",
-    label: "Text",
+    labelKey: "studio.content.type.text",
     icon: <IoTextOutline className={iconClassName} />,
   },
   {
     key: "SOURCE_REFERENCE",
-    label: "Source",
-    icon: <img src={pechaIcon} alt="Webuddhist Icon" className="w-4 h-4" />,
+    labelKey: "studio.content.type.source",
+    icon: <img src={pechaIcon} alt="" className="w-4 h-4" />,
   },
   {
     key: "GROUP_ACCUMULATION",
-    label: "Accumulation",
+    labelKey: LINKED_CONTENT_I18N.GROUP_ACCUMULATION.label,
     icon: <GiPrayerBeads className={iconClassName} />,
   },
   {
     key: "GROUP_COLLECTION",
-    label: "Chant collection",
+    labelKey: LINKED_CONTENT_I18N.GROUP_COLLECTION.label,
     icon: <LuLayers className={iconClassName} />,
   },
   {
     key: "EVENT",
-    label: "Event",
+    labelKey: LINKED_CONTENT_I18N.EVENT.label,
     icon: <LuCalendarDays className={iconClassName} />,
   },
   {
     key: "POST",
-    label: "Post",
+    labelKey: LINKED_CONTENT_I18N.POST.label,
     icon: <LuNewspaper className={iconClassName} />,
   },
 ];
@@ -92,6 +94,7 @@ export const ContentTypeSelector = ({
   onSelectType,
   groupId,
 }: ContentTypeSelectorProps) => {
+  const { t } = useTranslate();
   const [showContentTypes, setShowContentTypes] = useState(false);
   const [isSourceSheetOpen, setIsSourceSheetOpen] = useState(false);
   const [linkedContentType, setLinkedContentType] =
@@ -138,7 +141,7 @@ export const ContentTypeSelector = ({
 
         {showContentTypes && (
           <div className="flex flex-wrap border min-h-12 bg-white dark:bg-[#161616] items-center px-1 border-gray-300 dark:border-input rounded-sm overflow-visible min-w-0 flex-1 py-1 animate-in zoom-in-90 slide-in-from-left-3 duration-300 ease-out">
-            {contentTypes.map(({ key, label, icon }, index) => (
+            {contentTypes.map(({ key, labelKey, icon }, index) => (
               <Pecha.Button
                 key={key}
                 type="button"
@@ -151,7 +154,7 @@ export const ContentTypeSelector = ({
                 }}
               >
                 {icon}
-                <span className="text-xs">{label}</span>
+                <span className="text-xs">{t(labelKey)}</span>
               </Pecha.Button>
             ))}
           </div>

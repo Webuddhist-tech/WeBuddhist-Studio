@@ -1,3 +1,4 @@
+import { useTranslate } from "@tolgee/react";
 import type { UseFormReturn } from "react-hook-form";
 import { Pecha } from "@/components/ui/shadimport";
 import {
@@ -13,33 +14,33 @@ type EventRecurrenceSectionProps = {
 };
 
 const GREGORIAN_MONTHS = [
-  { value: 1, label: "January" },
-  { value: 2, label: "February" },
-  { value: 3, label: "March" },
-  { value: 4, label: "April" },
-  { value: 5, label: "May" },
-  { value: 6, label: "June" },
-  { value: 7, label: "July" },
-  { value: 8, label: "August" },
-  { value: 9, label: "September" },
-  { value: 10, label: "October" },
-  { value: 11, label: "November" },
-  { value: 12, label: "December" },
+  { value: 1, labelKey: "studio.groups.events.recurrence.month_january" },
+  { value: 2, labelKey: "studio.groups.events.recurrence.month_february" },
+  { value: 3, labelKey: "studio.groups.events.recurrence.month_march" },
+  { value: 4, labelKey: "studio.groups.events.recurrence.month_april" },
+  { value: 5, labelKey: "studio.groups.events.recurrence.month_may" },
+  { value: 6, labelKey: "studio.groups.events.recurrence.month_june" },
+  { value: 7, labelKey: "studio.groups.events.recurrence.month_july" },
+  { value: 8, labelKey: "studio.groups.events.recurrence.month_august" },
+  { value: 9, labelKey: "studio.groups.events.recurrence.month_september" },
+  { value: 10, labelKey: "studio.groups.events.recurrence.month_october" },
+  { value: 11, labelKey: "studio.groups.events.recurrence.month_november" },
+  { value: 12, labelKey: "studio.groups.events.recurrence.month_december" },
 ];
 
 const TIBETAN_MONTHS = [
-  { value: 1, label: "1st Month (Losar)" },
-  { value: 2, label: "2nd Month" },
-  { value: 3, label: "3rd Month" },
-  { value: 4, label: "4th Month (Saga Dawa)" },
-  { value: 5, label: "5th Month" },
-  { value: 6, label: "6th Month" },
-  { value: 7, label: "7th Month" },
-  { value: 8, label: "8th Month" },
-  { value: 9, label: "9th Month" },
-  { value: 10, label: "10th Month" },
-  { value: 11, label: "11th Month" },
-  { value: 12, label: "12th Month" },
+  { value: 1, labelKey: "studio.groups.events.recurrence.tibetan_month_1" },
+  { value: 2, labelKey: "studio.groups.events.recurrence.tibetan_month_2" },
+  { value: 3, labelKey: "studio.groups.events.recurrence.tibetan_month_3" },
+  { value: 4, labelKey: "studio.groups.events.recurrence.tibetan_month_4" },
+  { value: 5, labelKey: "studio.groups.events.recurrence.tibetan_month_5" },
+  { value: 6, labelKey: "studio.groups.events.recurrence.tibetan_month_6" },
+  { value: 7, labelKey: "studio.groups.events.recurrence.tibetan_month_7" },
+  { value: 8, labelKey: "studio.groups.events.recurrence.tibetan_month_8" },
+  { value: 9, labelKey: "studio.groups.events.recurrence.tibetan_month_9" },
+  { value: 10, labelKey: "studio.groups.events.recurrence.tibetan_month_10" },
+  { value: 11, labelKey: "studio.groups.events.recurrence.tibetan_month_11" },
+  { value: 12, labelKey: "studio.groups.events.recurrence.tibetan_month_12" },
 ];
 
 const EventRecurrenceSection = ({
@@ -49,6 +50,7 @@ const EventRecurrenceSection = ({
 }: EventRecurrenceSectionProps) => {
   const recurrence = form.watch("recurrence");
   const { errors } = form.formState;
+  const { t } = useTranslate();
 
   if (!recurrence) return null;
 
@@ -69,7 +71,9 @@ const EventRecurrenceSection = ({
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1">
-          <label className="text-sm font-medium">Frequency</label>
+          <label className="text-sm font-medium">
+            {t("studio.groups.events.recurrence.frequency")}
+          </label>
           <Pecha.Select
             value={recurrence.frequency}
             disabled={readOnly}
@@ -92,20 +96,28 @@ const EventRecurrenceSection = ({
               <Pecha.SelectValue />
             </Pecha.SelectTrigger>
             <Pecha.SelectContent>
-              <Pecha.SelectItem value="YEARLY">Yearly</Pecha.SelectItem>
-              <Pecha.SelectItem value="MONTHLY">Monthly</Pecha.SelectItem>
-              <Pecha.SelectItem value="WEEKLY">Weekly</Pecha.SelectItem>
+              <Pecha.SelectItem value="YEARLY">
+                {t("studio.groups.events.recurrence.frequency_yearly")}
+              </Pecha.SelectItem>
+              <Pecha.SelectItem value="MONTHLY">
+                {t("studio.groups.events.recurrence.frequency_monthly")}
+              </Pecha.SelectItem>
+              <Pecha.SelectItem value="WEEKLY">
+                {t("studio.groups.events.recurrence.frequency_weekly")}
+              </Pecha.SelectItem>
             </Pecha.SelectContent>
           </Pecha.Select>
           {errors.recurrence?.frequency ? (
             <p className="text-sm text-destructive">
-              {errors.recurrence.frequency.message}
+              {t(String(errors.recurrence.frequency.message))}
             </p>
           ) : null}
         </div>
 
         <div className="space-y-1">
-          <label className="text-sm font-medium">Date System</label>
+          <label className="text-sm font-medium">
+            {t("studio.groups.events.recurrence.date_system")}
+          </label>
           <Pecha.Select
             value={recurrence.date_system}
             disabled={readOnly || isWeekly}
@@ -117,20 +129,22 @@ const EventRecurrenceSection = ({
               <Pecha.SelectValue />
             </Pecha.SelectTrigger>
             <Pecha.SelectContent>
-              <Pecha.SelectItem value="GREGORIAN">Gregorian</Pecha.SelectItem>
+              <Pecha.SelectItem value="GREGORIAN">
+                {t("studio.groups.events.recurrence.date_system_gregorian")}
+              </Pecha.SelectItem>
               <Pecha.SelectItem value="TIBETAN_LUNAR" disabled={isWeekly}>
-                Tibetan Lunar
+                {t("studio.groups.events.recurrence.date_system_tibetan_lunar")}
               </Pecha.SelectItem>
             </Pecha.SelectContent>
           </Pecha.Select>
           {isWeekly ? (
             <p className="text-sm text-muted-foreground">
-              Weekly recurrence only supports the Gregorian calendar.
+              {t("studio.groups.events.recurrence.weekly_gregorian_only")}
             </p>
           ) : null}
           {errors.recurrence?.date_system ? (
             <p className="text-sm text-destructive">
-              {errors.recurrence.date_system.message}
+              {t(String(errors.recurrence.date_system.message))}
             </p>
           ) : null}
         </div>
@@ -138,23 +152,33 @@ const EventRecurrenceSection = ({
 
       {isLunar && !isWeekly ? (
         <div className="space-y-1">
-          <label className="text-sm font-medium">Calendar Type</label>
+          <label className="text-sm font-medium">
+            {t("studio.groups.events.recurrence.calendar_type")}
+          </label>
           <Pecha.Select
             value={recurrence.calendar_type}
             disabled={readOnly}
             onValueChange={(value) => updateField("calendar_type", value)}
           >
             <Pecha.SelectTrigger className="h-12">
-              <Pecha.SelectValue placeholder="Select calendar type" />
+              <Pecha.SelectValue
+                placeholder={t(
+                  "studio.groups.events.recurrence.calendar_type_placeholder",
+                )}
+              />
             </Pecha.SelectTrigger>
             <Pecha.SelectContent>
-              <Pecha.SelectItem value="phugpa">Phugpa</Pecha.SelectItem>
-              <Pecha.SelectItem value="tsurphu">Tsurphu</Pecha.SelectItem>
+              <Pecha.SelectItem value="phugpa">
+                {t("studio.groups.events.recurrence.calendar_phugpa")}
+              </Pecha.SelectItem>
+              <Pecha.SelectItem value="tsurphu">
+                {t("studio.groups.events.recurrence.calendar_tsurphu")}
+              </Pecha.SelectItem>
             </Pecha.SelectContent>
           </Pecha.Select>
           {errors.recurrence?.calendar_type ? (
             <p className="text-sm text-destructive">
-              {errors.recurrence.calendar_type.message}
+              {t(String(errors.recurrence.calendar_type.message))}
             </p>
           ) : null}
         </div>
@@ -163,7 +187,9 @@ const EventRecurrenceSection = ({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {isYearly ? (
           <div className="space-y-1">
-            <label className="text-sm font-medium">Month</label>
+            <label className="text-sm font-medium">
+              {t("studio.groups.events.recurrence.month")}
+            </label>
             <Pecha.Select
               value={recurrence.month?.toString() ?? ""}
               disabled={readOnly}
@@ -172,19 +198,23 @@ const EventRecurrenceSection = ({
               }
             >
               <Pecha.SelectTrigger className="h-12">
-                <Pecha.SelectValue placeholder="Select month" />
+                <Pecha.SelectValue
+                  placeholder={t(
+                    "studio.groups.events.recurrence.month_placeholder",
+                  )}
+                />
               </Pecha.SelectTrigger>
               <Pecha.SelectContent>
                 {monthOptions.map((m) => (
                   <Pecha.SelectItem key={m.value} value={m.value.toString()}>
-                    {m.label}
+                    {t(m.labelKey)}
                   </Pecha.SelectItem>
                 ))}
               </Pecha.SelectContent>
             </Pecha.Select>
             {errors.recurrence?.month ? (
               <p className="text-sm text-destructive">
-                {errors.recurrence.month.message}
+                {t(String(errors.recurrence.month.message))}
               </p>
             ) : null}
           </div>
@@ -192,7 +222,9 @@ const EventRecurrenceSection = ({
 
         {isWeekly ? (
           <div className="space-y-1">
-            <label className="text-sm font-medium">Day of week</label>
+            <label className="text-sm font-medium">
+              {t("studio.groups.events.recurrence.day_of_week")}
+            </label>
             <Pecha.Select
               value={recurrence.day_of_week?.toString() ?? ""}
               disabled={readOnly}
@@ -201,25 +233,31 @@ const EventRecurrenceSection = ({
               }
             >
               <Pecha.SelectTrigger className="h-12">
-                <Pecha.SelectValue placeholder="Select day of week" />
+                <Pecha.SelectValue
+                  placeholder={t(
+                    "studio.groups.events.recurrence.day_of_week_placeholder",
+                  )}
+                />
               </Pecha.SelectTrigger>
               <Pecha.SelectContent>
                 {DAYS_OF_WEEK.map((d) => (
                   <Pecha.SelectItem key={d.value} value={d.value.toString()}>
-                    {d.label}
+                    {t(`studio.groups.events.recurrence.weekday_${d.value}`)}
                   </Pecha.SelectItem>
                 ))}
               </Pecha.SelectContent>
             </Pecha.Select>
             {errors.recurrence?.day_of_week ? (
               <p className="text-sm text-destructive">
-                {errors.recurrence.day_of_week.message}
+                {t(String(errors.recurrence.day_of_week.message))}
               </p>
             ) : null}
           </div>
         ) : (
           <div className="space-y-1">
-            <label className="text-sm font-medium">Start date</label>
+            <label className="text-sm font-medium">
+              {t("studio.groups.events.recurrence.start_day")}
+            </label>
             <Pecha.Input
               type="number"
               min={1}
@@ -234,14 +272,16 @@ const EventRecurrenceSection = ({
             />
             {errors.recurrence?.day ? (
               <p className="text-sm text-destructive">
-                {errors.recurrence.day.message}
+                {t(String(errors.recurrence.day.message))}
               </p>
             ) : null}
           </div>
         )}
 
         <div className="space-y-1">
-          <label className="text-sm font-medium">Duration (days)</label>
+          <label className="text-sm font-medium">
+            {t("studio.groups.events.recurrence.duration_days")}
+          </label>
           <Pecha.Input
             type="number"
             min={1}
@@ -255,7 +295,7 @@ const EventRecurrenceSection = ({
           />
           {errors.recurrence?.duration_days ? (
             <p className="text-sm text-destructive">
-              {errors.recurrence.duration_days.message}
+              {t(String(errors.recurrence.duration_days.message))}
             </p>
           ) : null}
         </div>

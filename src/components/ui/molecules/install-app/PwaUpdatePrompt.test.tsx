@@ -81,7 +81,7 @@ describe("PwaUpdatePrompt", () => {
     renderPrompt(makeRouter("dashboard"));
 
     expect(toast).toHaveBeenCalledWith(
-      "A new version of the Studio is ready",
+      "studio.pwa.ready_toast_title",
       expect.any(Object),
     );
     const options = lastToastOptions();

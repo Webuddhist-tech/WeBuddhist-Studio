@@ -64,15 +64,13 @@ describe("PrayerPdfPreview", () => {
     renderPreview();
 
     const frame = (await screen.findByTitle(
-      "Prayer PDF preview",
+      "studio.groups.prayer_pdf.preview.frame_title",
     )) as HTMLIFrameElement;
     expect(frame.getAttribute("sandbox")).toBe("allow-scripts");
     expect(frame.getAttribute("srcdoc")).toContain("<base href=");
     expect(frame.getAttribute("srcdoc")).toContain("page");
     expect(
-      screen.getByText(
-        "No prayer requests on this day — showing sample requests.",
-      ),
+      screen.getByText("studio.groups.prayer_pdf.preview.sample"),
     ).toBeTruthy();
     expect(vi.mocked(previewPrayerPdf).mock.calls[0][0]).toEqual({
       kind: "group",
@@ -84,7 +82,7 @@ describe("PrayerPdfPreview", () => {
     renderPreview(false);
 
     expect(
-      screen.getByText("Fix the highlighted values to update the preview."),
+      screen.getByText("studio.groups.prayer_pdf.preview.fix_values"),
     ).toBeTruthy();
     await new Promise((resolve) => setTimeout(resolve, 800));
     expect(previewPrayerPdf).not.toHaveBeenCalled();
@@ -98,7 +96,7 @@ describe("PrayerPdfPreview", () => {
 
     await waitFor(() =>
       expect(
-        screen.getByText("You are not a member of this content's group."),
+        screen.getByText("studio.errors.no_group_membership"),
       ).toBeTruthy(),
     );
   });

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslate } from "@tolgee/react";
 import type { UniqueIdentifier } from "@dnd-kit/core";
 import { IoMdClose } from "react-icons/io";
 import { FaMagnifyingGlass } from "react-icons/fa6";
@@ -42,9 +43,10 @@ const PlanSearchSelector = ({
   searchLanguage,
   groupId,
   hideSelectedList = false,
-  searchPlaceholder = "Find plans to add",
+  searchPlaceholder,
   className = "",
 }: PlanSearchSelectorProps) => {
+  const { t } = useTranslate();
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -108,7 +110,7 @@ const PlanSearchSelector = ({
     >
       {!hideSelectedList && value.length === 0 ? (
         <div className="rounded-md border border-dashed border-muted-foreground/40 px-4 py-8 text-center text-sm text-muted-foreground">
-          No plans added yet — use the search to add plans to this series.
+          {t("studio.series.plan_search.empty")}
         </div>
       ) : !hideSelectedList ? (
         <SortableList
@@ -129,7 +131,9 @@ const PlanSearchSelector = ({
                     <button
                       type="button"
                       className="shrink-0 p-1 rounded text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none disabled:opacity-30 disabled:cursor-not-allowed"
-                      aria-label={`Reorder ${plan.title}`}
+                      aria-label={t("studio.series.plans.reorder_aria", {
+                        title: plan.title,
+                      })}
                       disabled={!canReorder}
                       {...listeners}
                     >
@@ -146,7 +150,9 @@ const PlanSearchSelector = ({
                     <button
                       type="button"
                       onClick={() => handleRemovePlan(plan.id)}
-                      aria-label={`Remove ${plan.title}`}
+                      aria-label={t("studio.series.plan_search.remove_aria", {
+                        title: plan.title,
+                      })}
                       className="text-muted-foreground hover:text-foreground cursor-pointer p-1 shrink-0"
                     >
                       <IoMdClose className="h-4 w-4" />
@@ -164,7 +170,9 @@ const PlanSearchSelector = ({
           <FaMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <input
             type="text"
-            placeholder={searchPlaceholder}
+            placeholder={
+              searchPlaceholder ?? t("studio.series.plan_search.placeholder")
+            }
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onFocus={() => setIsDropdownOpen(true)}
@@ -176,7 +184,7 @@ const PlanSearchSelector = ({
         {showMissingGroup && (
           <div className="absolute z-10 mt-1 w-full rounded-md border border-input bg-background dark:bg-[#262626] shadow-md px-3 py-2">
             <p className="text-sm text-muted-foreground">
-              Save the series with a group before adding plans.
+              {t("studio.series.plan_search.missing_group")}
             </p>
           </div>
         )}
@@ -185,7 +193,7 @@ const PlanSearchSelector = ({
           <div className="absolute z-10 mt-1 w-full rounded-md border border-input bg-background dark:bg-[#262626] shadow-md max-h-60 overflow-auto">
             {isLoading && searchResults.length === 0 && (
               <div className="px-3 py-2 text-sm text-muted-foreground">
-                Searching...
+                {t("studio.series.plan_search.searching")}
               </div>
             )}
 
@@ -216,7 +224,9 @@ const PlanSearchSelector = ({
 
             {showNoResults && (
               <div className="px-3 py-2">
-                <p className="text-sm text-muted-foreground">No plans found</p>
+                <p className="text-sm text-muted-foreground">
+                  {t("studio.series.plan_search.no_plans_found")}
+                </p>
               </div>
             )}
           </div>

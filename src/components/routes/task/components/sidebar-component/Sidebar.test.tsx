@@ -147,14 +147,14 @@ describe("SideBar Component", () => {
         onTaskClick={mockOnTaskClick}
       />,
     );
-    expect(screen.getByText("Current Plan")).toBeInTheDocument();
-    expect(screen.getByText("Days")).toBeInTheDocument();
+    expect(
+      screen.getByText("studio.task.sidebar.current_plan"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("studio.task.sidebar.days")).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByText("Test Plan Title")).toBeInTheDocument();
     });
-    expect(screen.getByText("Day 1")).toBeInTheDocument();
-    expect(screen.getByText("Day 2")).toBeInTheDocument();
-    expect(screen.getByText("Day 3")).toBeInTheDocument();
+    expect(screen.getAllByText("studio.task.day_number")).toHaveLength(3);
   });
 
   it("handles day selection and expands tasks correctly", async () => {
@@ -170,7 +170,7 @@ describe("SideBar Component", () => {
     });
     expect(screen.getByText("Task 1")).toBeInTheDocument();
     expect(screen.getByText("Task 2")).toBeInTheDocument();
-    const day2Element = screen.getByText("Day 2");
+    const day2Element = screen.getAllByText("studio.task.day_number")[1];
     fireEvent.click(day2Element);
     expect(mockOnDaySelect).toHaveBeenCalledWith(2);
     const task1Element = screen.getByText("Task 1");
@@ -191,7 +191,7 @@ describe("SideBar Component", () => {
     await waitFor(() => {
       expect(screen.getByText("Test Plan Title")).toBeInTheDocument();
     });
-    const addButton = screen.getByText("Add New Day");
+    const addButton = screen.getByText("studio.modals.day_add.add_new_day");
     fireEvent.click(addButton);
     await waitFor(() => {
       expect(axiosInstance.post).toHaveBeenCalledWith(
@@ -258,9 +258,12 @@ describe("SideBar Component", () => {
       );
     });
     await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith("Task deleted successfully!", {
-        description: "The task has been deleted.",
-      });
+      expect(toast.success).toHaveBeenCalledWith(
+        "studio.task.mutations.task_deleted",
+        {
+          description: "studio.task.mutations.task_deleted_description",
+        },
+      );
     });
   });
 

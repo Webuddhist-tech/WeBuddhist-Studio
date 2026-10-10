@@ -1,6 +1,7 @@
 import type { ComponentProps } from "react";
 import { HiOutlineDeviceMobile } from "react-icons/hi";
 import { cn } from "@/lib/utils";
+import { useTranslate } from "@tolgee/react";
 
 type MobilePreviewSplitDividerProps = ComponentProps<"div"> & {
   showPreview: boolean;
@@ -13,6 +14,7 @@ const MobilePreviewSplitDivider = ({
   className,
   ...props
 }: MobilePreviewSplitDividerProps) => {
+  const { t } = useTranslate();
   return (
     <div
       {...props}
@@ -23,8 +25,16 @@ const MobilePreviewSplitDivider = ({
     >
       <button
         type="button"
-        aria-label={showPreview ? "Hide mobile preview" : "Show mobile preview"}
-        title={showPreview ? "Hide Mobile Preview" : "Show Mobile Preview"}
+        aria-label={
+          showPreview
+            ? t("studio.task.preview.hide")
+            : t("studio.task.preview.show")
+        }
+        title={
+          showPreview
+            ? t("studio.task.preview.hide")
+            : t("studio.task.preview.show")
+        }
         onClick={(event) => {
           event.stopPropagation();
           onToggle();

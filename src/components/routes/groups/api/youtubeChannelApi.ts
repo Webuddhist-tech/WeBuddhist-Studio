@@ -1,3 +1,4 @@
+import { tolgee } from "@/i18n/tolgee";
 import type { GroupSocialLinkDTO } from "./groupsApi";
 
 const API_BASE = "https://www.googleapis.com/youtube/v3";
@@ -77,7 +78,8 @@ export const parseYoutubeChannelUrl = (
 
 const apiKey = (): string => {
   const key = import.meta.env.VITE_YOUTUBE_API_KEY || "";
-  if (!key) throw new Error("YouTube API key is not configured");
+  if (!key)
+    throw new Error(tolgee.t("studio.groups.shared.youtube_key_missing"));
   return key;
 };
 
@@ -90,7 +92,9 @@ async function youtubeGet<T>(
   const data = await response.json().catch(() => null);
   if (!response.ok || data?.error) {
     throw new Error(
-      `YouTube API error: ${data?.error?.message ?? response.statusText}`,
+      tolgee.t("studio.groups.shared.youtube_api_error", {
+        message: data?.error?.message ?? response.statusText,
+      }),
     );
   }
   return data as T;
@@ -120,7 +124,7 @@ async function fetchUploadsPlaylistId(ref: YoutubeChannelRef): Promise<string> {
     channelId = byHandle.items?.[0]?.id ?? null;
     if (!channelId) {
       throw new Error(
-        "Could not find this YouTube channel. Use its /@handle or /channel/ link in the group's social links.",
+        tolgee.t("studio.groups.shared.youtube_channel_lookup_failed"),
       );
     }
   }
@@ -132,7 +136,9 @@ async function fetchUploadsPlaylistId(ref: YoutubeChannelRef): Promise<string> {
       : ref.kind === "username"
         ? { forUsername: ref.value }
         : {};
-  if (!Object.keys(lookup).length) throw new Error("YouTube channel not found");
+  if (!Object.keys(lookup).length) {
+    throw new Error(tolgee.t("studio.groups.shared.youtube_channel_not_found"));
+  }
 
   const channels = await youtubeGet<ChannelsResponse>("channels", {
     part: "contentDetails",
@@ -140,7 +146,9 @@ async function fetchUploadsPlaylistId(ref: YoutubeChannelRef): Promise<string> {
   });
   const uploads =
     channels.items?.[0]?.contentDetails?.relatedPlaylists?.uploads;
-  if (!uploads) throw new Error("YouTube channel not found");
+  if (!uploads) {
+    throw new Error(tolgee.t("studio.groups.shared.youtube_channel_not_found"));
+  }
   return uploads;
 }
 
@@ -170,7 +178,9 @@ export async function fetchYoutubeChannelLiveVideos(
   maxUploads = 50,
 ): Promise<YoutubeLiveVideo[]> {
   const ref = parseYoutubeChannelUrl(channelUrl);
-  if (!ref) throw new Error("The group's YouTube link is not a channel URL");
+  if (!ref) {
+    throw new Error(tolgee.t("studio.groups.shared.youtube_not_channel_url"));
+  }
 
   const playlistId = await fetchUploadsPlaylistId(ref);
   const playlist = await youtubeGet<{

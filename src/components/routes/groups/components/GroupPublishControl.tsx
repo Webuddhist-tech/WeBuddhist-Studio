@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { MdOutlineFileUpload } from "react-icons/md";
 import { IoEyeOffSharp } from "react-icons/io5";
 import { Pecha } from "@/components/ui/shadimport";
@@ -27,6 +28,7 @@ const GroupPublishControl = ({
   size = "sm",
   className,
 }: GroupPublishControlProps) => {
+  const { t } = useTranslate();
   const queryClient = useQueryClient();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const isPublished = isGroupVisibleInApp(group.status);
@@ -47,8 +49,8 @@ const GroupPublishControl = ({
       setConfirmOpen(false);
       toast.success(
         isGroupVisibleInApp(updated.status)
-          ? "Group published — it is now visible in the app"
-          : "Group hidden — nothing was deleted",
+          ? t("studio.groups.components.publish.published_toast")
+          : t("studio.groups.components.publish.hidden_toast"),
       );
     },
     onError: (err) => toast.error(getApiErrorMessage(err)),
@@ -77,12 +79,15 @@ const GroupPublishControl = ({
       >
         {isPublished ? (
           <>
-            <IoEyeOffSharp className="w-4 h-4" /> Hide from app
+            <IoEyeOffSharp className="w-4 h-4" />{" "}
+            {t("studio.groups.components.publish.hide_from_app")}
           </>
         ) : (
           <>
             <MdOutlineFileUpload className="w-4 h-4" />
-            {statusMutation.isPending ? "Publishing…" : "Publish"}
+            {statusMutation.isPending
+              ? t("studio.groups.components.publish.publishing")
+              : t("studio.common.publish")}
           </>
         )}
       </Button>
@@ -91,31 +96,35 @@ const GroupPublishControl = ({
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
             <Pecha.AlertDialogTitle>
-              Hide &ldquo;{groupTitle}&rdquo; from the app?
+              {t("studio.groups.components.publish.confirm_title", {
+                title: groupTitle,
+              })}
             </Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription asChild>
               <div className="space-y-2">
                 <p>
-                  The group will disappear from the app for everyone
-                  {memberCount > 0 ? (
-                    <>
-                      , including its {memberCount} existing member
-                      {memberCount === 1 ? "" : "s"}
-                    </>
-                  ) : null}
-                  . Its posts, events, chants, accumulations and chat all become
-                  unreachable while it is hidden.
+                  {memberCount === 0
+                    ? t("studio.groups.components.publish.confirm_body")
+                    : memberCount === 1
+                      ? t(
+                          "studio.groups.components.publish.confirm_body_members_one",
+                        )
+                      : t(
+                          "studio.groups.components.publish.confirm_body_members_other",
+                          { count: memberCount },
+                        )}
                 </p>
                 <p>
-                  Nothing is deleted. Members, content and followers are kept
-                  and come back exactly as they are when you publish again.
+                  {t(
+                    "studio.groups.components.publish.confirm_nothing_deleted",
+                  )}
                 </p>
               </div>
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <Pecha.AlertDialogFooter>
             <Pecha.AlertDialogCancel disabled={statusMutation.isPending}>
-              Cancel
+              {t("studio.common.cancel")}
             </Pecha.AlertDialogCancel>
             <Pecha.AlertDialogAction
               disabled={statusMutation.isPending}
@@ -124,7 +133,9 @@ const GroupPublishControl = ({
                 statusMutation.mutate("UNPUBLISHED");
               }}
             >
-              {statusMutation.isPending ? "Hiding…" : "Hide group"}
+              {statusMutation.isPending
+                ? t("studio.groups.components.publish.hiding")
+                : t("studio.groups.components.publish.hide_group")}
             </Pecha.AlertDialogAction>
           </Pecha.AlertDialogFooter>
         </Pecha.AlertDialogContent>

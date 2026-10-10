@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useTranslate } from "@tolgee/react";
 import { IoMdAdd, IoMdClose } from "react-icons/io";
 import { Pecha } from "@/components/ui/shadimport";
 import { useLanguages } from "@/hooks/useLanguages";
@@ -38,6 +39,7 @@ const LocationFormDialog = ({
   onSubmit,
   initialName = "",
 }: LocationFormDialogProps) => {
+  const { t } = useTranslate();
   const isEdit = Boolean(location);
 
   const form = useForm<LocationFormData>({
@@ -174,8 +176,11 @@ const LocationFormDialog = ({
   const showSharedWarning = isEdit && eventCount > 0;
 
   const getSubmitLabel = () => {
-    if (isSubmitting) return isEdit ? "Saving…" : "Creating…";
-    return isEdit ? "Save changes" : "Create location";
+    if (isSubmitting)
+      return isEdit ? t("studio.common.saving") : t("studio.common.creating");
+    return isEdit
+      ? t("studio.groups.shared.save_changes")
+      : t("studio.groups.locations.form.create_submit");
   };
 
   return (
@@ -195,15 +200,19 @@ const LocationFormDialog = ({
       >
         <Pecha.DialogHeader>
           <Pecha.DialogTitle>
-            {isEdit ? "Edit location" : "New location"}
+            {isEdit
+              ? t("studio.groups.locations.form.edit_title")
+              : t("studio.groups.locations.form.new_title")}
           </Pecha.DialogTitle>
         </Pecha.DialogHeader>
 
         {showSharedWarning ? (
           <p className="rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-            This location is used by {eventCount} event
-            {eventCount === 1 ? "" : "s"}. Any changes you make here will apply
-            to {eventCount === 1 ? "that event" : "all of them"}.
+            {eventCount === 1
+              ? t("studio.groups.locations.form.shared_warning_one")
+              : t("studio.groups.locations.form.shared_warning_other", {
+                  count: eventCount,
+                })}
           </p>
         ) : null}
 
@@ -214,7 +223,7 @@ const LocationFormDialog = ({
               name="name"
               render={({ field }) => (
                 <Pecha.FormItem>
-                  <Pecha.FormLabel>Name</Pecha.FormLabel>
+                  <Pecha.FormLabel>{t("studio.common.name")}</Pecha.FormLabel>
                   <Pecha.FormControl>
                     <Pecha.Input
                       {...field}
@@ -222,7 +231,9 @@ const LocationFormDialog = ({
                         field.ref(element);
                         nameInputRef.current = element;
                       }}
-                      placeholder="Enter a location name"
+                      placeholder={t(
+                        "studio.groups.locations.form.name_placeholder",
+                      )}
                       maxLength={255}
                     />
                   </Pecha.FormControl>
@@ -233,7 +244,9 @@ const LocationFormDialog = ({
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">Localized names</p>
+                <p className="text-sm font-medium">
+                  {t("studio.groups.locations.form.localized_names")}
+                </p>
                 {nextUnusedLanguage ? (
                   <Pecha.Button
                     type="button"
@@ -242,13 +255,13 @@ const LocationFormDialog = ({
                     onClick={addTranslationRow}
                     className="gap-1"
                   >
-                    <IoMdAdd className="h-4 w-4" /> Add language
+                    <IoMdAdd className="h-4 w-4" />{" "}
+                    {t("studio.groups.locations.form.add_language")}
                   </Pecha.Button>
                 ) : null}
               </div>
               <p className="text-xs text-muted-foreground">
-                Readers see the name in their own language. Where a language has
-                no name here, they get the English one, or the name above.
+                {t("studio.groups.locations.form.localized_names_hint")}
               </p>
 
               {translationRows.fields.map((field, index) => {
@@ -266,7 +279,9 @@ const LocationFormDialog = ({
                           >
                             <Pecha.FormControl>
                               <Pecha.SelectTrigger className="w-full">
-                                <Pecha.SelectValue placeholder="Language" />
+                                <Pecha.SelectValue
+                                  placeholder={t("studio.common.language")}
+                                />
                               </Pecha.SelectTrigger>
                             </Pecha.FormControl>
                             <Pecha.SelectContent>
@@ -296,7 +311,9 @@ const LocationFormDialog = ({
                           <Pecha.FormControl>
                             <Pecha.Input
                               {...nameField}
-                              placeholder="Name in this language"
+                              placeholder={t(
+                                "studio.groups.locations.form.translation_name_placeholder",
+                              )}
                               maxLength={255}
                             />
                           </Pecha.FormControl>
@@ -307,7 +324,9 @@ const LocationFormDialog = ({
                     <button
                       type="button"
                       onClick={() => translationRows.remove(index)}
-                      aria-label="Remove localized name"
+                      aria-label={t(
+                        "studio.groups.locations.form.remove_localized_name",
+                      )}
                       className="mt-2 cursor-pointer p-1 text-muted-foreground hover:text-foreground"
                     >
                       <IoMdClose className="h-4 w-4" />
@@ -319,21 +338,23 @@ const LocationFormDialog = ({
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium">Place</p>
+                <p className="text-sm font-medium">
+                  {t("studio.groups.locations.form.place")}
+                </p>
                 {pin ? (
                   <button
                     type="button"
                     onClick={clearPin}
                     className="cursor-pointer text-xs text-muted-foreground underline hover:text-foreground"
                   >
-                    Clear
+                    {t("studio.common.clear")}
                   </button>
                 ) : null}
               </div>
               <p className="text-xs text-muted-foreground">
                 {isPlaceSearchEnabled()
-                  ? "Search for a place, or click the map to drop a pin. Drag the pin to adjust. You can skip this for online events."
-                  : "Click the map to drop a pin. Drag the pin to adjust. You can skip this for online events."}
+                  ? t("studio.groups.locations.form.place_hint_with_search")
+                  : t("studio.groups.locations.form.place_hint")}
               </p>
 
               <PlaceSearch onSelect={handlePlaceSelected} />
@@ -342,13 +363,15 @@ const LocationFormDialog = ({
 
               {suggestedName ? (
                 <p className="text-xs text-muted-foreground">
-                  Nearest place: {suggestedName}.{" "}
+                  {t("studio.groups.locations.form.nearest_place", {
+                    name: suggestedName,
+                  })}{" "}
                   <button
                     type="button"
                     onClick={applySuggestedName}
                     className="cursor-pointer underline hover:text-foreground"
                   >
-                    Use as name
+                    {t("studio.groups.locations.form.use_as_name")}
                   </button>
                 </p>
               ) : null}
@@ -359,12 +382,16 @@ const LocationFormDialog = ({
                   name="latitude"
                   render={({ field }) => (
                     <Pecha.FormItem>
-                      <Pecha.FormLabel>Latitude</Pecha.FormLabel>
+                      <Pecha.FormLabel>
+                        {t("studio.groups.locations.form.latitude")}
+                      </Pecha.FormLabel>
                       <Pecha.FormControl>
                         <Pecha.Input
                           {...field}
                           inputMode="decimal"
-                          placeholder="-90 to 90"
+                          placeholder={t(
+                            "studio.groups.locations.form.latitude_placeholder",
+                          )}
                         />
                       </Pecha.FormControl>
                       <Pecha.FormMessage />
@@ -376,12 +403,16 @@ const LocationFormDialog = ({
                   name="longitude"
                   render={({ field }) => (
                     <Pecha.FormItem>
-                      <Pecha.FormLabel>Longitude</Pecha.FormLabel>
+                      <Pecha.FormLabel>
+                        {t("studio.groups.locations.form.longitude")}
+                      </Pecha.FormLabel>
                       <Pecha.FormControl>
                         <Pecha.Input
                           {...field}
                           inputMode="decimal"
-                          placeholder="-180 to 180"
+                          placeholder={t(
+                            "studio.groups.locations.form.longitude_placeholder",
+                          )}
                         />
                       </Pecha.FormControl>
                       <Pecha.FormMessage />
@@ -397,7 +428,7 @@ const LocationFormDialog = ({
                 variant="outline"
                 onClick={() => onOpenChange(false)}
               >
-                Cancel
+                {t("studio.common.cancel")}
               </Pecha.Button>
               <Pecha.Button
                 type="submit"

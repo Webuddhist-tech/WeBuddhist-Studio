@@ -61,7 +61,9 @@ describe("VerseOfDayList — page column", () => {
     renderList([verse()]);
 
     expect(
-      screen.getByRole("columnheader", { name: "Page" }),
+      screen.getByRole("columnheader", {
+        name: "studio.verse_of_day.form.page_label",
+      }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("columnheader", { name: "Group" }),
@@ -111,6 +113,8 @@ describe("VerseOfDayList — page column", () => {
       await screen.findByText("A page of short daily teachings."),
     ).toBeInTheDocument();
     await waitFor(() => expect(fetchGroup).toHaveBeenCalledWith("page-1"));
-    expect(screen.getByText("12 followers")).toBeInTheDocument();
+    expect(
+      screen.getByText("studio.verse_of_day.page_cell.followers_other"),
+    ).toBeInTheDocument();
   });
 });

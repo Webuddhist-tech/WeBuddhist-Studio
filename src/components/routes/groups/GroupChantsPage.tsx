@@ -3,6 +3,7 @@ import { Link, useNavigate, useOutletContext } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IoMdAdd, IoMdTrash } from "react-icons/io";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Pagination } from "@/components/ui/molecules/pagination/Pagination";
 import { getApiErrorMessage } from "@/lib/apiErrors";
@@ -19,6 +20,7 @@ import {
 const PAGE_SIZE = 20;
 
 const GroupChantsPage = () => {
+  const { t } = useTranslate();
   const { groupId, myRole, userInfo, readOnlyPlatform } =
     useOutletContext<GroupOutletContext>();
   const navigate = useNavigate();
@@ -47,7 +49,7 @@ const GroupChantsPage = () => {
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteChantCollection(groupId, id),
     onSuccess: () => {
-      toast.success("Collection deleted");
+      toast.success(t("studio.groups.pages.chants.collection_deleted"));
       setPendingDelete(null);
       queryClient.invalidateQueries({
         queryKey: ["cms-chant-collections", groupId],
@@ -62,7 +64,9 @@ const GroupChantsPage = () => {
     if (isLoading) {
       return (
         <Pecha.TableRow>
-          <Pecha.TableCell colSpan={columnCount}>Loading…</Pecha.TableCell>
+          <Pecha.TableCell colSpan={columnCount}>
+            {t("studio.common.loading")}
+          </Pecha.TableCell>
         </Pecha.TableRow>
       );
     }
@@ -70,7 +74,10 @@ const GroupChantsPage = () => {
       return (
         <Pecha.TableRow>
           <Pecha.TableCell colSpan={columnCount} className="text-destructive">
-            {getApiErrorMessage(error, "Could not load collections.")}
+            {getApiErrorMessage(
+              error,
+              t("studio.groups.pages.chants.load_failed"),
+            )}
           </Pecha.TableCell>
         </Pecha.TableRow>
       );
@@ -82,7 +89,7 @@ const GroupChantsPage = () => {
             colSpan={columnCount}
             className="text-muted-foreground"
           >
-            No chant collections yet.
+            {t("studio.groups.pages.chants.empty")}
           </Pecha.TableCell>
         </Pecha.TableRow>
       );
@@ -104,12 +111,21 @@ const GroupChantsPage = () => {
               <div className="h-12 w-12 shrink-0 rounded bg-muted" />
             )}
             <span className="min-w-0 truncate">
-              {capitalizeFirstLetter(collection.name?.trim() || "Untitled")}
+              {capitalizeFirstLetter(
+                collection.name?.trim() ||
+                  t("studio.groups.pages.chants.untitled"),
+              )}
             </span>
           </Link>
         </Pecha.TableCell>
         <Pecha.TableCell>
-          {collection.item_count} item{collection.item_count === 1 ? "" : "s"}
+          {collection.item_count === 1
+            ? t("studio.groups.pages.chants.item_count_one", {
+                count: collection.item_count,
+              })
+            : t("studio.groups.pages.chants.item_count_other", {
+                count: collection.item_count,
+              })}
         </Pecha.TableCell>
         {canWrite ? (
           <Pecha.TableCell className="text-right">
@@ -121,14 +137,16 @@ const GroupChantsPage = () => {
                   navigate(ROUTES.groupChantEdit(groupId, collection.id))
                 }
               >
-                Edit
+                {t("studio.common.edit")}
               </Pecha.Button>
               <Pecha.Button
                 variant="outline"
                 size="sm"
                 className="text-destructive hover:text-destructive"
                 onClick={() => setPendingDelete(collection)}
-                aria-label={`Delete ${collection.name}`}
+                aria-label={t("studio.groups.pages.chants.delete_aria", {
+                  name: collection.name,
+                })}
               >
                 <IoMdTrash className="h-4 w-4" />
               </Pecha.Button>
@@ -146,18 +164,22 @@ const GroupChantsPage = () => {
     canWrite,
     groupId,
     navigate,
+    t,
   ]);
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold">Chants</h2>
+        <h2 className="text-lg font-bold">
+          {t("studio.groups.pages.chants.title")}
+        </h2>
         {canWrite ? (
           <Pecha.Button
             className="gap-1 bg-[#A51C21] text-white hover:bg-[#A51C21]/90"
             onClick={() => navigate(ROUTES.groupChantNew(groupId))}
           >
-            <IoMdAdd className="h-4 w-4" /> New collection
+            <IoMdAdd className="h-4 w-4" />{" "}
+            {t("studio.groups.pages.chants.new_collection")}
           </Pecha.Button>
         ) : null}
       </div>
@@ -166,11 +188,13 @@ const GroupChantsPage = () => {
         <Pecha.Table>
           <Pecha.TableHeader>
             <Pecha.TableRow>
-              <Pecha.TableHead>Name</Pecha.TableHead>
-              <Pecha.TableHead>Items</Pecha.TableHead>
+              <Pecha.TableHead>{t("studio.common.name")}</Pecha.TableHead>
+              <Pecha.TableHead>
+                {t("studio.groups.pages.chants.items_column")}
+              </Pecha.TableHead>
               {canWrite ? (
                 <Pecha.TableHead className="text-right">
-                  Actions
+                  {t("studio.common.actions")}
                 </Pecha.TableHead>
               ) : null}
             </Pecha.TableRow>
@@ -195,16 +219,21 @@ const GroupChantsPage = () => {
       >
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
-            <Pecha.AlertDialogTitle>Delete collection?</Pecha.AlertDialogTitle>
+            <Pecha.AlertDialogTitle>
+              {t("studio.groups.pages.chants.delete_title")}
+            </Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
-              This will permanently remove &ldquo;
-              {capitalizeFirstLetter(pendingDelete?.name?.trim() || "Untitled")}
-              &rdquo;. This action cannot be undone.
+              {t("studio.groups.pages.chants.delete_description", {
+                name: capitalizeFirstLetter(
+                  pendingDelete?.name?.trim() ||
+                    t("studio.groups.pages.chants.untitled"),
+                ),
+              })}
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <Pecha.AlertDialogFooter>
             <Pecha.AlertDialogCancel disabled={deleteMutation.isPending}>
-              Cancel
+              {t("studio.common.cancel")}
             </Pecha.AlertDialogCancel>
             <Pecha.AlertDialogAction
               className="bg-destructive text-white hover:bg-destructive/90"
@@ -214,7 +243,9 @@ const GroupChantsPage = () => {
                 if (pendingDelete) deleteMutation.mutate(pendingDelete.id);
               }}
             >
-              {deleteMutation.isPending ? "Deleting…" : "Delete"}
+              {deleteMutation.isPending
+                ? t("studio.common.deleting")
+                : t("studio.common.delete")}
             </Pecha.AlertDialogAction>
           </Pecha.AlertDialogFooter>
         </Pecha.AlertDialogContent>

@@ -3,6 +3,7 @@ import { DASHBOARD_TABLE_ICON_BTN } from "@/components/routes/dashboard/dashboar
 import type { AuthorGroupMemberRole } from "@/components/routes/groups/api/groupsApi";
 import type { PlatformRole } from "@/lib/platformAccess";
 import { canEditContent } from "@/lib/contentPermissions";
+import { useTranslate } from "@tolgee/react";
 
 type SeriesPlanRowActionsProps = {
   planId: string;
@@ -27,11 +28,17 @@ export function SeriesPlanRowActions({
   readOnly = false,
   onRemoveFromSeries,
 }: SeriesPlanRowActionsProps) {
+  const { t } = useTranslate();
   const canRemove =
     !readOnly && canEditContent(groupRole, status, platformRole);
 
   const additionalMenuItems = canRemove
-    ? [{ label: "Remove from series", onClick: onRemoveFromSeries }]
+    ? [
+        {
+          label: t("studio.series.plans.remove_from_series"),
+          onClick: onRemoveFromSeries,
+        },
+      ]
     : [];
 
   return (

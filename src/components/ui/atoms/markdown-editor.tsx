@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useTranslate } from "@tolgee/react";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/atoms/textarea";
 import { MarkdownToolbar } from "@/components/ui/molecules/markdown-editor/MarkdownToolbar";
@@ -28,6 +29,7 @@ const MarkdownEditor = ({
   className,
   textareaClassName,
 }: MarkdownEditorProps) => {
+  const { t } = useTranslate();
   const [activeTab, setActiveTab] = useState<"write" | "preview">(
     disabled ? "preview" : "write",
   );
@@ -153,7 +155,7 @@ const MarkdownEditor = ({
             disabled && "opacity-50 cursor-not-allowed",
           )}
         >
-          Write
+          {t("studio.ui.markdown_editor.write")}
         </button>
         <button
           type="button"
@@ -165,7 +167,7 @@ const MarkdownEditor = ({
               : "text-muted-foreground hover:text-foreground",
           )}
         >
-          Preview
+          {t("studio.ui.markdown_editor.preview")}
         </button>
       </div>
 

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslate } from "@tolgee/react";
 import {
   HoverCard,
   HoverCardContent,
@@ -33,6 +34,7 @@ const toMetadata = (info: GroupInfo[] | undefined): GroupMetadataDTO[] =>
   }));
 
 const VerseOfDayPageCell = ({ pageId, pageInfo }: VerseOfDayPageCellProps) => {
+  const { t } = useTranslate();
   const [open, setOpen] = useState(false);
   const fallbackMetadata = toMetadata(pageInfo);
 
@@ -49,7 +51,10 @@ const VerseOfDayPageCell = ({ pageId, pageInfo }: VerseOfDayPageCellProps) => {
   }
 
   const metadata = page?.metadata?.length ? page.metadata : fallbackMetadata;
-  const title = pickGroupTitle(metadata, "Untitled page");
+  const title = pickGroupTitle(
+    metadata,
+    t("studio.verse_of_day.untitled_page"),
+  );
   const details = pickMetadata(metadata);
   const avatarUrl = page ? resolveGroupAvatarUrl(page) : null;
   const tags = page?.tags ?? [];
@@ -64,7 +69,9 @@ const VerseOfDayPageCell = ({ pageId, pageInfo }: VerseOfDayPageCellProps) => {
           {title}
         </button>
       </HoverCardTrigger>
-      <HoverCardContent aria-label={`Details of page ${title}`}>
+      <HoverCardContent
+        aria-label={t("studio.verse_of_day.page_cell.details_aria", { title })}
+      >
         <div className="flex gap-3">
           {avatarUrl ? (
             <img
@@ -93,7 +100,9 @@ const VerseOfDayPageCell = ({ pageId, pageInfo }: VerseOfDayPageCellProps) => {
               <Badge variant="outline">{page.status.toLowerCase()}</Badge>
             ) : null}
             <Badge variant="outline">
-              {page.is_public ? "Public" : "Private"}
+              {page.is_public
+                ? t("studio.verse_of_day.page_cell.public")
+                : t("studio.verse_of_day.page_cell.private")}
             </Badge>
             {page.tradition?.name ? (
               <Badge variant="outline">{page.tradition.name}</Badge>
@@ -107,11 +116,18 @@ const VerseOfDayPageCell = ({ pageId, pageInfo }: VerseOfDayPageCellProps) => {
         ) : null}
         {page ? (
           <p className="mt-3 text-xs text-muted-foreground">
-            {page.follower_count} follower
-            {page.follower_count === 1 ? "" : "s"}
+            {page.follower_count === 1
+              ? t("studio.verse_of_day.page_cell.followers_one", {
+                  count: page.follower_count,
+                })
+              : t("studio.verse_of_day.page_cell.followers_other", {
+                  count: page.follower_count,
+                })}
           </p>
         ) : isLoading ? (
-          <p className="mt-3 text-xs text-muted-foreground">Loading…</p>
+          <p className="mt-3 text-xs text-muted-foreground">
+            {t("studio.common.loading")}
+          </p>
         ) : null}
       </HoverCardContent>
     </HoverCard>

@@ -1,5 +1,6 @@
 import { Link, useOutletContext } from "react-router-dom";
 import { IoMdCreate } from "react-icons/io";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import type { LanguageCode } from "@/schema/SeriesSchema";
@@ -12,6 +13,7 @@ import { traditionLabel } from "./lib/groupTradition";
 import type { GroupOutletContext } from "./GroupLayout";
 
 const GroupAboutPage = () => {
+  const { t } = useTranslate();
   const { group, groupId, myRole, readOnlyPlatform, canPublishGroup } =
     useOutletContext<GroupOutletContext>();
   const bannerUrl = resolveGroupBannerUrl(group);
@@ -26,7 +28,8 @@ const GroupAboutPage = () => {
         <div className="flex justify-end">
           <Button variant="outline" size="sm" asChild>
             <Link to={ROUTES.groupEdit(groupId)}>
-              <IoMdCreate className="w-4 h-4" /> Edit about
+              <IoMdCreate className="w-4 h-4" />{" "}
+              {t("studio.groups.pages.about.edit_about")}
             </Link>
           </Button>
         </div>
@@ -42,24 +45,37 @@ const GroupAboutPage = () => {
 
       <div className="flex flex-wrap gap-4 text-sm">
         <Pecha.Badge variant="outline">
-          {group.is_public ? "Public" : "Private"}
+          {group.is_public
+            ? t("studio.groups.pages.visibility.public")
+            : t("studio.groups.pages.visibility.private")}
         </Pecha.Badge>
         <Pecha.Badge variant={group.tradition ? "secondary" : "outline"}>
           {group.tradition
             ? traditionLabel(group.tradition)
-            : "No tradition set"}
+            : t("studio.groups.pages.about.no_tradition")}
         </Pecha.Badge>
         <span className="text-muted-foreground">
-          {memberCount} member{memberCount === 1 ? "" : "s"}
+          {memberCount === 1
+            ? t("studio.groups.pages.about.member_count_one", {
+                count: memberCount,
+              })
+            : t("studio.groups.pages.about.member_count_other", {
+                count: memberCount,
+              })}
         </span>
         <span className="text-muted-foreground">
-          {group.follower_count} follower
-          {group.follower_count === 1 ? "" : "s"}
+          {group.follower_count === 1
+            ? t("studio.groups.pages.about.follower_count_one", {
+                count: group.follower_count,
+              })
+            : t("studio.groups.pages.about.follower_count_other", {
+                count: group.follower_count,
+              })}
         </span>
       </div>
 
       {group.metadata.length > 0 ? (
-        <GroupDetailCard title="About">
+        <GroupDetailCard title={t("studio.groups.pages.about.about_title")}>
           <div className="space-y-4">
             {group.metadata.map((meta) => (
               <div
@@ -92,7 +108,7 @@ const GroupAboutPage = () => {
       ) : null}
 
       {group.tags.length > 0 ? (
-        <GroupDetailCard title="Tags">
+        <GroupDetailCard title={t("studio.groups.pages.about.tags_title")}>
           <div className="flex flex-wrap gap-2">
             {group.tags.map((tag) => (
               <Pecha.Badge key={tag.id} variant="secondary">
@@ -104,7 +120,9 @@ const GroupAboutPage = () => {
       ) : null}
 
       {group.social_links.length > 0 ? (
-        <GroupDetailCard title="Social links">
+        <GroupDetailCard
+          title={t("studio.groups.pages.about.social_links_title")}
+        >
           <ul className="space-y-2">
             {group.social_links.map((link, index) => (
               <li key={`${link.platform}-${index}`} className="text-sm">

@@ -1,4 +1,5 @@
 import { FaStar } from "react-icons/fa";
+import type { useTranslate } from "@tolgee/react";
 import { getLanguageLabel } from "@/components/api/languagesApi";
 import type { DashboardLanguageCode } from "./dashboardTable";
 
@@ -40,30 +41,33 @@ export function FeaturedStar({
   );
 }
 
-export function statusChip(status: string) {
+export function statusChip(
+  status: string,
+  t: ReturnType<typeof useTranslate>["t"],
+) {
   switch (status) {
     case "PUBLISHED":
       return (
         <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-[#4BBE51] dark:bg-green-900/40 dark:text-green-200">
-          Published
+          {t("studio.common.published")}
         </span>
       );
     case "UNPUBLISHED":
       return (
         <span className="rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900/40 dark:text-red-200">
-          Unpublished
+          {t("studio.dashboard.status.unpublished")}
         </span>
       );
     case "ARCHIVED":
       return (
         <span className="rounded-full border border-gray-300 bg-white px-2.5 py-0.5 text-xs font-medium text-gray-900 dark:border-gray-600 dark:bg-transparent dark:text-gray-100">
-          Archived
+          {t("studio.dashboard.status.archived")}
         </span>
       );
     default:
       return (
         <span className="rounded-full bg-[#E0EDFE] px-2.5 py-0.5 text-xs font-medium text-[#020C1D] dark:bg-blue-950/50 dark:text-white">
-          Draft
+          {t("studio.common.draft")}
         </span>
       );
   }

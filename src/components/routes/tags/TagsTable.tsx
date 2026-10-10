@@ -1,3 +1,4 @@
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { IoMdCreate, IoMdTrash } from "react-icons/io";
 import defaultCover from "/default-image.webp";
@@ -18,10 +19,11 @@ const TagsTable = ({
   onEdit,
   onDelete,
 }: TagsTableProps) => {
+  const { t } = useTranslate();
   if (isLoading) {
     return (
       <p className="text-sm text-muted-foreground py-8 text-center">
-        Loading tags...
+        {t("studio.tags.loading")}
       </p>
     );
   }
@@ -31,12 +33,16 @@ const TagsTable = ({
       <Pecha.Table>
         <Pecha.TableHeader>
           <Pecha.TableRow>
-            <Pecha.TableHead className="w-20">Image</Pecha.TableHead>
-            <Pecha.TableHead>Name</Pecha.TableHead>
-            <Pecha.TableHead className="w-24">Plans</Pecha.TableHead>
+            <Pecha.TableHead className="w-20">
+              {t("studio.common.image")}
+            </Pecha.TableHead>
+            <Pecha.TableHead>{t("studio.common.name")}</Pecha.TableHead>
+            <Pecha.TableHead className="w-24">
+              {t("studio.tags.table.plans")}
+            </Pecha.TableHead>
             {showActionsColumn ? (
               <Pecha.TableHead className="w-28 text-right">
-                Actions
+                {t("studio.common.actions")}
               </Pecha.TableHead>
             ) : null}
           </Pecha.TableRow>
@@ -77,7 +83,9 @@ const TagsTable = ({
                       type="button"
                       onClick={() => onEdit(tag)}
                       className="p-2 rounded-md border hover:bg-muted/50 transition-colors"
-                      aria-label={`Edit ${tag.name}`}
+                      aria-label={t("studio.tags.table.edit_aria", {
+                        name: tag.name,
+                      })}
                     >
                       <IoMdCreate className="w-4 h-4" />
                     </button>
@@ -85,7 +93,9 @@ const TagsTable = ({
                       type="button"
                       onClick={() => onDelete(tag)}
                       className="p-2 rounded-md border text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                      aria-label={`Delete ${tag.name}`}
+                      aria-label={t("studio.tags.table.delete_aria", {
+                        name: tag.name,
+                      })}
                     >
                       <IoMdTrash className="w-4 h-4" />
                     </button>

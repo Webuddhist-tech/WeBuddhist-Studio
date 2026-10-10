@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { FiLoader, FiSettings } from "react-icons/fi";
 import { Pecha } from "@/components/ui/shadimport";
 import {
@@ -32,9 +33,12 @@ interface TaskSettingsDialogProps {
   dayTasks?: DayTask[];
 }
 
+type PanelKind = "commentary" | "translation";
+
 interface PanelSettingProps {
   id: string;
-  label: string;
+  /** Picks the panel's sentences, each translated whole. */
+  kind: PanelKind;
   isOpen: boolean;
   textId: string | null;
   options: RelatedText[];
@@ -46,7 +50,7 @@ interface PanelSettingProps {
 
 const PanelSetting = ({
   id,
-  label,
+  kind,
   isOpen,
   textId,
   options,
@@ -55,6 +59,29 @@ const PanelSetting = ({
   onOpenChange,
   onTextChange,
 }: PanelSettingProps) => {
+  const { t } = useTranslate();
+  const keys =
+    kind === "commentary"
+      ? {
+          openByDefault:
+            "studio.modals.task_settings.commentary.open_by_default",
+          selectAria: "studio.modals.task_settings.commentary.select_aria",
+          loading: "studio.modals.task_settings.commentary.loading",
+          noSource: "studio.modals.task_settings.commentary.no_source",
+          noneFound: "studio.modals.task_settings.commentary.none_found",
+          opensSelected:
+            "studio.modals.task_settings.commentary.opens_selected",
+        }
+      : {
+          openByDefault:
+            "studio.modals.task_settings.translation.open_by_default",
+          selectAria: "studio.modals.task_settings.translation.select_aria",
+          loading: "studio.modals.task_settings.translation.loading",
+          noSource: "studio.modals.task_settings.translation.no_source",
+          noneFound: "studio.modals.task_settings.translation.none_found",
+          opensSelected:
+            "studio.modals.task_settings.translation.opens_selected",
+        };
   // Keep a saved choice selectable even when the list no longer offers it.
   const choices =
     textId && !options.some((option) => option.id === textId)
@@ -72,7 +99,7 @@ const PanelSetting = ({
           checked={isOpen}
           onCheckedChange={(checked) => onOpenChange(checked === true)}
         />
-        Open {label.toLowerCase()} by default
+        {t(keys.openByDefault)}
       </label>
 
       <Pecha.Select
@@ -82,12 +109,12 @@ const PanelSetting = ({
         }
         disabled={!isOpen}
       >
-        <Pecha.SelectTrigger aria-label={`${label} text`} className="w-full">
+        <Pecha.SelectTrigger aria-label={t(keys.selectAria)} className="w-full">
           <Pecha.SelectValue />
         </Pecha.SelectTrigger>
         <Pecha.SelectContent>
           <Pecha.SelectItem value={NO_TEXT}>
-            None (show the list)
+            {t("studio.modals.task_settings.none_option")}
           </Pecha.SelectItem>
           {choices.map((option) => (
             <Pecha.SelectItem key={option.id} value={option.id}>
@@ -106,17 +133,16 @@ const PanelSetting = ({
         <p className="text-xs text-muted-foreground">
           {isLoading ? (
             <span className="flex items-center gap-1">
-              <FiLoader className="w-3 h-3 animate-spin" /> Loading{" "}
-              {label.toLowerCase()} list…
+              <FiLoader className="w-3 h-3 animate-spin" /> {t(keys.loading)}
             </span>
           ) : !hasSource ? (
-            `This task has no text to read ${label.toLowerCase()} from. The reader will show the list.`
+            t(keys.noSource)
           ) : options.length === 0 ? (
-            `No ${label.toLowerCase()} found for this task's text. The reader will show the list.`
+            t(keys.noneFound)
           ) : textId ? (
-            `The reader opens this ${label.toLowerCase()}.`
+            t(keys.opensSelected)
           ) : (
-            `The reader shows the list without opening one.`
+            t("studio.modals.task_settings.shows_list")
           )}
         </p>
       )}
@@ -130,6 +156,7 @@ const TaskSettingsDialog = ({
   settings,
   dayTasks = [],
 }: TaskSettingsDialogProps) => {
+  const { t } = useTranslate();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<TaskSettings>({
     ...DEFAULT_TASK_SETTINGS,
@@ -179,13 +206,13 @@ const TaskSettingsDialog = ({
   const saveMutation = useMutation({
     mutationFn: () => updateTaskSettings(taskId, draft),
     onSuccess: () => {
-      toast.success("Task settings saved");
+      toast.success(t("studio.modals.task_settings.saved"));
       queryClient.invalidateQueries({ queryKey: ["planDetails", planId] });
       queryClient.invalidateQueries({ queryKey: ["taskDetails", taskId] });
       setOpen(false);
     },
     onError: (error: unknown) => {
-      toast.error("Failed to save task settings", {
+      toast.error(t("studio.modals.task_settings.save_failed"), {
         description: getApiErrorMessage(error),
       });
     },
@@ -203,19 +230,22 @@ const TaskSettingsDialog = ({
         }}
         className="flex items-center gap-2 cursor-pointer w-full"
       >
-        <FiSettings className="w-4 h-4" /> Settings
+        <FiSettings className="w-4 h-4" />{" "}
+        {t("studio.modals.task_settings.menu_label")}
       </span>
 
       <Pecha.Dialog open={open} onOpenChange={setOpen}>
         <Pecha.DialogContent className="sm:max-w-lg">
           <Pecha.DialogHeader>
-            <Pecha.DialogTitle>Task settings</Pecha.DialogTitle>
+            <Pecha.DialogTitle>
+              {t("studio.modals.task_settings.title")}
+            </Pecha.DialogTitle>
           </Pecha.DialogHeader>
 
           <div className="space-y-3">
             <PanelSetting
               id={`task-${taskId}-commentary`}
-              label="Commentary"
+              kind="commentary"
               isOpen={draft.is_commentary_open}
               textId={draft.commentary_text_id}
               options={relations?.commentaries ?? []}
@@ -226,7 +256,7 @@ const TaskSettingsDialog = ({
             />
             <PanelSetting
               id={`task-${taskId}-translation`}
-              label="Translation"
+              kind="translation"
               isOpen={draft.is_translation_open}
               textId={draft.translation_text_id}
               options={relations?.translations ?? []}
@@ -248,12 +278,16 @@ const TaskSettingsDialog = ({
                     update({ is_live: checked === true })
                   }
                 />
-                Live
+                {t("studio.modals.task_settings.live")}
               </label>
               <p className="text-xs text-muted-foreground">
                 {draft.is_live && otherLiveTask
-                  ? `This will turn off live for "${otherLiveTask.title || "another task"}" on this day.`
-                  : "Only one task per day can be live."}
+                  ? t("studio.modals.task_settings.live_turns_off", {
+                      title:
+                        otherLiveTask.title ||
+                        t("studio.modals.task_settings.another_task"),
+                    })
+                  : t("studio.modals.task_settings.one_live_per_day")}
               </p>
             </div>
           </div>
@@ -265,7 +299,7 @@ const TaskSettingsDialog = ({
               onClick={() => setOpen(false)}
               disabled={saveMutation.isPending}
             >
-              Cancel
+              {t("studio.common.cancel")}
             </Pecha.Button>
             <Pecha.Button
               type="button"
@@ -276,7 +310,7 @@ const TaskSettingsDialog = ({
               {saveMutation.isPending && (
                 <FiLoader className="w-4 h-4 animate-spin" />
               )}
-              Save
+              {t("studio.common.save")}
             </Pecha.Button>
           </div>
         </Pecha.DialogContent>

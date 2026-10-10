@@ -30,7 +30,7 @@ const ResetPassword = () => {
       return response.data;
     },
     onSuccess: () => {
-      setSuccess("Password reset successfully, redirecting to login page...");
+      setSuccess(t("studio.auth.reset_password.success"));
       setTimeout(() => {
         navigate("/login");
       }, 3000);
@@ -62,7 +62,7 @@ const ResetPassword = () => {
       forgotPasswordMutation.mutate({ password: clientPassword });
     } catch (error) {
       if (error instanceof z.ZodError) {
-        setError(error.issues[0].message);
+        setError(t(error.issues[0].message));
       }
     }
   };

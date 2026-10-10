@@ -122,7 +122,7 @@ const Login = () => {
       return;
     }
 
-    setErrors(data.message || "Phone authentication failed");
+    setErrors(data.message || t("studio.auth.errors.phone_auth_failed"));
   };
 
   const applyGoogleExchangeResult = (data: GoogleExchangeResponse) => {
@@ -141,7 +141,7 @@ const Login = () => {
       return;
     }
 
-    setErrors(data.message || "Google authentication failed");
+    setErrors(data.message || t("studio.auth.errors.google_auth_failed"));
   };
 
   const applyEmailExchangeResult = (data: EmailExchangeResponse) => {
@@ -160,7 +160,7 @@ const Login = () => {
       return;
     }
 
-    setErrors(data.message || "Email authentication failed");
+    setErrors(data.message || t("studio.auth.errors.email_auth_failed"));
   };
 
   const phoneExchangeMutation = useMutation({
@@ -323,8 +323,8 @@ const Login = () => {
         setPendingOauthProvider(null);
         setErrors(
           intentProvider === "google"
-            ? "Unable to complete Google login. Please try again."
-            : "Unable to complete phone login. Please try again.",
+            ? t("studio.auth.login.google_login_incomplete")
+            : t("studio.auth.login.phone_login_incomplete"),
         );
       }
     };
@@ -355,7 +355,8 @@ const Login = () => {
       void completeLogin(accessToken, refreshToken);
     },
     onError: (error: any) => {
-      const detail = getApiErrorDetail(error) ?? "Login failed";
+      const detail =
+        getApiErrorDetail(error) ?? t("studio.auth.login.login_failed");
       const emailVerificationErrorMessage = detail
         .toLowerCase()
         .includes("author not verified");
@@ -387,7 +388,7 @@ const Login = () => {
     },
     onError: (error: any) => {
       const errorMsg =
-        getApiErrorDetail(error) || "Email re-verification failed";
+        getApiErrorDetail(error) || t("studio.auth.login.reverify_failed");
       setErrors(errorMsg);
       setSuccessMessage("");
     },
@@ -426,8 +427,8 @@ const Login = () => {
     if (!isAuth0Configured) {
       setErrors(
         intent === AUTH0_INTENT.googleLogin
-          ? "Google login is not configured."
-          : "Phone login is not configured.",
+          ? t("studio.auth.login.google_not_configured")
+          : t("studio.auth.login.phone_not_configured"),
       );
       return;
     }
@@ -454,7 +455,7 @@ const Login = () => {
     await startAuth0Login(
       auth0Config.connection,
       AUTH0_INTENT.phoneLogin,
-      "Unable to start phone login. Please try again.",
+      t("studio.auth.login.phone_login_start_failed"),
     );
   };
 
@@ -462,7 +463,7 @@ const Login = () => {
     await startAuth0Login(
       auth0Config.googleConnection,
       AUTH0_INTENT.googleLogin,
-      "Unable to start Google login. Please try again.",
+      t("studio.auth.login.google_login_start_failed"),
     );
   };
 
@@ -470,7 +471,7 @@ const Login = () => {
     e.preventDefault();
     const auth0Token = getPendingAuth0Token();
     if (!auth0Token) {
-      setErrors("Sign-in session expired. Please try again.");
+      setErrors(t("studio.auth.login.session_expired"));
       setNeedsOAuthProfile(false);
       return;
     }
@@ -489,16 +490,21 @@ const Login = () => {
     }
   };
 
+  // The backend's "Author not active" detail is shown in the UI language.
+  const errorText =
+    errors && isAuthorNotActiveDetail(errors)
+      ? t("studio.errors.author_not_active")
+      : errors;
+
   if (inactiveOnly) {
     return (
       <ContainerLayout title={t("studio.login.title")}>
         <div className="animate-in fade-in-0 slide-in-from-top-1 w-full max-w-[425px] space-y-4 text-center duration-500">
           <p className="text-sm text-muted-foreground">
-            {errors || AUTHOR_NOT_ACTIVE_DETAIL}
+            {errorText || t("studio.errors.author_not_active")}
           </p>
           <p className="text-xs text-muted-foreground">
-            Your account must be activated by a platform administrator before
-            you can sign in.
+            {t("studio.auth.login.inactive_help")}
           </p>
         </div>
       </ContainerLayout>
@@ -521,11 +527,11 @@ const Login = () => {
           onSubmit={handleOAuthProfileSubmit}
         >
           <p className="text-sm text-muted-foreground">
-            Enter your name to finish creating your account.
+            {t("studio.auth.login.profile_prompt")}
           </p>
           <div className="text-sm space-y-2">
             <Label htmlFor="first_name" className="font-medium">
-              First name
+              {t("sign_up.form.first_name")}
             </Label>
             <Input
               id="first_name"
@@ -537,7 +543,7 @@ const Login = () => {
           </div>
           <div className="text-sm space-y-2">
             <Label htmlFor="last_name" className="font-medium">
-              Last name
+              {t("sign_up.form.last_name")}
             </Label>
             <Input
               id="last_name"
@@ -553,11 +559,13 @@ const Login = () => {
             className="w-full text-sm transition-transform hover:scale-[1.02] active:scale-[0.98]"
             disabled={profilePending}
           >
-            {profilePending ? "Creating profile..." : "Create profile"}
+            {profilePending
+              ? t("studio.auth.login.creating_profile")
+              : t("studio.auth.login.create_profile")}
           </Button>
           {errors && (
             <div className="animate-in fade-in-0 slide-in-from-top-1 text-center text-sm text-red-800 duration-300 dark:text-red-400">
-              {errors}
+              {errorText}
             </div>
           )}
         </form>
@@ -620,7 +628,7 @@ const Login = () => {
         <div className="flex items-center gap-3 py-1">
           <div className="h-px flex-1 bg-border" />
           <span className="text-xs text-muted-foreground">
-            or continue with
+            {t("studio.auth.login.or_continue_with")}
           </span>
           <div className="h-px flex-1 bg-border" />
         </div>
@@ -635,8 +643,8 @@ const Login = () => {
           >
             <FcGoogle className="h-4 w-4 shrink-0" />
             {pendingOauthProvider === "google"
-              ? "Continuing with Google..."
-              : "Continue with Google"}
+              ? t("studio.auth.login.continuing_with_google")
+              : t("studio.auth.login.continue_with_google")}
           </Button>
         </div>
         <div className="flex justify-center">
@@ -649,8 +657,8 @@ const Login = () => {
           >
             <IoCallOutline className="h-4 w-4 shrink-0" />
             {pendingOauthProvider === "phone"
-              ? "Continuing with phone..."
-              : "Continue with phone"}
+              ? t("studio.auth.login.continuing_with_phone")
+              : t("studio.auth.login.continue_with_phone")}
           </Button>
         </div>
         {showEmailReverify && (
@@ -670,7 +678,7 @@ const Login = () => {
         )}
         {errors && (
           <div className="animate-in fade-in-0 slide-in-from-top-1 text-center text-sm text-red-800 duration-300 dark:text-red-400">
-            {errors}
+            {errorText}
           </div>
         )}
         {successMessage && (

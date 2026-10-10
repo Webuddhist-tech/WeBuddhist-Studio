@@ -3,6 +3,7 @@ import { IoMdAdd, IoMdSearch } from "react-icons/io";
 import { useDebounce } from "use-debounce";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import AuthButton from "@/components/ui/molecules/auth-button/AuthButton";
@@ -25,6 +26,7 @@ import TagsTable from "./TagsTable";
 const PAGE_SIZE = 10;
 
 const Tags = () => {
+  const { t } = useTranslate();
   const { data: userInfo } = useUserInfo();
   const showActionsColumn = shouldShowCmsActionsColumn(userInfo?.platform_role);
   const [search, setSearch] = useState("");
@@ -60,7 +62,7 @@ const Tags = () => {
   const createMutation = useMutation({
     mutationFn: createTag,
     onSuccess: () => {
-      toast.success("Tag created successfully");
+      toast.success(t("studio.tags.toast.created"));
       setFormOpen(false);
       invalidateTags();
     },
@@ -71,7 +73,7 @@ const Tags = () => {
     mutationFn: ({ id, payload }: { id: string; payload: TagPayload }) =>
       updateTag(id, payload),
     onSuccess: () => {
-      toast.success("Tag updated successfully");
+      toast.success(t("studio.tags.toast.updated"));
       setFormOpen(false);
       setEditingTag(null);
       invalidateTags();
@@ -82,7 +84,7 @@ const Tags = () => {
   const deleteMutation = useMutation({
     mutationFn: deleteTag,
     onSuccess: () => {
-      toast.success("Tag deleted successfully");
+      toast.success(t("studio.tags.toast.deleted"));
       setDeleteTarget(null);
       invalidateTags();
     },
@@ -117,7 +119,7 @@ const Tags = () => {
           <div className="border w-fit px-2 bg-white dark:bg-input/30 rounded-md border-gray-200 dark:border-[#313132] flex items-center">
             <IoMdSearch className="w-4 h-4" />
             <Pecha.Input
-              placeholder="Search tags..."
+              placeholder={t("studio.tags.search_placeholder")}
               className="rounded-md border-none dark:bg-transparent px-4 shadow-none py-2"
               value={search}
               onChange={(e) => {
@@ -132,7 +134,7 @@ const Tags = () => {
               className="bg-gray-100 hover:bg-gray-200"
               onClick={handleOpenCreate}
             >
-              <IoMdAdd /> Add Tag
+              <IoMdAdd /> {t("studio.tags.add_tag")}
             </Button>
           ) : null}
         </div>
@@ -144,18 +146,20 @@ const Tags = () => {
       <div className="px-4 pt-4 h-full flex flex-col items-center justify-between flex-1 min-h-0">
         {error ? (
           <p className="text-sm text-red-500 py-8">
-            Failed to load tags. {getApiErrorMessage(error)}
+            {t("studio.tags.load_failed")} {getApiErrorMessage(error)}
           </p>
         ) : tagsData?.tags.length === 0 && !isLoading ? (
           <div className="flex flex-col h-full items-center justify-center">
-            <p className="text-base text-muted-foreground">No tags found</p>
+            <p className="text-base text-muted-foreground">
+              {t("studio.tags.empty")}
+            </p>
             {showActionsColumn ? (
               <Button
                 variant="outline"
                 className="mt-2"
                 onClick={handleOpenCreate}
               >
-                <IoMdAdd /> Add Tag
+                <IoMdAdd /> {t("studio.tags.add_tag")}
               </Button>
             ) : null}
           </div>
@@ -196,15 +200,18 @@ const Tags = () => {
       >
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
-            <Pecha.AlertDialogTitle>Delete tag?</Pecha.AlertDialogTitle>
+            <Pecha.AlertDialogTitle>
+              {t("studio.tags.delete_dialog.title")}
+            </Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
-              This will permanently delete &quot;{deleteTarget?.name}&quot;.
-              This action cannot be undone.
+              {t("studio.tags.delete_dialog.description", {
+                name: deleteTarget?.name ?? "",
+              })}
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <Pecha.AlertDialogFooter>
             <Pecha.AlertDialogCancel disabled={deleteMutation.isPending}>
-              Cancel
+              {t("studio.common.cancel")}
             </Pecha.AlertDialogCancel>
             <Pecha.AlertDialogAction
               className="bg-[#AD1B21] dark:text-white hover:bg-[#AD1B21]/90"
@@ -213,7 +220,9 @@ const Tags = () => {
                 deleteTarget && deleteMutation.mutate(deleteTarget.id)
               }
             >
-              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+              {deleteMutation.isPending
+                ? t("studio.common.deleting")
+                : t("studio.common.delete")}
             </Pecha.AlertDialogAction>
           </Pecha.AlertDialogFooter>
         </Pecha.AlertDialogContent>

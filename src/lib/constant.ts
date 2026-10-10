@@ -13,9 +13,21 @@ export const SIDEBAR_EXPANDED = "sidebarExpanded";
 /** Which collapsible nav sections the sidebar leaves open, as a JSON id array. */
 export const SIDEBAR_OPEN_SECTIONS = "sidebarOpenSections";
 export const DIFFICULTY = [
-  { label: "Beginner", value: "BEGINNER" },
-  { label: "Intermediate", value: "INTERMEDIATE" },
-  { label: "Advanced", value: "ADVANCED" },
+  {
+    label: "Beginner",
+    value: "BEGINNER",
+    labelKey: "studio.ui.options.difficulty.beginner",
+  },
+  {
+    label: "Intermediate",
+    value: "INTERMEDIATE",
+    labelKey: "studio.ui.options.difficulty.intermediate",
+  },
+  {
+    label: "Advanced",
+    value: "ADVANCED",
+    labelKey: "studio.ui.options.difficulty.advanced",
+  },
 ];
 export const SOCIAL_PLATFORMS = [
   { value: "facebook", label: "Facebook", icon: "Facebook" },
@@ -74,10 +86,26 @@ export const TIBETAN_LETTERS = [
 ];
 
 export const STATUS_TRANSITIONS = [
-  { label: "Draft", value: "DRAFT" },
-  { label: "Publish", value: "PUBLISHED" },
-  { label: "Unpublish", value: "UNPUBLISHED" },
-  { label: "Archive", value: "ARCHIVED" },
+  {
+    label: "Draft",
+    value: "DRAFT",
+    labelKey: "studio.ui.options.status_transition.draft",
+  },
+  {
+    label: "Publish",
+    value: "PUBLISHED",
+    labelKey: "studio.ui.options.status_transition.publish",
+  },
+  {
+    label: "Unpublish",
+    value: "UNPUBLISHED",
+    labelKey: "studio.ui.options.status_transition.unpublish",
+  },
+  {
+    label: "Archive",
+    value: "ARCHIVED",
+    labelKey: "studio.ui.options.status_transition.archive",
+  },
 ];
 
 export const ALLOWED_TRANSITIONS = {

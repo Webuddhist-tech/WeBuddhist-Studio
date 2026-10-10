@@ -68,7 +68,9 @@ describe("TaskSettingsDialog", () => {
   it("loads the lists for every distinct source text of the task", async () => {
     renderDialog();
 
-    await userEvent.click(screen.getByText("Settings"));
+    await userEvent.click(
+      screen.getByText("studio.modals.task_settings.menu_label"),
+    );
 
     await waitFor(() =>
       expect(fetchTextRelationsForSources).toHaveBeenCalledWith([
@@ -90,33 +92,53 @@ describe("TaskSettingsDialog", () => {
       },
     });
 
-    await userEvent.click(screen.getByText("Settings"));
+    await userEvent.click(
+      screen.getByText("studio.modals.task_settings.menu_label"),
+    );
 
     expect(
-      screen.getByRole("checkbox", { name: /open commentary by default/i }),
+      screen.getByRole("checkbox", {
+        name: "studio.modals.task_settings.commentary.open_by_default",
+      }),
     ).toBeChecked();
     expect(
-      screen.getByRole("checkbox", { name: /open translation by default/i }),
+      screen.getByRole("checkbox", {
+        name: "studio.modals.task_settings.translation.open_by_default",
+      }),
     ).not.toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "Live" })).toBeChecked();
+    expect(
+      screen.getByRole("checkbox", {
+        name: "studio.modals.task_settings.live",
+      }),
+    ).toBeChecked();
     await waitFor(() =>
       expect(
-        screen.getByRole("combobox", { name: "Commentary text" }),
+        screen.getByRole("combobox", {
+          name: "studio.modals.task_settings.commentary.select_aria",
+        }),
       ).toHaveTextContent("Great Commentary"),
     );
     expect(
-      screen.getByRole("combobox", { name: "Translation text" }),
+      screen.getByRole("combobox", {
+        name: "studio.modals.task_settings.translation.select_aria",
+      }),
     ).toBeDisabled();
   });
 
   it("saves an open panel with no text chosen", async () => {
     renderDialog();
-    await userEvent.click(screen.getByText("Settings"));
+    await userEvent.click(
+      screen.getByText("studio.modals.task_settings.menu_label"),
+    );
 
     await userEvent.click(
-      screen.getByRole("checkbox", { name: /open commentary by default/i }),
+      screen.getByRole("checkbox", {
+        name: "studio.modals.task_settings.commentary.open_by_default",
+      }),
     );
-    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.common.save" }),
+    );
 
     await waitFor(() =>
       expect(updateTaskSettings).toHaveBeenCalledWith("task-1", {
@@ -131,21 +153,29 @@ describe("TaskSettingsDialog", () => {
 
   it("saves a chosen translation", async () => {
     renderDialog();
-    await userEvent.click(screen.getByText("Settings"));
+    await userEvent.click(
+      screen.getByText("studio.modals.task_settings.menu_label"),
+    );
 
     await userEvent.click(
-      screen.getByRole("checkbox", { name: /open translation by default/i }),
+      screen.getByRole("checkbox", {
+        name: "studio.modals.task_settings.translation.open_by_default",
+      }),
     );
     await waitFor(() =>
       expect(fetchTextRelationsForSources).toHaveBeenCalled(),
     );
     await userEvent.click(
-      screen.getByRole("combobox", { name: "Translation text" }),
+      screen.getByRole("combobox", {
+        name: "studio.modals.task_settings.translation.select_aria",
+      }),
     );
     await userEvent.click(
       await screen.findByRole("option", { name: /English Translation/ }),
     );
-    await userEvent.click(screen.getByRole("button", { name: "Save" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.common.save" }),
+    );
 
     await waitFor(() =>
       expect(updateTaskSettings).toHaveBeenCalledWith(
@@ -163,11 +193,15 @@ describe("TaskSettingsDialog", () => {
       settings: { is_translation_open: true, translation_text_id: "old-text" },
     });
 
-    await userEvent.click(screen.getByText("Settings"));
+    await userEvent.click(
+      screen.getByText("studio.modals.task_settings.menu_label"),
+    );
 
     await waitFor(() =>
       expect(
-        screen.getByRole("combobox", { name: "Translation text" }),
+        screen.getByRole("combobox", {
+          name: "studio.modals.task_settings.translation.select_aria",
+        }),
       ).toHaveTextContent("old-text"),
     );
   });
@@ -179,18 +213,22 @@ describe("TaskSettingsDialog", () => {
         { id: "task-2", title: "Morning chant", settings: { is_live: true } },
       ],
     });
-    await userEvent.click(screen.getByText("Settings"));
+    await userEvent.click(
+      screen.getByText("studio.modals.task_settings.menu_label"),
+    );
 
     expect(
-      screen.getByText("Only one task per day can be live."),
+      screen.getByText("studio.modals.task_settings.one_live_per_day"),
     ).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("checkbox", { name: "Live" }));
+    await userEvent.click(
+      screen.getByRole("checkbox", {
+        name: "studio.modals.task_settings.live",
+      }),
+    );
 
     expect(
-      screen.getByText(
-        'This will turn off live for "Morning chant" on this day.',
-      ),
+      screen.getByText("studio.modals.task_settings.live_turns_off"),
     ).toBeInTheDocument();
   });
 
@@ -198,11 +236,13 @@ describe("TaskSettingsDialog", () => {
     fetchTaskDetails.mockResolvedValue({ id: "task-1", subtasks: [] });
     renderDialog({ settings: { is_commentary_open: true } });
 
-    await userEvent.click(screen.getByText("Settings"));
+    await userEvent.click(
+      screen.getByText("studio.modals.task_settings.menu_label"),
+    );
 
     expect(
       await screen.findByText(
-        "This task has no text to read commentary from. The reader will show the list.",
+        "studio.modals.task_settings.commentary.no_source",
       ),
     ).toBeInTheDocument();
     expect(fetchTextRelationsForSources).not.toHaveBeenCalled();

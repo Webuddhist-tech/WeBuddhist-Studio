@@ -6,6 +6,7 @@ import { z } from "zod";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { taskSchema } from "@/schema/TaskSchema";
 import { TaskTitleField } from "../../../../ui/molecules/task-title-field/TaskTitleField";
 import {
@@ -56,6 +57,7 @@ const TaskForm = ({
 }: TaskFormProps) => {
   const { planId } = useParams<{ planId: string }>();
   const queryClient = useQueryClient();
+  const { t } = useTranslate();
   const form = useForm({
     resolver: zodResolver(taskSchema),
     mode: "onTouched",
@@ -99,15 +101,15 @@ const TaskForm = ({
       return taskResponse;
     },
     onSuccess: (taskResponse) => {
-      toast.success("Task created successfully!", {
-        description: "Your task has been added to the day.",
+      toast.success(t("studio.task.form.created"), {
+        description: t("studio.task.form.created_description"),
       });
       clearFormData(taskResponse.id);
       queryClient.refetchQueries({ queryKey: ["planDetails", planId] });
     },
     onError: (error: Error) => {
-      toast.error("Failed to create task", {
-        description: error?.message || "Something went wrong",
+      toast.error(t("studio.task.form.create_failed"), {
+        description: error?.message || t("studio.common.something_went_wrong"),
       });
     },
   });
@@ -120,7 +122,7 @@ const TaskForm = ({
       await updateSubTasks(editingTask.id, subTasksPayload);
     },
     onSuccess: () => {
-      toast.success("Task updated successfully!");
+      toast.success(t("studio.task.form.updated"));
       queryClient.invalidateQueries({ queryKey: ["planDetails", planId] });
       queryClient.invalidateQueries({
         queryKey: ["taskDetails", editingTask?.id],
@@ -128,8 +130,8 @@ const TaskForm = ({
       clearFormData(editingTask?.id);
     },
     onError: (error: any) => {
-      toast.error("Failed to update task", {
-        description: error?.message || "Something went wrong",
+      toast.error(t("studio.task.form.update_failed"), {
+        description: error?.message || t("studio.common.something_went_wrong"),
       });
     },
   });
@@ -139,7 +141,7 @@ const TaskForm = ({
       await updateTaskTitle(editingTask.id, title);
     },
     onSuccess: () => {
-      toast.success("Title updated successfully!");
+      toast.success(t("studio.task.form.title_updated"));
       setIsTitleEditing(false);
       queryClient.invalidateQueries({ queryKey: ["planDetails", planId] });
       queryClient.invalidateQueries({
@@ -147,8 +149,8 @@ const TaskForm = ({
       });
     },
     onError: (error: any) => {
-      toast.error("Failed to update title", {
-        description: error?.message || "Something went wrong",
+      toast.error(t("studio.task.form.title_update_failed"), {
+        description: error?.message || t("studio.common.something_went_wrong"),
       });
     },
   });
@@ -344,9 +346,7 @@ const TaskForm = ({
   const handleSubTaskImageUpload = async (index: number, file: File) => {
     const fileSizeMB = file.size / (1024 * 1024);
     if (fileSizeMB > 1) {
-      setImageUploadError(
-        "File size exceeds 1MB limit. Please select a smaller image.",
-      );
+      setImageUploadError(t("studio.task.form.image_too_large"));
       return;
     }
     try {
@@ -355,9 +355,9 @@ const TaskForm = ({
         imagePreview: image.original,
         content: key,
       });
-      toast.success("Image uploaded successfully!");
+      toast.success(t("studio.task.form.image_uploaded"));
     } catch {
-      toast.error("Failed to upload image");
+      toast.error(t("studio.task.form.image_upload_failed"));
     }
   };
 
@@ -368,7 +368,7 @@ const TaskForm = ({
   const handleSaveTitle = async () => {
     const currentTitle = form.getValues("title");
     if (!currentTitle || currentTitle.trim() === "") {
-      toast.error("Title cannot be empty");
+      toast.error(t("studio.task.form.title_empty"));
       return;
     }
     updateTitleMutation.mutate(currentTitle);
@@ -384,8 +384,8 @@ const TaskForm = ({
     // A task hangs off a day. Without one there is nothing to save against, so
     // say so instead of letting the request go out with an undefined day.
     if (!isEditMode && !currentDayData?.id) {
-      toast.error("Create a day first", {
-        description: "Add a day to this plan before adding a task.",
+      toast.error(t("studio.task.form.create_day_first"), {
+        description: t("studio.task.form.create_day_first_description"),
       });
       return;
     }
@@ -395,7 +395,7 @@ const TaskForm = ({
       currentDayData?.audio_duration_ms,
     );
     if (timestampError) {
-      toast.error(timestampError);
+      toast.error(t(String(timestampError)));
       return;
     }
 
@@ -426,7 +426,9 @@ const TaskForm = ({
       ) : (
         <div className="overflow-y-auto flex-1">
           <h2 className="text-xl font-semibold p-4">
-            {isEditMode ? "Edit Task" : "Add Task"}
+            {isEditMode
+              ? t("studio.task.form.edit_task")
+              : t("studio.task.tabs.add_task")}
           </h2>
 
           <Pecha.Form {...form}>
@@ -452,7 +454,9 @@ const TaskForm = ({
 
               <div className="border-b w-full border-dashed border-gray-300 dark:border-input" />
               <div className=" px-4 flex items-center">
-                <h2 className="text-xl font-semibold">Add Subtask</h2>
+                <h2 className="text-xl font-semibold">
+                  {t("studio.task.form.add_subtask")}
+                </h2>
               </div>
 
               {subTasks.length > 0 && (
@@ -493,7 +497,7 @@ const TaskForm = ({
                     type="button"
                     onClick={() => clearFormData()}
                   >
-                    Cancel
+                    {t("studio.common.cancel")}
                   </Pecha.Button>
                 </Activity>
 
@@ -511,11 +515,11 @@ const TaskForm = ({
                 >
                   {createTaskMutation.isPending || updateTaskMutation.isPending
                     ? isEditMode
-                      ? "Updating..."
-                      : "Creating..."
+                      ? t("studio.plan.updating")
+                      : t("studio.common.creating")
                     : isEditMode
-                      ? "Update"
-                      : "Submit"}
+                      ? t("studio.common.update")
+                      : t("studio.common.submit")}
                 </Pecha.Button>
               </div>
             </form>

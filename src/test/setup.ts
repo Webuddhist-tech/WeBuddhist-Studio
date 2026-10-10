@@ -61,6 +61,14 @@ vi.mock("@tolgee/react", () => ({
   }),
 }));
 
+vi.mock("@/i18n/tolgee", () => ({
+  tolgee: {
+    t: (key: string) => key,
+    getLanguage: () => "en",
+    changeLanguage: vi.fn(),
+  },
+}));
+
 vi.mock("@/hooks/useUserInfo", () => ({
   USER_INFO_QUERY_KEY: ["userInfo"],
   fetchUserInfo: vi.fn(),

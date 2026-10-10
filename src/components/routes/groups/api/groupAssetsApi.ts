@@ -1,4 +1,5 @@
 import axiosInstance from "@/config/axios-config";
+import { tolgee } from "@/i18n/tolgee";
 
 export type GroupAssetType = "AUDIO" | "IMAGE" | "VIDEO";
 
@@ -139,7 +140,10 @@ export const getAssetDeleteConflict = (
 
   const detail = err.response?.data?.detail;
   if (!detail || typeof detail !== "object") {
-    return { message: "This audio is still in use.", usages: [] };
+    return {
+      message: tolgee.t("studio.groups.shared.audio_in_use"),
+      usages: [],
+    };
   }
 
   const { detail: message, usages } = detail as {
@@ -148,7 +152,9 @@ export const getAssetDeleteConflict = (
   };
   return {
     message:
-      typeof message === "string" ? message : "This audio is still in use.",
+      typeof message === "string"
+        ? message
+        : tolgee.t("studio.groups.shared.audio_in_use"),
     usages: Array.isArray(usages) ? (usages as GroupAssetUsageDTO[]) : [],
   };
 };
@@ -160,14 +166,17 @@ export const MAX_ASSET_SIZE_BYTES = 50 * 1024 * 1024;
 export const MAX_AUDIO_PER_ITEM = 10;
 
 export const FORMAT_HINT = "MP3, M4A, WAV, AAC or OGG · max 50 MB";
+/** Translation key for `FORMAT_HINT`; render `t(FORMAT_HINT_KEY)` in the UI. */
+export const FORMAT_HINT_KEY = "studio.groups.shared.audio_format_hint";
 
 /** Dark, compact tooltip; the shared atom is light-on-light. */
 export const TOOLTIP_CLASS =
   "border-0 bg-foreground px-2 py-1 text-xs text-background";
 
+/** Translation keys; `validateAudioFile` returns them translated. */
 export const INVALID_AUDIO_FORMAT_MESSAGE =
-  "Invalid audio format. Allowed: MP3, M4A, WAV, AAC, OGG";
-export const AUDIO_TOO_LARGE_MESSAGE = "File exceeds the maximum size of 50 MB";
+  "studio.groups.shared.audio_invalid_format";
+export const AUDIO_TOO_LARGE_MESSAGE = "studio.groups.shared.audio_too_large";
 
 export const isSupportedAudioFile = (file: File): boolean => {
   const ext = file.name.split(".").pop()?.toLowerCase();
@@ -176,8 +185,11 @@ export const isSupportedAudioFile = (file: File): boolean => {
 
 /** Client-side mirror of the server's checks, so doomed uploads fail fast. */
 export const validateAudioFile = (file: File): string | null => {
-  if (!isSupportedAudioFile(file)) return INVALID_AUDIO_FORMAT_MESSAGE;
-  if (file.size > MAX_ASSET_SIZE_BYTES) return AUDIO_TOO_LARGE_MESSAGE;
+  if (!isSupportedAudioFile(file)) {
+    return tolgee.t(INVALID_AUDIO_FORMAT_MESSAGE);
+  }
+  if (file.size > MAX_ASSET_SIZE_BYTES)
+    return tolgee.t(AUDIO_TOO_LARGE_MESSAGE);
   return null;
 };
 

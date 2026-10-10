@@ -1,14 +1,16 @@
 import * as React from "react";
 import { FaAngleLeft, FaAngleRight, FaEllipsis } from "react-icons/fa6";
+import { useTranslate } from "@tolgee/react";
 
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/atoms/button";
 
 function Pagination({ className, ...props }: React.ComponentProps<"nav">) {
+  const { t } = useTranslate();
   return (
     <nav
       role="navigation"
-      aria-label="pagination"
+      aria-label={t("studio.ui.pagination.label")}
       data-slot="pagination"
       className={cn("mx-auto flex w-full justify-center", className)}
       {...props}
@@ -65,9 +67,10 @@ function PaginationPrevious({
   className,
   ...props
 }: React.ComponentProps<typeof PaginationLink>) {
+  const { t } = useTranslate();
   return (
     <PaginationLink
-      aria-label="Go to previous page"
+      aria-label={t("studio.ui.pagination.previous_page")}
       size="default"
       className={cn(
         "gap-1 border dark:bg-[#232323] rounded-lg px-2.5 sm:pl-2.5",
@@ -75,7 +78,7 @@ function PaginationPrevious({
       )}
       {...props}
     >
-      <span className="hidden sm:block">Previous</span>
+      <span className="hidden sm:block">{t("studio.common.previous")}</span>
       <span className="sm:hidden">
         <FaAngleLeft className="size-4" />
       </span>
@@ -87,9 +90,10 @@ function PaginationNext({
   className,
   ...props
 }: React.ComponentProps<typeof PaginationLink>) {
+  const { t } = useTranslate();
   return (
     <PaginationLink
-      aria-label="Go to next page"
+      aria-label={t("studio.ui.pagination.next_page")}
       size="default"
       className={cn(
         "gap-1 px-2.5 border rounded-lg dark:bg-[#232323] sm:pr-2.5",
@@ -97,7 +101,7 @@ function PaginationNext({
       )}
       {...props}
     >
-      <span className="hidden sm:block">Next</span>
+      <span className="hidden sm:block">{t("studio.common.next")}</span>
       <span className="sm:hidden">
         <FaAngleRight className="size-4" />
       </span>
@@ -109,6 +113,7 @@ function PaginationEllipsis({
   className,
   ...props
 }: React.ComponentProps<"span">) {
+  const { t } = useTranslate();
   return (
     <span
       aria-hidden
@@ -117,7 +122,7 @@ function PaginationEllipsis({
       {...props}
     >
       <FaEllipsis className="size-4" />
-      <span className="sr-only">More pages</span>
+      <span className="sr-only">{t("studio.ui.pagination.more_pages")}</span>
     </span>
   );
 }

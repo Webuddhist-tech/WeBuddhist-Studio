@@ -77,10 +77,14 @@ describe("GroupPublishControl", () => {
 
     expect(patch).not.toHaveBeenCalled();
     expect(await screen.findByRole("alertdialog")).toHaveTextContent(
-      /nothing is deleted/i,
+      "studio.groups.components.publish.confirm_nothing_deleted",
     );
 
-    await userEvent.click(screen.getByRole("button", { name: /hide group/i }));
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "studio.groups.components.publish.hide_group",
+      }),
+    );
     await waitFor(() => {
       expect(patch).toHaveBeenCalledWith("g1", "UNPUBLISHED");
     });

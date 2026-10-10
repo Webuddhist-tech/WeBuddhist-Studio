@@ -1,3 +1,4 @@
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import VerseOfDayForm from "./VerseOfDayForm";
 import type { VerseOfDayItem } from "./api/verseOfDayApi";
@@ -17,6 +18,7 @@ const VerseOfDayFormDialog = ({
   onSuccess,
   existingVerses,
 }: VerseOfDayFormDialogProps) => {
+  const { t } = useTranslate();
   const mode = editingItem ? "edit" : "create";
 
   const handleCancel = () => {
@@ -28,7 +30,9 @@ const VerseOfDayFormDialog = ({
       <Pecha.DialogContent className="flex max-h-[min(90dvh,90vh)] w-[calc(100%-2rem)] max-w-[1100px] flex-col gap-0 overflow-hidden p-0 sm:w-full">
         <Pecha.DialogHeader className="shrink-0 border-b px-6 py-4">
           <Pecha.DialogTitle>
-            {mode === "edit" ? "Edit Verse of Day" : "Create Verse of Day"}
+            {mode === "edit"
+              ? t("studio.verse_of_day.form.edit_title")
+              : t("studio.verse_of_day.form.create_title")}
           </Pecha.DialogTitle>
         </Pecha.DialogHeader>
 

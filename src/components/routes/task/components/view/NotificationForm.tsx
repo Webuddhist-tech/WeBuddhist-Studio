@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import {
   getNotification,
   createNotification,
@@ -16,8 +17,8 @@ import { MdOutlineImage } from "react-icons/md";
 import ImageCropDialog from "@/components/ui/molecules/modals/image-upload/image-crop/ImageCropDialog";
 
 const notificationSchema = z.object({
-  title: z.string().max(40, "Title must be 40 characters or less"),
-  body: z.string().max(180, "Body must be 180 characters or less"),
+  title: z.string().max(40, "studio.task.notification.title_max"),
+  body: z.string().max(180, "studio.task.notification.body_max"),
 });
 
 type NotificationFormData = z.infer<typeof notificationSchema>;
@@ -36,6 +37,7 @@ export const NotificationForm = ({
   isEditable = true,
 }: NotificationFormProps) => {
   const queryClient = useQueryClient();
+  const { t } = useTranslate();
   const [imageType, setImageType] = useState<"PLAN" | "CUSTOM" | null>(null);
   const [customImageUrl, setCustomImageUrl] = useState<string | null>(null);
   const [customImagePreview, setCustomImagePreview] = useState<string | null>(
@@ -95,14 +97,14 @@ export const NotificationForm = ({
     onSuccess: () => {
       toast.success(
         existingNotification
-          ? "Notification updated successfully!"
-          : "Notification created successfully!",
+          ? t("studio.task.notification.updated")
+          : t("studio.task.notification.created"),
       );
       queryClient.invalidateQueries({ queryKey: ["notification", dayId] });
     },
     onError: (error: Error) => {
-      toast.error("Failed to save notification", {
-        description: error?.message || "Something went wrong",
+      toast.error(t("studio.task.notification.save_failed"), {
+        description: error?.message || t("studio.common.something_went_wrong"),
       });
     },
   });
@@ -110,7 +112,7 @@ export const NotificationForm = ({
   const deleteMutation = useMutation({
     mutationFn: () => deleteNotification(dayId),
     onSuccess: () => {
-      toast.success("Notification deleted successfully!");
+      toast.success(t("studio.task.notification.deleted"));
       form.reset();
       setImageType(null);
       setCustomImageUrl(null);
@@ -118,8 +120,8 @@ export const NotificationForm = ({
       queryClient.invalidateQueries({ queryKey: ["notification", dayId] });
     },
     onError: (error: Error) => {
-      toast.error("Failed to delete notification", {
-        description: error?.message || "Something went wrong",
+      toast.error(t("studio.task.notification.delete_failed"), {
+        description: error?.message || t("studio.common.something_went_wrong"),
       });
     },
   });
@@ -133,15 +135,13 @@ export const NotificationForm = ({
 
     const fileSizeMB = file.size / (1024 * 1024);
     if (fileSizeMB > 5) {
-      toast.error(
-        "File size exceeds 5MB limit. Please select a smaller image.",
-      );
+      toast.error(t("studio.task.notification.image_too_large"));
       return;
     }
 
     const validTypes = ["image/png", "image/jpg", "image/jpeg", "image/webp"];
     if (!validTypes.includes(file.type)) {
-      toast.error("Invalid file type. Please upload PNG, JPG, JPEG, or WebP.");
+      toast.error(t("studio.task.notification.invalid_file_type"));
       return;
     }
 
@@ -151,9 +151,7 @@ export const NotificationForm = ({
   const uploadCroppedImage = async (file: File) => {
     setCropFile(null);
     if (file.size > 5 * 1024 * 1024) {
-      toast.error(
-        "File size exceeds 5MB limit. Please select a smaller image.",
-      );
+      toast.error(t("studio.task.notification.image_too_large"));
       return;
     }
     try {
@@ -162,9 +160,9 @@ export const NotificationForm = ({
       setCustomImageUrl(key);
       setCustomImagePreview(image.original);
       setImageType("CUSTOM");
-      toast.success("Image uploaded successfully!");
+      toast.success(t("studio.task.form.image_uploaded"));
     } catch {
-      toast.error("Failed to upload image");
+      toast.error(t("studio.task.form.image_upload_failed"));
     } finally {
       setUploadingImage(false);
     }
@@ -191,7 +189,7 @@ export const NotificationForm = ({
   if (isLoading) {
     return (
       <div className="w-full my-4 h-[calc(100vh-40px)] bg-[#F5F5F5] dark:bg-[#181818] rounded-l-2xl border border-dashed flex items-center justify-center max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
-        <p className="text-gray-500">Loading...</p>
+        <p className="text-gray-500">{t("studio.common.loading")}</p>
       </div>
     );
   }
@@ -206,11 +204,13 @@ export const NotificationForm = ({
               name="title"
               render={({ field }) => (
                 <Pecha.FormItem>
-                  <Pecha.FormLabel>Title</Pecha.FormLabel>
+                  <Pecha.FormLabel>{t("studio.common.title")}</Pecha.FormLabel>
                   <Pecha.FormControl>
                     <Pecha.Input
                       {...field}
-                      placeholder="What's the day about?"
+                      placeholder={t(
+                        "studio.task.notification.title_placeholder",
+                      )}
                       disabled={!isEditable}
                       maxLength={40}
                     />
@@ -228,11 +228,15 @@ export const NotificationForm = ({
               name="body"
               render={({ field }) => (
                 <Pecha.FormItem>
-                  <Pecha.FormLabel>Body</Pecha.FormLabel>
+                  <Pecha.FormLabel>
+                    {t("studio.task.notification.body")}
+                  </Pecha.FormLabel>
                   <Pecha.FormControl>
                     <Pecha.Textarea
                       {...field}
-                      placeholder="Why open the app today?"
+                      placeholder={t(
+                        "studio.task.notification.body_placeholder",
+                      )}
                       disabled={!isEditable}
                       maxLength={180}
                       rows={4}
@@ -247,7 +251,7 @@ export const NotificationForm = ({
             />
 
             <div className="space-y-3">
-              <Pecha.FormLabel>Image</Pecha.FormLabel>
+              <Pecha.FormLabel>{t("studio.common.image")}</Pecha.FormLabel>
               <ImageCropDialog
                 file={cropFile}
                 onCancel={() => setCropFile(null)}
@@ -273,7 +277,7 @@ export const NotificationForm = ({
                       {customImagePreview ? (
                         <img
                           src={customImagePreview}
-                          alt="Custom"
+                          alt={t("studio.task.notification.custom")}
                           className="w-full h-full object-cover rounded"
                         />
                       ) : (
@@ -281,12 +285,14 @@ export const NotificationForm = ({
                       )}
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium">Custom</p>
-                      <p className="text-xs text-gray-500">
-                        Up to 5 MB. PNG, JPG, JPEG or WebP
+                      <p className="font-medium">
+                        {t("studio.task.notification.custom")}
                       </p>
                       <p className="text-xs text-gray-500">
-                        Best in 3:4 ratio (cropping available)
+                        {t("studio.task.notification.image_constraints")}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {t("studio.task.notification.image_ratio")}
                       </p>
                     </div>
                     {isEditable && (
@@ -310,7 +316,9 @@ export const NotificationForm = ({
                             );
                           }}
                         >
-                          {uploadingImage ? "Uploading..." : "Upload"}
+                          {uploadingImage
+                            ? t("studio.common.uploading")
+                            : t("studio.common.upload")}
                         </Pecha.Button>
                       </label>
                     )}
@@ -327,7 +335,7 @@ export const NotificationForm = ({
                       {planCoverImage ? (
                         <img
                           src={planCoverImage}
-                          alt="Plan cover"
+                          alt={t("studio.task.notification.plan_cover_alt")}
                           className="w-full h-full object-cover"
                         />
                       ) : (
@@ -335,7 +343,9 @@ export const NotificationForm = ({
                       )}
                     </div>
                     <div>
-                      <p className="font-medium">Use plan cover</p>
+                      <p className="font-medium">
+                        {t("studio.task.notification.use_plan_cover")}
+                      </p>
                     </div>
                   </label>
                 </div>
@@ -343,7 +353,9 @@ export const NotificationForm = ({
                 <div className="flex items-center space-x-3 border border-gray-300 dark:border-input rounded-md p-4">
                   <Pecha.RadioGroupItem value="" id="no-image" />
                   <label htmlFor="no-image" className="flex-1 cursor-pointer">
-                    <p className="font-medium">No image</p>
+                    <p className="font-medium">
+                      {t("studio.task.notification.no_image")}
+                    </p>
                   </label>
                 </div>
               </Pecha.RadioGroup>
@@ -360,7 +372,7 @@ export const NotificationForm = ({
                   deleteMutation.isPending
                 }
               >
-                Clear
+                {t("studio.common.clear")}
               </Pecha.Button>
 
               <Pecha.Button
@@ -373,10 +385,10 @@ export const NotificationForm = ({
                 }
               >
                 {saveMutation.isPending
-                  ? "Saving..."
+                  ? t("studio.common.saving")
                   : existingNotification
-                    ? "Update"
-                    : "Save"}
+                    ? t("studio.common.update")
+                    : t("studio.common.save")}
               </Pecha.Button>
             </div>
           </form>

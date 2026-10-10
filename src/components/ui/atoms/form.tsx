@@ -3,6 +3,7 @@
 import * as React from "react";
 import * as LabelPrimitive from "@radix-ui/react-label";
 import { Slot } from "@radix-ui/react-slot";
+import { useTranslate } from "@tolgee/react";
 import {
   Controller,
   FormProvider,
@@ -138,7 +139,9 @@ function FormDescription({ className, ...props }: React.ComponentProps<"p">) {
 
 function FormMessage({ className, ...props }: React.ComponentProps<"p">) {
   const { error, formMessageId } = useFormField();
-  const body = error ? String(error?.message ?? "") : props.children;
+  const { t } = useTranslate();
+  // Schemas carry translation keys as their messages.
+  const body = error ? t(String(error?.message ?? "")) : props.children;
 
   if (!body) {
     return null;

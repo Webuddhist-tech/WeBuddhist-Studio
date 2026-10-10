@@ -1,4 +1,5 @@
 import axiosInstance from "@/config/axios-config";
+import { tolgee } from "@/i18n/tolgee";
 import { uploadImageToS3 } from "@/components/routes/task/api/taskApi";
 import { makeLinkedContentSearchFn } from "@/components/routes/groups/api/groupPickerApi";
 import { searchAccumulatorPresets } from "@/components/routes/groups/api/accumulatorPresetSearchApi";
@@ -314,7 +315,7 @@ export function eventName(
   const name =
     arr.find((e) => e.language.toUpperCase() === preferred)?.name ??
     arr[0]?.name ??
-    "Untitled event";
+    tolgee.t("studio.groups.shared.untitled_event");
   return capitalizeFirstLetter(name);
 }
 
@@ -638,7 +639,10 @@ export function resolveLinkedContent(
   id: string,
   kind: "plan" | "series",
 ): Promise<FkOption> {
-  const fallback = kind === "series" ? "Linked series" : "Linked plan";
+  const fallback =
+    kind === "series"
+      ? tolgee.t("studio.groups.shared.linked_series")
+      : tolgee.t("studio.groups.shared.linked_plan");
   return resolveLinkOption(
     id,
     fallback,
@@ -648,7 +652,11 @@ export function resolveLinkedContent(
 }
 
 export function resolveLinkedAccumulator(id: string): Promise<FkOption> {
-  return resolveLinkOption(id, "Linked accumulator", searchAccumulatorPresets);
+  return resolveLinkOption(
+    id,
+    tolgee.t("studio.groups.shared.linked_accumulator"),
+    searchAccumulatorPresets,
+  );
 }
 
 export function resolveLinkedGroupAccumulator(
@@ -657,7 +665,7 @@ export function resolveLinkedGroupAccumulator(
 ): Promise<FkOption> {
   return resolveLinkOption(
     id,
-    "Linked group accumulator",
+    tolgee.t("studio.groups.shared.linked_group_accumulator"),
     makeGroupAccumulatorSearchFn(groupId),
   );
 }
@@ -670,11 +678,16 @@ export async function resolveLinkedChantCollection(
     const collection = await fetchChantCollection(groupId, id);
     return {
       id: collection.id,
-      title: collection.name?.trim() || "Linked chant collection",
+      title:
+        collection.name?.trim() ||
+        tolgee.t("studio.groups.shared.linked_chant_collection"),
       ...(collection.img_url ? { image_url: collection.img_url } : {}),
     };
   } catch {
-    return { id, title: "Linked chant collection" };
+    return {
+      id,
+      title: tolgee.t("studio.groups.shared.linked_chant_collection"),
+    };
   }
 }
 

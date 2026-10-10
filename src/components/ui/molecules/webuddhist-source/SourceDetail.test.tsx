@@ -93,7 +93,7 @@ describe("SelectedSourceDetail select all", () => {
     // The button reads "Loading…" until the range input has settled.
     const addButton = screen.getByRole("button");
     await waitFor(() => expect(addButton).not.toBeDisabled());
-    expect(addButton).toHaveTextContent("Add");
+    expect(addButton).toHaveTextContent("studio.common.add");
 
     fireEvent.click(addButton);
 
@@ -126,7 +126,7 @@ describe("SelectedSourceDetail select all", () => {
 
     const addButton = screen.getByRole("button");
     await waitFor(() => expect(addButton).not.toBeDisabled());
-    expect(addButton).toHaveTextContent("Add");
+    expect(addButton).toHaveTextContent("studio.common.add");
 
     fireEvent.click(addButton);
 
@@ -232,7 +232,7 @@ describe("SelectedSourceDetail select all", () => {
     expect(screen.getByText("Segment 200")).toBeInTheDocument();
     expect(screen.queryByText("Segment 201")).not.toBeInTheDocument();
     expect(
-      screen.getByText(/and 50 more selected segments not shown/),
+      screen.getByText("studio.source.hidden_segments_other"),
     ).toBeInTheDocument();
   });
 });

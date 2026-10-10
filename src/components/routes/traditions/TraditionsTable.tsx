@@ -1,3 +1,4 @@
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { IoMdCreate, IoMdTrash } from "react-icons/io";
 import type { Tradition } from "./api/traditionsApi";
@@ -18,10 +19,11 @@ const TraditionsTable = ({
   onEdit,
   onDelete,
 }: TraditionsTableProps) => {
+  const { t } = useTranslate();
   if (isLoading) {
     return (
       <p className="text-sm text-muted-foreground py-8 text-center">
-        Loading traditions...
+        {t("studio.traditions.loading")}
       </p>
     );
   }
@@ -31,12 +33,16 @@ const TraditionsTable = ({
       <Pecha.Table>
         <Pecha.TableHeader>
           <Pecha.TableRow>
-            <Pecha.TableHead>Code</Pecha.TableHead>
-            <Pecha.TableHead>Name</Pecha.TableHead>
-            <Pecha.TableHead>Regions</Pecha.TableHead>
+            <Pecha.TableHead>
+              {t("studio.traditions.table.code")}
+            </Pecha.TableHead>
+            <Pecha.TableHead>{t("studio.common.name")}</Pecha.TableHead>
+            <Pecha.TableHead>
+              {t("studio.traditions.table.regions")}
+            </Pecha.TableHead>
             {showActionsColumn ? (
               <Pecha.TableHead className="w-28 text-right">
-                Actions
+                {t("studio.common.actions")}
               </Pecha.TableHead>
             ) : null}
           </Pecha.TableRow>
@@ -51,7 +57,7 @@ const TraditionsTable = ({
                 <div className="flex flex-col gap-1">
                   <span className="font-medium">
                     {capitalizeFirstLetter(
-                      tradition.name?.trim() || "Untitled",
+                      tradition.name?.trim() || t("studio.traditions.untitled"),
                     )}
                   </span>
                   {tradition.metadata?.length > 0 ? (
@@ -82,7 +88,12 @@ const TraditionsTable = ({
                       type="button"
                       onClick={() => onEdit(tradition)}
                       className="p-2 rounded-md border hover:bg-muted/50 transition-colors"
-                      aria-label={`Edit ${capitalizeFirstLetter(tradition.name?.trim() || "Untitled")}`}
+                      aria-label={t("studio.traditions.table.edit_aria", {
+                        name: capitalizeFirstLetter(
+                          tradition.name?.trim() ||
+                            t("studio.traditions.untitled"),
+                        ),
+                      })}
                     >
                       <IoMdCreate className="w-4 h-4" />
                     </button>
@@ -90,7 +101,12 @@ const TraditionsTable = ({
                       type="button"
                       onClick={() => onDelete(tradition)}
                       className="p-2 rounded-md border text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-                      aria-label={`Delete ${capitalizeFirstLetter(tradition.name?.trim() || "Untitled")}`}
+                      aria-label={t("studio.traditions.table.delete_aria", {
+                        name: capitalizeFirstLetter(
+                          tradition.name?.trim() ||
+                            t("studio.traditions.untitled"),
+                        ),
+                      })}
                     >
                       <IoMdTrash className="w-4 h-4" />
                     </button>

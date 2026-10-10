@@ -1,4 +1,5 @@
 import { IoMdAdd, IoMdMusicalNote } from "react-icons/io";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { formatDuration, type GroupAssetDTO } from "../../api/groupAssetsApi";
 
@@ -20,6 +21,7 @@ const ChantItemAudioCell = ({
   canWrite,
   onManage,
 }: ChantItemAudioCellProps) => {
+  const { t } = useTranslate();
   const [first] = audio;
   const count = audio.length;
 
@@ -30,10 +32,12 @@ const ChantItemAudioCell = ({
         size="sm"
         className="h-8 gap-1 text-xs"
         onClick={onManage}
-        aria-label={`Add audio to ${itemTitle}`}
+        aria-label={t("studio.groups.chants.audio_cell.add_audio_to", {
+          title: itemTitle,
+        })}
       >
         <IoMdAdd className="h-3.5 w-3.5" />
-        Add audio
+        {t("studio.groups.chants.audio_cell.add_audio")}
       </Pecha.Button>
     ) : (
       <span className="text-muted-foreground">—</span>
@@ -47,7 +51,9 @@ const ChantItemAudioCell = ({
           <button
             type="button"
             className="flex min-w-0 flex-1 items-center gap-1.5 rounded px-1 py-0.5 text-left text-sm hover:bg-muted"
-            aria-label={`Play audio for ${itemTitle}`}
+            aria-label={t("studio.groups.chants.audio_cell.play_audio_for", {
+              title: itemTitle,
+            })}
           >
             <IoMdMusicalNote
               className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
@@ -68,7 +74,11 @@ const ChantItemAudioCell = ({
               {itemTitle}
             </p>
             <p className="text-xs text-muted-foreground">
-              {count} recording{count === 1 ? "" : "s"}
+              {count === 1
+                ? t("studio.groups.chants.audio_cell.recordings_one")
+                : t("studio.groups.chants.audio_cell.recordings_other", {
+                    count,
+                  })}
             </p>
           </div>
           <ol className="max-h-72 space-y-2 overflow-y-auto p-3">
@@ -91,13 +101,15 @@ const ChantItemAudioCell = ({
                     preload="none"
                     src={asset.asset_url}
                     className="h-9 w-full"
-                    aria-label={`Play ${asset.title}`}
+                    aria-label={t("studio.groups.chants.audio_cell.play", {
+                      title: asset.title,
+                    })}
                   >
                     <track kind="captions" />
                   </audio>
                 ) : (
                   <p className="text-xs text-muted-foreground">
-                    Preview unavailable
+                    {t("studio.groups.chants.audio_cell.preview_unavailable")}
                   </p>
                 )}
               </li>
@@ -112,9 +124,11 @@ const ChantItemAudioCell = ({
           size="sm"
           className="h-8 shrink-0 px-2 text-xs"
           onClick={onManage}
-          aria-label={`Edit audio for ${itemTitle}`}
+          aria-label={t("studio.groups.chants.audio_cell.edit_audio_for", {
+            title: itemTitle,
+          })}
         >
-          Edit
+          {t("studio.common.edit")}
         </Pecha.Button>
       ) : null}
     </div>

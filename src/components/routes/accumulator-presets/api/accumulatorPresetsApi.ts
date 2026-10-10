@@ -1,6 +1,7 @@
 import axiosInstance from "@/config/axios-config";
 import type { LanguageCode } from "@/schema/SeriesSchema";
 import { capitalizeFirstLetter } from "@/lib/textUtils";
+import { tolgee } from "@/i18n/tolgee";
 import type { ImageUrlModel } from "./mantrasApi";
 
 import { getAuthHeaders } from "@/lib/auth-storage";
@@ -139,5 +140,5 @@ export function presetDisplayName(preset: AccumulatorPreset): string {
       mantraText.length > 60 ? `${mantraText.slice(0, 57)}…` : mantraText;
     return capitalizeFirstLetter(truncated);
   }
-  return "Untitled preset";
+  return tolgee.t("studio.accumulator_presets.untitled_preset");
 }

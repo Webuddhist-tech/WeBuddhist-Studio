@@ -103,10 +103,12 @@ const renderForm = (
 
 const fillRequiredCreateFields = async () => {
   await userEvent.type(
-    screen.getByPlaceholderText(/enter verse content in english/i),
+    screen.getByPlaceholderText("studio.verse_of_day.form.content_placeholder"),
     "May all beings be happy.",
   );
-  await userEvent.click(await screen.findByText("Select a page..."));
+  await userEvent.click(
+    await screen.findByText("studio.verse_of_day.form.select_page"),
+  );
   await userEvent.click(await screen.findByText("Dhamma group"));
 };
 
@@ -122,11 +124,13 @@ describe("VerseOfDayForm — source", () => {
     renderForm();
     await fillRequiredCreateFields();
     await userEvent.type(
-      screen.getByLabelText(/source \/ reference/i),
+      screen.getByLabelText("studio.verse_of_day.form.source_label"),
       "  Dhp 1.5  ",
     );
 
-    await userEvent.click(screen.getByRole("button", { name: /^create$/i }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.common.create" }),
+    );
 
     await waitFor(() => expect(createVerseOfDay).toHaveBeenCalledTimes(1));
     expect(vi.mocked(createVerseOfDay).mock.calls[0][0]).toEqual(
@@ -138,7 +142,9 @@ describe("VerseOfDayForm — source", () => {
     renderForm();
     await fillRequiredCreateFields();
 
-    await userEvent.click(screen.getByRole("button", { name: /^create$/i }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.common.create" }),
+    );
 
     await waitFor(() => expect(createVerseOfDay).toHaveBeenCalledTimes(1));
     expect(vi.mocked(createVerseOfDay).mock.calls[0][0]).toEqual(
@@ -153,11 +159,13 @@ describe("VerseOfDayForm — source", () => {
       existingVerses: [existingVerse()],
     });
 
-    expect(screen.getByLabelText(/source \/ reference/i)).toHaveValue(
-      "Dhp 1.5",
-    );
+    expect(
+      screen.getByLabelText("studio.verse_of_day.form.source_label"),
+    ).toHaveValue("Dhp 1.5");
 
-    await userEvent.click(screen.getByRole("button", { name: /^update$/i }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.common.update" }),
+    );
 
     await waitFor(() => expect(updateVerseOfDay).toHaveBeenCalledTimes(1));
     const [, payload] = vi.mocked(updateVerseOfDay).mock.calls[0];
@@ -171,10 +179,14 @@ describe("VerseOfDayForm — source", () => {
       existingVerses: [existingVerse()],
     });
 
-    const sourceInput = screen.getByLabelText(/source \/ reference/i);
+    const sourceInput = screen.getByLabelText(
+      "studio.verse_of_day.form.source_label",
+    );
     await userEvent.clear(sourceInput);
     await userEvent.type(sourceInput, "  Dhp 2.1  ");
-    await userEvent.click(screen.getByRole("button", { name: /^update$/i }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.common.update" }),
+    );
 
     await waitFor(() => expect(updateVerseOfDay).toHaveBeenCalledTimes(1));
     expect(updateVerseOfDay).toHaveBeenCalledWith(
@@ -190,8 +202,12 @@ describe("VerseOfDayForm — source", () => {
       existingVerses: [existingVerse()],
     });
 
-    await userEvent.clear(screen.getByLabelText(/source \/ reference/i));
-    await userEvent.click(screen.getByRole("button", { name: /^update$/i }));
+    await userEvent.clear(
+      screen.getByLabelText("studio.verse_of_day.form.source_label"),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "studio.common.update" }),
+    );
 
     await waitFor(() => expect(updateVerseOfDay).toHaveBeenCalledTimes(1));
     expect(updateVerseOfDay).toHaveBeenCalledWith(
@@ -205,9 +221,13 @@ describe("VerseOfDayForm — page picker", () => {
   it("lists only PAGE type groups and labels the field Page", async () => {
     renderForm();
 
-    await userEvent.click(await screen.findByText("Select a page..."));
+    await userEvent.click(
+      await screen.findByText("studio.verse_of_day.form.select_page"),
+    );
 
-    expect(screen.getByText("Page")).toBeInTheDocument();
+    expect(
+      screen.getByText("studio.verse_of_day.form.page_label"),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Group")).not.toBeInTheDocument();
     expect(fetchGroups).toHaveBeenCalledWith(
       expect.objectContaining({ group_type: "PAGE" }),

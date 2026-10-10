@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useOutletContext, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslate } from "@tolgee/react";
 import { IoCalendarClearOutline } from "react-icons/io5";
 import { MdLocationOn } from "react-icons/md";
 import {
@@ -14,8 +15,8 @@ import { Pecha } from "@/components/ui/shadimport";
 import { MarkdownPreview } from "@/components/ui/molecules/markdown-editor/MarkdownPreview";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import { cn } from "@/lib/utils";
-import { eventFormatLabel, eventRecurrenceLabel } from "@/schema/EventSchema";
 import { formatEventScheduleRange } from "./lib/eventSchedule";
+import { eventFormatLabelKey, eventRecurrenceLabelKey } from "./eventLabelKeys";
 import { getLanguageLabel } from "@/components/api/languagesApi";
 import { ROUTES } from "@/routes/paths";
 import type { GroupOutletContext } from "./GroupLayout";
@@ -103,6 +104,7 @@ function getYoutubeVideoId(url: string): string | null {
 }
 
 const GroupEventDetailPage = () => {
+  const { t } = useTranslate();
   const { groupId, eventId } = useParams<{
     groupId: string;
     eventId: string;
@@ -171,7 +173,7 @@ const GroupEventDetailPage = () => {
   if (isLoading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-muted-foreground">
-        Loading event…
+        {t("studio.groups.pages.event_detail.loading")}
       </div>
     );
   }
@@ -180,13 +182,16 @@ const GroupEventDetailPage = () => {
     return (
       <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4">
         <p className="text-center text-destructive">
-          {getApiErrorMessage(error, "Could not load this event.")}
+          {getApiErrorMessage(
+            error,
+            t("studio.groups.pages.event_detail.load_failed"),
+          )}
         </p>
         <Pecha.Button
           variant="outline"
           onClick={() => navigate(eventsListPath)}
         >
-          Back to events
+          {t("studio.groups.pages.event_detail.back_to_events")}
         </Pecha.Button>
       </div>
     );
@@ -195,7 +200,9 @@ const GroupEventDetailPage = () => {
   const heroImage = resolveHeroImage(data);
   const active =
     rows.find((r) => r.language === activeLang) ?? pickDefault(rows);
-  const title = active?.name?.trim() || "Untitled event";
+  const title =
+    active?.name?.trim() ||
+    t("studio.groups.pages.event_detail.untitled_event");
   const description = active?.description?.trim();
 
   const eventLocation = data.location ?? null;
@@ -204,18 +211,28 @@ const GroupEventDetailPage = () => {
     : null;
 
   const links = [
-    { id: planId, key: "plan", label: "Plan", Icon: LuBookOpen },
-    { id: seriesId, key: "series", label: "Series", Icon: LuLibrary },
+    {
+      id: planId,
+      key: "plan",
+      label: t("studio.groups.pages.event_detail.linked_plan"),
+      Icon: LuBookOpen,
+    },
+    {
+      id: seriesId,
+      key: "series",
+      label: t("studio.groups.pages.event_detail.linked_series"),
+      Icon: LuLibrary,
+    },
     {
       id: accumulatorId,
       key: "accumulator",
-      label: "Accumulator",
+      label: t("studio.groups.pages.event_detail.linked_accumulator"),
       Icon: LuCircleDot,
     },
     {
       id: chantCollectionId,
       key: "chant",
-      label: "Chant collection",
+      label: t("studio.groups.pages.event_detail.linked_chant_collection"),
       Icon: LuScrollText,
     },
   ].filter((link) => Boolean(link.id));
@@ -229,7 +246,7 @@ const GroupEventDetailPage = () => {
     activeLang,
   ).sort((a, b) => a.display_order - b.display_order);
 
-  const formatLabel = eventFormatLabel(data.event_format);
+  const formatLabelKey = eventFormatLabelKey(data.event_format);
   const schedule = formatEventScheduleRange(data);
 
   return (
@@ -240,7 +257,7 @@ const GroupEventDetailPage = () => {
           onClick={() => navigate(eventsListPath)}
           className="text-sm text-muted-foreground hover:text-foreground"
         >
-          ← Events
+          ← {t("studio.groups.pages.events.title")}
         </button>
         {canWrite ? (
           <div className="flex items-center gap-2 max-md:flex-wrap">
@@ -259,7 +276,7 @@ const GroupEventDetailPage = () => {
               }
             >
               <LuRadio className="h-4 w-4" />
-              Live control
+              {t("studio.groups.pages.event_detail.live_control")}
             </Pecha.Button>
             <PrayerPdfActions scope={{ kind: "event", eventId: data.id }} />
             {data.group_accumulator_id ? (
@@ -272,7 +289,7 @@ const GroupEventDetailPage = () => {
                 navigate(ROUTES.groupEventEdit(groupId ?? "", data.id))
               }
             >
-              Edit
+              {t("studio.common.edit")}
             </Pecha.Button>
           </div>
         ) : null}
@@ -304,11 +321,15 @@ const GroupEventDetailPage = () => {
             <IoCalendarClearOutline className="mt-0.5 h-4 w-4 shrink-0" />
             <div className="flex flex-col gap-0.5 text-foreground">
               <span>
-                <span className="text-muted-foreground">Start </span>
+                <span className="text-muted-foreground">
+                  {t("studio.groups.pages.events.start_label")}{" "}
+                </span>
                 {schedule.start}
               </span>
               <span>
-                <span className="text-muted-foreground">End </span>
+                <span className="text-muted-foreground">
+                  {t("studio.groups.pages.events.end_label")}{" "}
+                </span>
                 {schedule.end}
               </span>
             </div>
@@ -316,14 +337,16 @@ const GroupEventDetailPage = () => {
               variant={data.is_recurring ? "default" : "secondary"}
               className="ml-1"
             >
-              {eventRecurrenceLabel(
-                data.is_recurring,
-                data.recurrence?.frequency,
+              {t(
+                eventRecurrenceLabelKey(
+                  data.is_recurring,
+                  data.recurrence?.frequency,
+                ),
               )}
             </Pecha.Badge>
-            {formatLabel ? (
+            {formatLabelKey ? (
               <Pecha.Badge variant="secondary" className="ml-1">
-                {formatLabel}
+                {t(formatLabelKey)}
               </Pecha.Badge>
             ) : null}
             {/* An event's chat room is created on first use, so "on, unused"
@@ -333,10 +356,10 @@ const GroupEventDetailPage = () => {
               className="ml-1"
             >
               {data.chat_enabled === false
-                ? "Chat off"
+                ? t("studio.groups.pages.event_detail.chat_off")
                 : data.chat_room_id
-                  ? "Chat active"
-                  : "Chat on"}
+                  ? t("studio.groups.pages.event_detail.chat_active")
+                  : t("studio.groups.pages.event_detail.chat_on")}
             </Pecha.Badge>
           </div>
 
@@ -397,7 +420,7 @@ const GroupEventDetailPage = () => {
       {youtubeLinks.length > 0 ? (
         <div className="space-y-4">
           <h2 className="text-sm font-semibold text-muted-foreground">
-            Videos
+            {t("studio.groups.pages.event_detail.videos")}
           </h2>
           {youtubeLinks.map((item) => {
             const videoId = getYoutubeVideoId(item.url);
@@ -413,7 +436,8 @@ const GroupEventDetailPage = () => {
                 >
                   <EVENT_YOUTUBE_ICON className="h-4 w-4 shrink-0" />
                   <span className="max-w-[16rem] truncate">
-                    {label || "YouTube video"}
+                    {label ||
+                      t("studio.groups.pages.event_detail.youtube_video")}
                   </span>
                 </a>
               );
@@ -423,7 +447,10 @@ const GroupEventDetailPage = () => {
                 <div className="relative aspect-video w-full overflow-hidden rounded-lg border bg-black">
                   <iframe
                     src={`https://www.youtube.com/embed/${videoId}`}
-                    title={label || "YouTube video"}
+                    title={
+                      label ||
+                      t("studio.groups.pages.event_detail.youtube_video")
+                    }
                     className="absolute inset-0 h-full w-full"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
@@ -440,7 +467,7 @@ const GroupEventDetailPage = () => {
 
       <div className="space-y-2">
         <h2 className="text-sm font-semibold text-muted-foreground">
-          Description
+          {t("studio.common.description")}
         </h2>
         {description ? (
           <MarkdownPreview
@@ -449,7 +476,9 @@ const GroupEventDetailPage = () => {
           />
         ) : (
           <p className="text-sm text-muted-foreground">
-            No description for {languageLabel(active?.language ?? "EN")}.
+            {t("studio.groups.pages.event_detail.no_description", {
+              language: languageLabel(active?.language ?? "EN"),
+            })}
           </p>
         )}
       </div>
@@ -457,7 +486,7 @@ const GroupEventDetailPage = () => {
       {eventLocation ? (
         <div className="space-y-2">
           <h2 className="text-sm font-semibold text-muted-foreground">
-            Location
+            {t("studio.groups.pages.event_detail.location")}
           </h2>
           <div className="flex items-center gap-3 rounded-lg border bg-card p-3">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted">
@@ -488,7 +517,7 @@ const GroupEventDetailPage = () => {
       {links.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground">
-            Linked content
+            {t("studio.groups.pages.event_detail.linked_content")}
           </h2>
           <div className="space-y-2">
             {links.map(({ key, label, Icon }) => (
@@ -502,7 +531,10 @@ const GroupEventDetailPage = () => {
                 <div className="min-w-0">
                   <p className="text-xs text-muted-foreground">{label}</p>
                   <p className="truncate font-medium">
-                    {linkTitles[key] ?? `Linked ${label.toLowerCase()}`}
+                    {linkTitles[key] ??
+                      t("studio.groups.pages.event_detail.linked_fallback", {
+                        label: label.toLowerCase(),
+                      })}
                   </p>
                 </div>
               </div>

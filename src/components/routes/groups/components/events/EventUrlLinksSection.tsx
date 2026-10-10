@@ -1,3 +1,4 @@
+import { useTranslate } from "@tolgee/react";
 import type { UseFormReturn } from "react-hook-form";
 import { IoMdAdd } from "react-icons/io";
 import { IoWarningOutline } from "react-icons/io5";
@@ -23,6 +24,7 @@ const EventUrlLinksSection = ({
   onRemove,
   onMove,
 }: EventUrlLinksSectionProps) => {
+  const { t } = useTranslate();
   const canReorder = !readOnly && fields.length > 1;
   const eventFormat = form.watch("event_format");
   const showLiveLinkWarning = eventFormat === "online" && fields.length === 0;
@@ -38,9 +40,11 @@ const EventUrlLinksSection = ({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-sm font-bold">Links (optional)</h3>
+          <h3 className="text-sm font-bold">
+            {t("studio.groups.events.url_links.heading")}
+          </h3>
           <p className="text-xs text-muted-foreground">
-            Web, meeting, or video links shown on the event.
+            {t("studio.groups.events.url_links.help")}
           </p>
         </div>
         {!readOnly ? (
@@ -51,13 +55,16 @@ const EventUrlLinksSection = ({
             onClick={onAdd}
             className="gap-1"
           >
-            <IoMdAdd className="h-4 w-4" /> Add link
+            <IoMdAdd className="h-4 w-4" />{" "}
+            {t("studio.groups.events.url_links.add")}
           </Pecha.Button>
         ) : null}
       </div>
 
       {fields.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No links added.</p>
+        <p className="text-sm text-muted-foreground">
+          {t("studio.groups.events.url_links.empty")}
+        </p>
       ) : null}
 
       {showLiveLinkWarning ? (
@@ -67,8 +74,7 @@ const EventUrlLinksSection = ({
             aria-hidden
           />
           <p className="text-xs text-amber-800 dark:text-amber-200/90">
-            This event is set to Live but has no links yet — attendees won't
-            have a way to join. Add at least one link.
+            {t("studio.groups.events.url_links.live_no_links_warning")}
           </p>
         </div>
       ) : null}

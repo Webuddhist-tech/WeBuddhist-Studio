@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Navigate } from "react-router-dom";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Pagination } from "@/components/ui/molecules/pagination/Pagination";
 import { getApiErrorMessage } from "@/lib/apiErrors";
@@ -20,11 +21,19 @@ import {
 const PAGE_SIZE = 20;
 const TABLE_COLUMN_COUNT = 7;
 
+type TFn = ReturnType<typeof useTranslate>["t"];
+
 const formatEnumLabel = (value: string) =>
   value
     .replaceAll("_", " ")
     .toLowerCase()
     .replace(/\b\w/g, (c) => c.toUpperCase());
+
+const formatReason = (reason: string, t: TFn) =>
+  t(
+    `studio.chat_reports.reason.${reason.toLowerCase()}`,
+    formatEnumLabel(reason),
+  );
 
 const displayName = (user?: ChatReportUserDTO | null) => {
   if (!user) return null;
@@ -47,14 +56,18 @@ const UserCell = ({ user }: { user?: ChatReportUserDTO | null }) => {
 const renderTableBody = ({
   isLoading,
   reports,
+  t,
 }: {
   isLoading: boolean;
   reports: ChatMessageReportDTO[];
+  t: TFn;
 }) => {
   if (isLoading) {
     return (
       <Pecha.TableRow>
-        <Pecha.TableCell colSpan={TABLE_COLUMN_COUNT}>Loading…</Pecha.TableCell>
+        <Pecha.TableCell colSpan={TABLE_COLUMN_COUNT}>
+          {t("studio.common.loading")}
+        </Pecha.TableCell>
       </Pecha.TableRow>
     );
   }
@@ -63,7 +76,7 @@ const renderTableBody = ({
     return (
       <Pecha.TableRow>
         <Pecha.TableCell colSpan={TABLE_COLUMN_COUNT}>
-          No reports found.
+          {t("studio.chat_reports.empty")}
         </Pecha.TableCell>
       </Pecha.TableRow>
     );
@@ -77,7 +90,7 @@ const renderTableBody = ({
       <Pecha.TableCell>
         {report.source === "AUTOMATIC" ? (
           <span className="text-muted-foreground italic">
-            System (automatic)
+            {t("studio.chat_reports.source.automatic")}
           </span>
         ) : (
           <UserCell user={report.reporter} />
@@ -87,7 +100,7 @@ const renderTableBody = ({
         <div className="max-w-[24rem]">
           {report.message_type === "PRAYER" ? (
             <Pecha.Badge variant="secondary" className="mb-1">
-              Prayer request
+              {t("studio.chat_reports.prayer_request")}
             </Pecha.Badge>
           ) : null}
           <p
@@ -98,18 +111,20 @@ const renderTableBody = ({
           </p>
           {report.description?.trim() ? (
             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-              Note: {report.description}
+              {t("studio.chat_reports.note", { note: report.description })}
             </p>
           ) : null}
         </div>
       </Pecha.TableCell>
-      <Pecha.TableCell>{formatEnumLabel(report.reason)}</Pecha.TableCell>
+      <Pecha.TableCell>{formatReason(report.reason, t)}</Pecha.TableCell>
       <Pecha.TableCell>
         {report.room_name?.trim() ? (
           <div className="flex flex-col gap-0.5">
             <span>{report.room_name.trim()}</span>
             {report.room_kind === "EVENT" ? (
-              <span className="text-xs text-muted-foreground">Event chat</span>
+              <span className="text-xs text-muted-foreground">
+                {t("studio.chat_reports.event_chat")}
+              </span>
             ) : null}
           </div>
         ) : (
@@ -124,11 +139,11 @@ const renderTableBody = ({
       <Pecha.TableCell>
         {report.resolved_at ? (
           <span className="text-xs font-medium text-green-700 dark:text-green-400">
-            Resolved
+            {t("studio.chat_reports.status.resolved")}
           </span>
         ) : (
           <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
-            Open
+            {t("studio.chat_reports.status.open")}
           </span>
         )}
       </Pecha.TableCell>
@@ -137,6 +152,7 @@ const renderTableBody = ({
 };
 
 const ChatReportsPage = () => {
+  const { t } = useTranslate();
   const { data: userInfo } = useUserInfo();
   const [page, setPage] = useState(0);
   const [sourceFilter, setSourceFilter] = useState<ChatReportSource | "ALL">(
@@ -179,10 +195,11 @@ const ChatReportsPage = () => {
   return (
     <div className="font-dynamic border h-[calc(100vh-40px)] overflow-auto bg-[#F5F5F5] dark:bg-[#181818] my-4 rounded-l-2xl max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
       <div className="px-4 pt-10 pb-4">
-        <h1 className="text-xl font-semibold">Chat reports</h1>
+        <h1 className="text-xl font-semibold">
+          {t("studio.chat_reports.title")}
+        </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Messages reported by users, and messages rejected automatically for
-          inappropriate language.
+          {t("studio.chat_reports.subtitle")}
         </p>
       </div>
 
@@ -195,9 +212,13 @@ const ChatReportsPage = () => {
             setPage(0);
           }}
         >
-          <option value="ALL">All sources</option>
-          <option value="MANUAL">Reported by users</option>
-          <option value="AUTOMATIC">System (automatic)</option>
+          <option value="ALL">{t("studio.chat_reports.all_sources")}</option>
+          <option value="MANUAL">
+            {t("studio.chat_reports.source.manual")}
+          </option>
+          <option value="AUTOMATIC">
+            {t("studio.chat_reports.source.automatic")}
+          </option>
         </select>
         <select
           className="rounded border bg-background px-3 py-2 text-sm"
@@ -207,10 +228,10 @@ const ChatReportsPage = () => {
             setPage(0);
           }}
         >
-          <option value="ALL">All reasons</option>
+          <option value="ALL">{t("studio.chat_reports.all_reasons")}</option>
           {REPORT_REASONS.map((reason) => (
             <option key={reason} value={reason}>
-              {formatEnumLabel(reason)}
+              {formatReason(reason, t)}
             </option>
           ))}
         </select>
@@ -222,9 +243,11 @@ const ChatReportsPage = () => {
             setPage(0);
           }}
         >
-          <option value="ALL">All statuses</option>
-          <option value="OPEN">Open</option>
-          <option value="RESOLVED">Resolved</option>
+          <option value="ALL">{t("studio.chat_reports.all_statuses")}</option>
+          <option value="OPEN">{t("studio.chat_reports.status.open")}</option>
+          <option value="RESOLVED">
+            {t("studio.chat_reports.status.resolved")}
+          </option>
         </select>
       </div>
 
@@ -238,17 +261,27 @@ const ChatReportsPage = () => {
         <Pecha.Table>
           <Pecha.TableHeader>
             <Pecha.TableRow>
-              <Pecha.TableHead>Reported user</Pecha.TableHead>
-              <Pecha.TableHead>Reported by</Pecha.TableHead>
-              <Pecha.TableHead>Message</Pecha.TableHead>
-              <Pecha.TableHead>Reason</Pecha.TableHead>
-              <Pecha.TableHead>Room</Pecha.TableHead>
-              <Pecha.TableHead>Date</Pecha.TableHead>
-              <Pecha.TableHead>Status</Pecha.TableHead>
+              <Pecha.TableHead>
+                {t("studio.chat_reports.table.reported_user")}
+              </Pecha.TableHead>
+              <Pecha.TableHead>
+                {t("studio.chat_reports.table.reported_by")}
+              </Pecha.TableHead>
+              <Pecha.TableHead>
+                {t("studio.chat_reports.table.message")}
+              </Pecha.TableHead>
+              <Pecha.TableHead>
+                {t("studio.chat_reports.table.reason")}
+              </Pecha.TableHead>
+              <Pecha.TableHead>
+                {t("studio.chat_reports.table.room")}
+              </Pecha.TableHead>
+              <Pecha.TableHead>{t("studio.common.date")}</Pecha.TableHead>
+              <Pecha.TableHead>{t("studio.common.status")}</Pecha.TableHead>
             </Pecha.TableRow>
           </Pecha.TableHeader>
           <Pecha.TableBody>
-            {renderTableBody({ isLoading, reports })}
+            {renderTableBody({ isLoading, reports, t })}
           </Pecha.TableBody>
         </Pecha.Table>
 

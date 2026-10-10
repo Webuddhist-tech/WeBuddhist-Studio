@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { IoMdCopy } from "react-icons/io";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { getLanguageLabel } from "@/components/api/languagesApi";
 import type { LanguageCode } from "@/schema/SeriesSchema";
@@ -25,6 +26,7 @@ export function CloneLanguagePlansPanel({
   embedded = false,
 }: Readonly<CloneLanguagePlansPanelProps>) {
   const queryClient = useQueryClient();
+  const { t } = useTranslate();
   const [sourceLanguage, setSourceLanguage] = useState<LanguageCode>(
     sourceLanguages[0] ?? "EN",
   );
@@ -44,7 +46,10 @@ export function CloneLanguagePlansPanel({
       queryClient.invalidateQueries({ queryKey: ["series", seriesId] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-items"] });
       toast.success(
-        `Cloned plans from ${languageLabel(effectiveSource)} to ${languageLabel(targetLanguage)}`,
+        t("studio.series.clone.success", {
+          source: languageLabel(effectiveSource),
+          target: languageLabel(targetLanguage),
+        }),
       );
     },
     onError: (err: unknown) => {
@@ -56,7 +61,7 @@ export function CloneLanguagePlansPanel({
       const text =
         typeof message === "string"
           ? message
-          : (message?.message ?? "Could not clone plans");
+          : (message?.message ?? t("studio.series.clone.failed"));
       toast.error(text);
     },
   });
@@ -66,8 +71,9 @@ export function CloneLanguagePlansPanel({
   const content = (
     <>
       <p className="text-center text-sm text-muted-foreground">
-        No plans in {languageLabel(targetLanguage)} yet. Clone the full plan
-        structure from another language.
+        {t("studio.series.clone.empty_description", {
+          language: languageLabel(targetLanguage),
+        })}
       </p>
       <div className="flex flex-wrap items-center justify-center gap-3">
         <Pecha.Select
@@ -75,7 +81,9 @@ export function CloneLanguagePlansPanel({
           onValueChange={(value) => setSourceLanguage(value as LanguageCode)}
         >
           <Pecha.SelectTrigger className="w-[180px] bg-background">
-            <Pecha.SelectValue placeholder="Source language" />
+            <Pecha.SelectValue
+              placeholder={t("studio.series.clone.source_language")}
+            />
           </Pecha.SelectTrigger>
           <Pecha.SelectContent>
             {sourceLanguages.map((code) => (
@@ -93,7 +101,9 @@ export function CloneLanguagePlansPanel({
           onClick={() => cloneMutation.mutate()}
         >
           <IoMdCopy className="h-4 w-4" />
-          {cloneMutation.isPending ? "Cloning…" : "Clone plans"}
+          {cloneMutation.isPending
+            ? t("studio.series.clone.cloning")
+            : t("studio.series.clone.clone_plans")}
         </Pecha.Button>
       </div>
     </>

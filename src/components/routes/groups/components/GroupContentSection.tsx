@@ -39,17 +39,19 @@ const GroupContentSection = ({
   const rows = data ?? [];
 
   return (
-    <GroupDetailCard title="Group content">
+    <GroupDetailCard title={t("studio.groups.components.content.title")}>
       {canCreate ? (
         <div className="mb-4 flex flex-wrap gap-2">
           <Button variant="outline" size="sm" asChild>
             <Link to={ROUTES.groupPlanNew(groupId)}>
-              <IoMdAdd className="h-4 w-4" /> Add plan
+              <IoMdAdd className="h-4 w-4" />{" "}
+              {t("studio.groups.components.content.add_plan")}
             </Link>
           </Button>
           <Button variant="outline" size="sm" asChild>
             <Link to={ROUTES.groupSeriesNew(groupId)}>
-              <IoMdAdd className="h-4 w-4" /> Add series
+              <IoMdAdd className="h-4 w-4" />{" "}
+              {t("studio.groups.components.content.add_series")}
             </Link>
           </Button>
         </div>
@@ -59,8 +61,10 @@ const GroupContentSection = ({
         <p className="text-sm text-destructive">{String(error)}</p>
       ) : rows.length === 0 && !isLoading ? (
         <p className="text-sm text-muted-foreground">
-          No plans or series in this group yet.
-          {canCreate ? " Use the buttons above to add content." : null}
+          {t("studio.groups.components.content.empty")}
+          {canCreate
+            ? ` ${t("studio.groups.components.content.empty_hint")}`
+            : null}
         </p>
       ) : (
         <div className="overflow-x-auto">

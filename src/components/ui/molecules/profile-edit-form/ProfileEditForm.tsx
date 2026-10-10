@@ -11,6 +11,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { profileSchema, type ProfileFormData } from "@/schema/ProfileSchema";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
+import { tolgee } from "@/i18n/tolgee";
 import ImageContentData from "@/components/ui/molecules/modals/image-upload/ImageContentData";
 import { uploadImageToS3 } from "@/components/routes/task/api/taskApi";
 import { USER_INFO_QUERY_KEY } from "@/hooks/useUserInfo";
@@ -20,7 +22,7 @@ const getUrlError = (account: string, url: string): string | null => {
   if (!account || !url || account === "email") return null;
   const pattern = PLATFORM_PATTERNS[account];
   if (pattern && !pattern.test(url))
-    return `URL must be a valid ${account} link`;
+    return tolgee.t("studio.profile_form.url_invalid", { platform: account });
   return null;
 };
 
@@ -51,6 +53,7 @@ const updateUserProfile = async (
 };
 
 const ProfileEditForm = ({ userInfo, onSuccess }: ProfileEditFormProps) => {
+  const { t } = useTranslate();
   const queryClient = useQueryClient();
 
   const [isSocialDirty, setIsSocialDirty] = useState(false);
@@ -93,10 +96,10 @@ const ProfileEditForm = ({ userInfo, onSuccess }: ProfileEditFormProps) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: USER_INFO_QUERY_KEY });
       onSuccess();
-      toast.success("Profile updated successfully!");
+      toast.success(t("studio.profile_form.update_success"));
     },
     onError: () => {
-      toast.error("Failed to update profile");
+      toast.error(t("studio.profile_form.update_failed"));
     },
   });
 
@@ -112,9 +115,9 @@ const ProfileEditForm = ({ userInfo, onSuccess }: ProfileEditFormProps) => {
         shouldTouch: true,
       });
       setIsImageDialogOpen(false);
-      toast.success("Image uploaded successfully!");
+      toast.success(t("studio.profile_form.image_upload_success"));
     } catch {
-      toast.error("Failed to upload image");
+      toast.error(t("studio.profile_form.image_upload_failed"));
     } finally {
       setIsImageUploading(false);
     }
@@ -161,7 +164,7 @@ const ProfileEditForm = ({ userInfo, onSuccess }: ProfileEditFormProps) => {
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
-        toast.error(error.issues[0].message);
+        toast.error(t(String(error.issues[0].message)));
       }
     }
   };
@@ -174,7 +177,9 @@ const ProfileEditForm = ({ userInfo, onSuccess }: ProfileEditFormProps) => {
       >
         <div className="gap-4 flex-1 space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="image_key">Profile Picture</Label>
+            <Label htmlFor="image_key">
+              {t("studio.profile_form.profile_picture")}
+            </Label>
             <div>
               {!imagePreview ? (
                 <div
@@ -189,7 +194,7 @@ const ProfileEditForm = ({ userInfo, onSuccess }: ProfileEditFormProps) => {
                 <div className="w-32 h-32 rounded-full overflow-hidden relative">
                   <img
                     src={imagePreview}
-                    alt="Profile"
+                    alt={t("studio.profile_form.profile_image_alt")}
                     className=" w-full h-full object-cover rounded-full border "
                   />
                   <div
@@ -208,11 +213,15 @@ const ProfileEditForm = ({ userInfo, onSuccess }: ProfileEditFormProps) => {
             name="firstname"
             render={({ field }) => (
               <Pecha.FormItem>
-                <Pecha.FormLabel>First Name *</Pecha.FormLabel>
+                <Pecha.FormLabel>
+                  {t("studio.profile_form.first_name_label")}
+                </Pecha.FormLabel>
                 <Pecha.FormControl>
                   <Pecha.Input
                     type="text"
-                    placeholder="Enter your first name"
+                    placeholder={t(
+                      "studio.profile_form.first_name_placeholder",
+                    )}
                     {...field}
                   />
                 </Pecha.FormControl>
@@ -226,11 +235,13 @@ const ProfileEditForm = ({ userInfo, onSuccess }: ProfileEditFormProps) => {
             name="lastname"
             render={({ field }) => (
               <Pecha.FormItem>
-                <Pecha.FormLabel>Last Name *</Pecha.FormLabel>
+                <Pecha.FormLabel>
+                  {t("studio.profile_form.last_name_label")}
+                </Pecha.FormLabel>
                 <Pecha.FormControl>
                   <Pecha.Input
                     type="text"
-                    placeholder="Enter your last name"
+                    placeholder={t("studio.profile_form.last_name_placeholder")}
                     {...field}
                   />
                 </Pecha.FormControl>
@@ -244,10 +255,12 @@ const ProfileEditForm = ({ userInfo, onSuccess }: ProfileEditFormProps) => {
             name="bio"
             render={({ field }) => (
               <Pecha.FormItem>
-                <Pecha.FormLabel>Bio</Pecha.FormLabel>
+                <Pecha.FormLabel>
+                  {t("studio.profile_form.bio_label")}
+                </Pecha.FormLabel>
                 <Pecha.FormControl>
                   <Pecha.Textarea
-                    placeholder="Tell us about yourself..."
+                    placeholder={t("studio.profile_form.bio_placeholder")}
                     rows={4}
                     {...field}
                   />
@@ -261,7 +274,7 @@ const ProfileEditForm = ({ userInfo, onSuccess }: ProfileEditFormProps) => {
         <div className="flex-1">
           <div className="space-y-4 border border-dashed rounded-md p-4">
             <div className="flex justify-between items-center">
-              <Label>Social Links (Max 7)</Label>
+              <Label>{t("studio.profile_form.social_links_label")}</Label>
               <Pecha.Button
                 type="button"
                 variant="outline"
@@ -269,7 +282,7 @@ const ProfileEditForm = ({ userInfo, onSuccess }: ProfileEditFormProps) => {
                 onClick={handleAddSocialProfile}
                 disabled={socialProfiles.length >= 7}
               >
-                Add Social Link
+                {t("studio.profile_form.add_social_link")}
               </Pecha.Button>
             </div>
 
@@ -290,7 +303,7 @@ const ProfileEditForm = ({ userInfo, onSuccess }: ProfileEditFormProps) => {
                       <div className="flex justify-between items-start">
                         <div className="space-y-2">
                           <Label htmlFor={`social-platform-${index}`}>
-                            Platform
+                            {t("studio.profile_form.platform_label")}
                           </Label>
                           <Pecha.Select
                             value={social.account}
@@ -305,7 +318,11 @@ const ProfileEditForm = ({ userInfo, onSuccess }: ProfileEditFormProps) => {
                             <Pecha.SelectTrigger
                               id={`social-platform-${index}`}
                             >
-                              <Pecha.SelectValue placeholder="Select platform" />
+                              <Pecha.SelectValue
+                                placeholder={t(
+                                  "studio.profile_form.platform_placeholder",
+                                )}
+                              />
                             </Pecha.SelectTrigger>
                             <Pecha.SelectContent>
                               <Pecha.SelectGroup>
@@ -336,13 +353,18 @@ const ProfileEditForm = ({ userInfo, onSuccess }: ProfileEditFormProps) => {
                             social.account === "email" &&
                             social.url === userInfo?.email
                           }
+                          aria-label={t(
+                            "studio.profile_form.remove_social_link",
+                          )}
                         >
                           <IoMdClose className="w-4 h-4" />
                         </Pecha.Button>
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor={`social-url-${index}`}>URL</Label>
+                        <Label htmlFor={`social-url-${index}`}>
+                          {t("studio.profile_form.url_label")}
+                        </Label>
                         <Pecha.Input
                           type="url"
                           id={`social-url-${index}`}
@@ -381,7 +403,9 @@ const ProfileEditForm = ({ userInfo, onSuccess }: ProfileEditFormProps) => {
                 socialProfiles.some((sp) => getUrlError(sp.account, sp.url))
               }
             >
-              {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
+              {updateProfileMutation.isPending
+                ? t("studio.common.saving")
+                : t("studio.profile_form.save_changes")}
             </Pecha.Button>
           </div>
         </div>
@@ -393,7 +417,7 @@ const ProfileEditForm = ({ userInfo, onSuccess }: ProfileEditFormProps) => {
           <Pecha.DialogContent showCloseButton={true}>
             <Pecha.DialogHeader>
               <Pecha.DialogTitle>
-                Upload & Crop Profile Picture
+                {t("studio.profile_form.upload_dialog_title")}
               </Pecha.DialogTitle>
             </Pecha.DialogHeader>
             <ImageContentData

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
 import { IoChatbubbleOutline } from "react-icons/io5";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import { Pagination } from "@/components/ui/molecules/pagination/Pagination";
@@ -26,9 +27,9 @@ const STATUS_FILTER_OPTIONS: {
   value: GroupJoinRequestStatus;
   label: string;
 }[] = [
-  { value: "PENDING", label: "Pending" },
-  { value: "APPROVED", label: "Approved" },
-  { value: "REJECTED", label: "Rejected" },
+  { value: "PENDING", label: "studio.groups.components.status.pending" },
+  { value: "APPROVED", label: "studio.groups.components.status.approved" },
+  { value: "REJECTED", label: "studio.groups.components.status.rejected" },
 ];
 
 const EMPTY_STATE: Record<
@@ -36,16 +37,16 @@ const EMPTY_STATE: Record<
   { title: string; hint: string }
 > = {
   PENDING: {
-    title: "No pending requests",
-    hint: "When someone asks to join this group from the app, they'll show up here for review.",
+    title: "studio.groups.components.join_requests.empty_pending_title",
+    hint: "studio.groups.components.join_requests.empty_pending_hint",
   },
   APPROVED: {
-    title: "No approved requests",
-    hint: "Requests you approve will be listed here.",
+    title: "studio.groups.components.join_requests.empty_approved_title",
+    hint: "studio.groups.components.join_requests.empty_approved_hint",
   },
   REJECTED: {
-    title: "No rejected requests",
-    hint: "Requests you reject will be listed here.",
+    title: "studio.groups.components.join_requests.empty_rejected_title",
+    hint: "studio.groups.components.join_requests.empty_rejected_hint",
   },
 };
 
@@ -77,6 +78,7 @@ const GroupJoinRequestsSection = ({
   groupId,
   canModerate,
 }: GroupJoinRequestsSectionProps) => {
+  const { t } = useTranslate();
   const queryClient = useQueryClient();
   const { data: userInfo } = useUserInfo();
   const showActions =
@@ -149,14 +151,20 @@ const GroupJoinRequestsSection = ({
     onSuccess: (_data, { action, userName }) => {
       toast.success(
         action === "approve"
-          ? `${userName} is now a member`
-          : `Request from ${userName} rejected`,
+          ? t("studio.groups.components.join_requests.approved_toast", {
+              name: userName,
+            })
+          : t("studio.groups.components.join_requests.rejected_toast", {
+              name: userName,
+            }),
       );
       invalidate();
     },
     onError: (err) => {
       if (isJoinRequestAlreadyReviewedError(err)) {
-        toast.error("This request was already reviewed.");
+        toast.error(
+          t("studio.groups.components.join_requests.already_reviewed"),
+        );
         invalidate();
         return;
       }
@@ -223,7 +231,7 @@ const GroupJoinRequestsSection = ({
             ) : null}
             <span className="text-muted-foreground">
               {" "}
-              asked to join this group
+              {t("studio.groups.components.join_requests.asked_to_join")}
             </span>
             <span className="text-muted-foreground"> · </span>
             <time
@@ -256,7 +264,9 @@ const GroupJoinRequestsSection = ({
                 disabled={rowPending}
                 onClick={() => runAction(request, "approve")}
               >
-                {rowAction === "approve" ? "Approving…" : "Approve"}
+                {rowAction === "approve"
+                  ? t("studio.groups.components.join_requests.approving")
+                  : t("studio.groups.components.join_requests.approve")}
               </Button>
               <Button
                 type="button"
@@ -266,7 +276,9 @@ const GroupJoinRequestsSection = ({
                 disabled={rowPending}
                 onClick={() => runAction(request, "reject")}
               >
-                {rowAction === "reject" ? "Rejecting…" : "Reject"}
+                {rowAction === "reject"
+                  ? t("studio.groups.components.join_requests.rejecting")
+                  : t("studio.groups.components.invite.reject")}
               </Button>
             </div>
           ) : null}
@@ -303,7 +315,10 @@ const GroupJoinRequestsSection = ({
       return (
         <div className="rounded-xl border border-dashed px-4 py-10 text-center sm:px-6">
           <p className="text-sm text-destructive">
-            {getApiErrorMessage(error, "Could not load join requests.")}
+            {getApiErrorMessage(
+              error,
+              t("studio.groups.components.join_requests.load_error"),
+            )}
           </p>
         </div>
       );
@@ -312,9 +327,9 @@ const GroupJoinRequestsSection = ({
     if (requests.length === 0) {
       return (
         <div className="rounded-xl border border-dashed px-4 py-10 text-center sm:px-6 sm:py-14">
-          <p className="font-medium">{EMPTY_STATE[status].title}</p>
+          <p className="font-medium">{t(EMPTY_STATE[status].title)}</p>
           <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-            {EMPTY_STATE[status].hint}
+            {t(EMPTY_STATE[status].hint)}
           </p>
         </div>
       );
@@ -328,7 +343,7 @@ const GroupJoinRequestsSection = ({
   return (
     <div className="space-y-3">
       <GroupSectionHeader
-        title={`Join requests${pendingCount}`}
+        title={`${t("studio.groups.components.join_requests.title")}${pendingCount}`}
         action={
           <Pecha.Select
             value={status}
@@ -338,14 +353,16 @@ const GroupJoinRequestsSection = ({
           >
             <Pecha.SelectTrigger
               className="h-8 w-28 shrink-0 sm:w-36"
-              aria-label="Filter by status"
+              aria-label={t(
+                "studio.groups.components.join_requests.filter_label",
+              )}
             >
               <Pecha.SelectValue />
             </Pecha.SelectTrigger>
             <Pecha.SelectContent>
               {STATUS_FILTER_OPTIONS.map((opt) => (
                 <Pecha.SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
+                  {t(opt.label)}
                 </Pecha.SelectItem>
               ))}
             </Pecha.SelectContent>

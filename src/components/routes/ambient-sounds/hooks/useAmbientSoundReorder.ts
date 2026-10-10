@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import { reorderArray } from "@/lib/utils";
 import { updateAmbientSound, type AmbientSound } from "../api/ambientSoundsApi";
@@ -12,6 +13,7 @@ export const useAmbientSoundReorder = (
   sounds: AmbientSound[] | undefined,
   canManage: boolean,
 ) => {
+  const { t } = useTranslate();
   const queryClient = useQueryClient();
   const [orderedSounds, setOrderedSounds] = useState<AmbientSound[]>([]);
 
@@ -46,7 +48,7 @@ export const useAmbientSoundReorder = (
     },
     onSuccess: reconcileWithServer,
     onError: (err) => {
-      toast.error("Failed to reorder sounds", {
+      toast.error(t("studio.ambient_sounds.toast_reorder_failed"), {
         description: getApiErrorMessage(err),
       });
       reconcileWithServer();

@@ -1,4 +1,5 @@
 import axiosInstance from "@/config/axios-config";
+import { tolgee } from "@/i18n/tolgee";
 import {
   getLanguageLabel,
   getLanguageName,
@@ -599,7 +600,7 @@ export const removeGroupMember = async (
 
 export function pickGroupTitle(
   metadata: GroupMetadataDTO[] | undefined,
-  fallback = "Untitled group",
+  fallback = tolgee.t("studio.groups.shared.untitled_group"),
 ): string {
   if (!metadata?.length) return capitalizeFirstLetter(fallback);
   const en = metadata.find((m) => m.language === "EN");
@@ -636,7 +637,7 @@ export function resolveGroupAvatarUrl(group: {
 
 export function pickGroupLinkedSeriesTitle(
   series: GroupLinkedSeriesDTO,
-  fallback = "Untitled series",
+  fallback = tolgee.t("studio.groups.shared.untitled_series"),
 ): string {
   return pickGroupTitle(series.metadata, fallback);
 }
@@ -660,7 +661,7 @@ export function groupLinkedSeriesToFkOptions(
 
 export function pickGroupLinkedPlanTitle(
   plan: GroupLinkedPlanDTO,
-  fallback = "Untitled plan",
+  fallback = tolgee.t("studio.groups.shared.untitled_plan"),
 ): string {
   const title = plan.title?.trim() || fallback;
   return capitalizeFirstLetter(title);

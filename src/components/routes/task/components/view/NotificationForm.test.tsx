@@ -91,8 +91,12 @@ describe("NotificationForm Component", () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Title")).toBeInTheDocument();
-        expect(screen.getByLabelText("Body")).toBeInTheDocument();
+        expect(
+          screen.getByLabelText("studio.common.title"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByLabelText("studio.task.notification.body"),
+        ).toBeInTheDocument();
       });
     });
 
@@ -129,9 +133,15 @@ describe("NotificationForm Component", () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText("Custom")).toBeInTheDocument();
-        expect(screen.getByText("Use plan cover")).toBeInTheDocument();
-        expect(screen.getByText("No image")).toBeInTheDocument();
+        expect(
+          screen.getByText("studio.task.notification.custom"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByText("studio.task.notification.use_plan_cover"),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByText("studio.task.notification.no_image"),
+        ).toBeInTheDocument();
       });
     });
 
@@ -144,7 +154,7 @@ describe("NotificationForm Component", () => {
         />,
       );
 
-      expect(screen.getByText("Loading...")).toBeInTheDocument();
+      expect(screen.getByText("studio.common.loading")).toBeInTheDocument();
     });
 
     it("shows Save button in create mode", async () => {
@@ -161,7 +171,7 @@ describe("NotificationForm Component", () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText("Save")).toBeInTheDocument();
+        expect(screen.getByText("studio.common.save")).toBeInTheDocument();
       });
     });
 
@@ -176,7 +186,7 @@ describe("NotificationForm Component", () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText("Update")).toBeInTheDocument();
+        expect(screen.getByText("studio.common.update")).toBeInTheDocument();
       });
     });
   });
@@ -196,7 +206,7 @@ describe("NotificationForm Component", () => {
       );
 
       await waitFor(() => {
-        const titleInput = screen.getByLabelText("Title");
+        const titleInput = screen.getByLabelText("studio.common.title");
         fireEvent.change(titleInput, { target: { value: "New Title" } });
         expect(titleInput).toHaveValue("New Title");
         expect(screen.getByText("9 / 40")).toBeInTheDocument();
@@ -217,7 +227,9 @@ describe("NotificationForm Component", () => {
       );
 
       await waitFor(() => {
-        const bodyInput = screen.getByLabelText("Body");
+        const bodyInput = screen.getByLabelText(
+          "studio.task.notification.body",
+        );
         fireEvent.change(bodyInput, { target: { value: "New Body Content" } });
         expect(bodyInput).toHaveValue("New Body Content");
         expect(screen.getByText("16 / 180")).toBeInTheDocument();
@@ -238,7 +250,9 @@ describe("NotificationForm Component", () => {
       );
 
       await waitFor(() => {
-        const titleInput = screen.getByLabelText("Title") as HTMLInputElement;
+        const titleInput = screen.getByLabelText(
+          "studio.common.title",
+        ) as HTMLInputElement;
         expect(titleInput.maxLength).toBe(40);
       });
     });
@@ -257,7 +271,9 @@ describe("NotificationForm Component", () => {
       );
 
       await waitFor(() => {
-        const bodyInput = screen.getByLabelText("Body") as HTMLTextAreaElement;
+        const bodyInput = screen.getByLabelText(
+          "studio.task.notification.body",
+        ) as HTMLTextAreaElement;
         expect(bodyInput.maxLength).toBe(180);
       });
     });
@@ -297,7 +313,7 @@ describe("NotificationForm Component", () => {
 
       await waitFor(() => {
         const planRadio = screen.getByRole("radio", {
-          name: /use plan cover/i,
+          name: "studio.task.notification.use_plan_cover",
         });
         fireEvent.click(planRadio);
         expect(planRadio).toBeChecked();
@@ -318,7 +334,9 @@ describe("NotificationForm Component", () => {
       );
 
       await waitFor(() => {
-        const noImageRadio = screen.getByRole("radio", { name: /no image/i });
+        const noImageRadio = screen.getByRole("radio", {
+          name: "studio.task.notification.no_image",
+        });
         fireEvent.click(noImageRadio);
         expect(noImageRadio).toBeChecked();
       });
@@ -352,7 +370,7 @@ describe("NotificationForm Component", () => {
         fireEvent.change(fileInput, { target: { files: [largeFile] } });
 
         expect(toast.error).toHaveBeenCalledWith(
-          "File size exceeds 5MB limit. Please select a smaller image.",
+          "studio.task.notification.image_too_large",
         );
       });
     });
@@ -383,7 +401,7 @@ describe("NotificationForm Component", () => {
         fireEvent.change(fileInput, { target: { files: [invalidFile] } });
 
         expect(toast.error).toHaveBeenCalledWith(
-          "Invalid file type. Please upload PNG, JPG, JPEG, or WebP.",
+          "studio.task.notification.invalid_file_type",
         );
       });
     });
@@ -422,7 +440,7 @@ describe("NotificationForm Component", () => {
         await waitFor(() => {
           expect(uploadImageToS3).toHaveBeenCalledWith(validFile, "plan-1");
           expect(toast.success).toHaveBeenCalledWith(
-            "Image uploaded successfully!",
+            "studio.task.form.image_uploaded",
           );
         });
       });
@@ -452,13 +470,15 @@ describe("NotificationForm Component", () => {
       );
 
       await waitFor(() => {
-        const titleInput = screen.getByLabelText("Title");
-        const bodyInput = screen.getByLabelText("Body");
+        const titleInput = screen.getByLabelText("studio.common.title");
+        const bodyInput = screen.getByLabelText(
+          "studio.task.notification.body",
+        );
 
         fireEvent.change(titleInput, { target: { value: "New Title" } });
         fireEvent.change(bodyInput, { target: { value: "New Body" } });
 
-        const saveButton = screen.getByText("Save");
+        const saveButton = screen.getByText("studio.common.save");
         fireEvent.click(saveButton);
       });
 
@@ -470,7 +490,7 @@ describe("NotificationForm Component", () => {
           image_url: null,
         });
         expect(toast.success).toHaveBeenCalledWith(
-          "Notification created successfully!",
+          "studio.task.notification.created",
         );
       });
     });
@@ -491,10 +511,10 @@ describe("NotificationForm Component", () => {
       );
 
       await waitFor(() => {
-        const titleInput = screen.getByLabelText("Title");
+        const titleInput = screen.getByLabelText("studio.common.title");
         fireEvent.change(titleInput, { target: { value: "Updated Title" } });
 
-        const updateButton = screen.getByText("Update");
+        const updateButton = screen.getByText("studio.common.update");
         fireEvent.click(updateButton);
       });
 
@@ -506,7 +526,7 @@ describe("NotificationForm Component", () => {
           image_url: mockPlanCoverImage,
         });
         expect(toast.success).toHaveBeenCalledWith(
-          "Notification updated successfully!",
+          "studio.task.notification.updated",
         );
       });
     });
@@ -527,14 +547,14 @@ describe("NotificationForm Component", () => {
       );
 
       await waitFor(() => {
-        const clearButton = screen.getByText("Clear");
+        const clearButton = screen.getByText("studio.common.clear");
         fireEvent.click(clearButton);
       });
 
       await waitFor(() => {
         expect(deleteNotification).toHaveBeenCalledWith("day-1");
         expect(toast.success).toHaveBeenCalledWith(
-          "Notification deleted successfully!",
+          "studio.task.notification.deleted",
         );
       });
     });
@@ -556,10 +576,10 @@ describe("NotificationForm Component", () => {
       );
 
       await waitFor(() => {
-        const titleInput = screen.getByLabelText("Title");
+        const titleInput = screen.getByLabelText("studio.common.title");
         fireEvent.change(titleInput, { target: { value: "Some Title" } });
 
-        const clearButton = screen.getByText("Clear");
+        const clearButton = screen.getByText("studio.common.clear");
         fireEvent.click(clearButton);
 
         expect(deleteNotification).not.toHaveBeenCalled();
@@ -588,16 +608,16 @@ describe("NotificationForm Component", () => {
       );
 
       await waitFor(() => {
-        const titleInput = screen.getByLabelText("Title");
+        const titleInput = screen.getByLabelText("studio.common.title");
         fireEvent.change(titleInput, { target: { value: "Title" } });
 
-        const saveButton = screen.getByText("Save");
+        const saveButton = screen.getByText("studio.common.save");
         fireEvent.click(saveButton);
       });
 
       await waitFor(() => {
         expect(toast.error).toHaveBeenCalledWith(
-          "Failed to save notification",
+          "studio.task.notification.save_failed",
           {
             description: "Network error",
           },
@@ -628,10 +648,10 @@ describe("NotificationForm Component", () => {
       );
 
       await waitFor(() => {
-        const titleInput = screen.getByLabelText("Title");
+        const titleInput = screen.getByLabelText("studio.common.title");
         fireEvent.change(titleInput, { target: { value: "Title" } });
 
-        const saveButton = screen.getByText("Save");
+        const saveButton = screen.getByText("studio.common.save");
         fireEvent.click(saveButton);
       });
 
@@ -671,7 +691,9 @@ describe("NotificationForm Component", () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByLabelText("Title")).toBeInTheDocument();
+        expect(
+          screen.getByLabelText("studio.common.title"),
+        ).toBeInTheDocument();
       });
 
       const fileInput = container.querySelector(
@@ -688,10 +710,10 @@ describe("NotificationForm Component", () => {
         expect(uploadImageToS3).toHaveBeenCalledWith(validFile, "plan-1");
       });
 
-      const titleInput = screen.getByLabelText("Title");
+      const titleInput = screen.getByLabelText("studio.common.title");
       fireEvent.change(titleInput, { target: { value: "Title" } });
 
-      const saveButton = screen.getByText("Save");
+      const saveButton = screen.getByText("studio.common.save");
       fireEvent.click(saveButton);
 
       await waitFor(() => {
@@ -726,14 +748,14 @@ describe("NotificationForm Component", () => {
 
       await waitFor(() => {
         const planRadio = screen.getByRole("radio", {
-          name: /use plan cover/i,
+          name: "studio.task.notification.use_plan_cover",
         });
         fireEvent.click(planRadio);
 
-        const titleInput = screen.getByLabelText("Title");
+        const titleInput = screen.getByLabelText("studio.common.title");
         fireEvent.change(titleInput, { target: { value: "Title" } });
 
-        const saveButton = screen.getByText("Save");
+        const saveButton = screen.getByText("studio.common.save");
         fireEvent.click(saveButton);
       });
 
@@ -764,8 +786,10 @@ describe("NotificationForm Component", () => {
       );
 
       await waitFor(() => {
-        const titleInput = screen.getByLabelText("Title");
-        const bodyInput = screen.getByLabelText("Body");
+        const titleInput = screen.getByLabelText("studio.common.title");
+        const bodyInput = screen.getByLabelText(
+          "studio.task.notification.body",
+        );
 
         expect(titleInput).toBeDisabled();
         expect(bodyInput).toBeDisabled();
@@ -787,8 +811,8 @@ describe("NotificationForm Component", () => {
       );
 
       await waitFor(() => {
-        const clearButton = screen.getByText("Clear");
-        const saveButton = screen.getByText("Save");
+        const clearButton = screen.getByText("studio.common.clear");
+        const saveButton = screen.getByText("studio.common.save");
 
         expect(clearButton).toBeDisabled();
         expect(saveButton).toBeDisabled();
@@ -808,8 +832,12 @@ describe("NotificationForm Component", () => {
       );
 
       await waitFor(() => {
-        const titleInput = screen.getByLabelText("Title") as HTMLInputElement;
-        const bodyInput = screen.getByLabelText("Body") as HTMLTextAreaElement;
+        const titleInput = screen.getByLabelText(
+          "studio.common.title",
+        ) as HTMLInputElement;
+        const bodyInput = screen.getByLabelText(
+          "studio.task.notification.body",
+        ) as HTMLTextAreaElement;
 
         expect(titleInput.value).toBe("Test Title");
         expect(bodyInput.value).toBe("Test Body");
@@ -828,7 +856,7 @@ describe("NotificationForm Component", () => {
 
       await waitFor(() => {
         const planRadio = screen.getByRole("radio", {
-          name: /use plan cover/i,
+          name: "studio.task.notification.use_plan_cover",
         });
         expect(planRadio).toBeChecked();
       });
@@ -848,7 +876,9 @@ describe("NotificationForm Component", () => {
         const customRadio = screen.getByRole("radio", { name: /custom/i });
         expect(customRadio).toBeChecked();
 
-        const customImage = screen.getByAltText("Custom") as HTMLImageElement;
+        const customImage = screen.getByAltText(
+          "studio.task.notification.custom",
+        ) as HTMLImageElement;
         expect(customImage.src).toBe("https://example.com/custom-image.jpg");
       });
     });

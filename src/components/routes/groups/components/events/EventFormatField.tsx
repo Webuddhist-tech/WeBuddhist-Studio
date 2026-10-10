@@ -1,3 +1,4 @@
+import { useTranslate } from "@tolgee/react";
 import type { UseFormReturn } from "react-hook-form";
 import { Pecha } from "@/components/ui/shadimport";
 import { EVENT_FORMAT_OPTIONS, type EventFormData } from "@/schema/EventSchema";
@@ -8,6 +9,7 @@ type EventFormatFieldProps = {
 };
 
 const EventFormatField = ({ form, readOnly }: EventFormatFieldProps) => {
+  const { t } = useTranslate();
   return (
     <Pecha.FormField
       control={form.control}
@@ -15,7 +17,7 @@ const EventFormatField = ({ form, readOnly }: EventFormatFieldProps) => {
       render={({ field }) => (
         <Pecha.FormItem>
           <Pecha.FormLabel className="text-sm font-medium">
-            Format
+            {t("studio.groups.events.format.label")}
           </Pecha.FormLabel>
           <Pecha.Select
             value={field.value}
@@ -24,13 +26,15 @@ const EventFormatField = ({ form, readOnly }: EventFormatFieldProps) => {
           >
             <Pecha.FormControl>
               <Pecha.SelectTrigger className="h-11 w-full bg-white dark:bg-[#262626]">
-                <Pecha.SelectValue placeholder="Select a format" />
+                <Pecha.SelectValue
+                  placeholder={t("studio.groups.events.format.placeholder")}
+                />
               </Pecha.SelectTrigger>
             </Pecha.FormControl>
             <Pecha.SelectContent>
               {EVENT_FORMAT_OPTIONS.map((option) => (
                 <Pecha.SelectItem key={option.value} value={option.value}>
-                  {option.label}
+                  {t(`studio.groups.events.format.option_${option.value}`)}
                 </Pecha.SelectItem>
               ))}
             </Pecha.SelectContent>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { useDebounce } from "use-debounce";
 import { fetchTextDetails } from "@/components/api/searchApi";
@@ -41,6 +42,7 @@ const SelectedSourceDetail = ({
   onRangeNavigate?: (start: number, end: number) => void;
   scrollToSegmentNumber?: number | null;
 }) => {
+  const { t } = useTranslate();
   const [rangeInput, setRangeInput] = useState("");
   const [selectAll, setSelectAll] = useState(false);
   const [isResolvingSelection, setIsResolvingSelection] = useState(false);
@@ -202,7 +204,7 @@ const SelectedSourceDetail = ({
         );
       } catch {
         if (addRequestRef.current !== request) return;
-        toast.error("Couldn't load the selected segments. Try again.");
+        toast.error(t("studio.source.load_selected_failed"));
         return;
       } finally {
         if (addRequestRef.current === request) {
@@ -213,7 +215,7 @@ const SelectedSourceDetail = ({
 
     if (addRequestRef.current !== request) return;
     if (selected.length !== sortedIndices.length) {
-      toast.error("Couldn't load the selected segments. Try again.");
+      toast.error(t("studio.source.load_selected_failed"));
       return;
     }
 
@@ -236,7 +238,9 @@ const SelectedSourceDetail = ({
     <div className="mt-3 space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-sm text-muted-foreground">
-          Select Range (e.g. 1-{selectionMax || "N"})
+          {t("studio.source.select_range_hint", {
+            max: selectionMax || "N",
+          })}
         </span>
         <label
           className={`flex items-center gap-1.5 ${
@@ -248,7 +252,7 @@ const SelectedSourceDetail = ({
           <span
             className={`text-sm select-none${selectAll ? "" : " text-muted-foreground"}`}
           >
-            Select All
+            {t("studio.source.select_all")}
           </span>
           <Pecha.Checkbox
             checked={selectAll}
@@ -274,7 +278,9 @@ const SelectedSourceDetail = ({
           onClick={handleAdd}
           className="h-10 px-6 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isResolvingSelection || rangePending ? "Loading…" : "Add"}
+          {isResolvingSelection || rangePending
+            ? t("studio.common.loading")
+            : t("studio.common.add")}
         </Pecha.Button>
       </div>
 
@@ -282,7 +288,7 @@ const SelectedSourceDetail = ({
         !rangeInput.trim().endsWith("-") &&
         !selectedIndices && (
           <p className="text-xs text-red-500 dark:text-red-400 -mt-1">
-            Enter a single number (e.g. 3) or a range (e.g. 1-10)
+            {t("studio.source.range_invalid")}
           </p>
         )}
 
@@ -295,7 +301,7 @@ const SelectedSourceDetail = ({
             !isFetchingNextPage &&
             !isFetchingPreviousPage && (
               <p className="text-center text-sm text-gray-500">
-                Loading segments...
+                {t("studio.source.loading_segments")}
               </p>
             )}
           {topRef && (
@@ -306,7 +312,7 @@ const SelectedSourceDetail = ({
           )}
           {isFetchingPreviousPage && (
             <p className="text-center text-sm text-gray-500">
-              Loading earlier segments...
+              {t("studio.source.loading_earlier_segments")}
             </p>
           )}
           {visibleSegments.map((segment: any, segIndex: number) => {
@@ -333,8 +339,11 @@ const SelectedSourceDetail = ({
           })}
           {hiddenSegmentCount > 0 && (
             <p className="text-center text-sm text-gray-500">
-              … and {hiddenSegmentCount} more selected segment
-              {hiddenSegmentCount === 1 ? "" : "s"} not shown
+              {hiddenSegmentCount === 1
+                ? t("studio.source.hidden_segments_one")
+                : t("studio.source.hidden_segments_other", {
+                    count: hiddenSegmentCount,
+                  })}
             </p>
           )}
           {bottomRef && (
@@ -345,7 +354,7 @@ const SelectedSourceDetail = ({
           )}
           {isFetchingNextPage && (
             <p className="text-center text-sm text-gray-500">
-              Loading more segments...
+              {t("studio.source.loading_more_segments")}
             </p>
           )}
         </div>

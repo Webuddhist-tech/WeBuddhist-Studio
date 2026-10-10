@@ -1,3 +1,4 @@
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import { type PoemItem } from "./api/poemApi";
@@ -11,17 +12,22 @@ interface PoemsListProps {
   onDelete: (item: PoemItem) => void;
 }
 
-const StatusBadge = ({ status }: { status: PoemItem["status"] }) => (
-  <span
-    className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-      status === "PUBLISHED"
-        ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
-        : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
-    }`}
-  >
-    {status === "PUBLISHED" ? "Published" : "Draft"}
-  </span>
-);
+const StatusBadge = ({ status }: { status: PoemItem["status"] }) => {
+  const { t } = useTranslate();
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+        status === "PUBLISHED"
+          ? "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400"
+          : "bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+      }`}
+    >
+      {status === "PUBLISHED"
+        ? t("studio.common.published")
+        : t("studio.common.draft")}
+    </span>
+  );
+};
 
 const PoemsList = ({
   poems,
@@ -30,10 +36,11 @@ const PoemsList = ({
   onEdit,
   onDelete,
 }: PoemsListProps) => {
+  const { t } = useTranslate();
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <p className="text-muted-foreground">Loading...</p>
+        <p className="text-muted-foreground">{t("studio.common.loading")}</p>
       </div>
     );
   }
@@ -41,7 +48,7 @@ const PoemsList = ({
   if (!poems.length) {
     return (
       <div className="flex items-center justify-center py-8">
-        <p className="text-muted-foreground">No poems found</p>
+        <p className="text-muted-foreground">{t("studio.poems.empty")}</p>
       </div>
     );
   }
@@ -51,16 +58,30 @@ const PoemsList = ({
       <Pecha.Table>
         <Pecha.TableHeader>
           <Pecha.TableRow>
-            <Pecha.TableHead className="w-[100px]">Image</Pecha.TableHead>
-            <Pecha.TableHead className="w-[280px]">Title</Pecha.TableHead>
-            <Pecha.TableHead className="w-[160px]">Author</Pecha.TableHead>
-            <Pecha.TableHead className="w-[160px]">Chapter</Pecha.TableHead>
-            <Pecha.TableHead className="w-[90px]">Language</Pecha.TableHead>
-            <Pecha.TableHead className="w-[110px]">Status</Pecha.TableHead>
-            <Pecha.TableHead className="w-[150px]">Updated</Pecha.TableHead>
+            <Pecha.TableHead className="w-[100px]">
+              {t("studio.common.image")}
+            </Pecha.TableHead>
+            <Pecha.TableHead className="w-[280px]">
+              {t("studio.common.title")}
+            </Pecha.TableHead>
+            <Pecha.TableHead className="w-[160px]">
+              {t("studio.poems.table.author")}
+            </Pecha.TableHead>
+            <Pecha.TableHead className="w-[160px]">
+              {t("studio.poems.table.chapter")}
+            </Pecha.TableHead>
+            <Pecha.TableHead className="w-[90px]">
+              {t("studio.common.language")}
+            </Pecha.TableHead>
+            <Pecha.TableHead className="w-[110px]">
+              {t("studio.common.status")}
+            </Pecha.TableHead>
+            <Pecha.TableHead className="w-[150px]">
+              {t("studio.poems.table.updated")}
+            </Pecha.TableHead>
             {showActionsColumn ? (
               <Pecha.TableHead className="w-[180px] text-right">
-                Actions
+                {t("studio.common.actions")}
               </Pecha.TableHead>
             ) : null}
           </Pecha.TableRow>
@@ -111,7 +132,7 @@ const PoemsList = ({
                       size="sm"
                       onClick={() => onEdit(poem)}
                     >
-                      Edit
+                      {t("studio.common.edit")}
                     </Button>
                     <Button
                       type="button"
@@ -120,7 +141,7 @@ const PoemsList = ({
                       onClick={() => onDelete(poem)}
                       className="text-red-600 hover:text-red-700"
                     >
-                      Delete
+                      {t("studio.common.delete")}
                     </Button>
                   </div>
                 </Pecha.TableCell>

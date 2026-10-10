@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import ImageContentData from "@/components/ui/molecules/modals/image-upload/ImageContentData";
@@ -73,6 +74,7 @@ const toCoreSnapshot = (
 };
 
 const GroupAboutEditPage = () => {
+  const { t } = useTranslate();
   const { group, groupId, myRole, readOnlyPlatform } =
     useOutletContext<GroupOutletContext>();
   const queryClient = useQueryClient();
@@ -121,7 +123,9 @@ const GroupAboutEditPage = () => {
   const persist = async (request: () => Promise<unknown>) => {
     try {
       await request();
-      toast.success("Changes saved", { id: SAVE_TOAST_ID });
+      toast.success(t("studio.groups.pages.form.changes_saved"), {
+        id: SAVE_TOAST_ID,
+      });
       invalidateGroup();
       return true;
     } catch (err) {
@@ -261,7 +265,7 @@ const GroupAboutEditPage = () => {
 
   const removeLanguage = (code: LanguageCode) => {
     if (addedLanguages.length <= 1) {
-      toast.error("At least one language is required");
+      toast.error(t("studio.groups.pages.form.language_required"));
       return;
     }
     setAddedLanguages((prev) => prev.filter((c) => c !== code));
@@ -285,7 +289,7 @@ const GroupAboutEditPage = () => {
       form.setValue(field, key, { shouldDirty: true });
       setDialog(false);
     } catch {
-      toast.error("Failed to upload image");
+      toast.error(t("studio.groups.pages.form.image_upload_failed"));
     } finally {
       setUploading(false);
     }
@@ -305,24 +309,26 @@ const GroupAboutEditPage = () => {
   return (
     <>
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-base font-bold">Edit about</h2>
+        <h2 className="text-base font-bold">
+          {t("studio.groups.pages.about.edit_about")}
+        </h2>
         <div className="flex items-center gap-3">
           <span className="text-xs text-muted-foreground" aria-live="polite">
             {isSaving
-              ? "Saving…"
+              ? t("studio.common.saving")
               : hasError
-                ? "Couldn't save changes"
+                ? t("studio.groups.pages.form.save_failed")
                 : hasUnsaved
-                  ? "Unsaved changes"
-                  : "All changes saved"}
+                  ? t("studio.common.unsaved_changes")
+                  : t("studio.groups.pages.form.all_changes_saved")}
           </span>
           {hasError && !isSaving && (
             <Button variant="outline" size="sm" onClick={retryFailedSaves}>
-              Retry
+              {t("studio.common.retry")}
             </Button>
           )}
           <Button variant="outline" size="sm" asChild>
-            <Link to={ROUTES.group(groupId)}>Done</Link>
+            <Link to={ROUTES.group(groupId)}>{t("studio.common.done")}</Link>
           </Button>
         </div>
       </div>
@@ -331,7 +337,7 @@ const GroupAboutEditPage = () => {
         <div className="w-full xl:w-1/2 xl:min-w-0 xl:pr-8 xl:border-r border-border space-y-6">
           <section className="space-y-6">
             <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wide">
-              General
+              {t("studio.groups.pages.form.general_heading")}
             </h3>
             <Pecha.Form {...form}>
               <div className="space-y-6">
@@ -341,7 +347,7 @@ const GroupAboutEditPage = () => {
                   render={({ field }) => (
                     <Pecha.FormItem>
                       <Pecha.FormLabel className="text-sm font-bold">
-                        Slug
+                        {t("studio.groups.pages.form.slug_label")}
                         <span className="text-destructive"> *</span>
                       </Pecha.FormLabel>
                       <Pecha.FormControl>
@@ -369,7 +375,7 @@ const GroupAboutEditPage = () => {
                         />
                       </Pecha.FormControl>
                       <Pecha.FormLabel className="text-sm font-bold !mt-0">
-                        Public group
+                        {t("studio.groups.pages.form.public_group")}
                       </Pecha.FormLabel>
                     </Pecha.FormItem>
                   )}
@@ -387,14 +393,14 @@ const GroupAboutEditPage = () => {
                 />
                 <div className="grid sm:grid-cols-2 gap-6">
                   <GroupImageField
-                    label="Avatar"
+                    label={t("studio.groups.pages.form.avatar_label")}
                     displayUrl={avatarPreview}
                     hasStoredImage={Boolean(avatarKey)}
                     onUploadClick={() => setAvatarDialogOpen(true)}
                     imageClassName="w-20 h-20 rounded-full object-cover border"
                   />
                   <GroupImageField
-                    label="Banner"
+                    label={t("studio.groups.pages.form.banner_label")}
                     displayUrl={bannerPreview}
                     hasStoredImage={Boolean(bannerKey)}
                     onUploadClick={() => setBannerDialogOpen(true)}
@@ -418,7 +424,9 @@ const GroupAboutEditPage = () => {
       <Pecha.Dialog open={avatarDialogOpen} onOpenChange={setAvatarDialogOpen}>
         <Pecha.DialogContent>
           <Pecha.DialogHeader>
-            <Pecha.DialogTitle>Upload avatar</Pecha.DialogTitle>
+            <Pecha.DialogTitle>
+              {t("studio.groups.pages.form.upload_avatar")}
+            </Pecha.DialogTitle>
           </Pecha.DialogHeader>
           <ImageContentData
             onUpload={(file) => handleImageUpload(file, "avatar")}
@@ -430,7 +438,9 @@ const GroupAboutEditPage = () => {
       <Pecha.Dialog open={bannerDialogOpen} onOpenChange={setBannerDialogOpen}>
         <Pecha.DialogContent>
           <Pecha.DialogHeader>
-            <Pecha.DialogTitle>Upload banner</Pecha.DialogTitle>
+            <Pecha.DialogTitle>
+              {t("studio.groups.pages.form.upload_banner")}
+            </Pecha.DialogTitle>
           </Pecha.DialogHeader>
           <ImageContentData
             onUpload={(file) => handleImageUpload(file, "banner")}

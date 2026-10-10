@@ -1,3 +1,4 @@
+import { useTranslate } from "@tolgee/react";
 import PlanTagSearchInput from "@/components/routes/create-plan/PlanTagSearchInput";
 import type { TagSummaryDTO } from "../api/groupsApi";
 import { mapGroupTagsToPlanTagSummaries } from "../api/groupPickerApi";
@@ -19,27 +20,34 @@ const GroupFormAssociationsPanel = ({
   initialTags,
   socialLinks,
   onSocialLinksChange,
-}: GroupFormAssociationsPanelProps) => (
-  <div className="w-full xl:w-1/2 xl:min-w-0 xl:pl-8 space-y-10">
-    <section className="space-y-4">
-      <GroupSectionHeader title="Tags" />
-      <PlanTagSearchInput
-        value={tagIds}
-        onChange={onTagIdsChange}
-        hideLabel
-        initialTags={mapGroupTagsToPlanTagSummaries(initialTags)}
-      />
-    </section>
+}: GroupFormAssociationsPanelProps) => {
+  const { t } = useTranslate();
+  return (
+    <div className="w-full xl:w-1/2 xl:min-w-0 xl:pl-8 space-y-10">
+      <section className="space-y-4">
+        <GroupSectionHeader
+          title={t("studio.groups.components.associations.tags")}
+        />
+        <PlanTagSearchInput
+          value={tagIds}
+          onChange={onTagIdsChange}
+          hideLabel
+          initialTags={mapGroupTagsToPlanTagSummaries(initialTags)}
+        />
+      </section>
 
-    <section className="space-y-4">
-      <GroupSectionHeader title="Social links" />
-      <GroupSocialLinksEditor
-        value={socialLinks}
-        onChange={onSocialLinksChange}
-        hideLabel
-      />
-    </section>
-  </div>
-);
+      <section className="space-y-4">
+        <GroupSectionHeader
+          title={t("studio.groups.components.associations.social_links")}
+        />
+        <GroupSocialLinksEditor
+          value={socialLinks}
+          onChange={onSocialLinksChange}
+          hideLabel
+        />
+      </section>
+    </div>
+  );
+};
 
 export default GroupFormAssociationsPanel;

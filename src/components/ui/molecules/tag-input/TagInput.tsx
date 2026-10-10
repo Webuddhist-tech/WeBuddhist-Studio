@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { IoMdClose } from "react-icons/io";
+import { useTranslate } from "@tolgee/react";
 import { Input } from "../../atoms/input";
 
 interface TagInputProps {
@@ -9,6 +10,7 @@ interface TagInputProps {
 }
 
 const TagInput = ({ value = [], onChange, size = "md" }: TagInputProps) => {
+  const { t } = useTranslate();
   const [inputValue, setInputValue] = useState("");
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -31,14 +33,14 @@ const TagInput = ({ value = [], onChange, size = "md" }: TagInputProps) => {
   };
   return (
     <div className=" w-full space-y-2 h-full font-dynamic flex flex-col">
-      <p className="text-sm font-bold">Tags</p>
+      <p className="text-sm font-bold">{t("studio.molecules.tags.label")}</p>
       <div
         className={`w-full border p-2 overflow-auto space-y-4 rounded-md ${
           size === "sm" ? "min-h-[100px]" : "h-100"
         }`}
       >
         <Input
-          placeholder="Add a tag"
+          placeholder={t("studio.molecules.tags.placeholder")}
           className=" border-none shadow-none bg-white"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
@@ -54,6 +56,7 @@ const TagInput = ({ value = [], onChange, size = "md" }: TagInputProps) => {
               <IoMdClose
                 className=" h-5 w-5 text-white rounded-full p-1 border border-dashed dark:bg-input/90 bg-gray-300 hover:bg-gray-400 transition cursor-pointer"
                 onClick={() => removeTag(index)}
+                aria-label={t("studio.molecules.tags.remove", { tag })}
               />
             </div>
           ))}

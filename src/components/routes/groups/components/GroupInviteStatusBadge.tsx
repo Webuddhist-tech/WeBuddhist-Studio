@@ -1,3 +1,4 @@
+import { useTranslate } from "@tolgee/react";
 import type { AuthorGroupInviteStatus } from "../api/groupsApi";
 
 const STATUS_STYLES: Record<AuthorGroupInviteStatus, string> = {
@@ -12,12 +13,15 @@ type GroupInviteStatusBadgeProps = {
   status: AuthorGroupInviteStatus;
 };
 
-const GroupInviteStatusBadge = ({ status }: GroupInviteStatusBadgeProps) => (
-  <span
-    className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[status]}`}
-  >
-    {status}
-  </span>
-);
+const GroupInviteStatusBadge = ({ status }: GroupInviteStatusBadgeProps) => {
+  const { t } = useTranslate();
+  return (
+    <span
+      className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[status]}`}
+    >
+      {t(`studio.groups.components.status.${status.toLowerCase()}`)}
+    </span>
+  );
+};
 
 export default GroupInviteStatusBadge;

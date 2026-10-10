@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useQueries, useQuery } from "@tanstack/react-query";
+import { useTranslate } from "@tolgee/react";
+import { tolgee } from "@/i18n/tolgee";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import {
   fetchEditionTitle,
@@ -27,12 +29,7 @@ const toWireLanguage = (code: string) => code.trim().toLowerCase() || "bo";
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3];
 /** What a line with no recorded time does: stop, as the controller does, or
  * hold for a fixed time so the rest of the text can still be watched. */
-const UNTIMED_OPTIONS = [
-  { value: 0, label: "Stop" },
-  { value: 2000, label: "Hold 2s" },
-  { value: 4000, label: "Hold 4s" },
-  { value: 8000, label: "Hold 8s" },
-];
+const UNTIMED_OPTIONS = [0, 2000, 4000, 8000].map((value) => ({ value }));
 const TICK_MS = 50;
 /** How long the clock waits on the library's yigchung before going without. */
 const YIGCHUNG_WAIT_MS = 8000;
@@ -99,6 +96,7 @@ const formatMs = (ms: number) => {
 };
 
 const AutoplayTestPage = () => {
+  const { t } = useTranslate();
   const { eventId } = useParams<{ eventId: string }>();
   /** `?text=<text_id>` is the text on screen; with none, the page opens on the
    * picker. Picking a text writes it here, so the link reopens it. */
@@ -146,14 +144,14 @@ const AutoplayTestPage = () => {
   const choices = [
     ...recentTexts.map((text) => ({
       ...text,
-      group: "Opened in the controller",
+      groupKey: "studio.live_control.autoplay_test.group_recent",
     })),
     ...SUGGESTED_TEXT_IDS.filter(
       (textId) => !recentTexts.some((text) => text.textId === textId),
     ).map((textId) => ({
       textId,
       title: suggestionTitles[SUGGESTED_TEXT_IDS.indexOf(textId)]?.data ?? null,
-      group: "Suggested",
+      groupKey: "studio.live_control.autoplay_test.group_suggested",
     })),
   ];
 
@@ -373,7 +371,9 @@ const AutoplayTestPage = () => {
       if (duration === undefined) {
         setPlaying(false);
         setNote(
-          `Stopped at line ${at + 1}: it has no recorded play time. Pick a hold for untimed lines to play through it.`,
+          tolgee.t("studio.live_control.autoplay_test.stopped_untimed", {
+            line: at + 1,
+          }),
         );
         return;
       }
@@ -399,7 +399,7 @@ const AutoplayTestPage = () => {
       }
       if (forward === null) {
         setPlaying(false);
-        setNote("Reached the end of the text.");
+        setNote(tolgee.t("studio.live_control.autoplay_test.reached_end"));
         elapsedRef.current = duration;
         setElapsed(duration);
         return;
@@ -475,8 +475,8 @@ const AutoplayTestPage = () => {
       ? getApiErrorMessage(
           linesError ?? playTimesError,
           linesError
-            ? "Could not load this text."
-            : "Could not load the play times.",
+            ? t("studio.live_control.autoplay_test.load_text_failed")
+            : t("studio.live_control.autoplay_test.load_play_times_failed"),
         )
       : null;
 
@@ -496,9 +496,11 @@ const AutoplayTestPage = () => {
       <div className="min-h-[100dvh] bg-black font-tibetan-ui text-[#f2f2f7]">
         <div className="mx-auto flex max-w-3xl flex-col gap-4 px-5 py-10">
           <div className="mb-2">
-            <h1 className="text-2xl font-bold">Choose a text</h1>
+            <h1 className="text-2xl font-bold">
+              {t("studio.live_control.autoplay_test.choose_text")}
+            </h1>
             <p className="mt-1 text-sm text-[#8e8e93]">
-              Autoplay test · plays on this screen only
+              {t("studio.live_control.autoplay_test.subtitle")}
             </p>
           </div>
           {choices.map((choice) => (
@@ -509,7 +511,7 @@ const AutoplayTestPage = () => {
               className="flex w-full flex-col items-start gap-1 rounded-2xl border border-[#2c2c2e] bg-[#111113] px-6 py-5 text-left hover:border-[#30d158] hover:bg-[#15201a]"
             >
               <span className="text-[11px] font-medium tracking-[0.11em] text-[#8e8e93] uppercase">
-                {choice.group}
+                {t(choice.groupKey)}
               </span>
               <span className="text-[26px] leading-[1.5] break-words">
                 {choice.title ?? choice.textId}
@@ -529,7 +531,9 @@ const AutoplayTestPage = () => {
       >
         {lines.length === 0 ? (
           <p className="py-12 text-center text-sm text-[#8e8e93]">
-            {loadingLines ? "Loading…" : "This text has no lines."}
+            {loadingLines
+              ? t("studio.common.loading")
+              : t("studio.live_control.autoplay_test.no_lines")}
           </p>
         ) : null}
         <div className="mx-auto max-w-4xl">
@@ -599,11 +603,11 @@ const AutoplayTestPage = () => {
               onClick={() => setLiturgyId("")}
               className="rounded-md px-2 py-1.5 text-[13px] font-semibold text-[#0a84ff] hover:bg-[#1c1c1e]"
             >
-              ← Texts
+              ← {t("studio.live_control.autoplay_test.texts")}
             </button>
             {editions.length > 1 ? (
               <select
-                aria-label="Edition"
+                aria-label={t("studio.live_control.autoplay_test.edition")}
                 value={editionId}
                 onChange={(e) => setEditionId(e.target.value)}
                 className={`${selectClass} max-w-[10rem]`}
@@ -623,7 +627,7 @@ const AutoplayTestPage = () => {
               onClick={() => step(-1)}
               className={iconButtonClass}
               disabled={lines.length === 0 || awaitingMarks}
-              aria-label="Previous line"
+              aria-label={t("studio.live_control.autoplay_test.previous_line")}
             >
               ⏮
             </button>
@@ -631,7 +635,11 @@ const AutoplayTestPage = () => {
               type="button"
               onClick={togglePlay}
               disabled={lines.length === 0 || !playTimes}
-              aria-label={playing ? "Pause" : "Play"}
+              aria-label={
+                playing
+                  ? t("studio.live_control.autoplay_test.pause")
+                  : t("studio.live_control.autoplay_test.play")
+              }
               className={`flex h-14 w-14 items-center justify-center rounded-full text-xl font-bold text-black disabled:cursor-not-allowed disabled:opacity-40 ${
                 playing ? "bg-[#ff9f0a]" : "bg-[#30d158] hover:bg-[#28b84c]"
               }`}
@@ -643,7 +651,7 @@ const AutoplayTestPage = () => {
               onClick={() => step(1)}
               className={iconButtonClass}
               disabled={lines.length === 0 || awaitingMarks}
-              aria-label="Next line"
+              aria-label={t("studio.live_control.autoplay_test.next_line")}
             >
               ⏭
             </button>
@@ -651,7 +659,7 @@ const AutoplayTestPage = () => {
 
           <div className="flex items-center gap-2">
             <select
-              aria-label="Speed"
+              aria-label={t("studio.live_control.autoplay_test.speed")}
               value={speed}
               onChange={(e) => setSpeed(Number(e.target.value))}
               className={selectClass}
@@ -663,15 +671,22 @@ const AutoplayTestPage = () => {
               ))}
             </select>
             <select
-              aria-label="Untimed lines"
-              title="What a line with no recorded time does"
+              aria-label={t("studio.live_control.autoplay_test.untimed_lines")}
+              title={t("studio.live_control.autoplay_test.untimed_title")}
               value={untimedHold}
               onChange={(e) => setUntimedHold(Number(e.target.value))}
               className={selectClass}
             >
               {UNTIMED_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
-                  Untimed: {option.label}
+                  {t("studio.live_control.autoplay_test.untimed_option", {
+                    label:
+                      option.value === 0
+                        ? t("studio.live_control.autoplay_test.untimed_stop")
+                        : t("studio.live_control.autoplay_test.untimed_hold", {
+                            seconds: option.value / 1000,
+                          }),
+                  })}
                 </option>
               ))}
             </select>
@@ -679,7 +694,7 @@ const AutoplayTestPage = () => {
               type="button"
               onClick={restart}
               disabled={currentIndex < 0}
-              aria-label="Restart"
+              aria-label={t("studio.live_control.autoplay_test.restart")}
               className={iconButtonClass}
             >
               ↺
@@ -688,20 +703,29 @@ const AutoplayTestPage = () => {
         </div>
         {includesPlannedReturns ? (
           <p className="px-4 pt-1 text-center font-sans text-[11px] text-[#8e8e93]">
-            Planned returns for this event are included.
+            {t("studio.live_control.autoplay_test.planned_returns_included")}
           </p>
         ) : null}
         <p className="pb-2 text-center font-sans text-[11px] text-[#636366] tabular-nums">
           {playing && (refreshing || awaitingMarks)
-            ? "Waiting for the play times and instruction marks… · "
+            ? `${t("studio.live_control.autoplay_test.waiting_marks")} · `
             : ""}
           {loadingPlayTimes
-            ? "Loading play times…"
-            : `${timedCount}/${recitedCount} lines timed · total ${formatMs(totalTimed)}`}
+            ? t("studio.live_control.autoplay_test.loading_play_times")
+            : t("studio.live_control.autoplay_test.timed_summary", {
+                timed: timedCount,
+                recited: recitedCount,
+                total: formatMs(totalTimed),
+              })}
           {currentIndex >= 0
-            ? ` · line ${currentIndex + 1} ${formatMs(elapsed)}${
-                currentDuration ? ` / ${formatMs(currentDuration)}` : ""
-              } · elapsed ${formatMs(reachedTimed + elapsed)}`
+            ? ` · ${t("studio.live_control.autoplay_test.line_progress", {
+                line: currentIndex + 1,
+                time: `${formatMs(elapsed)}${
+                  currentDuration ? ` / ${formatMs(currentDuration)}` : ""
+                }`,
+              })} · ${t("studio.live_control.autoplay_test.elapsed_total", {
+                elapsed: formatMs(reachedTimed + elapsed),
+              })}`
             : ""}
         </p>
       </div>

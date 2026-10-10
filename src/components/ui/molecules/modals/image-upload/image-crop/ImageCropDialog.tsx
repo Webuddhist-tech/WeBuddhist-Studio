@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { toJpegName } from "@/components/routes/task/hooks/useImageUploadDraft";
 import ImageCropContent from "./ImageCropModal";
@@ -11,6 +12,7 @@ interface ImageCropDialogProps {
 }
 
 const ImageCropDialog = ({ file, onDone, onCancel }: ImageCropDialogProps) => {
+  const { t } = useTranslate();
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -35,7 +37,9 @@ const ImageCropDialog = ({ file, onDone, onCancel }: ImageCropDialogProps) => {
         className="max-h-[90vh] overflow-y-auto"
       >
         <Pecha.DialogHeader>
-          <Pecha.DialogTitle>Crop image</Pecha.DialogTitle>
+          <Pecha.DialogTitle>
+            {t("studio.modals.image_crop.title")}
+          </Pecha.DialogTitle>
         </Pecha.DialogHeader>
         {file && previewUrl && (
           <ImageCropContent

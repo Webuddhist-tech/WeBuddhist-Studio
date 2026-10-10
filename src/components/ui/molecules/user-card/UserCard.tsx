@@ -1,7 +1,9 @@
 import { NO_PROFILE_IMAGE } from "@/lib/constant";
 import { getIcon } from "@/lib/utils";
+import { useTranslate } from "@tolgee/react";
 
 const UserCard = ({ userInfo }: any) => {
+  const { t } = useTranslate();
   return (
     <div className="space-y-6 px-6 py-2">
       <div className="flex flex-col md:flex-row items-start gap-6">
@@ -10,7 +12,7 @@ const UserCard = ({ userInfo }: any) => {
             src={
               userInfo.image?.medium || userInfo.image_url || NO_PROFILE_IMAGE
             }
-            alt="profile"
+            alt={t("studio.shell.profile_image_alt")}
             className="w-full h-full object-cover"
           />
         </div>

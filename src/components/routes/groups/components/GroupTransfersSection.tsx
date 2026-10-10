@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Button } from "@/components/ui/atoms/button";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import {
@@ -31,15 +32,20 @@ function TransferRow({
   req: ContentTransferRequestDTO;
   actions: React.ReactNode;
 }) {
+  const { t } = useTranslate();
   const expired = isTransferRequestExpired(req);
   return (
     <li className="flex flex-wrap items-center justify-between gap-2 border-b py-2 text-sm last:border-0">
       <div>
-        <span className="font-medium capitalize">{req.content_type}</span>
+        <span className="font-medium capitalize">
+          {t(
+            `studio.groups.components.transfers.content_type_${req.content_type}`,
+          )}
+        </span>
         {req.content_title ? `: ${req.content_title}` : null}
         <span className="text-muted-foreground">
           {" "}
-          · {req.status}
+          · {t(`studio.groups.components.status.${req.status.toLowerCase()}`)}
           {req.source_group_title ||
           req.target_group_title ||
           req.source_group_id ||
@@ -53,11 +59,15 @@ function TransferRow({
         </span>
         {req.status === "PENDING" && req.expires_at && !expired ? (
           <div className="mt-1 text-xs text-muted-foreground">
-            {formatDistanceToNow(new Date(req.expires_at))} left
+            {t("studio.groups.components.invite.time_left", {
+              time: formatDistanceToNow(new Date(req.expires_at)),
+            })}
           </div>
         ) : null}
         {expired ? (
-          <div className="mt-1 text-xs text-muted-foreground">Expired</div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            {t("studio.groups.components.status.expired")}
+          </div>
         ) : null}
       </div>
       <div className="flex gap-2">{expired ? null : actions}</div>
@@ -71,6 +81,7 @@ const GroupTransfersSection = ({
   canManageOutgoing,
   alwaysVisible = false,
 }: GroupTransfersSectionProps) => {
+  const { t } = useTranslate();
   const queryClient = useQueryClient();
 
   const {
@@ -148,7 +159,7 @@ const GroupTransfersSection = ({
   const acceptMutation = useMutation({
     mutationFn: acceptTransferRequest,
     onSuccess: () => {
-      toast.success("Transfer accepted");
+      toast.success(t("studio.groups.components.transfers.accepted_toast"));
       invalidate();
     },
     onError: (err) => toast.error(getApiErrorMessage(err)),
@@ -157,7 +168,7 @@ const GroupTransfersSection = ({
   const rejectMutation = useMutation({
     mutationFn: rejectTransferRequest,
     onSuccess: () => {
-      toast.success("Transfer rejected");
+      toast.success(t("studio.groups.components.transfers.rejected_toast"));
       invalidate();
     },
     onError: (err) => toast.error(getApiErrorMessage(err)),
@@ -166,7 +177,7 @@ const GroupTransfersSection = ({
   const revokeMutation = useMutation({
     mutationFn: revokeTransferRequest,
     onSuccess: () => {
-      toast.success("Transfer revoked");
+      toast.success(t("studio.groups.components.transfers.revoked_toast"));
       invalidate();
     },
     onError: (err) => toast.error(getApiErrorMessage(err)),
@@ -204,16 +215,18 @@ const GroupTransfersSection = ({
       : null;
 
   return (
-    <GroupDetailCard title="Content transfers">
+    <GroupDetailCard title={t("studio.groups.components.transfers.title")}>
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading transfers…</p>
+        <p className="text-sm text-muted-foreground">
+          {t("studio.groups.components.transfers.loading")}
+        </p>
       ) : null}
 
       {incomingError ? (
         <p className="text-sm text-destructive mb-3">
           {getApiErrorMessage(
             incomingError,
-            "Could not load incoming transfers",
+            t("studio.groups.components.transfers.load_incoming_error"),
           )}
         </p>
       ) : null}
@@ -222,7 +235,7 @@ const GroupTransfersSection = ({
         <p className="text-sm text-destructive mb-3">
           {getApiErrorMessage(
             outgoingError,
-            "Could not load outgoing transfers",
+            t("studio.groups.components.transfers.load_outgoing_error"),
           )}
         </p>
       ) : null}
@@ -230,14 +243,12 @@ const GroupTransfersSection = ({
       {!isLoading && !hasRequests && hasApiData ? (
         <>
           <p className="text-sm text-amber-700 dark:text-amber-400 mb-3">
-            Transfer requests exist but could not be matched to this group ID.
-            Showing all incoming/outgoing for your account — accept from the
-            target group or use notifications.
+            {t("studio.groups.components.transfers.unmatched_notice")}
           </p>
           {(incomingAll?.requests?.length ?? 0) > 0 ? (
             <div className="mb-4">
               <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">
-                All incoming (account)
+                {t("studio.groups.components.transfers.all_incoming")}
               </p>
               <ul>
                 {incomingAll!.requests.map((req) => (
@@ -256,7 +267,7 @@ const GroupTransfersSection = ({
                             }
                             onClick={() => acceptMutation.mutate(req.id)}
                           >
-                            Accept
+                            {t("studio.groups.components.invite.accept")}
                           </Button>
                           <Button
                             size="sm"
@@ -267,7 +278,7 @@ const GroupTransfersSection = ({
                             }
                             onClick={() => rejectMutation.mutate(req.id)}
                           >
-                            Reject
+                            {t("studio.groups.components.invite.reject")}
                           </Button>
                         </>
                       ) : null
@@ -280,7 +291,7 @@ const GroupTransfersSection = ({
           {(outgoingAll?.requests?.length ?? 0) > 0 ? (
             <div>
               <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">
-                All outgoing (account)
+                {t("studio.groups.components.transfers.all_outgoing")}
               </p>
               <ul>
                 {outgoingAll!.requests.map((req) => (
@@ -295,7 +306,7 @@ const GroupTransfersSection = ({
                           disabled={revokeMutation.isPending}
                           onClick={() => revokeMutation.mutate(req.id)}
                         >
-                          Revoke
+                          {t("studio.groups.components.invites_admin.revoke")}
                         </Button>
                       ) : null
                     }
@@ -309,14 +320,14 @@ const GroupTransfersSection = ({
 
       {!isLoading && !hasRequests && !hasApiData ? (
         <p className="text-sm text-muted-foreground">
-          No transfer requests for this group right now.
+          {t("studio.groups.components.transfers.empty")}
         </p>
       ) : null}
 
       {incomingForGroup.length > 0 ? (
         <div className="mb-4">
           <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">
-            Incoming
+            {t("studio.groups.components.transfers.incoming")}
           </p>
           <ul>
             {incomingForGroup.map((req) => (
@@ -334,7 +345,7 @@ const GroupTransfersSection = ({
                         }
                         onClick={() => acceptMutation.mutate(req.id)}
                       >
-                        Accept
+                        {t("studio.groups.components.invite.accept")}
                       </Button>
                       <Button
                         size="sm"
@@ -344,7 +355,7 @@ const GroupTransfersSection = ({
                         }
                         onClick={() => rejectMutation.mutate(req.id)}
                       >
-                        Reject
+                        {t("studio.groups.components.invite.reject")}
                       </Button>
                     </>
                   ) : null
@@ -358,7 +369,7 @@ const GroupTransfersSection = ({
       {outgoingForGroup.length > 0 ? (
         <div>
           <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">
-            Outgoing
+            {t("studio.groups.components.transfers.outgoing")}
           </p>
           <ul>
             {outgoingForGroup.map((req) => (
@@ -373,7 +384,7 @@ const GroupTransfersSection = ({
                       disabled={revokeMutation.isPending}
                       onClick={() => revokeMutation.mutate(req.id)}
                     >
-                      Revoke
+                      {t("studio.groups.components.invites_admin.revoke")}
                     </Button>
                   ) : null
                 }

@@ -1,3 +1,4 @@
+import { useTranslate } from "@tolgee/react";
 import type { UseFormReturn } from "react-hook-form";
 import { Pecha } from "@/components/ui/shadimport";
 import type { EventFormData } from "@/schema/EventSchema";
@@ -20,6 +21,7 @@ const EventNotificationsField = ({
   form,
   readOnly,
 }: EventNotificationsFieldProps) => {
+  const { t } = useTranslate();
   return (
     <Pecha.FormField
       control={form.control}
@@ -35,12 +37,10 @@ const EventNotificationsField = ({
           </Pecha.FormControl>
           <div className="space-y-1 leading-none">
             <Pecha.FormLabel className="text-sm font-medium">
-              Send notifications for this event
+              {t("studio.groups.events.notifications.enable_label")}
             </Pecha.FormLabel>
             <p className="text-xs text-muted-foreground">
-              Covers the notice when the event is published, the reminder before
-              it starts, and anything you send by hand. Turn it off to keep the
-              event silent.
+              {t("studio.groups.events.notifications.enable_help")}
             </p>
           </div>
           <Pecha.FormMessage />

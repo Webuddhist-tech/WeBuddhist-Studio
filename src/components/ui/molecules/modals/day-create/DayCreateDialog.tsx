@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
+import { useTranslate } from "@tolgee/react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { IoMdAdd, IoMdClose, IoMdRemove } from "react-icons/io";
 import { FiLoader } from "react-icons/fi";
@@ -32,6 +33,7 @@ const DayCreateDialog = ({
   isPending,
   onSubmit,
 }: DayCreateDialogProps) => {
+  const { t } = useTranslate();
   const containerRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
 
@@ -98,7 +100,10 @@ const DayCreateDialog = ({
     if (!o) resetForm();
   };
 
-  const addLabel = `Add ${numberOfDays} ${numberOfDays === 1 ? "Day" : "Days"}`;
+  const addLabel =
+    numberOfDays === 1
+      ? t("studio.modals.day_create.submit_one")
+      : t("studio.modals.day_create.submit_other", { count: numberOfDays });
 
   const handleSubmit = () => {
     onSubmit({
@@ -169,17 +174,20 @@ const DayCreateDialog = ({
         >
           <IoMdAdd className="w-4 h-4" />
           <span className="text-sm font-medium">
-            {isPending ? "Adding..." : "Add New Day"}
+            {isPending
+              ? t("studio.modals.day_add.adding")
+              : t("studio.modals.day_add.add_new_day")}
           </span>
         </Pecha.Button>
       </DialogTrigger>
 
       <Pecha.DialogContent className="max-w-md">
         <Pecha.DialogHeader>
-          <Pecha.DialogTitle>Add Days</Pecha.DialogTitle>
+          <Pecha.DialogTitle>
+            {t("studio.modals.day_create.title")}
+          </Pecha.DialogTitle>
           <DialogDescription>
-            Add one or more new days to this plan. Optionally copy tasks from an
-            existing day.
+            {t("studio.modals.day_create.description")}
           </DialogDescription>
         </Pecha.DialogHeader>
 
@@ -187,12 +195,12 @@ const DayCreateDialog = ({
           {/* Number of days */}
           <div className="space-y-2">
             <label htmlFor="num-days-input" className="text-sm font-medium">
-              Number of days
+              {t("studio.modals.day_create.number_of_days")}
             </label>
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                aria-label="Decrease"
+                aria-label={t("studio.modals.day_create.decrease")}
                 disabled={numberOfDays <= 1}
                 className="w-8 h-8 rounded-md border flex items-center justify-center hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 onClick={() => setNumberOfDays((n) => Math.max(1, n - 1))}
@@ -214,7 +222,7 @@ const DayCreateDialog = ({
               />
               <button
                 type="button"
-                aria-label="Increase"
+                aria-label={t("studio.modals.day_create.increase")}
                 disabled={numberOfDays >= 365}
                 className="w-8 h-8 rounded-md border flex items-center justify-center hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 onClick={() => setNumberOfDays((n) => Math.min(365, n + 1))}
@@ -227,18 +235,22 @@ const DayCreateDialog = ({
           {/* Template section */}
           <div className="space-y-3 border rounded-lg p-3 bg-muted/30">
             <p className="text-sm font-medium">
-              Copy tasks from a day{" "}
+              {t("studio.modals.day_create.copy_tasks_from_day")}{" "}
               <span className="text-muted-foreground font-normal">
-                (optional)
+                ({t("studio.common.optional")})
               </span>
             </p>
 
             {/* Plan search */}
             <div ref={containerRef} className="space-y-2">
-              <p className="text-xs text-muted-foreground">Plan</p>
+              <p className="text-xs text-muted-foreground">
+                {t("studio.modals.day_create.plan_label")}
+              </p>
               <div className="relative">
                 <Input
-                  placeholder="Search plans…"
+                  placeholder={t(
+                    "studio.modals.day_create.search_plans_placeholder",
+                  )}
                   className="bg-background pr-8"
                   value={planInputValue}
                   autoComplete="off"
@@ -254,7 +266,7 @@ const DayCreateDialog = ({
                 {templatePlanId && !showPlanPicker && (
                   <button
                     type="button"
-                    aria-label="Clear plan"
+                    aria-label={t("studio.modals.day_create.clear_plan")}
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     onClick={clearPlan}
                   >
@@ -266,7 +278,7 @@ const DayCreateDialog = ({
                     {isPlanFetching && planOptions.length === 0 && (
                       <li className="px-3 py-2 text-sm text-muted-foreground flex items-center gap-2">
                         <FiLoader className="w-4 h-4 animate-spin" />
-                        Searching plans…
+                        {t("studio.modals.day_create.searching_plans")}
                       </li>
                     )}
                     {planOptions.map((plan) => (
@@ -282,8 +294,11 @@ const DayCreateDialog = ({
                           <span className="block truncate">{plan.title}</span>
                           <span className="text-xs text-muted-foreground">
                             {formatPlanLanguage(plan.language)} ·{" "}
-                            {plan.total_days}{" "}
-                            {plan.total_days === 1 ? "day" : "days"}
+                            {plan.total_days === 1
+                              ? t("studio.modals.day_create.day_count_one")
+                              : t("studio.modals.day_create.day_count_other", {
+                                  count: plan.total_days,
+                                })}
                           </span>
                         </button>
                       </li>
@@ -292,14 +307,14 @@ const DayCreateDialog = ({
                       planOptions.length === 0 &&
                       debouncedPlanSearch.trim().length > 0 && (
                         <li className="px-3 py-2 text-sm text-muted-foreground">
-                          No plans found
+                          {t("studio.modals.day_create.no_plans_found")}
                         </li>
                       )}
                     {!isPlanFetching &&
                       planOptions.length === 0 &&
                       debouncedPlanSearch.trim().length === 0 && (
                         <li className="px-3 py-2 text-sm text-muted-foreground">
-                          Start typing to search plans
+                          {t("studio.modals.day_create.start_typing")}
                         </li>
                       )}
                   </ul>
@@ -309,19 +324,21 @@ const DayCreateDialog = ({
               {/* Day selector */}
               {templatePlanId && (
                 <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground">Source day</p>
+                  <p className="text-xs text-muted-foreground">
+                    {t("studio.modals.day_create.source_day")}
+                  </p>
                   {isTemplatePlanFetching ? (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground py-1">
                       <FiLoader className="w-4 h-4 animate-spin" />
-                      Loading days…
+                      {t("studio.modals.day_create.loading_days")}
                     </div>
                   ) : isTemplatePlanError ? (
                     <p className="text-sm text-destructive py-1">
-                      Could not load days for this plan
+                      {t("studio.modals.day_create.load_days_failed")}
                     </p>
                   ) : templateDays.length === 0 ? (
                     <p className="text-sm text-muted-foreground py-1">
-                      No days in this plan
+                      {t("studio.modals.day_create.no_days")}
                     </p>
                   ) : (
                     <Pecha.Select
@@ -329,12 +346,18 @@ const DayCreateDialog = ({
                       onValueChange={setSourceDayId}
                     >
                       <Pecha.SelectTrigger className="bg-background">
-                        <Pecha.SelectValue placeholder="Select a day…" />
+                        <Pecha.SelectValue
+                          placeholder={t(
+                            "studio.modals.day_create.select_day_placeholder",
+                          )}
+                        />
                       </Pecha.SelectTrigger>
                       <Pecha.SelectContent>
                         {templateDays.map((day) => (
                           <Pecha.SelectItem key={day.id} value={String(day.id)}>
-                            Day {day.day_number}
+                            {t("studio.modals.day_create.day_label", {
+                              day: day.day_number,
+                            })}
                           </Pecha.SelectItem>
                         ))}
                       </Pecha.SelectContent>
@@ -352,7 +375,7 @@ const DayCreateDialog = ({
             variant="outline"
             onClick={() => handleOpenChange(false)}
           >
-            Cancel
+            {t("studio.common.cancel")}
           </Pecha.Button>
           <Pecha.Button
             type="button"

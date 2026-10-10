@@ -101,7 +101,7 @@ describe("ResetPassword Component", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Password must be at least 6 characters"),
+        screen.getByText("studio.validation.password_min_6"),
       ).toBeInTheDocument();
     });
   });
@@ -123,7 +123,9 @@ describe("ResetPassword Component", () => {
     await user.click(submitButton);
 
     await waitFor(() => {
-      expect(screen.getByText("Passwords do not match")).toBeInTheDocument();
+      expect(
+        screen.getByText("studio.validation.passwords_do_not_match"),
+      ).toBeInTheDocument();
     });
   });
 
@@ -181,9 +183,7 @@ describe("ResetPassword Component", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(
-          "Password reset successfully, redirecting to login page...",
-        ),
+        screen.getByText("studio.auth.reset_password.success"),
       ).toBeInTheDocument();
     });
 
@@ -255,7 +255,9 @@ describe("ResetPassword Component", () => {
     await user.click(submitButton);
 
     await waitFor(() => {
-      expect(screen.getByText("Password is required")).toBeInTheDocument();
+      expect(
+        screen.getByText("studio.validation.password_required"),
+      ).toBeInTheDocument();
     });
   });
 
@@ -277,7 +279,7 @@ describe("ResetPassword Component", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Password must be at least 6 characters"),
+        screen.getByText("studio.validation.password_min_6"),
       ).toBeInTheDocument();
     });
 
@@ -294,7 +296,7 @@ describe("ResetPassword Component", () => {
 
     await waitFor(() => {
       expect(
-        screen.queryByText("Password must be at least 6 characters"),
+        screen.queryByText("studio.validation.password_min_6"),
       ).not.toBeInTheDocument();
     });
   });

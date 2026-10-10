@@ -87,7 +87,9 @@ describe("GroupTraditionField", () => {
     renderField();
 
     await waitFor(() =>
-      expect(screen.getByRole("combobox")).toHaveTextContent("No tradition"),
+      expect(screen.getByRole("combobox")).toHaveTextContent(
+        "studio.groups.components.tradition.none",
+      ),
     );
     expect(screen.getByTestId("value")).toBeEmptyDOMElement();
   });
@@ -102,7 +104,7 @@ describe("GroupTraditionField", () => {
 
     await waitFor(() =>
       expect(
-        screen.getByText(/couldn't load the traditions list/i),
+        screen.getByText("studio.groups.components.tradition.load_error"),
       ).toBeInTheDocument(),
     );
     expect(screen.getByRole("combobox")).toHaveTextContent("Tibetan");

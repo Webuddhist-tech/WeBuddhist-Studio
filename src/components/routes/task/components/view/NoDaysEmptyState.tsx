@@ -1,5 +1,6 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { IoCalendarClearOutline } from "react-icons/io5";
 import DayCreateDialog from "@/components/ui/molecules/modals/day-create/DayCreateDialog";
 import {
@@ -23,6 +24,7 @@ const NoDaysEmptyState = ({
   isEditable = true,
 }: NoDaysEmptyStateProps) => {
   const queryClient = useQueryClient();
+  const { t } = useTranslate();
   const { createNewDay } = usePlanMutations(planId);
 
   const handleCreateDays = (req: CreateDaysRequest) => {
@@ -37,9 +39,8 @@ const NoDaysEmptyState = ({
           error?.response?.data?.detail?.code ===
           PLAN_DAYS_OVERLAP_NEXT_PLAN_CODE
         ) {
-          toast.error("These days overlap the next plan in the series", {
-            description:
-              "Use Add New Day in the sidebar to shift the following plans.",
+          toast.error(t("studio.task.no_days.overlap_title"), {
+            description: t("studio.task.no_days.overlap_description"),
           });
         }
       },
@@ -50,10 +51,11 @@ const NoDaysEmptyState = ({
     <div className="w-full my-4 h-[calc(100vh-40px)] bg-[#F5F5F5] dark:bg-[#181818] rounded-l-2xl border border-dashed flex items-center justify-center max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
       <div className="max-w-sm px-6 text-center space-y-3">
         <IoCalendarClearOutline className="w-10 h-10 mx-auto text-muted-foreground" />
-        <h2 className="text-xl font-semibold">This plan has no days yet</h2>
+        <h2 className="text-xl font-semibold">
+          {t("studio.task.no_days.title")}
+        </h2>
         <p className="text-sm text-muted-foreground">
-          Tasks and subtasks belong to a day. Create the first day to start
-          adding them.
+          {t("studio.task.no_days.description")}
         </p>
         {isEditable && (
           <div className="pt-2">

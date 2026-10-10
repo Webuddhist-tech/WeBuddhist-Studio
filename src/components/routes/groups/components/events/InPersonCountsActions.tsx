@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslate } from "@tolgee/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LuCircleDot, LuPencil, LuPlus, LuTrash2 } from "react-icons/lu";
 import { toast } from "sonner";
@@ -55,58 +56,61 @@ const DraftRow = ({
   onChange: (draft: Draft) => void;
   onSave: () => void;
   onCancel: () => void;
-}) => (
-  <form
-    className="flex flex-wrap items-end gap-2 rounded-lg border border-dashed bg-card p-3"
-    onSubmit={(e) => {
-      e.preventDefault();
-      onSave();
-    }}
-  >
-    <div className="space-y-1">
-      <label htmlFor="in-person-day" className="text-xs font-medium">
-        Day
-      </label>
-      <Pecha.Input
-        id="in-person-day"
-        type="date"
-        value={draft.day}
-        max={maxDay}
-        onChange={(e) => onChange({ ...draft, day: e.target.value })}
-        className="w-40"
-      />
-    </div>
-    <div className="space-y-1">
-      <label htmlFor="in-person-count" className="text-xs font-medium">
-        Count
-      </label>
-      <Pecha.Input
-        id="in-person-count"
-        type="number"
-        inputMode="numeric"
-        min={1}
-        step={1}
-        value={draft.count}
-        onChange={(e) => onChange({ ...draft, count: e.target.value })}
-        className="w-36"
-      />
-    </div>
-    <div className="flex gap-2">
-      <Pecha.Button type="submit" size="sm" disabled={pending}>
-        {pending ? "Saving…" : "Save"}
-      </Pecha.Button>
-      <Pecha.Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        onClick={onCancel}
-        disabled={pending}
-      >
-        Cancel
-      </Pecha.Button>
-    </div>
-  </form>
-);
+}) => {
+  const { t } = useTranslate();
+  return (
+    <form
+      className="flex flex-wrap items-end gap-2 rounded-lg border border-dashed bg-card p-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSave();
+      }}
+    >
+      <div className="space-y-1">
+        <label htmlFor="in-person-day" className="text-xs font-medium">
+          {t("studio.groups.events.in_person.day")}
+        </label>
+        <Pecha.Input
+          id="in-person-day"
+          type="date"
+          value={draft.day}
+          max={maxDay}
+          onChange={(e) => onChange({ ...draft, day: e.target.value })}
+          className="w-40"
+        />
+      </div>
+      <div className="space-y-1">
+        <label htmlFor="in-person-count" className="text-xs font-medium">
+          {t("studio.groups.events.in_person.count")}
+        </label>
+        <Pecha.Input
+          id="in-person-count"
+          type="number"
+          inputMode="numeric"
+          min={1}
+          step={1}
+          value={draft.count}
+          onChange={(e) => onChange({ ...draft, count: e.target.value })}
+          className="w-36"
+        />
+      </div>
+      <div className="flex gap-2">
+        <Pecha.Button type="submit" size="sm" disabled={pending}>
+          {pending ? t("studio.common.saving") : t("studio.common.save")}
+        </Pecha.Button>
+        <Pecha.Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onCancel}
+          disabled={pending}
+        >
+          {t("studio.common.cancel")}
+        </Pecha.Button>
+      </div>
+    </form>
+  );
+};
 
 /** Share of `target` as a bar width, kept visible when there is any count. */
 const barWidth = (value: number, target: number) =>
@@ -116,6 +120,7 @@ const barWidth = (value: number, target: number) =>
 
 /** Which group accumulation the counts go to, and how far along it is. */
 const LinkedAccumulationCard = ({ list }: { list: InPersonCountList }) => {
+  const { t } = useTranslate();
   const [imageFailed, setImageFailed] = useState(false);
   const imageUrl = list.group_accumulator_image
     ? resolveGroupAccumulatorImageUrl({ image: list.group_accumulator_image })
@@ -145,7 +150,8 @@ const LinkedAccumulationCard = ({ list }: { list: InPersonCountList }) => {
         )}
         <div className="min-w-0">
           <p className="font-medium break-words">
-            {list.group_accumulator_title || "Untitled group accumulation"}
+            {list.group_accumulator_title ||
+              t("studio.groups.events.in_person.untitled_accumulation")}
           </p>
         </div>
       </div>
@@ -156,8 +162,12 @@ const LinkedAccumulationCard = ({ list }: { list: InPersonCountList }) => {
             <span className="text-muted-foreground">
               <span className="text-sm font-semibold text-foreground tabular-nums">
                 {total.toLocaleString()}
-              </span>
-              {target ? ` of ${target.toLocaleString()}` : " in total"}
+              </span>{" "}
+              {target
+                ? t("studio.groups.events.in_person.of_target", {
+                    target: target.toLocaleString(),
+                  })
+                : t("studio.groups.events.in_person.in_total")}
             </span>
             {percent != null ? (
               <span className="font-medium tabular-nums">
@@ -167,7 +177,7 @@ const LinkedAccumulationCard = ({ list }: { list: InPersonCountList }) => {
           </div>
           <div
             role="progressbar"
-            aria-label="Group accumulation progress"
+            aria-label={t("studio.groups.events.in_person.progress_aria")}
             aria-valuemin={0}
             aria-valuemax={scale}
             aria-valuenow={Math.min(total, scale)}
@@ -185,14 +195,14 @@ const LinkedAccumulationCard = ({ list }: { list: InPersonCountList }) => {
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-full bg-[#A51C21]" />
-              App{" "}
+              {t("studio.groups.events.in_person.legend_app")}{" "}
               <span className="font-medium text-foreground tabular-nums">
                 {others.toLocaleString()}
               </span>
             </span>
             <span className="flex items-center gap-1.5">
               <span className="h-2 w-2 rounded-full bg-amber-500" />
-              In person{" "}
+              {t("studio.groups.events.in_person.legend_in_person")}{" "}
               <span className="font-medium text-foreground tabular-nums">
                 {inPerson.toLocaleString()}
               </span>
@@ -211,6 +221,7 @@ const LinkedAccumulationCard = ({ list }: { list: InPersonCountList }) => {
  * and remove each day's count there.
  */
 const InPersonCountsActions = ({ eventId }: InPersonCountsActionsProps) => {
+  const { t } = useTranslate();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -252,20 +263,27 @@ const InPersonCountsActions = ({ eventId }: InPersonCountsActionsProps) => {
         ? updateInPersonCount(eventId, id, { day, count })
         : createInPersonCount(eventId, { day, count }),
     onSuccess: (_, { id }) => {
-      toast.success(id ? "In-person count updated" : "In-person count added");
+      toast.success(
+        id
+          ? t("studio.groups.events.in_person.updated")
+          : t("studio.groups.events.in_person.added"),
+      );
       setDraft(null);
       refresh();
     },
     onError: (err) =>
       toast.error(
-        getInPersonCountErrorMessage(err, "Could not save the count."),
+        getInPersonCountErrorMessage(
+          err,
+          t("studio.groups.events.in_person.save_error"),
+        ),
       ),
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteInPersonCount(eventId, id),
     onSuccess: () => {
-      toast.success("In-person count deleted");
+      toast.success(t("studio.groups.events.in_person.deleted"));
       setDeleteTarget(null);
       // The last row of a page takes the reader back a page.
       if (data && data.items.length === 1 && page > 1) setPage(page - 1);
@@ -273,7 +291,10 @@ const InPersonCountsActions = ({ eventId }: InPersonCountsActionsProps) => {
     },
     onError: (err) =>
       toast.error(
-        getInPersonCountErrorMessage(err, "Could not delete the count."),
+        getInPersonCountErrorMessage(
+          err,
+          t("studio.groups.events.in_person.delete_error"),
+        ),
       ),
   });
 
@@ -281,11 +302,11 @@ const InPersonCountsActions = ({ eventId }: InPersonCountsActionsProps) => {
     if (!draft) return;
     const count = Number(draft.count);
     if (!draft.day) {
-      toast.error("Choose a day");
+      toast.error(t("studio.groups.events.in_person.choose_day"));
       return;
     }
     if (!Number.isInteger(count) || count < 1) {
-      toast.error("Enter a whole number of at least 1");
+      toast.error(t("studio.groups.events.in_person.invalid_count"));
       return;
     }
     saveMutation.mutate({ id: draft.id, day: draft.day, count });
@@ -317,7 +338,7 @@ const InPersonCountsActions = ({ eventId }: InPersonCountsActionsProps) => {
         <p className="text-sm text-red-500">
           {getInPersonCountErrorMessage(
             error,
-            "Could not load the in-person counts.",
+            t("studio.groups.events.in_person.load_error"),
           )}
         </p>
       );
@@ -325,7 +346,7 @@ const InPersonCountsActions = ({ eventId }: InPersonCountsActionsProps) => {
     if (!data?.items.length) {
       return draft?.id === null ? null : (
         <p className="text-sm text-muted-foreground">
-          No in-person counts yet.
+          {t("studio.groups.events.in_person.empty")}
         </p>
       );
     }
@@ -348,7 +369,9 @@ const InPersonCountsActions = ({ eventId }: InPersonCountsActionsProps) => {
               <Pecha.Button
                 variant="ghost"
                 size="icon"
-                aria-label={`Edit ${item.day}`}
+                aria-label={t("studio.groups.events.in_person.edit_aria", {
+                  day: item.day,
+                })}
                 onClick={() =>
                   setDraft({
                     id: item.id,
@@ -362,7 +385,9 @@ const InPersonCountsActions = ({ eventId }: InPersonCountsActionsProps) => {
               <Pecha.Button
                 variant="ghost"
                 size="icon"
-                aria-label={`Delete ${item.day}`}
+                aria-label={t("studio.groups.events.in_person.delete_aria", {
+                  day: item.day,
+                })}
                 className="text-destructive hover:text-destructive"
                 onClick={() => setDeleteTarget(item)}
               >
@@ -389,7 +414,7 @@ const InPersonCountsActions = ({ eventId }: InPersonCountsActionsProps) => {
         onClick={() => setOpen(true)}
       >
         <LuPlus className="h-4 w-4" />
-        Add In-person count
+        {t("studio.groups.events.in_person.open_button")}
       </Pecha.Button>
 
       <Pecha.Sheet open={open} onOpenChange={closeSheet}>
@@ -398,16 +423,17 @@ const InPersonCountsActions = ({ eventId }: InPersonCountsActionsProps) => {
           className="w-full sm:max-w-xl flex flex-col gap-0"
         >
           <Pecha.SheetHeader>
-            <Pecha.SheetTitle>Add count to</Pecha.SheetTitle>
+            <Pecha.SheetTitle>
+              {t("studio.groups.events.in_person.sheet_title")}
+            </Pecha.SheetTitle>
             <Pecha.SheetDescription className="sr-only">
-              Daily counts made at this event in person.
+              {t("studio.groups.events.in_person.sheet_description")}
             </Pecha.SheetDescription>
           </Pecha.SheetHeader>
 
           {data?.group_accumulator_id === null ? (
             <p className="px-4 text-sm text-muted-foreground">
-              Link a group accumulation to this event to record in-person
-              counts.
+              {t("studio.groups.events.in_person.no_accumulation")}
             </p>
           ) : (
             <>
@@ -421,7 +447,7 @@ const InPersonCountsActions = ({ eventId }: InPersonCountsActionsProps) => {
                   onClick={() => setDraft({ id: null, day: maxDay, count: "" })}
                 >
                   <LuPlus className="h-4 w-4" />
-                  Add day
+                  {t("studio.groups.events.in_person.add_day")}
                 </Pecha.Button>
               </div>
 
@@ -456,16 +482,21 @@ const InPersonCountsActions = ({ eventId }: InPersonCountsActionsProps) => {
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
             <Pecha.AlertDialogTitle>
-              Delete in-person count?
+              {t("studio.groups.events.in_person.delete_title")}
             </Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
               {deleteTarget
-                ? `${deleteTarget.count.toLocaleString()} for ${formatDay(deleteTarget.day)} will be taken off the group accumulation's total.`
+                ? t("studio.groups.events.in_person.delete_description", {
+                    count: deleteTarget.count.toLocaleString(),
+                    day: formatDay(deleteTarget.day),
+                  })
                 : ""}
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <Pecha.AlertDialogFooter>
-            <Pecha.AlertDialogCancel>Cancel</Pecha.AlertDialogCancel>
+            <Pecha.AlertDialogCancel>
+              {t("studio.common.cancel")}
+            </Pecha.AlertDialogCancel>
             <Pecha.AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
               disabled={deleteMutation.isPending}
@@ -474,7 +505,9 @@ const InPersonCountsActions = ({ eventId }: InPersonCountsActionsProps) => {
                 if (deleteTarget) deleteMutation.mutate(deleteTarget.id);
               }}
             >
-              {deleteMutation.isPending ? "Deleting…" : "Delete"}
+              {deleteMutation.isPending
+                ? t("studio.common.deleting")
+                : t("studio.common.delete")}
             </Pecha.AlertDialogAction>
           </Pecha.AlertDialogFooter>
         </Pecha.AlertDialogContent>

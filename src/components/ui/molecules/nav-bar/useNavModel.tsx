@@ -9,6 +9,7 @@ import {
   IoDocumentTextOutline,
   IoHeartOutline,
   IoNewspaperOutline,
+  IoDocumentAttachOutline,
 } from "react-icons/io5";
 import {
   MdAudioFile,
@@ -26,10 +27,12 @@ import {
   canAccessAdminAuthors,
   canAccessContentCatalogues,
   canManageAmbientSounds,
+  canManageTextRequests,
   isContentAdmin,
   isStaffRole,
 } from "@/lib/platformAccess";
 
+/** `label` and `tooltip` hold translation keys; translate them where rendered. */
 export type NavItem = {
   icon: ReactNode;
   label: string;
@@ -39,6 +42,7 @@ export type NavItem = {
 
 export type NavSection = {
   id: string;
+  /** A translation key. */
   label: string;
   items: NavItem[];
 };
@@ -47,27 +51,27 @@ export type NavSection = {
 const pinnedItems: NavItem[] = [
   {
     icon: <MdDashboard className="w-4 h-4" />,
-    label: "Dashboard",
+    label: "studio.nav.dashboard",
     path: ROUTES.dashboard,
-    tooltip: "Go to dashboard",
+    tooltip: "studio.nav.dashboard_tooltip",
   },
   {
     icon: <IoAnalytics className="w-4 h-4" />,
-    label: "Analytics",
+    label: "studio.nav.analytics",
     path: ROUTES.analytics,
-    tooltip: "View analytics",
+    tooltip: "studio.nav.analytics_tooltip",
   },
   {
     icon: <MdSelfImprovement className="w-4 h-4" />,
-    label: "Practice spaces",
+    label: "studio.nav.practice_spaces",
     path: ROUTES.groups,
-    tooltip: "Manage practice spaces",
+    tooltip: "studio.nav.practice_spaces_tooltip",
   },
   {
     icon: <IoNewspaperOutline className="w-4 h-4" />,
-    label: "Pages",
+    label: "studio.nav.pages",
     path: ROUTES.pages,
-    tooltip: "Manage pages",
+    tooltip: "studio.nav.pages_tooltip",
   },
 ];
 
@@ -77,80 +81,89 @@ const GROUP_LIST_PATHS: string[] = [ROUTES.groups, ROUTES.pages];
 const contentItems: NavItem[] = [
   {
     icon: <IoBookOutline className="w-4 h-4" />,
-    label: "Verse of Day",
+    label: "studio.nav.verse_of_day",
     path: ROUTES.verseOfDay,
-    tooltip: "Verse of Day",
+    tooltip: "studio.nav.verse_of_day",
   },
   {
     icon: <IoDocumentTextOutline className="w-4 h-4" />,
-    label: "Poems",
+    label: "studio.nav.poems",
     path: ROUTES.poems,
-    tooltip: "Poems",
+    tooltip: "studio.nav.poems",
   },
   {
     icon: <MdAudioFile className="w-4 h-4" />,
-    label: "Text audio",
+    label: "studio.nav.text_audio",
     path: ROUTES.textAudio,
-    tooltip: "Manage text audio",
+    tooltip: "studio.nav.text_audio_tooltip",
   },
 ];
 
 const configurationItems: NavItem[] = [
   {
     icon: <IoPricetags className="w-4 h-4" />,
-    label: "Tags",
+    label: "studio.nav.tags",
     path: ROUTES.tags,
-    tooltip: "Manage tags",
+    tooltip: "studio.nav.tags_tooltip",
   },
   {
     icon: <IoBook className="w-4 h-4" />,
-    label: "Traditions",
+    label: "studio.nav.traditions",
     path: ROUTES.traditions,
-    tooltip: "Manage traditions",
+    tooltip: "studio.nav.traditions_tooltip",
   },
   {
     icon: <IoPulse className="w-4 h-4" />,
-    label: "Presets",
+    label: "studio.nav.presets",
     path: ROUTES.accumulatorPresets,
-    tooltip: "Manage accumulator presets",
+    tooltip: "studio.nav.presets_tooltip",
   },
 ];
 
 const prayerIntentionsItem: NavItem = {
   icon: <IoHeartOutline className="w-4 h-4" />,
-  label: "Prayer intentions",
+  label: "studio.nav.prayer_intentions",
   path: ROUTES.prayerIntentions,
-  tooltip: "Prayer intentions catalog",
+  tooltip: "studio.nav.prayer_intentions_tooltip",
 };
 
 const administrationItems: NavItem[] = [
   {
     icon: <MdAdminPanelSettings className="w-4 h-4" />,
-    label: "Authors",
+    label: "studio.nav.authors",
     path: ROUTES.adminAuthors,
-    tooltip: "Author administration",
+    tooltip: "studio.nav.authors_tooltip",
   },
   {
     icon: <MdPublicOff className="w-4 h-4" />,
-    label: "China",
+    label: "studio.nav.china",
     path: ROUTES.adminChinaRestrictions,
-    tooltip: "China content restrictions",
+    tooltip: "studio.nav.china_tooltip",
   },
   {
     icon: <MdOutlineReportProblem className="w-4 h-4" />,
-    label: "Chat Reports",
+    label: "studio.nav.chat_reports",
     path: ROUTES.adminChatReports,
-    tooltip: "Chat moderation reports",
+    tooltip: "studio.nav.chat_reports_tooltip",
   },
   prayerIntentionsItem,
 ];
 
+/** Super Admins and Content Admins answer these, so a Content Admin gets an
+ * Administration section holding only this. */
+const textRequestsItem: NavItem = {
+  icon: <IoDocumentAttachOutline className="w-4 h-4" />,
+  label: "studio.nav.text_requests",
+  path: ROUTES.adminTextRequests,
+  tooltip: "studio.nav.text_requests_tooltip",
+};
+
 /** Super Admin only, but it reads as one of the media catalogues. */
 const ambientSoundsItem: NavItem = {
   icon: <MdMusicNote className="w-4 h-4" />,
-  label: "Ambient Sounds",
+  label: "studio.nav.ambient_sounds",
   path: ROUTES.ambientSounds,
-  tooltip: "Manage ambient sound catalog",
+  tooltip: "studio.nav.ambient_sounds_tooltip",
 };
 
 /** Section landing pages own every route beneath them, so match on the prefix. */
@@ -160,6 +173,7 @@ const SECTION_PATHS: string[] = [
   ROUTES.adminAuthors,
   ROUTES.adminChinaRestrictions,
   ROUTES.adminChatReports,
+  ROUTES.adminTextRequests,
 ];
 
 export const isActivePath = (itemPath: string, currentPath: string) => {
@@ -180,6 +194,11 @@ export function useNavModel() {
    * Admins and Content Admins only. */
   const showAmbientSounds = canManageAmbientSounds(userInfo?.platform_role);
   const isContentAdminRole = isContentAdmin(userInfo?.platform_role);
+  const showTextRequests = canManageTextRequests(userInfo?.platform_role);
+  const visibleAdministrationItems = [
+    ...(showAdminAuthors ? administrationItems : []),
+    ...(showTextRequests ? [textRequestsItem] : []),
+  ];
   /** Everyone but platform staff only gets Practice spaces pinned: no
    * dashboard, analytics or pages, which list every plan and space. */
   const pinsOnlyGroups =
@@ -209,24 +228,24 @@ export function useNavModel() {
     : [
         {
           id: "content",
-          label: "Content",
+          label: "studio.nav.section_content",
           items: showAmbientSounds
             ? [...contentItems, ambientSoundsItem]
             : contentItems,
         },
         {
           id: "configuration",
-          label: "Configuration",
+          label: "studio.nav.section_configuration",
           items: isContentAdminRole
             ? [...configurationItems, prayerIntentionsItem]
             : configurationItems,
         },
-        ...(showAdminAuthors
+        ...(visibleAdministrationItems.length > 0
           ? [
               {
                 id: "administration",
-                label: "Administration",
-                items: administrationItems,
+                label: "studio.nav.section_administration",
+                items: visibleAdministrationItems,
               },
             ]
           : []),

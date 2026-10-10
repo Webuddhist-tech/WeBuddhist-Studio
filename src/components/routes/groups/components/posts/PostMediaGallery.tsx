@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { IoChevronBack, IoChevronForward } from "react-icons/io5";
+import { useTranslate } from "@tolgee/react";
 import type { GroupPostMediaDTO } from "../../api/groupPostsApi";
 
 type PostMediaGalleryProps = {
@@ -7,6 +8,7 @@ type PostMediaGalleryProps = {
 };
 
 const PostMediaGallery = ({ media }: PostMediaGalleryProps) => {
+  const { t } = useTranslate();
   const orderedMedia = [...media].sort(
     (left, right) => left.display_order - right.display_order,
   );
@@ -41,7 +43,9 @@ const PostMediaGallery = ({ media }: PostMediaGalleryProps) => {
           />
         ) : activeMedia.media_type === "AUDIO" && mediaUrl ? (
           <div className="flex w-full flex-col items-center gap-4 px-8 text-white">
-            <div className="text-sm font-medium">Audio</div>
+            <div className="text-sm font-medium">
+              {t("studio.common.audio")}
+            </div>
             <audio
               key={activeMedia.id}
               src={mediaUrl}
@@ -52,7 +56,9 @@ const PostMediaGallery = ({ media }: PostMediaGalleryProps) => {
         ) : mediaUrl ? (
           <img src={mediaUrl} alt="" className="h-full w-full object-contain" />
         ) : (
-          <div className="text-sm text-white/70">Media unavailable</div>
+          <div className="text-sm text-white/70">
+            {t("studio.groups.posts.media.unavailable")}
+          </div>
         )}
       </div>
 
@@ -60,7 +66,7 @@ const PostMediaGallery = ({ media }: PostMediaGalleryProps) => {
         <>
           <button
             type="button"
-            aria-label="Previous media"
+            aria-label={t("studio.groups.posts.media.previous_aria")}
             onClick={showPrevious}
             className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/55 p-2 text-white transition hover:bg-black/75"
           >
@@ -68,7 +74,7 @@ const PostMediaGallery = ({ media }: PostMediaGalleryProps) => {
           </button>
           <button
             type="button"
-            aria-label="Next media"
+            aria-label={t("studio.groups.posts.media.next_aria")}
             onClick={showNext}
             className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/55 p-2 text-white transition hover:bg-black/75"
           >
@@ -79,7 +85,9 @@ const PostMediaGallery = ({ media }: PostMediaGalleryProps) => {
               <button
                 key={item.id}
                 type="button"
-                aria-label={`Show media ${index + 1}`}
+                aria-label={t("studio.groups.posts.media.show_aria", {
+                  index: index + 1,
+                })}
                 onClick={() => setActiveIndex(index)}
                 className={`size-2 rounded-full ${
                   index === activeIndex ? "bg-white" : "bg-white/50"

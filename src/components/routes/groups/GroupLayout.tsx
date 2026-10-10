@@ -12,6 +12,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { IoMdTrash } from "react-icons/io";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import { Button } from "@/components/ui/atoms/button";
 import { getApiErrorMessage } from "@/lib/apiErrors";
@@ -63,6 +64,7 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   );
 
 const GroupLayout = () => {
+  const { t } = useTranslate();
   const { groupId } = useParams<{ groupId: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -100,12 +102,18 @@ const GroupLayout = () => {
   });
 
   const kind = groupKindOf(group?.group_type);
-  const noun = kind.singular.toLowerCase();
+  const isCommunity = kind.type === "COMMUNITY";
 
   const deleteMutation = useMutation({
     mutationFn: () => deleteGroup(groupId!),
     onSuccess: () => {
-      toast.success(`${kind.singular} deleted`);
+      toast.success(
+        t(
+          isCommunity
+            ? "studio.groups.pages.layout.deleted_community"
+            : "studio.groups.pages.layout.deleted_page",
+        ),
+      );
       setDeleteOpen(false);
       setConfirmName("");
       queryClient.invalidateQueries({ queryKey: ["cms-groups"] });
@@ -123,7 +131,7 @@ const GroupLayout = () => {
   if (isLoading) {
     return (
       <div className="flex h-[calc(100vh-40px)] items-center justify-center text-muted-foreground max-md:h-full">
-        Loading…
+        {t("studio.common.loading")}
       </div>
     );
   }
@@ -132,10 +140,13 @@ const GroupLayout = () => {
     return (
       <div className="flex h-[calc(100vh-40px)] flex-col items-center justify-center gap-4 max-md:h-full">
         <p className="text-destructive">
-          {getApiErrorMessage(error, "Could not load this group")}
+          {getApiErrorMessage(
+            error,
+            t("studio.groups.pages.layout.load_failed"),
+          )}
         </p>
         <Button variant="outline" onClick={() => navigate(ROUTES.groups)}>
-          Back to practice spaces
+          {t("studio.groups.pages.layout.back_to_practice_spaces")}
         </Button>
       </div>
     );
@@ -193,7 +204,11 @@ const GroupLayout = () => {
   return (
     <>
       <GroupPageShell
-        backLabel={`← ${kind.plural}`}
+        backLabel={`← ${t(
+          isCommunity
+            ? "studio.groups.pages.layout.back_label_community"
+            : "studio.groups.pages.layout.back_label_page",
+        )}`}
         onBack={() => navigate(kind.listPath)}
         title={groupTitle}
         avatarUrl={avatarUrl}
@@ -218,7 +233,7 @@ const GroupLayout = () => {
                 className="text-destructive hover:text-destructive"
                 onClick={() => setDeleteOpen(true)}
               >
-                <IoMdTrash className="w-4 h-4" /> Delete
+                <IoMdTrash className="w-4 h-4" /> {t("studio.common.delete")}
               </Button>
             ) : null}
           </>
@@ -230,34 +245,34 @@ const GroupLayout = () => {
               end
               className={() => navLinkClass({ isActive: isAboutSection })}
             >
-              About
+              {t("studio.groups.pages.layout.nav_about")}
             </NavLink>
             <NavLink
               to={ROUTES.groupContent(group.id)}
               className={navLinkClass}
             >
-              Content
+              {t("studio.groups.pages.layout.nav_content")}
             </NavLink>
             {showTransfersNav ? (
               <NavLink
                 to={ROUTES.groupTransfers(group.id)}
                 className={navLinkClass}
               >
-                Transfers
+                {t("studio.groups.pages.layout.nav_transfers")}
               </NavLink>
             ) : null}
             <NavLink
               to={ROUTES.groupMembers(group.id)}
               className={navLinkClass}
             >
-              Members
+              {t("studio.groups.pages.layout.nav_members")}
             </NavLink>
             {showCommunityNav ? (
               <NavLink
                 to={ROUTES.groupCommunity(group.id)}
                 className={navLinkClass}
               >
-                Community
+                {t("studio.groups.pages.layout.nav_community")}
               </NavLink>
             ) : null}
             {showJoinRequestsNav ? (
@@ -266,11 +281,16 @@ const GroupLayout = () => {
                 className={navLinkClass}
               >
                 <span className="inline-flex items-center gap-1.5">
-                  Join requests
+                  {t("studio.groups.pages.layout.nav_join_requests")}
                   {pendingCount > 0 ? (
                     <span
                       className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#A51C21] px-1 text-[10px] font-medium text-white"
-                      aria-label={`${pendingCount} pending`}
+                      aria-label={t(
+                        "studio.groups.pages.layout.pending_count",
+                        {
+                          count: pendingCount,
+                        },
+                      )}
                     >
                       {pendingCount > 9 ? "9+" : pendingCount}
                     </span>
@@ -279,16 +299,16 @@ const GroupLayout = () => {
               </NavLink>
             ) : null}
             <NavLink to={ROUTES.groupEvents(group.id)} className={navLinkClass}>
-              Events
+              {t("studio.groups.pages.layout.nav_events")}
             </NavLink>
             <NavLink to={ROUTES.groupPosts(group.id)} className={navLinkClass}>
-              Posts
+              {t("studio.groups.pages.layout.nav_posts")}
             </NavLink>
             <NavLink to={ROUTES.groupChants(group.id)} className={navLinkClass}>
-              Chants
+              {t("studio.groups.pages.layout.nav_chants")}
             </NavLink>
             <NavLink to={ROUTES.groupAssets(group.id)} className={navLinkClass}>
-              Assets
+              {t("studio.groups.pages.layout.nav_assets")}
             </NavLink>
           </nav>
         }
@@ -306,10 +326,20 @@ const GroupLayout = () => {
       >
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
-            <Pecha.AlertDialogTitle>Delete {noun}?</Pecha.AlertDialogTitle>
+            <Pecha.AlertDialogTitle>
+              {t(
+                isCommunity
+                  ? "studio.groups.pages.layout.delete_title_community"
+                  : "studio.groups.pages.layout.delete_title_page",
+              )}
+            </Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
-              This will permanently remove &ldquo;{groupTitle}&rdquo;. This
-              action cannot be undone. Type the {noun} name to confirm.
+              {t(
+                isCommunity
+                  ? "studio.groups.pages.layout.delete_description_community"
+                  : "studio.groups.pages.layout.delete_description_page",
+                { title: groupTitle },
+              )}
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <div className="space-y-2 py-2">
@@ -317,7 +347,11 @@ const GroupLayout = () => {
               htmlFor="delete-group-confirm-name"
               className="text-sm font-medium"
             >
-              {kind.singular} name
+              {t(
+                isCommunity
+                  ? "studio.groups.pages.layout.name_label_community"
+                  : "studio.groups.pages.layout.name_label_page",
+              )}
             </label>
             <Pecha.Input
               id="delete-group-confirm-name"
@@ -330,7 +364,7 @@ const GroupLayout = () => {
           </div>
           <Pecha.AlertDialogFooter>
             <Pecha.AlertDialogCancel disabled={deleteMutation.isPending}>
-              Cancel
+              {t("studio.common.cancel")}
             </Pecha.AlertDialogCancel>
             <Pecha.AlertDialogAction
               className="bg-destructive text-white hover:bg-destructive/90"
@@ -341,7 +375,9 @@ const GroupLayout = () => {
                 deleteMutation.mutate();
               }}
             >
-              {deleteMutation.isPending ? "Deleting…" : "Delete"}
+              {deleteMutation.isPending
+                ? t("studio.common.deleting")
+                : t("studio.common.delete")}
             </Pecha.AlertDialogAction>
           </Pecha.AlertDialogFooter>
         </Pecha.AlertDialogContent>

@@ -1,3 +1,4 @@
+import { useTranslate } from "@tolgee/react";
 import { Pecha } from "@/components/ui/shadimport";
 import PoemForm from "./PoemForm";
 import type { PoemItem } from "./api/poemApi";
@@ -15,6 +16,7 @@ const PoemFormDialog = ({
   editingItem,
   onSuccess,
 }: PoemFormDialogProps) => {
+  const { t } = useTranslate();
   const mode = editingItem ? "edit" : "create";
 
   const handleCancel = () => {
@@ -26,7 +28,9 @@ const PoemFormDialog = ({
       <Pecha.DialogContent className="flex max-h-[min(90dvh,90vh)] w-[calc(100%-2rem)] max-w-[1100px] flex-col gap-0 overflow-hidden p-0 sm:w-full">
         <Pecha.DialogHeader className="shrink-0 border-b px-6 py-4">
           <Pecha.DialogTitle>
-            {mode === "edit" ? "Edit Poem" : "Create Poem"}
+            {mode === "edit"
+              ? t("studio.poems.form.edit_title")
+              : t("studio.poems.form.create_title")}
           </Pecha.DialogTitle>
         </Pecha.DialogHeader>
 

@@ -1,4 +1,5 @@
 import axiosInstance from "@/config/axios-config";
+import { tolgee } from "@/i18n/tolgee";
 import { uploadImageToS3 } from "@/components/routes/task/api/taskApi";
 import { capitalizeFirstLetter } from "@/lib/textUtils";
 import type { GroupAssetDTO } from "./groupAssetsApi";
@@ -181,7 +182,8 @@ export const makeChantCollectionSearchFn =
       items: data.collections.map((collection) => ({
         id: collection.id,
         title: capitalizeFirstLetter(
-          collection.name?.trim() || "Untitled collection",
+          collection.name?.trim() ||
+            tolgee.t("studio.groups.shared.untitled_collection"),
         ),
         ...(collection.img_url ? { image_url: collection.img_url } : {}),
       })),

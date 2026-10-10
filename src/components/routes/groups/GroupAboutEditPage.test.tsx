@@ -10,6 +10,15 @@ import {
   type AuthorGroupDetailDTO,
 } from "./api/groupsApi";
 
+// Echoes keys plus interpolated values, so each language's labels stay distinct.
+vi.mock("@tolgee/react", () => ({
+  useTranslate: () => ({
+    t: (key: string, params?: Record<string, unknown>) =>
+      params ? `${key} ${Object.values(params).join(" ")}` : key,
+  }),
+  useTolgee: () => ({ getLanguage: () => "en", changeLanguage: vi.fn() }),
+}));
+
 vi.mock("sonner", () => ({
   toast: { error: vi.fn(), success: vi.fn() },
 }));
@@ -81,6 +90,10 @@ const renderPage = (detail: AuthorGroupDetailDTO) => {
 const EN = languageLabelForCode("EN");
 const BO = languageLabelForCode("BO");
 
+/** A language tab's field label, e.g. `fieldLabel("title", "EN")`. */
+const fieldLabel = (field: string, code: "EN" | "BO" | "ZH") =>
+  new RegExp(`language_tabs\\.${field}_label ${languageLabelForCode(code)}`);
+
 const lastMetadata = () =>
   vi.mocked(patchGroup).mock.calls.at(-1)?.[1].metadata;
 
@@ -98,19 +111,29 @@ describe("GroupAboutEditPage (edit) language tabs", () => {
       ]),
     );
     await screen.findByDisplayValue("Dharma Circle");
-    const names = screen.getAllByRole("tab").map((tab) => tab.textContent?.trim());
+    const names = screen
+      .getAllByRole("tab")
+      .map((tab) => tab.textContent?.trim());
     // Tabs follow the order the group's languages were saved in.
-    expect(names).toEqual([BO, EN, "Add language"]);
+    expect(names).toEqual([
+      BO,
+      EN,
+      "studio.groups.components.language_tabs.add_language",
+    ]);
   });
 
   it("opens a title-only group with the other fields empty and optional", async () => {
     renderPage(group([{ language: "EN", title: "Dharma Circle" }]));
     await screen.findByDisplayValue("Dharma Circle");
-    expect(screen.getByLabelText(new RegExp(`${EN} sub-title`))).toHaveValue("");
-    expect(screen.getByLabelText(new RegExp(`${EN} description`))).toHaveValue("");
-    expect(screen.getByText(new RegExp(`${EN} sub-title`)).textContent).toContain(
-      "(optional)",
+    expect(screen.getByLabelText(fieldLabel("sub_title", "EN"))).toHaveValue(
+      "",
     );
+    expect(screen.getByLabelText(fieldLabel("description", "EN"))).toHaveValue(
+      "",
+    );
+    expect(
+      screen.getByText(fieldLabel("sub_title", "EN")).textContent,
+    ).toContain("(studio.common.optional)");
   });
 
   it("saves a cleared sub-title and description as empty", async () => {
@@ -126,10 +149,14 @@ describe("GroupAboutEditPage (edit) language tabs", () => {
     );
     await screen.findByDisplayValue("Weekly sitting");
 
-    await userEvent.clear(screen.getByLabelText(new RegExp(`${EN} sub-title`)));
-    await userEvent.clear(screen.getByLabelText(new RegExp(`${EN} description`)));
+    await userEvent.clear(screen.getByLabelText(fieldLabel("sub_title", "EN")));
+    await userEvent.clear(
+      screen.getByLabelText(fieldLabel("description", "EN")),
+    );
 
-    await waitFor(() => expect(patchGroup).toHaveBeenCalled(), { timeout: 4000 });
+    await waitFor(() => expect(patchGroup).toHaveBeenCalled(), {
+      timeout: 4000,
+    });
     expect(lastMetadata()).toEqual([
       {
         language: "EN",
@@ -145,9 +172,14 @@ describe("GroupAboutEditPage (edit) language tabs", () => {
     renderPage(group([{ language: "EN", title: "Dharma Circle" }]));
     await screen.findByDisplayValue("Dharma Circle");
 
-    await userEvent.click(screen.getByRole("tab", { name: /add language/i }));
+    await userEvent.click(
+      screen.getByRole("tab", { name: /language_tabs\.add_language/ }),
+    );
     await userEvent.click(screen.getByRole("button", { name: "Tibetan" }));
-    await userEvent.type(screen.getByLabelText(new RegExp(`${BO} title`)), "Chos Tshogs");
+    await userEvent.type(
+      screen.getByLabelText(fieldLabel("title", "BO")),
+      "Chos Tshogs",
+    );
 
     await waitFor(
       () =>
@@ -168,16 +200,22 @@ describe("GroupAboutEditPage (edit) language tabs", () => {
     renderPage(group([{ language: "EN", title: "Dharma Circle" }]));
     await screen.findByDisplayValue("Dharma Circle");
 
-    await userEvent.click(screen.getByRole("tab", { name: /add language/i }));
+    await userEvent.click(
+      screen.getByRole("tab", { name: /language_tabs\.add_language/ }),
+    );
     await userEvent.click(screen.getByRole("button", { name: "Tibetan" }));
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
     expect(patchGroup).not.toHaveBeenCalled();
-    expect(await screen.findByText("Title is required")).toBeInTheDocument();
+    expect(
+      await screen.findByText("studio.validation.title_required"),
+    ).toBeInTheDocument();
     expect(
       screen
         .getByRole("tab", { name: new RegExp(BO) })
-        .querySelector('[aria-label="has errors"]'),
+        .querySelector(
+          '[aria-label="studio.groups.components.language_tabs.has_errors"]',
+        ),
     ).not.toBeNull();
   });
 });

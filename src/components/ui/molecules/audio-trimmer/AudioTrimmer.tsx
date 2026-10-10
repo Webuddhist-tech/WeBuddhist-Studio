@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pecha } from "@/components/ui/shadimport";
+import { useTranslate } from "@tolgee/react";
 import { formatMs } from "@/lib/utils";
 import { FaPlay, FaPause } from "react-icons/fa6";
 
@@ -24,6 +25,7 @@ export const AudioTrimmer = ({
   onClear,
   disabled = false,
 }: AudioTrimmerProps) => {
+  const { t } = useTranslate();
   const audioRef = useRef<HTMLAudioElement>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [localStart, setLocalStart] = useState(startMs ?? 0);
@@ -130,10 +132,13 @@ export const AudioTrimmer = ({
       />
 
       <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
-        <span>Day audio segment</span>
+        <span>{t("studio.molecules.audio_trimmer.heading")}</span>
         <span>
-          {formatMs(localStart)} – {formatMs(localEnd)} ({localEnd - localStart}{" "}
-          ms)
+          {t("studio.molecules.audio_trimmer.range_summary", {
+            start: formatMs(localStart),
+            end: formatMs(localEnd),
+            ms: localEnd - localStart,
+          })}
         </span>
       </div>
 
@@ -146,7 +151,7 @@ export const AudioTrimmer = ({
 
       <div className="space-y-2">
         <label className="text-xs text-muted-foreground flex justify-between">
-          <span>Start</span>
+          <span>{t("studio.molecules.audio_trimmer.start")}</span>
           <span>{formatMs(localStart)}</span>
         </label>
         <input
@@ -166,7 +171,7 @@ export const AudioTrimmer = ({
 
       <div className="space-y-2">
         <label className="text-xs text-muted-foreground flex justify-between">
-          <span>End</span>
+          <span>{t("studio.molecules.audio_trimmer.end")}</span>
           <span>{formatMs(localEnd)}</span>
         </label>
         <input
@@ -197,7 +202,9 @@ export const AudioTrimmer = ({
           ) : (
             <FaPlay className="w-3 h-3 mr-1" />
           )}
-          {isPlaying ? "Pause" : "Play segment"}
+          {isPlaying
+            ? t("studio.molecules.audio_trimmer.pause")
+            : t("studio.molecules.audio_trimmer.play_segment")}
         </Pecha.Button>
         <Pecha.Button
           type="button"
@@ -206,7 +213,7 @@ export const AudioTrimmer = ({
           disabled={disabled}
           onClick={handleClear}
         >
-          Clear timestamps
+          {t("studio.subtask.timestamps.clear")}
         </Pecha.Button>
       </div>
     </div>

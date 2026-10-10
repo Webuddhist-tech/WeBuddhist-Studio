@@ -12,11 +12,13 @@ import {
 } from "react-icons/fi";
 import { FaTrash } from "react-icons/fa6";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 
 import { Pecha } from "@/components/ui/shadimport";
 import AuthButton from "@/components/ui/molecules/auth-button/AuthButton";
 import { getApiErrorMessage } from "@/lib/apiErrors";
 import { formatMs, getAudioDurationMs } from "@/lib/utils";
+import { tolgee } from "@/i18n/tolgee";
 
 import {
   deleteRecording,
@@ -33,7 +35,10 @@ import {
 } from "./api/textAudioApi";
 
 const recordingLabel = (recording: Recording) =>
-  recording.title?.en ?? `Recording (${recording.format})`;
+  recording.title?.en ??
+  tolgee.t("studio.text_audio.recording_fallback", {
+    format: recording.format,
+  });
 
 const CONTRIBUTOR_ROLES: ContributorRole[] = [
   "narrator",
@@ -44,6 +49,7 @@ const CONTRIBUTOR_ROLES: ContributorRole[] = [
 ];
 
 const TextAudioPage = () => {
+  const { t } = useTranslate();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [debouncedSearch] = useDebounce(search.trim(), 400);
@@ -136,11 +142,11 @@ const TextAudioPage = () => {
         setPendingFile(null);
         setUploadProgress(0);
       }
-      toast.success("Audio uploaded");
+      toast.success(t("studio.text_audio.toast_uploaded"));
     },
     onError: (error) => {
       setUploadProgress(0);
-      toast.error("Failed to upload audio", {
+      toast.error(t("studio.text_audio.toast_upload_failed"), {
         description: getApiErrorMessage(error),
       });
     },
@@ -154,10 +160,10 @@ const TextAudioPage = () => {
         queryKey: ["edition-recordings", editionId],
       });
       setRecordingToDelete(null);
-      toast.success("Audio deleted");
+      toast.success(t("studio.text_audio.toast_deleted"));
     },
     onError: (error) =>
-      toast.error("Failed to delete audio", {
+      toast.error(t("studio.text_audio.toast_delete_failed"), {
         description: getApiErrorMessage(error),
       }),
   });
@@ -176,10 +182,10 @@ const TextAudioPage = () => {
         queryKey: ["edition-recordings", editionId],
       });
       setEditingRecordingId(null);
-      toast.success("Audio renamed");
+      toast.success(t("studio.text_audio.toast_renamed"));
     },
     onError: (error) =>
-      toast.error("Failed to rename audio", {
+      toast.error(t("studio.text_audio.toast_rename_failed"), {
         description: getApiErrorMessage(error),
       }),
   });
@@ -215,9 +221,11 @@ const TextAudioPage = () => {
     <div className="flex flex-col border h-[calc(100vh-40px)] overflow-auto bg-[#F5F5F5] dark:bg-[#181818] my-4 rounded-l-2xl font-dynamic max-md:my-0 max-md:h-full max-md:rounded-none max-md:border-0">
       <div className="px-4 pt-10 pb-4 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold">Text audio</h1>
+          <h1 className="text-xl font-semibold">
+            {t("studio.text_audio.title")}
+          </h1>
           <p className="text-sm text-muted-foreground">
-            Pick a text below and upload its audio recordings.
+            {t("studio.text_audio.subtitle")}
           </p>
         </div>
         <AuthButton />
@@ -227,7 +235,7 @@ const TextAudioPage = () => {
       <div className="grid gap-4 p-4 lg:grid-cols-[minmax(280px,2fr)_3fr]">
         <section className="rounded-lg border bg-white dark:bg-[#161616] p-4">
           <label className="text-sm font-medium" htmlFor="text-audio-search">
-            Search texts
+            {t("studio.text_audio.search_label")}
           </label>
           <div className="mt-2 flex items-center rounded-md border px-3">
             <FiSearch className="shrink-0 text-muted-foreground" />
@@ -235,7 +243,7 @@ const TextAudioPage = () => {
               id="text-audio-search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Enter a text title..."
+              placeholder={t("studio.text_audio.search_placeholder")}
               className="border-0 shadow-none focus-visible:ring-0"
             />
           </div>
@@ -243,7 +251,8 @@ const TextAudioPage = () => {
           <div className="mt-3 max-h-[calc(100vh-230px)] space-y-1 overflow-auto">
             {textsQuery.isFetching ? (
               <p className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
-                <FiLoader className="animate-spin" /> Loading…
+                <FiLoader className="animate-spin" />{" "}
+                {t("studio.common.loading")}
               </p>
             ) : textsQuery.isError ? (
               <p className="p-3 text-sm text-red-500">
@@ -269,7 +278,7 @@ const TextAudioPage = () => {
               ))
             ) : (
               <p className="p-3 text-sm text-muted-foreground">
-                No texts found.
+                {t("studio.text_audio.no_texts")}
               </p>
             )}
           </div>
@@ -278,7 +287,7 @@ const TextAudioPage = () => {
         <section className="rounded-lg border bg-white dark:bg-[#161616] p-5">
           {!selectedText ? (
             <div className="flex min-h-64 items-center justify-center text-sm text-muted-foreground">
-              Select a text to manage its audios.
+              {t("studio.text_audio.select_text")}
             </div>
           ) : (
             <div className="space-y-5">
@@ -291,7 +300,8 @@ const TextAudioPage = () => {
 
               {recordingsQuery.isLoading ? (
                 <p className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <FiLoader className="animate-spin" /> Loading audios…
+                  <FiLoader className="animate-spin" />{" "}
+                  {t("studio.text_audio.loading_audios")}
                 </p>
               ) : recordingsQuery.isError ? (
                 <p className="text-sm text-red-500">
@@ -300,7 +310,9 @@ const TextAudioPage = () => {
               ) : recordings.length ? (
                 <div className="space-y-2">
                   <p className="text-sm font-medium">
-                    Audios ({recordings.length})
+                    {t("studio.text_audio.audios_count", {
+                      count: recordings.length,
+                    })}
                   </p>
                   {recordings.map((recording) => (
                     <div
@@ -347,7 +359,7 @@ const TextAudioPage = () => {
                           </span>
                           <button
                             type="button"
-                            aria-label="Rename audio"
+                            aria-label={t("studio.text_audio.rename_aria")}
                             className="text-muted-foreground hover:text-foreground"
                             onClick={() => startRename(recording)}
                           >
@@ -368,7 +380,7 @@ const TextAudioPage = () => {
                           <span>
                             {recording.duration_ms != null
                               ? formatMs(recording.duration_ms)
-                              : "Duration unavailable"}
+                              : t("studio.text_audio.duration_unavailable")}
                           </span>
                           <Pecha.Button
                             type="button"
@@ -386,7 +398,7 @@ const TextAudioPage = () => {
                 </div>
               ) : (
                 <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
-                  This text has no audio yet.
+                  {t("studio.text_audio.no_audio")}
                 </p>
               )}
 
@@ -407,17 +419,23 @@ const TextAudioPage = () => {
                       <input {...getInputProps()} />
                       <FiUpload className="mx-auto mb-2 h-6 w-6" />
                       <p className="text-sm font-medium">
-                        {pendingFile ? pendingFile.name : "Add an audio file"}
+                        {pendingFile
+                          ? pendingFile.name
+                          : t("studio.ambient_sounds.form.add_audio_file")}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        MP3, M4A, WAV, AAC, or OGG; maximum 50 MB.
+                        {t("studio.ambient_sounds.form.audio_hint")}
                       </p>
                     </div>
                   )}
                 </Dropzone>
 
                 {isUploading ? (
-                  <div aria-label={`Upload progress ${uploadProgress}%`}>
+                  <div
+                    aria-label={t("studio.text_audio.upload_progress_aria", {
+                      progress: uploadProgress,
+                    })}
+                  >
                     <div className="h-2 overflow-hidden rounded-full bg-muted">
                       <div
                         className="h-full bg-[#A51C21] transition-[width]"
@@ -425,7 +443,9 @@ const TextAudioPage = () => {
                       />
                     </div>
                     <p className="mt-1 text-right text-xs text-muted-foreground">
-                      Uploading {uploadProgress}%
+                      {t("studio.text_audio.uploading_progress", {
+                        progress: uploadProgress,
+                      })}
                     </p>
                   </div>
                 ) : null}
@@ -435,7 +455,7 @@ const TextAudioPage = () => {
                     <div className="flex flex-wrap gap-2">
                       <div className="min-w-52 flex-1">
                         <label className="text-xs font-medium text-muted-foreground">
-                          Contributor
+                          {t("studio.text_audio.contributor")}
                         </label>
                         <Pecha.Popover
                           open={isContributorOpen}
@@ -450,7 +470,7 @@ const TextAudioPage = () => {
                             >
                               {selectedContributor
                                 ? personLabel(selectedContributor)
-                                : "Search a person…"}
+                                : t("studio.text_audio.search_person")}
                             </Pecha.Button>
                           </Pecha.PopoverTrigger>
                           <Pecha.PopoverContent
@@ -459,7 +479,9 @@ const TextAudioPage = () => {
                           >
                             <Pecha.Command shouldFilter={false}>
                               <Pecha.CommandInput
-                                placeholder="Search persons…"
+                                placeholder={t(
+                                  "studio.text_audio.search_persons",
+                                )}
                                 value={contributorQuery}
                                 onValueChange={setContributorQuery}
                               />
@@ -467,7 +489,7 @@ const TextAudioPage = () => {
                                 {personsQuery.isFetching ? (
                                   <p className="flex items-center gap-2 p-3 text-sm text-muted-foreground">
                                     <FiLoader className="animate-spin" />{" "}
-                                    Loading…
+                                    {t("studio.common.loading")}
                                   </p>
                                 ) : (
                                   <Pecha.CommandGroup>
@@ -488,7 +510,7 @@ const TextAudioPage = () => {
                                 {!personsQuery.isFetching &&
                                   personsQuery.data?.length === 0 && (
                                     <Pecha.CommandEmpty>
-                                      No persons found.
+                                      {t("studio.text_audio.no_persons")}
                                     </Pecha.CommandEmpty>
                                   )}
                               </Pecha.CommandList>
@@ -498,7 +520,7 @@ const TextAudioPage = () => {
                       </div>
                       <div className="w-40">
                         <label className="text-xs font-medium text-muted-foreground">
-                          Role
+                          {t("studio.text_audio.role")}
                         </label>
                         <Pecha.Select
                           value={contributorRole}
@@ -513,7 +535,7 @@ const TextAudioPage = () => {
                           <Pecha.SelectContent>
                             {CONTRIBUTOR_ROLES.map((role) => (
                               <Pecha.SelectItem key={role} value={role}>
-                                {role}
+                                {t(`studio.text_audio.roles.${role}`)}
                               </Pecha.SelectItem>
                             ))}
                           </Pecha.SelectContent>
@@ -541,7 +563,7 @@ const TextAudioPage = () => {
                         ) : (
                           <FiUpload />
                         )}
-                        Upload audio
+                        {t("studio.text_audio.upload_audio")}
                       </Pecha.Button>
                       <Pecha.Button
                         type="button"
@@ -549,7 +571,7 @@ const TextAudioPage = () => {
                         disabled={isUploading}
                         onClick={() => setPendingFile(null)}
                       >
-                        Cancel
+                        {t("studio.common.cancel")}
                       </Pecha.Button>
                     </div>
                   </div>
@@ -568,14 +590,21 @@ const TextAudioPage = () => {
       >
         <Pecha.AlertDialogContent>
           <Pecha.AlertDialogHeader>
-            <Pecha.AlertDialogTitle>Delete this audio?</Pecha.AlertDialogTitle>
+            <Pecha.AlertDialogTitle>
+              {t("studio.text_audio.delete_title")}
+            </Pecha.AlertDialogTitle>
             <Pecha.AlertDialogDescription>
-              “{recordingToDelete ? recordingLabel(recordingToDelete) : ""}”
-              will be permanently deleted.
+              {t("studio.text_audio.delete_description", {
+                name: recordingToDelete
+                  ? recordingLabel(recordingToDelete)
+                  : "",
+              })}
             </Pecha.AlertDialogDescription>
           </Pecha.AlertDialogHeader>
           <Pecha.AlertDialogFooter>
-            <Pecha.AlertDialogCancel>Cancel</Pecha.AlertDialogCancel>
+            <Pecha.AlertDialogCancel>
+              {t("studio.common.cancel")}
+            </Pecha.AlertDialogCancel>
             <Pecha.AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
               disabled={deleteMutation.isPending}
@@ -588,7 +617,9 @@ const TextAudioPage = () => {
                 })
               }
             >
-              {deleteMutation.isPending ? "Deleting…" : "Delete"}
+              {deleteMutation.isPending
+                ? t("studio.common.deleting")
+                : t("studio.common.delete")}
             </Pecha.AlertDialogAction>
           </Pecha.AlertDialogFooter>
         </Pecha.AlertDialogContent>

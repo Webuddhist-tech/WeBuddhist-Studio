@@ -160,11 +160,11 @@ describe("publishMove", () => {
 
     expect(throttled).toEqual({
       ok: false,
-      message: expect.stringMatching(/slow down/),
+      message: "studio.live_control.errors.positions_throttled",
     });
     expect(refused).toEqual({
       ok: false,
-      message: expect.stringMatching(/token was rejected/),
+      message: "studio.live_control.errors.token_rejected",
     });
   });
 });
@@ -272,11 +272,11 @@ describe("autoplay", () => {
 
     expect(gone).toEqual({
       ok: false,
-      message: "Autoplay is no longer running that plan.",
+      message: "studio.live_control.errors.autoplay_not_running",
     });
     expect(fast).toMatchObject({
       ok: false,
-      message: expect.stringMatching(/slow down/),
+      message: "studio.live_control.errors.lines_throttled",
     });
   });
 
@@ -309,7 +309,7 @@ describe("autoplay", () => {
 
     expect(result).toEqual({
       ok: false,
-      message: expect.stringMatching(/could not run autoplay/),
+      message: "studio.live_control.errors.autoplay_unavailable",
     });
     expect(emitGet).not.toHaveBeenCalled();
   });
@@ -557,7 +557,7 @@ describe("fetchLiveControlEvent", () => {
     vi.mocked(axiosInstance.get).mockResolvedValue({ data: { metadata: [] } });
 
     await expect(fetchLiveControlEvent("e1")).resolves.toEqual({
-      title: "Untitled event",
+      title: "studio.live_control.untitled_event",
       collectionId: null,
     });
   });

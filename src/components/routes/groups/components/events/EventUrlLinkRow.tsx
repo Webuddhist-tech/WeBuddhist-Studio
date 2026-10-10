@@ -1,3 +1,4 @@
+import { useTranslate } from "@tolgee/react";
 import type { UseFormReturn } from "react-hook-form";
 import { IoMdClose } from "react-icons/io";
 import { PiDotsSixVertical } from "react-icons/pi";
@@ -6,6 +7,12 @@ import { SortableItem } from "@/components/ui/atoms/sortable";
 import { useLanguages } from "@/hooks/useLanguages";
 import type { EventFormData } from "@/schema/EventSchema";
 import { EVENT_LINK_TYPES } from "../../lib/eventLinkTypes";
+
+/** Link types whose label is a translatable word (others are brand names). */
+const LINK_TYPE_LABEL_KEYS: Record<string, string> = {
+  web: "studio.groups.events.url_links.type_web",
+  video: "studio.groups.events.url_links.type_video",
+};
 
 type EventUrlLinkRowProps = {
   form: UseFormReturn<EventFormData>;
@@ -24,6 +31,7 @@ const EventUrlLinkRow = ({
   canReorder,
   onRemove,
 }: EventUrlLinkRowProps) => {
+  const { t } = useTranslate();
   const { languageOptions } = useLanguages();
 
   const renderRow = ({ listeners }: { listeners: Record<string, unknown> }) => (
@@ -33,7 +41,7 @@ const EventUrlLinkRow = ({
           {!readOnly ? (
             <button
               type="button"
-              aria-label="Reorder link"
+              aria-label={t("studio.groups.events.url_links.reorder_aria")}
               disabled={!canReorder}
               className="mt-8 shrink-0 cursor-grab touch-none rounded p-1 text-muted-foreground hover:text-foreground active:cursor-grabbing disabled:cursor-not-allowed disabled:opacity-30"
               {...listeners}
@@ -47,7 +55,9 @@ const EventUrlLinkRow = ({
             name={`links.${index}.type`}
             render={({ field: typeField }) => (
               <Pecha.FormItem className="w-48 max-md:min-w-0 max-md:flex-1">
-                <Pecha.FormLabel>Type</Pecha.FormLabel>
+                <Pecha.FormLabel>
+                  {t("studio.groups.events.url_links.type_label")}
+                </Pecha.FormLabel>
                 <Pecha.Select
                   value={typeField.value}
                   onValueChange={typeField.onChange}
@@ -55,13 +65,19 @@ const EventUrlLinkRow = ({
                 >
                   <Pecha.FormControl>
                     <Pecha.SelectTrigger className="w-full bg-white dark:bg-[#181818]">
-                      <Pecha.SelectValue placeholder="Select a type" />
+                      <Pecha.SelectValue
+                        placeholder={t(
+                          "studio.groups.events.url_links.type_placeholder",
+                        )}
+                      />
                     </Pecha.SelectTrigger>
                   </Pecha.FormControl>
                   <Pecha.SelectContent>
                     {EVENT_LINK_TYPES.map((option) => (
                       <Pecha.SelectItem key={option.value} value={option.value}>
-                        {option.label}
+                        {LINK_TYPE_LABEL_KEYS[option.value]
+                          ? t(LINK_TYPE_LABEL_KEYS[option.value])
+                          : option.label}
                       </Pecha.SelectItem>
                     ))}
                   </Pecha.SelectContent>
@@ -76,7 +92,7 @@ const EventUrlLinkRow = ({
             name={`links.${index}.language`}
             render={({ field: langField }) => (
               <Pecha.FormItem className="w-40 max-md:min-w-0 max-md:flex-1">
-                <Pecha.FormLabel>Language</Pecha.FormLabel>
+                <Pecha.FormLabel>{t("studio.common.language")}</Pecha.FormLabel>
                 <Pecha.Select
                   value={langField.value}
                   onValueChange={langField.onChange}
@@ -84,7 +100,9 @@ const EventUrlLinkRow = ({
                 >
                   <Pecha.FormControl>
                     <Pecha.SelectTrigger className="w-full bg-white dark:bg-[#181818]">
-                      <Pecha.SelectValue placeholder="Language" />
+                      <Pecha.SelectValue
+                        placeholder={t("studio.common.language")}
+                      />
                     </Pecha.SelectTrigger>
                   </Pecha.FormControl>
                   <Pecha.SelectContent>
@@ -104,7 +122,7 @@ const EventUrlLinkRow = ({
         {!readOnly ? (
           <button
             type="button"
-            aria-label="Remove link"
+            aria-label={t("studio.groups.events.url_links.remove_aria")}
             onClick={() => onRemove(index)}
             className="mt-8 text-muted-foreground hover:text-destructive"
           >
@@ -118,7 +136,9 @@ const EventUrlLinkRow = ({
         name={`links.${index}.url`}
         render={({ field: urlField }) => (
           <Pecha.FormItem>
-            <Pecha.FormLabel>URL</Pecha.FormLabel>
+            <Pecha.FormLabel>
+              {t("studio.groups.events.url_links.url_label")}
+            </Pecha.FormLabel>
             <Pecha.FormControl>
               <Pecha.Input
                 {...urlField}
@@ -139,11 +159,15 @@ const EventUrlLinkRow = ({
         name={`links.${index}.label`}
         render={({ field: labelField }) => (
           <Pecha.FormItem>
-            <Pecha.FormLabel>Label (optional)</Pecha.FormLabel>
+            <Pecha.FormLabel>
+              {t("studio.groups.events.url_links.label_label")}
+            </Pecha.FormLabel>
             <Pecha.FormControl>
               <Pecha.Input
                 {...labelField}
-                placeholder="Display text"
+                placeholder={t(
+                  "studio.groups.events.url_links.label_placeholder",
+                )}
                 disabled={readOnly}
                 className="bg-white dark:bg-[#181818]"
               />

@@ -4,6 +4,13 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LinkedContentSelectorSheet } from "./LinkedContentSelectorSheet";
 import { fetchLinkedContent } from "./linkedContent";
+import { createChantCollection } from "@/components/routes/groups/api/chantsApi";
+
+vi.mock("@/components/routes/groups/api/chantsApi", async (orig) => {
+  const actual =
+    await orig<typeof import("@/components/routes/groups/api/chantsApi")>();
+  return { ...actual, createChantCollection: vi.fn() };
+});
 
 vi.mock("./linkedContent", async (orig) => {
   const actual = await orig<typeof import("./linkedContent")>();
@@ -71,13 +78,20 @@ describe("LinkedContentSelectorSheet", () => {
     renderSheet();
     await screen.findByText("Losar");
 
-    await userEvent.type(screen.getByPlaceholderText(/search event/i), "saga");
+    await userEvent.type(
+      screen.getByPlaceholderText(
+        "studio.content.linked.event.search_placeholder",
+      ),
+      "saga",
+    );
 
     await waitFor(() => {
       expect(screen.queryByText("Losar")).not.toBeInTheDocument();
     });
     expect(screen.getByText("Saga Dawa")).toBeInTheDocument();
-    expect(screen.getByText(/filtering this page only/i)).toBeInTheDocument();
+    expect(
+      screen.getByText("studio.content.linked.filtering_page_only"),
+    ).toBeInTheDocument();
   });
 
   it("sends the search term to the server for accumulations", async () => {
@@ -90,7 +104,9 @@ describe("LinkedContentSelectorSheet", () => {
     await screen.findByText("Mani");
 
     await userEvent.type(
-      screen.getByPlaceholderText(/search accumulation/i),
+      screen.getByPlaceholderText(
+        "studio.content.linked.accumulation.search_placeholder",
+      ),
       "mani",
     );
 
@@ -101,7 +117,7 @@ describe("LinkedContentSelectorSheet", () => {
       );
     });
     expect(
-      screen.queryByText(/filtering this page only/i),
+      screen.queryByText("studio.content.linked.filtering_page_only"),
     ).not.toBeInTheDocument();
   });
 
@@ -110,16 +126,78 @@ describe("LinkedContentSelectorSheet", () => {
 
     renderSheet({ type: "POST" });
 
-    expect(await screen.findByText(/no post found/i)).toBeInTheDocument();
-    expect(screen.getByText(/has no post yet/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText("studio.content.linked.post.none_found"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("studio.content.linked.post.group_empty"),
+    ).toBeInTheDocument();
   });
 
   it("does not query when the plan has no group", async () => {
     renderSheet({ groupId: null });
 
     expect(
-      await screen.findByText(/this plan has no group/i),
+      await screen.findByText("studio.content.linked.no_group"),
     ).toBeInTheDocument();
     expect(fetchLinkedContent).not.toHaveBeenCalled();
+  });
+});
+
+describe("LinkedContentSelectorSheet creating content", () => {
+  it("creates a chant collection inline and links it", async () => {
+    vi.mocked(createChantCollection).mockResolvedValue({
+      id: "c-new",
+      group_id: "group-1",
+      name: "Morning chants",
+      created_at: "2026-10-10T00:00:00Z",
+      items: [],
+    });
+    const { onSelect } = renderSheet({ type: "GROUP_COLLECTION" });
+
+    await userEvent.click(
+      await screen.findByRole("button", {
+        name: "studio.content.linked.create_new",
+      }),
+    );
+    await userEvent.type(
+      screen.getByPlaceholderText(
+        "studio.content.linked.chant_collection.quick_create_placeholder",
+      ),
+      "Morning chants",
+    );
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "studio.content.linked.create_and_link",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(createChantCollection).toHaveBeenCalledWith("group-1", {
+        name: "Morning chants",
+      }),
+    );
+    expect(onSelect).toHaveBeenCalledWith(
+      "GROUP_COLLECTION",
+      expect.objectContaining({ id: "c-new", title: "Morning chants" }),
+    );
+  });
+
+  it("opens the full create form for other types in a new tab", async () => {
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    renderSheet({ type: "EVENT" });
+
+    await userEvent.click(
+      await screen.findByRole("button", {
+        name: "studio.content.linked.create_new",
+      }),
+    );
+
+    expect(open).toHaveBeenCalledWith(
+      "/groups/group-1/events/new",
+      "_blank",
+      "noopener,noreferrer",
+    );
+    open.mockRestore();
   });
 });

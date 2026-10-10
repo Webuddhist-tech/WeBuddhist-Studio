@@ -122,7 +122,9 @@ describe("SeriesDetailsPage", () => {
 
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /中文/i }));
-    await user.click(screen.getByRole("link", { name: /Add New Plan/i }));
+    await user.click(
+      screen.getByRole("link", { name: "studio.series.add_new_plan" }),
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("plan-new-location-state")).toHaveTextContent(

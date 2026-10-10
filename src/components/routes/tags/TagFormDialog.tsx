@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/atoms/button";
 import ImageContentData from "@/components/ui/molecules/modals/image-upload/ImageContentData";
 import { uploadImageToS3 } from "@/components/routes/task/api/taskApi";
 import { toast } from "sonner";
+import { useTranslate } from "@tolgee/react";
 import { useLanguages } from "@/hooks/useLanguages";
 import { normalizeLanguageCode } from "@/lib/languageCodes";
 import type { LanguageCode } from "@/schema/SeriesSchema";
@@ -38,6 +39,7 @@ const TagFormDialog = ({
   isSubmitting,
   onSubmit,
 }: TagFormDialogProps) => {
+  const { t } = useTranslate();
   const isEdit = !!tag;
   const { languageOptions, getLanguageLabel } = useLanguages();
   const [activeLanguages, setActiveLanguages] = useState<LanguageCode[]>([
@@ -105,7 +107,7 @@ const TagFormDialog = ({
 
   const removeLanguage = (langCode: LanguageCode) => {
     if (activeLanguages.length === 1) {
-      toast.error("At least one language is required");
+      toast.error(t("studio.tags.validation.language_required"));
       return;
     }
     setActiveLanguages(activeLanguages.filter((l) => l !== langCode));
@@ -145,14 +147,14 @@ const TagFormDialog = ({
       setImagePreview(image.original);
       setImageKey(key);
       setIsImageDialogOpen(false);
-      toast.success("Image uploaded successfully!");
+      toast.success(t("studio.tags.toast.image_uploaded"));
     } catch (error: any) {
       if (error?.response?.status === 413) {
-        toast.error("Failed to upload image", {
-          description: "File exceeds the maximum size of 1MB",
+        toast.error(t("studio.tags.toast.image_upload_failed"), {
+          description: t("studio.tags.toast.image_too_large"),
         });
       } else {
-        toast.error("Failed to upload image");
+        toast.error(t("studio.tags.toast.image_upload_failed"));
       }
     } finally {
       setIsImageUploading(false);
@@ -171,7 +173,11 @@ const TagFormDialog = ({
     for (const lang of activeLanguages) {
       const data = languageData[lang] ?? { name: "", description: "" };
       if (!data.name.trim()) {
-        toast.error(`Name is required for ${getLanguageLabel(lang)}`);
+        toast.error(
+          t("studio.tags.validation.name_required_for", {
+            language: getLanguageLabel(lang),
+          }),
+        );
         return;
       }
       metadata.push({
@@ -194,7 +200,9 @@ const TagFormDialog = ({
         <Pecha.DialogContent className="flex max-h-[min(90dvh,90vh)] w-[calc(100%-2rem)] max-w-lg flex-col gap-0 overflow-hidden p-0 sm:w-full">
           <Pecha.DialogHeader className="shrink-0 border-b px-6 py-4">
             <Pecha.DialogTitle>
-              {isEdit ? "Edit Tag" : "Create Tag"}
+              {isEdit
+                ? t("studio.tags.form.edit_title")
+                : t("studio.tags.form.create_title")}
             </Pecha.DialogTitle>
           </Pecha.DialogHeader>
           <form
@@ -205,7 +213,9 @@ const TagFormDialog = ({
               {/* Language Sections */}
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-bold">Languages</label>
+                  <label className="text-sm font-bold">
+                    {t("studio.tags.form.languages")}
+                  </label>
                   {availableLanguages.length > 0 && (
                     <Pecha.DropdownMenu>
                       <Pecha.DropdownMenuTrigger asChild>
@@ -216,7 +226,7 @@ const TagFormDialog = ({
                           className="h-7 text-xs"
                         >
                           <IoMdAdd className="h-3 w-3 mr-1" />
-                          Add Language
+                          {t("studio.tags.form.add_language")}
                         </Button>
                       </Pecha.DropdownMenuTrigger>
                       <Pecha.DropdownMenuContent>
@@ -246,7 +256,12 @@ const TagFormDialog = ({
                           type="button"
                           onClick={() => removeLanguage(lang)}
                           className="absolute top-2 right-2 text-muted-foreground hover:text-foreground p-1 rounded"
-                          aria-label={`Remove ${langLabel}`}
+                          aria-label={t(
+                            "studio.tags.form.remove_language_aria",
+                            {
+                              language: langLabel,
+                            },
+                          )}
                         >
                           <IoMdClose className="h-4 w-4" />
                         </button>
@@ -255,19 +270,23 @@ const TagFormDialog = ({
                         {langLabel}
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-bold">Name</label>
+                        <label className="text-sm font-bold">
+                          {t("studio.common.name")}
+                        </label>
                         <Pecha.Input
                           value={languageData[lang]?.name ?? ""}
                           onChange={(e) =>
                             updateLanguageField(lang, "name", e.target.value)
                           }
-                          placeholder="Tag name"
+                          placeholder={t("studio.tags.form.name_placeholder")}
                           required
                           className="bg-white dark:bg-[#181818]"
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-bold">Description</label>
+                        <label className="text-sm font-bold">
+                          {t("studio.common.description")}
+                        </label>
                         <Textarea
                           value={languageData[lang]?.description ?? ""}
                           onChange={(e) =>
@@ -277,7 +296,9 @@ const TagFormDialog = ({
                               e.target.value,
                             )
                           }
-                          placeholder="Optional description"
+                          placeholder={t(
+                            "studio.tags.form.description_placeholder",
+                          )}
                           className="field-sizing-fixed min-h-[80px] max-h-32 resize-none bg-white dark:bg-[#181818]"
                         />
                       </div>
@@ -287,14 +308,16 @@ const TagFormDialog = ({
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-bold">Image</label>
+                <label className="text-sm font-bold">
+                  {t("studio.common.image")}
+                </label>
                 <div className="flex gap-4 items-start">
                   {!imagePreview && (
                     <button
                       type="button"
                       onClick={() => setIsImageDialogOpen(true)}
                       className="border w-32 h-24 border-dashed border-gray-300 rounded-lg flex items-center justify-center hover:border-gray-400 transition-colors"
-                      aria-label="Upload tag image"
+                      aria-label={t("studio.tags.form.upload_image_aria")}
                     >
                       <IoMdAdd className="h-8 w-8 text-gray-400" />
                     </button>
@@ -303,14 +326,14 @@ const TagFormDialog = ({
                     <div className="relative">
                       <img
                         src={imagePreview}
-                        alt="Tag preview"
+                        alt={t("studio.tags.form.image_preview_alt")}
                         className="w-32 h-24 object-cover rounded-lg border"
                       />
                       <button
                         type="button"
                         onClick={handleRemoveImage}
                         className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1"
-                        aria-label="Remove image"
+                        aria-label={t("studio.tags.form.remove_image_aria")}
                       >
                         <IoMdClose className="h-4 w-4" />
                       </button>
@@ -320,16 +343,18 @@ const TagFormDialog = ({
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-bold">Linked plans</label>
+                <label className="text-sm font-bold">
+                  {t("studio.tags.form.linked_plans")}
+                </label>
                 <Pecha.Input
                   value={planSearch}
                   onChange={(e) => setPlanSearch(e.target.value)}
-                  placeholder="Search plans..."
+                  placeholder={t("studio.tags.form.search_plans")}
                 />
                 <div className="max-h-40 overflow-y-auto border rounded-md p-2 space-y-2">
                   {filteredPlans.length === 0 ? (
                     <p className="text-sm text-muted-foreground px-2 py-1">
-                      No plans found
+                      {t("studio.tags.form.no_plans")}
                     </p>
                   ) : (
                     filteredPlans.map((plan) => (
@@ -350,7 +375,9 @@ const TagFormDialog = ({
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {selectedPlanIds.length} plan(s) selected
+                  {t("studio.tags.form.plans_selected", {
+                    count: selectedPlanIds.length,
+                  })}
                 </p>
               </div>
             </div>
@@ -361,7 +388,7 @@ const TagFormDialog = ({
                 onClick={() => onOpenChange(false)}
                 disabled={isSubmitting}
               >
-                Cancel
+                {t("studio.common.cancel")}
               </Button>
               <Button
                 type="submit"
@@ -370,11 +397,11 @@ const TagFormDialog = ({
               >
                 {isSubmitting
                   ? isEdit
-                    ? "Saving..."
-                    : "Creating..."
+                    ? t("studio.common.saving")
+                    : t("studio.common.creating")
                   : isEdit
-                    ? "Save"
-                    : "Create"}
+                    ? t("studio.common.save")
+                    : t("studio.common.create")}
               </Button>
             </div>
           </form>
@@ -387,7 +414,9 @@ const TagFormDialog = ({
       >
         <Pecha.DialogContent showCloseButton>
           <Pecha.DialogHeader>
-            <Pecha.DialogTitle>Upload & Crop Image</Pecha.DialogTitle>
+            <Pecha.DialogTitle>
+              {t("studio.tags.form.upload_crop_image")}
+            </Pecha.DialogTitle>
           </Pecha.DialogHeader>
           <ImageContentData
             onUpload={handleImageUpload}

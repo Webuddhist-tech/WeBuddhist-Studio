@@ -148,12 +148,11 @@ const Createplan = () => {
 
   useEffect(() => {
     if (isSeriesError) {
-      toast.error("Couldn't load series", {
-        description:
-          "The series list is unavailable. The plan's current series won't be changed.",
+      toast.error(t("studio.plan.series.load_failed_title"), {
+        description: t("studio.plan.series.load_failed_description"),
       });
     }
-  }, [isSeriesError]);
+  }, [isSeriesError, t]);
 
   const [isSeriesOpen, setIsSeriesOpen] = useState(false);
   const [seriesQuery, setSeriesQuery] = useState("");
@@ -180,20 +179,24 @@ const Createplan = () => {
   );
 
   const pageHeading = useMemo(() => {
-    if (!isCreateMode) return "Plan Edit";
-    if (!planNewFromSeries) return "Plan Details";
+    if (!isCreateMode) return t("studio.plan.heading.edit");
+    if (!planNewFromSeries) return t("studio.plan.heading.details");
     if (lockSeriesAndLanguageFields) {
       const seriesTitle = seriesOptions.find(
         (s) => s.id === planNewFromSeries.seriesId,
       )?.title;
       const languageLabel = getLanguageLabel(planNewFromSeries.language);
       if (seriesTitle && languageLabel) {
-        return `Add New Plan for ${seriesTitle} (${languageLabel})`;
+        return t("studio.plan.heading.add_for_series_language", {
+          series: seriesTitle,
+          language: languageLabel,
+        });
       }
-      if (seriesTitle) return `Add New Plan for ${seriesTitle}`;
+      if (seriesTitle)
+        return t("studio.plan.heading.add_for_series", { series: seriesTitle });
     }
-    if (isSeriesLoading) return "Add New Plan";
-    return "Plan Details";
+    if (isSeriesLoading) return t("studio.plan.heading.add_new");
+    return t("studio.plan.heading.details");
   }, [
     isCreateMode,
     planNewFromSeries,
@@ -201,6 +204,7 @@ const Createplan = () => {
     seriesOptions,
     isSeriesLoading,
     getLanguageLabel,
+    t,
   ]);
 
   useEffect(() => {
@@ -284,8 +288,8 @@ const Createplan = () => {
   const createPlanMutation = useMutation({
     mutationFn: postPlan,
     onSuccess: (data) => {
-      toast.success("Plan created successfully!", {
-        description: "Your plan has been created and is now available.",
+      toast.success(t("studio.plan.toast.created"), {
+        description: t("studio.plan.toast.created_description"),
       });
       void queryClient.invalidateQueries({ queryKey: ["dashboard-items"] });
       form.reset();
@@ -294,7 +298,7 @@ const Createplan = () => {
       navigate(ROUTES.plan(data.id));
     },
     onError: (error) => {
-      toast.error("Failed to create plan", {
+      toast.error(t("studio.plan.toast.create_failed"), {
         description: error.message,
       });
     },
@@ -302,14 +306,14 @@ const Createplan = () => {
   const updatePlanMutation = useMutation({
     mutationFn: updatePlan,
     onSuccess: () => {
-      toast.success("Saved");
+      toast.success(t("studio.plan.toast.saved"));
       void queryClient.invalidateQueries({ queryKey: ["dashboard-items"] });
       if (planId) {
         void queryClient.invalidateQueries({ queryKey: ["plan", planId] });
       }
     },
     onError: (error) => {
-      toast.error("Failed to update plan", {
+      toast.error(t("studio.plan.toast.update_failed"), {
         description: error.message,
       });
     },
@@ -356,17 +360,17 @@ const Createplan = () => {
         shouldDirty: true,
       });
       setIsImageDialogOpen(false);
-      toast.success("Image uploaded successfully!");
+      toast.success(t("studio.plan.image.upload_success"));
     } catch (error: unknown) {
       if (
         (error as { response?: { status?: number } }).response?.status === 413
       ) {
-        toast.error("Failed to update Image", {
-          description: "file exceeds the maximum size of 1MB",
+        toast.error(t("studio.plan.image.upload_failed"), {
+          description: t("studio.plan.image.too_large"),
         });
       } else {
         console.error("Image upload failed:", error as Error);
-        toast.error("Failed to upload image");
+        toast.error(t("studio.plan.image.upload_failed"));
       }
     } finally {
       setIsImageUploading(false);
@@ -493,7 +497,7 @@ const Createplan = () => {
                           type="button"
                           onClick={() => setIsImageDialogOpen(true)}
                           className="border w-48 h-32 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors cursor-pointer focus:outline-none"
-                          aria-label="Upload cover image"
+                          aria-label={t("studio.plan.image.upload_cover_aria")}
                         >
                           <IoMdAdd className="mx-auto h-8 w-8 text-gray-400 mb-2" />
                         </button>
@@ -503,7 +507,7 @@ const Createplan = () => {
                         <div className="relative">
                           <img
                             src={imagePreview}
-                            alt="Cover preview"
+                            alt={t("studio.plan.image.cover_preview_alt")}
                             className="w-48 h-32 object-cover rounded-lg border"
                           />
                           <div className="flex items-center justify-between absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent rounded-b-lg p-2">
@@ -513,7 +517,9 @@ const Createplan = () => {
                               </p>
                             )}
                             <button
-                              aria-label="Remove image"
+                              aria-label={t(
+                                "studio.plan.image.remove_image_aria",
+                              )}
                               type="button"
                               onClick={handleRemoveImage}
                               className=" text-white cursor-pointer rounded-full p-1 transition-colors ml-2"
@@ -538,7 +544,9 @@ const Createplan = () => {
             >
               <Pecha.DialogContent showCloseButton={true}>
                 <Pecha.DialogHeader>
-                  <Pecha.DialogTitle>Upload & Crop Image</Pecha.DialogTitle>
+                  <Pecha.DialogTitle>
+                    {t("studio.plan.image.upload_crop_title")}
+                  </Pecha.DialogTitle>
                 </Pecha.DialogHeader>
                 <ImageContentData
                   onUpload={handleImageUpload}
@@ -617,7 +625,7 @@ const Createplan = () => {
                 render={({ field }) => (
                   <Pecha.FormItem className="flex-1">
                     <Pecha.FormLabel className="text-sm font-bold">
-                      Start Date
+                      {t("studio.plan.form_field.start_date")}
                     </Pecha.FormLabel>
                     <Pecha.RadioGroup
                       value={startDateMode}
@@ -643,7 +651,7 @@ const Createplan = () => {
                           htmlFor="start-date-enroll"
                           className="text-sm cursor-pointer"
                         >
-                          When User Enrolls
+                          {t("studio.plan.start_date.when_user_enrolls")}
                         </label>
                       </div>
                       <div className="flex items-center gap-2">
@@ -656,7 +664,7 @@ const Createplan = () => {
                           htmlFor="start-date-specific"
                           className="text-sm cursor-pointer"
                         >
-                          On Specific Date
+                          {t("studio.plan.start_date.on_specific_date")}
                         </label>
                       </div>
                     </Pecha.RadioGroup>
@@ -687,7 +695,7 @@ const Createplan = () => {
                                   fromBackendMidnightISO(field.value),
                                   "MMM d, yyyy",
                                 )
-                              : "Choose Date"}
+                              : t("studio.plan.start_date.choose_date")}
                           </span>
                         </Pecha.Button>
                       </Pecha.PopoverTrigger>
@@ -727,11 +735,12 @@ const Createplan = () => {
 
                 let seriesTriggerLabel: string;
                 if (isSeriesLoading) {
-                  seriesTriggerLabel = "Loading series…";
+                  seriesTriggerLabel = t("studio.plan.series.loading");
                 } else if (isSeriesError) {
-                  seriesTriggerLabel = "Series unavailable";
+                  seriesTriggerLabel = t("studio.plan.series.unavailable");
                 } else {
-                  seriesTriggerLabel = selectedSeries?.title ?? "None";
+                  seriesTriggerLabel =
+                    selectedSeries?.title ?? t("studio.common.none");
                 }
 
                 const isSeriesFieldDisabled =
@@ -742,7 +751,7 @@ const Createplan = () => {
                 return (
                   <Pecha.FormItem className="flex flex-col">
                     <Pecha.FormLabel className="text-sm font-bold">
-                      Series
+                      {t("studio.plan.form_field.series")}
                     </Pecha.FormLabel>
                     <Pecha.Popover
                       open={isSeriesFieldDisabled ? false : isSeriesOpen}
@@ -787,7 +796,9 @@ const Createplan = () => {
                       >
                         <Pecha.Command shouldFilter={false}>
                           <Pecha.CommandInput
-                            placeholder="Search series…"
+                            placeholder={t(
+                              "studio.plan.series.search_placeholder",
+                            )}
                             value={seriesQuery}
                             onValueChange={setSeriesQuery}
                           />
@@ -800,7 +811,7 @@ const Createplan = () => {
                                   setIsSeriesOpen(false);
                                 }}
                               >
-                                None
+                                {t("studio.common.none")}
                               </Pecha.CommandItem>
                               {filteredSeriesOptions.map((series) => (
                                 <Pecha.CommandItem
@@ -818,7 +829,7 @@ const Createplan = () => {
                             {seriesQuery &&
                               filteredSeriesOptions.length === 0 && (
                                 <Pecha.CommandEmpty>
-                                  No series found.
+                                  {t("studio.plan.series.no_series_found")}
                                 </Pecha.CommandEmpty>
                               )}
                           </Pecha.CommandList>
@@ -827,8 +838,7 @@ const Createplan = () => {
                     </Pecha.Popover>
                     {isSeriesError && (
                       <p className="text-sm text-destructive">
-                        Couldn't load series. This plan's current series will
-                        not be changed.
+                        {t("studio.plan.series.load_failed_inline")}
                       </p>
                     )}
                     <Pecha.FormMessage />
@@ -868,7 +878,9 @@ const Createplan = () => {
                             key={difficulty.value}
                             value={difficulty.value}
                           >
-                            {difficulty.label}
+                            {t(
+                              `studio.plan.difficulty.${difficulty.value.toLowerCase()}`,
+                            )}
                           </Pecha.SelectItem>
                         ))}
                       </Pecha.SelectContent>
@@ -960,7 +972,7 @@ const Createplan = () => {
                   disabled={createPlanMutation.isPending}
                 >
                   {createPlanMutation.isPending
-                    ? "Creating..."
+                    ? t("studio.common.creating")
                     : t("studio.plan.next_button")}
                 </Pecha.Button>
               ) : (
@@ -982,7 +994,7 @@ const Createplan = () => {
                     disabled={updatePlanMutation.isPending || !canUpdate}
                   >
                     {updatePlanMutation.isPending
-                      ? "Updating..."
+                      ? t("studio.plan.updating")
                       : t("studio.plan.update_button")}
                   </Pecha.Button>
                 </div>

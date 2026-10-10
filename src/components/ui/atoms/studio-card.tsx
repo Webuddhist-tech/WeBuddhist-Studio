@@ -1,3 +1,4 @@
+import { useTranslate } from "@tolgee/react";
 import pechaIcon from "../../../assets/icon/pecha_icon.png";
 
 interface ContainerLayoutProps {
@@ -6,6 +7,7 @@ interface ContainerLayoutProps {
 }
 
 const ContainerLayout = ({ children, title }: ContainerLayoutProps) => {
+  const { t } = useTranslate();
   return (
     <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#F5F5F5] px-4 py-10 dark:bg-[#0f0f10] sm:px-6">
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -20,7 +22,7 @@ const ContainerLayout = ({ children, title }: ContainerLayoutProps) => {
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-200 to-orange-300 shadow-inner transition-transform duration-500 hover:rotate-[8deg] dark:from-amber-500/30 dark:to-orange-500/20">
             <img
               src={pechaIcon}
-              alt="Webuddhist Studio Logo"
+              alt={t("studio.ui.auth_card.logo_alt")}
               className="h-7 w-7 object-contain"
             />
           </div>
@@ -29,11 +31,11 @@ const ContainerLayout = ({ children, title }: ContainerLayoutProps) => {
               Webuddhist Studio
             </h1>
             <p className="text-left font-inter text-xs text-muted-foreground">
-              Learn, live and share Buddhist wisdom daily
+              {t("studio.ui.auth_card.tagline")}
             </p>
           </div>
         </div>
-        <p className="text-lg font-bold">Welcome to Webuddhist Studio</p>
+        <p className="text-lg font-bold">{t("studio.ui.auth_card.welcome")}</p>
         {title && (
           <div className="relative z-10 mb-6 w-full text-left text-sm text-[#919191]">
             {title}
