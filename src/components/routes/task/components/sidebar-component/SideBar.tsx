@@ -331,7 +331,7 @@ const SideBar = ({
                                   }}
                                 />
                               </Activity>
-                              {isEditable && currentPlan?.days.length > 1 && (
+                              {isEditable && (
                                 <Pecha.DropdownMenu>
                                   <Pecha.DropdownMenuTrigger asChild>
                                     <BsThreeDots className="w-3 h-3 max-md:w-8 max-md:h-8 max-md:p-2 text-gray-400 dark:text-muted-foreground cursor-pointer" />

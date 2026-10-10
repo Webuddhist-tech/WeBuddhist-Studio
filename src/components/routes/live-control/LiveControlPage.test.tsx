@@ -1093,6 +1093,106 @@ describe("LiveControlPage", () => {
     expect(publishMove).not.toHaveBeenCalled();
   });
 
+  describe("stop / go live", () => {
+    it("moves only this screen while stopped, and remembers it in this browser", async () => {
+      const user = userEvent.setup();
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+      await screen.findByText(/following_other count=2/);
+
+      await user.click(
+        screen.getByRole("button", { name: "studio.live_control.on_air.stop" }),
+      );
+      expect(localStorage.getItem("live-control-on-air:e1")).toBe("false");
+      expect(
+        screen.getByText("studio.live_control.on_air.stopped"),
+      ).toBeInTheDocument();
+      expect(publishState()).toHaveTextContent(
+        "studio.live_control.status.stopped",
+      );
+      expect(
+        controlButton("▶ studio.live_control.controls.auto"),
+      ).toBeDisabled();
+      publishPosition.mockClear();
+
+      await pressKey("Space");
+      await user.click(screen.getByText("root line 3"));
+      expect(
+        await screen.findByText(/position\.line_of line=3 total=3/),
+      ).toBeInTheDocument();
+      expect(publishPosition).not.toHaveBeenCalled();
+      expect(publishMove).not.toHaveBeenCalled();
+      expect(startAutoplay).not.toHaveBeenCalled();
+
+      await user.click(
+        screen.getByRole("button", {
+          name: "studio.live_control.on_air.go_live",
+        }),
+      );
+      expect(localStorage.getItem("live-control-on-air:e1")).toBe("true");
+      // Going live sends nothing by itself; the next move does.
+      expect(publishPosition).not.toHaveBeenCalled();
+
+      await user.click(screen.getByText("root line 2"));
+      await waitFor(() =>
+        expect(publishPosition).toHaveBeenCalledWith(
+          "e1",
+          "tok-123",
+          { textId: "root", segmentId: "root-s2", index: 1, roundNumber: 1 },
+          expect.any(String),
+        ),
+      );
+    });
+
+    it("opens stopped when it was stopped in this browser", async () => {
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      localStorage.setItem("live-control-on-air:e1", "false");
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+      await screen.findByText(/following_other count=2/);
+
+      expect(
+        screen.getByRole("button", {
+          name: "studio.live_control.on_air.go_live",
+        }),
+      ).toHaveAttribute("aria-pressed", "false");
+      await pressKey("Space");
+      expect(
+        await screen.findByText(/position\.line_of line=1 total=3/),
+      ).toBeInTheDocument();
+      expect(publishMove).not.toHaveBeenCalled();
+    });
+
+    it("pauses the backend's autoplay on Stop, then sends nothing more", async () => {
+      const user = userEvent.setup();
+      localStorage.setItem("recitation_emit_token", "tok-123");
+      fetchSegmentPlayTimes.mockResolvedValue({
+        "root-s1": 20_000,
+        "root-s2": 20_000,
+        "root-s3": 20_000,
+      });
+      renderPage();
+      expect(await screen.findByText("root line 1")).toBeInTheDocument();
+      await screen.findByText(/following_other count=2/);
+
+      await user.click(controlButton("▶ studio.live_control.controls.auto"));
+      await waitFor(() => expect(startAutoplay).toHaveBeenCalledTimes(1));
+
+      await user.click(
+        screen.getByRole("button", { name: "studio.live_control.on_air.stop" }),
+      );
+      await waitFor(() => expect(stopAutoplay).toHaveBeenCalledTimes(1));
+
+      await user.click(screen.getByText("root line 3"));
+      expect(
+        await screen.findByText(/position\.line_of line=3 total=3/),
+      ).toBeInTheDocument();
+      expect(startAutoplay).toHaveBeenCalledTimes(1);
+      expect(sendAutoplayCommand).not.toHaveBeenCalled();
+    });
+  });
+
   it("sends the edition on screen again when a translation is ticked on the line being read", async () => {
     const user = userEvent.setup();
     localStorage.setItem("recitation_emit_token", "tok-123");
