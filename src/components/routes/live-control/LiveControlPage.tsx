@@ -253,6 +253,29 @@ const storeOpenText = (eventId: string | undefined, textId: string) => {
   }
 };
 
+/** Whether this screen is on air for one event: sending its moves to the room,
+ * or stopped, driving this screen alone. Kept per browser, so a reload does not
+ * put a stopped controller back on air. On air unless stopped. */
+const onAirStorageKey = (eventId: string | undefined) =>
+  `live-control-on-air:${eventId ?? ""}`;
+
+const readOnAir = (eventId: string | undefined) => {
+  try {
+    return localStorage.getItem(onAirStorageKey(eventId)) !== "false";
+  } catch {
+    return true;
+  }
+};
+
+const storeOnAir = (eventId: string | undefined, onAir: boolean) => {
+  try {
+    if (!eventId) return;
+    localStorage.setItem(onAirStorageKey(eventId), String(onAir));
+  } catch {
+    // Blocked site data: the choice holds for this session only.
+  }
+};
+
 const readStoredCounts = (storageKey: string): Record<string, number> => {
   try {
     const parsed: unknown = JSON.parse(
@@ -606,6 +629,25 @@ const LiveControlPage = () => {
   const [token, setToken] = useState<string | null>(() => readStoredToken());
   const [tokenDraft, setTokenDraft] = useState("");
   const [showTokenBox, setShowTokenBox] = useState(() => !readStoredToken());
+  /**
+   * Stop / Go live. While stopped, nothing this screen does reaches the
+   * backend: lines, sections, Returns and Next move this screen alone, and
+   * autoplay cannot be started. The room is still heard, so its line shows.
+   */
+  const [onAirState, setOnAirState] = useState(() => ({
+    eventId,
+    onAir: readOnAir(eventId),
+  }));
+  const onAir =
+    onAirState.eventId === eventId ? onAirState.onAir : readOnAir(eventId);
+  /** For callbacks made between renders; written at once by `setOnAir`. */
+  const onAirRef = useRef(onAir);
+  onAirRef.current = onAir;
+  const setOnAir = (next: boolean) => {
+    onAirRef.current = next;
+    storeOnAir(eventId, next);
+    setOnAirState({ eventId, onAir: next });
+  };
   /** The work the operator is on: this event's liturgy, or one found by title
    * or pasted by id. A reload of the same event lands back on it. A text
    * opened for another event is not carried over. */
@@ -832,6 +874,8 @@ const LiveControlPage = () => {
    * later reset. */
   const publish = useCallback(
     (cues: PositionToPublish[]) => {
+      // Stopped: the room is not told.
+      if (!onAirRef.current) return;
       if (cues.length > 0) {
         moveSequenceRef.current += 1;
         const move = moveSequenceRef.current;
@@ -1467,6 +1511,15 @@ const LiveControlPage = () => {
   const jump = useCallback(
     (index: number, round?: number) => {
       if (index < 0 || index >= driverLines.length) return;
+      // Stopped: this screen moves alone. Its hold is nobody's, so the first
+      // move after going live carries no time for the line it leaves.
+      if (!onAirRef.current) {
+        heldLineRef.current = null;
+        setCurrentIndex(index);
+        setLineStartedAt(performance.now());
+        scrollLineIntoBand(index);
+        return;
+      }
       // Autoplay started elsewhere is taken over the same way: one line sent
       // from here would be overtaken by its plan's next step.
       if (autoplayRef.current || remoteAutoplayRef.current) {
@@ -1602,7 +1655,10 @@ const LiveControlPage = () => {
     resetAllReturns();
     // A running plan still holds the old puja's rounds: seeking into it would
     // carry them on. The new puja is a plan of its own, built after the reset.
-    if (autoplayRef.current || remoteAutoplayRef.current) {
+    if (
+      onAirRef.current &&
+      (autoplayRef.current || remoteAutoplayRef.current)
+    ) {
       setHeldMoves((current) => (current.length > 0 ? [] : current));
       setFreshPujaFrom(index);
       return;
@@ -1612,8 +1668,9 @@ const LiveControlPage = () => {
 
   const beginNextRound = (key: string, index: number) => {
     const round = roundOf(key) + 1;
-    // With no token nothing goes to the room, so no round is begun there.
-    if (token) {
+    // With no token, or stopped, nothing goes to the room, so no round is
+    // begun there.
+    if (token && onAirRef.current) {
       setRequestedRounds((current) => ({ ...current, [key]: round }));
     }
     goTo(index, round);
@@ -1621,7 +1678,8 @@ const LiveControlPage = () => {
 
   const step = useCallback(
     (delta: number) => {
-      if (autoplayRef.current && stepPlanRef.current(delta)) return;
+      if (onAirRef.current && autoplayRef.current && stepPlanRef.current(delta))
+        return;
       if (awaitingYigchungs) {
         setHeldMoves((current) => [...current, delta]);
         return;
@@ -1837,7 +1895,7 @@ const LiveControlPage = () => {
     keepFirstFor?: number,
     byHand = false,
   ) => {
-    if (!eventId || !token) return;
+    if (!eventId || !token || !onAirRef.current) return;
     autoplayStartRef.current += 1;
     const handOverId = autoplayStartRef.current;
     setAutoplay(true);
@@ -1960,6 +2018,9 @@ const LiveControlPage = () => {
         ok: false,
         message: t("studio.live_control.autoplay.token_needed"),
       };
+    }
+    if (!onAirRef.current) {
+      return { ok: false, message: t("studio.live_control.on_air.stopped") };
     }
     const viaSocket = socketRef.current.sendCommand(command);
     return (await viaSocket) ?? sendAutoplayCommand(eventId, token, command);
@@ -2116,7 +2177,7 @@ const LiveControlPage = () => {
   /** Holds the room on its line past its time, or lets it go on. */
   const toggleHold = async () => {
     const server = serverAutoplayRef.current;
-    if (holdBusy || server?.status !== "running") return;
+    if (holdBusy || server?.status !== "running" || !onAirRef.current) return;
     setHoldBusy(true);
     const result = await commandAutoplay({
       type: server.held ? "resume" : "hold",
@@ -2266,6 +2327,21 @@ const LiveControlPage = () => {
 
   // Whoever is moving the room, the screen stays on while autoplay runs.
   useWakeLock(autoplay || serverAutoplay?.status === "running");
+
+  /**
+   * Stop lets the room go where it is; Go live sends moves again, from the
+   * next one made. Autoplay is the backend moving the room by itself, so
+   * stopping pauses it first - the last word this screen sends.
+   */
+  const toggleOnAir = () => {
+    if (!onAir) {
+      setOnAir(true);
+      return;
+    }
+    if (autoplay || remoteAutoplay) void pauseAutoplay();
+    setHeldMoves((current) => (current.length > 0 ? [] : current));
+    setOnAir(false);
+  };
 
   const toggleAutoplay = () => {
     if (autoplay || remoteAutoplay) {
@@ -2544,14 +2620,16 @@ const LiveControlPage = () => {
 
   const statusLabel = !token
     ? t("studio.live_control.status.no_token")
-    : state === "live"
-      ? t("studio.live_control.status.publishing")
-      : state === "publishing"
-        ? t("studio.live_control.status.sending")
-        : state === "error"
-          ? t("studio.live_control.status.not_publishing")
-          : t("studio.live_control.status.ready");
-  const online = state === "live" || state === "publishing";
+    : !onAir
+      ? t("studio.live_control.status.stopped")
+      : state === "live"
+        ? t("studio.live_control.status.publishing")
+        : state === "publishing"
+          ? t("studio.live_control.status.sending")
+          : state === "error"
+            ? t("studio.live_control.status.not_publishing")
+            : t("studio.live_control.status.ready");
+  const online = onAir && (state === "live" || state === "publishing");
 
   /** What an edition has ready, and whether it lines up with what is on screen. */
   const editionNote = (edition: TextEdition) => {
@@ -3118,6 +3196,34 @@ const LiveControlPage = () => {
                 </Dialog>
               ) : null}
             </div>
+            {/* Stop / Go live stays out of the menu: whether the app follows
+             * this screen must be seen, and changed, at a glance. */}
+            <button
+              type="button"
+              onClick={toggleOnAir}
+              aria-pressed={onAir}
+              data-on-air={onAir ? "on" : "off"}
+              title={
+                onAir
+                  ? t("studio.live_control.on_air.stop_title")
+                  : t("studio.live_control.on_air.go_live_title")
+              }
+              className={`mt-1 flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-semibold whitespace-nowrap select-none max-lg:mt-0 max-lg:px-2.5 max-lg:py-1 ${
+                onAir
+                  ? "bg-[#2c2c2e] text-[#f2f2f7] hover:bg-[#3a3a3c]"
+                  : "bg-[#e5231c] text-white hover:bg-[#ff3a33]"
+              }`}
+            >
+              <span
+                aria-hidden="true"
+                className={`inline-block size-2 shrink-0 ${
+                  onAir ? "rounded-[1px] bg-[#e5231c]" : "rounded-full bg-white"
+                }`}
+              />
+              {onAir
+                ? t("studio.live_control.on_air.stop")
+                : t("studio.live_control.on_air.go_live")}
+            </button>
             {/* Live, Auto and Hold, and everything set up once - status, the
              * titles, size, cue, token - folded away so the lines have the
              * screen. The dot says what Live or Auto would: red when this
@@ -3180,14 +3286,17 @@ const LiveControlPage = () => {
                   // the yigchung, which the plan is laid out from.
                   disabled={
                     !token ||
+                    !onAir ||
                     (!autoplay &&
                       !remoteAutoplay &&
                       (driverLines.length === 0 || awaitingYigchungs))
                   }
                   title={
-                    token
-                      ? t("studio.live_control.controls.auto_title")
-                      : t("studio.live_control.autoplay.token_needed")
+                    !token
+                      ? t("studio.live_control.autoplay.token_needed")
+                      : !onAir
+                        ? t("studio.live_control.on_air.stopped")
+                        : t("studio.live_control.controls.auto_title")
                   }
                   className={`w-full touch-manipulation cursor-pointer rounded-[9px] py-3 text-base font-semibold select-none disabled:cursor-not-allowed disabled:opacity-40 ${
                     autoplay || remoteAutoplay
@@ -3204,7 +3313,7 @@ const LiveControlPage = () => {
                     type="button"
                     onClick={() => void toggleHold()}
                     aria-pressed={serverAutoplay.held}
-                    disabled={holdBusy}
+                    disabled={holdBusy || !onAir}
                     title={
                       serverAutoplay.held
                         ? t("studio.live_control.controls.go_on_title")
@@ -3353,7 +3462,7 @@ const LiveControlPage = () => {
                       <AutoplaySettingsFields
                         leadMs={serverAutoplay?.leadMs ?? null}
                         tempo={serverAutoplay?.tempo ?? null}
-                        disabled={!token}
+                        disabled={!token || !onAir}
                         onChange={(change) =>
                           void changeAutoplaySettings(change)
                         }
@@ -3439,6 +3548,16 @@ const LiveControlPage = () => {
             </div>
           ) : null}
           <div className="mb-2 max-lg:mb-1" />
+
+          {!onAir ? (
+            <div
+              data-off-air=""
+              role="status"
+              className="mb-3 rounded-lg border border-[#5a4a1f] bg-[#2a2310] px-3 py-2 text-sm text-[#e0c46a] max-lg:mb-2"
+            >
+              {t("studio.live_control.on_air.stopped")}
+            </div>
+          ) : null}
 
           {errorMessage && errorMessage !== dismissedError ? (
             <div
