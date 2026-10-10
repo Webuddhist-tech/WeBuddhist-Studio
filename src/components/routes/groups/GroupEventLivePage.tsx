@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link, Navigate, useOutletContext, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslate } from "@tolgee/react";
-import { LuDownload, LuRadio, LuUpload } from "react-icons/lu";
+import { LuDownload, LuUpload } from "react-icons/lu";
 import { toast } from "sonner";
 import { Pecha } from "@/components/ui/shadimport";
 import { getApiErrorMessage } from "@/lib/apiErrors";
@@ -100,20 +100,6 @@ const GroupEventLivePage = () => {
           <Pecha.Button variant="outline" size="sm" onClick={exportSettings}>
             <LuDownload className="h-4 w-4" />
             {t("studio.live_settings.export")}
-          </Pecha.Button>
-          <Pecha.Button
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              window.open(
-                ROUTES.liveControl(eventId),
-                "_blank",
-                "noopener,noreferrer",
-              )
-            }
-          >
-            <LuRadio className="h-4 w-4" />
-            {t("studio.groups.pages.event_detail.live_control")}
           </Pecha.Button>
         </div>
       </div>

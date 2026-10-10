@@ -8,7 +8,6 @@ import {
   LuBookOpen,
   LuCircleDot,
   LuLibrary,
-  LuRadio,
   LuScrollText,
   LuSettings2,
 } from "react-icons/lu";
@@ -263,23 +262,6 @@ const GroupEventDetailPage = () => {
         </button>
         {canWrite ? (
           <div className="flex items-center gap-2 max-md:flex-wrap">
-            <Pecha.Button
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              // Its own tab: the control needs no session, and the operator
-              // keeps Studio open beside it.
-              onClick={() =>
-                window.open(
-                  ROUTES.liveControl(data.id),
-                  "_blank",
-                  "noopener,noreferrer",
-                )
-              }
-            >
-              <LuRadio className="h-4 w-4" />
-              {t("studio.groups.pages.event_detail.live_control")}
-            </Pecha.Button>
             <Pecha.Button
               variant="outline"
               size="sm"

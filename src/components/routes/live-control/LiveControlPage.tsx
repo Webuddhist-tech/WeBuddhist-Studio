@@ -138,6 +138,28 @@ const storeToken = (token: string | null) => {
   }
 };
 
+/**
+ * A token handed over in the link Studio opens (`#token=…`). It is saved like
+ * one typed in, and taken out of the address bar so it is not left on screen,
+ * in the history, or in a link copied from there.
+ */
+const takeLinkToken = (): string | null => {
+  const hash = window.location.hash.replace(/^#/, "");
+  if (!hash) return null;
+  const params = new URLSearchParams(hash);
+  const token = params.get("token")?.trim();
+  if (!token) return null;
+  params.delete("token");
+  const rest = params.toString();
+  window.history.replaceState(
+    window.history.state,
+    "",
+    `${window.location.pathname}${window.location.search}${rest ? `#${rest}` : ""}`,
+  );
+  storeToken(token);
+  return token;
+};
+
 /** The languages the room reads in. A new work follows these of its
  * translations from the start; any other edition waits to be ticked. */
 const DEFAULT_FOLLOWED_LANGUAGES = ["bo", "en", "zh"];
@@ -628,7 +650,9 @@ const LiveControlPage = () => {
   const { eventId } = useParams<{ eventId: string }>();
   useHostsUpdateButton();
 
-  const [token, setToken] = useState<string | null>(() => readStoredToken());
+  const [token, setToken] = useState<string | null>(
+    () => takeLinkToken() ?? readStoredToken(),
+  );
   const [tokenDraft, setTokenDraft] = useState("");
   const [showTokenBox, setShowTokenBox] = useState(() => !readStoredToken());
   /**

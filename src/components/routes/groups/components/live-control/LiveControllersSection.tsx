@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslate } from "@tolgee/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { LuCopy, LuExternalLink, LuPlus } from "react-icons/lu";
+import { LuCopy, LuExternalLink, LuPlay, LuPlus } from "react-icons/lu";
 import { toast } from "sonner";
 import { Pecha } from "@/components/ui/shadimport";
 import { getApiErrorMessage } from "@/lib/apiErrors";
@@ -47,6 +47,64 @@ const formatWhen = (iso: string | null, never: string) =>
       }).format(new Date(iso))
     : never;
 
+/** A long value on one line, cut short on screen, with a copy button at its end. */
+const CopyField = ({
+  label,
+  value,
+  copyLabel,
+  onCopy,
+}: {
+  label: string;
+  value: string;
+  copyLabel: string;
+  onCopy: () => void;
+}) => (
+  <div className="min-w-0 space-y-1">
+    <span className="text-xs font-medium">{label}</span>
+    <div className="flex min-w-0 items-center rounded-md border bg-muted/50">
+      <code
+        title={value}
+        className="min-w-0 flex-1 truncate px-2 py-1.5 text-xs"
+      >
+        {value}
+      </code>
+      <button
+        type="button"
+        aria-label={copyLabel}
+        title={copyLabel}
+        onClick={onCopy}
+        className="inline-flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-r-md border-l text-muted-foreground hover:bg-muted hover:text-foreground"
+      >
+        <LuCopy className="h-4 w-4" />
+      </button>
+    </div>
+  </div>
+);
+
+/** Copies a controller's token, which the table shows only by its last characters. */
+const CopyTokenButton = ({ token }: { token: string }) => {
+  const { t } = useTranslate();
+  const label = t("studio.live_settings.controllers.copy_token");
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={async () => {
+        try {
+          await navigator.clipboard.writeText(token);
+          toast.success(t("studio.live_settings.controllers.copied"));
+        } catch {
+          toast.error(t("studio.live_settings.controllers.copy_failed"));
+        }
+      }}
+      className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
+    >
+      <LuCopy className="h-3.5 w-3.5" />
+    </button>
+  );
+};
+
 /**
  * The link to a controller, shown once: the backend keeps only the token's
  * hash, so this is the one time it can be copied or opened.
@@ -75,56 +133,30 @@ const TokenDialog = ({
       open={Boolean(controller)}
       onOpenChange={(open) => !open && onClose()}
     >
-      <Pecha.DialogContent className="sm:max-w-lg">
-        <Pecha.DialogHeader>
-          <Pecha.DialogTitle>
+      <Pecha.DialogContent className="min-w-0 overflow-hidden sm:max-w-lg">
+        <Pecha.DialogHeader className="min-w-0">
+          <Pecha.DialogTitle className="break-words">
             {t("studio.live_settings.controllers.token_title", {
               name: controller?.name ?? "",
             })}
           </Pecha.DialogTitle>
         </Pecha.DialogHeader>
-        <p className="text-sm text-muted-foreground">
+        <p className="min-w-0 text-sm break-words text-muted-foreground">
           {t("studio.live_settings.controllers.token_once")}
         </p>
-        <div className="space-y-1">
-          <span className="text-xs font-medium">
-            {t("studio.live_settings.controllers.link")}
-          </span>
-          <div className="flex items-center gap-2">
-            <code className="min-w-0 flex-1 truncate rounded-md border bg-muted/50 px-2 py-1.5 text-xs">
-              {link}
-            </code>
-            <Pecha.Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => copy(link)}
-            >
-              <LuCopy className="h-4 w-4" />
-              {t("studio.live_settings.controllers.copy_link")}
-            </Pecha.Button>
-          </div>
-        </div>
-        <div className="space-y-1">
-          <span className="text-xs font-medium">
-            {t("studio.live_settings.controllers.token")}
-          </span>
-          <div className="flex items-center gap-2">
-            <code className="min-w-0 flex-1 truncate rounded-md border bg-muted/50 px-2 py-1.5 text-xs">
-              {controller?.token}
-            </code>
-            <Pecha.Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => controller && copy(controller.token)}
-            >
-              <LuCopy className="h-4 w-4" />
-              {t("studio.live_settings.controllers.copy_token")}
-            </Pecha.Button>
-          </div>
-        </div>
-        <div className="flex justify-end gap-2">
+        <CopyField
+          label={t("studio.live_settings.controllers.link")}
+          value={link}
+          copyLabel={t("studio.live_settings.controllers.copy_link")}
+          onCopy={() => copy(link)}
+        />
+        <CopyField
+          label={t("studio.live_settings.controllers.token")}
+          value={controller?.token ?? ""}
+          copyLabel={t("studio.live_settings.controllers.copy_token")}
+          onCopy={() => controller && copy(controller.token)}
+        />
+        <div className="flex min-w-0 flex-wrap justify-end gap-2">
           <Pecha.Button type="button" variant="outline" onClick={onClose}>
             {t("studio.common.close")}
           </Pecha.Button>
@@ -411,6 +443,7 @@ export const LiveControllersSection = ({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b text-left text-xs text-muted-foreground">
+                <th className="w-10 px-2 py-2" />
                 <th className="px-2 py-2 font-medium">
                   {t("studio.live_settings.controllers.name")}
                 </th>
@@ -440,9 +473,50 @@ export const LiveControllersSection = ({
                       revoked && "opacity-55",
                     )}
                   >
+                    <td className="px-2 py-3">
+                      {/* Opens this controller in a new tab, already holding
+                       * its token. */}
+                      {controller.token && !revoked ? (
+                        <button
+                          type="button"
+                          aria-label={t(
+                            "studio.live_settings.controllers.open",
+                          )}
+                          title={t("studio.live_settings.controllers.open")}
+                          onClick={() =>
+                            window.open(
+                              controllerLink(eventId, controller.token ?? ""),
+                              "_blank",
+                              "noopener,noreferrer",
+                            )
+                          }
+                          className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-full bg-[#A51C21] text-white hover:bg-[#8a171b]"
+                        >
+                          <LuPlay className="h-4 w-4 translate-x-px" />
+                        </button>
+                      ) : (
+                        <span
+                          title={
+                            revoked
+                              ? undefined
+                              : t(
+                                  "studio.live_settings.controllers.no_token_title",
+                                )
+                          }
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground opacity-50"
+                        >
+                          <LuPlay className="h-4 w-4 translate-x-px" />
+                        </span>
+                      )}
+                    </td>
                     <td className="px-2 py-3 font-medium">{controller.name}</td>
                     <td className="px-2 py-3 font-mono text-xs">
-                      ••••{controller.token_hint}
+                      <span className="inline-flex items-center gap-1">
+                        ••••{controller.token_hint}
+                        {controller.token && !revoked ? (
+                          <CopyTokenButton token={controller.token} />
+                        ) : null}
+                      </span>
                     </td>
                     <td className="px-2 py-3">
                       {titleOf(controller.default_text_id) ?? (

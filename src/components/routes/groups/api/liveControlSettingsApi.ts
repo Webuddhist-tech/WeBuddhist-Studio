@@ -12,6 +12,8 @@ export interface LiveController {
   name: string;
   /** The token's last characters, to tell controllers apart. */
   token_hint: string;
+  /** The token, for editors to copy. Null once revoked, or if it was not kept. */
+  token?: string | null;
   default_text_id: string | null;
   created_by: string;
   created_at: string;
@@ -19,7 +21,7 @@ export interface LiveController {
   revoked_at: string | null;
 }
 
-/** Only when a token was just set: the one time Studio sees it. */
+/** Returned when a token was just set. */
 export interface LiveControllerWithToken extends LiveController {
   token: string;
 }
